@@ -69,7 +69,7 @@ def test_approval_must_be_explicit() -> None:
     approval = service.request("t-a", uuid4(), "delete", "db:item", "destructive", "agent")
     with pytest.raises(PermissionError):
         service.require_approved(approval.approval_id)
-    approved = service.decide(approval.approval_id, True)
+    approved = service.decide(approval.approval_id, True, "t-a")
     assert approved.status is ApprovalStatus.APPROVED
     service.require_approved(approval.approval_id)
 
