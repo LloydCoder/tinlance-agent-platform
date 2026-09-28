@@ -14,7 +14,7 @@ class RetryPolicy:
     def delay(self, attempt: int) -> float:
         if attempt < 1 or attempt > self.max_attempts:
             raise ValueError("attempt is outside retry policy")
-        delay = self.base_delay_seconds * (2 ** (attempt - 1))
+        delay = self.base_delay_seconds * (2.0 ** (attempt - 1))
         return min(delay, self.max_delay_seconds)
 
 
