@@ -1,6 +1,12 @@
 """Security invariants independent of providers and frameworks."""
 
-from tinlance_agent_platform_contracts import CapabilityRequest, Principal, RequestContext, RiskTier
+from tinlance_agent_platform_contracts import (
+    CapabilityRequest,
+    Principal,
+    RequestContext,
+    RiskTier,
+)
+
 
 def assert_authority_boundary(request: CapabilityRequest, principal: Principal) -> None:
     if not request.capabilities:
@@ -11,6 +17,7 @@ def assert_authority_boundary(request: CapabilityRequest, principal: Principal) 
         raise PermissionError("requested capability exceeds principal authority")
     if request.risk is RiskTier.PROHIBITED:
         raise PermissionError("prohibited actions are never executable")
+
 
 def assert_child_tenant(parent: RequestContext, child: RequestContext) -> None:
     if child.tenant_id != parent.tenant_id:

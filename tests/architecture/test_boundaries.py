@@ -1,5 +1,5 @@
-from pathlib import Path
 import ast
+from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 PACKAGES = {
@@ -19,6 +19,7 @@ ALLOWED = {
     "policy": {"tinlance_agent_platform_contracts"},
 }
 
+
 def imports_for(path: Path) -> set[str]:
     tree = ast.parse(path.read_text())
     result: set[str] = set()
@@ -29,6 +30,7 @@ def imports_for(path: Path) -> set[str]:
             result.add(node.module.split(".")[0])
     return result
 
+
 def test_bounded_package_dependencies() -> None:
     names = set(PACKAGES.values())
     for package, import_name in PACKAGES.items():
@@ -36,6 +38,7 @@ def test_bounded_package_dependencies() -> None:
         for path in root.rglob("*.py"):
             external = imports_for(path) & names
             assert external <= ALLOWED[package], f"{path}: forbidden imports"
+
 
 def test_no_provider_or_framework_imports_in_core() -> None:
     forbidden = {"fastapi", "pydantic", "openai", "anthropic", "boto3", "sqlalchemy", "psycopg"}
