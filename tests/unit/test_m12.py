@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import pytest
+
 from tinlance_agent_platform_multi_agent import DelegationService
 
 
