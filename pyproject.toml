@@ -35,6 +35,7 @@ packages = [
   "packages/durability/src/tinlance_agent_platform_durability",
   "packages/governance/src/tinlance_agent_platform_governance",
   "packages/context/src/tinlance_agent_platform_context",
+  "packages/mcp/src/tinlance_agent_platform_mcp",
 ]
 
 [tool.pytest.ini_options]
