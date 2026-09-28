@@ -29,8 +29,13 @@ def test_canonical_governed_agent_path_is_fail_closed() -> None:
     principal = Principal("user-1", "human", tenant, scopes=frozenset({"doc:read"}))
     context = RequestContext("request-1", tenant, principal, "test", trace_id="trace-1")
     request = CapabilityRequest(
-        "read", "doc-1", frozenset({"doc:read"}), RiskTier.LOW,
-        Reversibility.REVERSIBLE, DataClass.INTERNAL, "single-resource",
+        "read",
+        "doc-1",
+        frozenset({"doc:read"}),
+        RiskTier.LOW,
+        Reversibility.REVERSIBLE,
+        DataClass.INTERNAL,
+        "single-resource",
     )
     call = ToolCall(uuid4(), tenant, uuid4(), "reader", "doc:read", "read", "doc-1")
 
@@ -56,8 +61,13 @@ def test_tenant_boundary_cannot_be_crossed() -> None:
     principal = Principal("user-1", "human", "tenant-a", scopes=frozenset({"doc:read"}))
     context = RequestContext("request-1", "tenant-a", principal, "test")
     request = CapabilityRequest(
-        "read", "doc-1", frozenset({"doc:read"}), RiskTier.LOW,
-        Reversibility.REVERSIBLE, DataClass.INTERNAL, "single",
+        "read",
+        "doc-1",
+        frozenset({"doc:read"}),
+        RiskTier.LOW,
+        Reversibility.REVERSIBLE,
+        DataClass.INTERNAL,
+        "single",
     )
     from tinlance_agent_platform_tools import ToolGateway
     call = ToolCall(uuid4(), "tenant-b", uuid4(), "reader", "doc:read", "read", "doc-1")
@@ -126,6 +136,7 @@ def test_sandbox_and_evaluation_are_not_authority_sources() -> None:
 def test_runner_preserves_task_tenant_and_turn_budget() -> None:
     task = TaskSpec(uuid4(), "tenant-a", uuid4(), "1.0", "user-1", "do one thing", max_turns=1)
     from tinlance_agent_platform_contracts import Run
+
     run = Run(uuid4(), task.task_id, task.tenant_id)
     runner = AgentRunner(lambda _task, _turn: "done")
     completed, step = runner.start(run, task)
