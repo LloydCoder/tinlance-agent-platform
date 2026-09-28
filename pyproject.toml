@@ -37,6 +37,19 @@ src = ["packages", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
 
+[tool.ruff.lint.isort]
+known-first-party = [
+  "tinlance_agent_platform_authorization",
+  "tinlance_agent_platform_contracts",
+  "tinlance_agent_platform_domain",
+  "tinlance_agent_platform_identity",
+  "tinlance_agent_platform_kernel",
+  "tinlance_agent_platform_persistence",
+  "tinlance_agent_platform_policy",
+  "tinlance_agent_platform_sandbox",
+  "tinlance_agent_platform_tenancy",
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
