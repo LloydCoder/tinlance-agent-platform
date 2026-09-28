@@ -9,10 +9,6 @@ from tinlance_agent_platform_budgets import BudgetService
 from tinlance_agent_platform_contracts import (
     AgentIdentity,
     Budget,
-    DataClass,
-    Event,
-    RiskTier,
-    Reversibility,
 )
 from tinlance_agent_platform_durability import IdempotencyStore, RetryPolicy
 from tinlance_agent_platform_events import InMemoryEventStore, new_event
@@ -89,7 +85,7 @@ def test_idempotency_claim_is_atomic_across_concurrent_callers() -> None:
 
 
 def test_budget_consumption_is_atomic_across_concurrent_callers() -> None:
-    budget = Budget(uuid4(), "tenant-a", 100, 1000.0, 100)
+    budget = Budget(uuid4(), "tenant-a", uuid4(), 100, 1000.0, 100)
     service = BudgetService(budget)
 
     def consume() -> None:
