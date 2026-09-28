@@ -115,7 +115,7 @@ class CapabilityRequest:
             raise ValueError("capability request fields must be non-empty")
         if self.data_class is DataClass.SECRET:
             raise ValueError("secret data cannot be a normal capability payload")
-        object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
+        if len(self.parameters) > 64:\n            raise ValueError("capability parameters are too large")\n        object.__setattr__(self, "parameters", _freeze(self.parameters))
 
 
 @dataclass(frozen=True, slots=True)
