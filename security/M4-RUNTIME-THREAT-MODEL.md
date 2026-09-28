@@ -1,14 +1,17 @@
 # M4 Runtime Threat Model
 
-## Assets
-Run state, budgets, task identity, cancellation and failure semantics.
+## Abuse cases
 
-## Threats
-- illegal state transitions;
-- replay of terminal runs;
-- turn-budget exhaustion;
-- tenant/task identity substitution;
-- exception leakage into authorization state.
+- Run transitions from terminal state back to active state.
+- Turn or token budgets are bypassed through retries or duplicate calls.
+- A failed model/tool call leaves side effects without a terminal record.
+- Cancellation or timeout is treated as success.
+- Duplicate execution creates repeated consequential side effects.
 
-## Required controls
-The state machine is the sole transition authority. Terminal states are immutable. Turn limits are checked before model execution and failures produce explicit terminal failure codes.
+## Controls
+
+Runtime state transitions are explicit and terminal-state constrained. Hard turn/cost budgets are checked before consequential work. Failures are represented as failed terminal states. Idempotency/durability contracts must bind retries to the same run/action identity.
+
+## Test obligations
+
+Exercise terminal-state rejection, budget exhaustion, failure propagation, duplicate invocation and cancellation/timeout semantics at the orchestration boundary.
