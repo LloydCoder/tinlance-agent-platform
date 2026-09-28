@@ -58,7 +58,7 @@ class SandboxExecutor:
                     stderr=stderr,
                     start_new_session=True,
                     close_fds=True,
-                    preexec_fn=_limit_process,
+                    preexec_fn=lambda: _limit_process(limits),
                 )
                 timed_out = False
                 try:
