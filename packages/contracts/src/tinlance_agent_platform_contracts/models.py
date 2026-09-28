@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping
 from uuid import UUID
 
 
@@ -55,8 +56,13 @@ class Principal:
     scopes: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
-        if not self.subject_id or not self.principal_type or not self.tenant_id:
-            raise ValueError("principal identity fields must be non-empty")
+        values = (self.subject_id, self.principal_type, self.tenant_id)
+        if not all(values) or any(value != value.strip() for value in values):
+            raise ValueError("principal identity fields must be normalized and non-empty")
+        if any(not scope or scope != scope.strip() for scope in self.scopes):
+            raise ValueError("principal scopes must be normalized")
+        if any(not role or role != role.strip() for role in self.roles):
+            raise ValueError("principal roles must be normalized")
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +76,8 @@ class RequestContext:
     def __post_init__(self) -> None:
         if not self.request_id or not self.tenant_id or not self.environment:
             raise ValueError("request context fields must be non-empty")
+        if self.request_id != self.request_id.strip() or self.tenant_id != self.tenant_id.strip():
+            raise ValueError("request context identifiers must be normalized")
         if self.principal.tenant_id != self.tenant_id:
             raise ValueError("principal and request context tenants must match")
 
@@ -99,13 +107,14 @@ class CapabilityRequest:
     reversibility: Reversibility
     data_class: DataClass
     blast_radius: str
-    parameters: dict[str, Any] = field(default_factory=dict)
+    parameters: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.action or not self.resource or not self.capabilities or not self.blast_radius:
             raise ValueError("capability request fields must be non-empty")
         if self.data_class is DataClass.SECRET:
             raise ValueError("secret data cannot be a normal capability payload")
+        object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
 
 
 @dataclass(frozen=True, slots=True)
