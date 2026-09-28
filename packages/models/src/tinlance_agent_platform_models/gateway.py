@@ -78,9 +78,7 @@ class ModelGateway:
             not tenant or tenant != tenant.strip() for tenant in tenants
         ):
             raise ValueError("model tenant allowlist must be normalized")
-        if agents is not None and any(
-            not agent or agent != agent.strip() for agent in agents
-        ):
+        if agents is not None and any(not agent or agent != agent.strip() for agent in agents):
             raise ValueError("model agent allowlist must be normalized")
         self._providers[name] = _ProviderBinding(provider, tenants, agents)
 
