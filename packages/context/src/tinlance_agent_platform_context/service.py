@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -53,11 +54,5 @@ class ContextService:
         return result[: self.policy.max_chars]
 
     def redact_sensitive(self, text: str) -> str:
-        for marker in ("SECRET=", "API_KEY=", "PASSWORD="):
-            while marker in text:
-                start = text.index(marker)
-                end = text.find("\n", start)
-                if end < 0:
-                    end = len(text)
-                text = text[:start] + marker + "[REDACTED]" + text[end:]
-        return text
+        pattern = r"(SECRET|API_KEY|PASSWORD)=[^\\s\\n]*"
+        return re.sub(pattern, r"\\1=[REDACTED]", text)
