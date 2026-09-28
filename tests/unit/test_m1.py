@@ -66,9 +66,7 @@ def test_run_state_machine_is_fail_closed() -> None:
 
 def test_approval_must_be_explicit() -> None:
     service = ApprovalService()
-    approval = service.request(
-        "t-a", uuid4(), "delete", "db:item", "destructive", "agent"
-    )
+    approval = service.request("t-a", uuid4(), "delete", "db:item", "destructive", "agent")
     with pytest.raises(PermissionError):
         service.require_approved(approval.approval_id)
     approved = service.decide(approval.approval_id, True)
@@ -90,9 +88,7 @@ def test_sandbox_fails_closed() -> None:
     request = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("python",), 10)
     with pytest.raises(SandboxUnavailable):
         validate_request(request, SandboxPolicy(frozenset({"python"})))
-    denied = SandboxRequest(
-        uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",)
-    )
+    denied = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",))
     with pytest.raises(PermissionError):
         validate_request(denied, SandboxPolicy(frozenset({"python"})))
 
