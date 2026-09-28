@@ -55,9 +55,7 @@ class ContextService:
         self._memory.append(entry)
         return entry
 
-    def recall(
-        self, tenant_id: str, classification: str | None = None
-    ) -> tuple[MemoryEntry, ...]:
+    def recall(self, tenant_id: str, classification: str | None = None) -> tuple[MemoryEntry, ...]:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("tenant is required and normalized")
         return tuple(
