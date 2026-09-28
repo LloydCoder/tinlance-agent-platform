@@ -114,7 +114,7 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
         "lookup",
         {"q": "x"},
         mcp_request,
-        run_id=call.run_id,
+        run_id=uuid4(),
     )
     assert result["tenant"] == "tenant-a"
     with pytest.raises(PermissionError):
