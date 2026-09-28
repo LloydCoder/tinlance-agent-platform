@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from tinlance_agent_platform_contracts import Run, RunStatus, TaskSpec
-from tinlance_agent_platform_runtime import RunStateMachine
+from tinlance_agent_platform_runtime import ExecutionTimeout, RunStateMachine, call_with_timeout
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +31,16 @@ class AgentRunner:
             )
             return failed, RunStep(failed.run_id, failed.turn_count, "")
         try:
-            output = self._model_call(task, next_run.turn_count)
+            output, _elapsed = call_with_timeout(
+                lambda: self._model_call(task, next_run.turn_count), task.timeout_seconds
+            )
+        except ExecutionTimeout:
+            failed = self._state.transition(
+                next_run,
+                RunStatus.FAILED,
+                failure_code="runtime_timeout",
+            )
+            return failed, RunStep(failed.run_id, failed.turn_count, "")
         except Exception as exc:
             failed = self._state.transition(
                 next_run,

@@ -35,4 +35,10 @@ Evaluation: safety-critical regressions fail the evaluation run. Evaluation neve
 - Domain SDK consumers pass compatibility/conformance tests.
 - FAS/FAS-Bench and FDSE integration tests run in their own repositories; platform remains independent.
 
+## Hardening status
+
+The repository's reference execution path enforces real wall-clock deadlines rather than relying only on post-hoc elapsed-time checks. The POSIX sandbox adapter also has a process supervisor with wall-clock, address-space, file-size and process-count ceilings and kills the entire process group on timeout.
+
+The repository still cannot prove deployment of external infrastructure from CI alone. Production acceptance therefore requires the deployment operator to verify the non-superuser database role, durable persistence/outbox, external secret manager, sandbox runtime, telemetry, backups and restore drills listed above. These are deployment gates, not claims of repository completeness.
+
 A repository can be enterprise-grade in architecture and controls without claiming infrastructure outside the repository has already been deployed.

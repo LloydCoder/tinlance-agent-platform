@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from time import monotonic
 from uuid import UUID
 
 from tinlance_agent_platform_authorization import authorize
@@ -17,7 +16,7 @@ from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
 from tinlance_agent_platform_observability import ObservabilitySink, new_security_event
-from tinlance_agent_platform_runtime import RunStateMachine
+from tinlance_agent_platform_runtime import ExecutionTimeout, RunStateMachine, call_with_timeout
 from tinlance_agent_platform_tools.gateway import ApprovalVerifier, ToolGateway
 from tinlance_agent_platform_trajectory import TrajectoryStore
 
@@ -90,17 +89,34 @@ class GovernedExecutionService:
             raise PermissionError(decision.reason)
 
         running = self._state.transition(run, RunStatus.RUNNING)
-        self._budget.consume_turn(0.0)
-        started = monotonic()
-
-        model_response = self._models.complete(model_provider, model_request)
-        elapsed = monotonic() - started
-        if elapsed > self._budget.budget.max_seconds:
+        remaining_budget = self._budget.budget.max_seconds - self._budget.budget.elapsed_seconds
+        timeout_seconds = min(task.timeout_seconds, remaining_budget)
+        if timeout_seconds <= 0:
             self._state.transition(
                 running, RunStatus.FAILED, failure_code="runtime_budget_exceeded"
             )
-            raise TimeoutError("runtime budget exceeded before side effects")
+            raise TimeoutError("runtime budget exhausted before model execution")
 
+        try:
+            model_response, elapsed = call_with_timeout(
+                lambda: self._models.complete(model_provider, model_request), timeout_seconds
+            )
+        except ExecutionTimeout as exc:
+            self._budget.consume_turn(timeout_seconds)
+            self._state.transition(running, RunStatus.FAILED, failure_code="runtime_timeout")
+            self._observability.emit_security(
+                new_security_event(
+                    context.tenant_id,
+                    "runtime.timeout",
+                    "warning",
+                    actor_id=context.principal.subject_id,
+                    trace_id=context.trace_id,
+                    outcome="deny",
+                )
+            )
+            raise TimeoutError("model execution exceeded its wall-clock deadline") from exc
+
+        self._budget.consume_turn(elapsed)
         self._events.append(
             new_event(
                 context.tenant_id,
