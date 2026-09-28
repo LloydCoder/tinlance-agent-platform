@@ -31,7 +31,9 @@ class MCPToolGateway:
             raise ValueError("tool name must be unique and non-empty")
         self._tools[tool.name] = tool
 
-    def call(self, scope: ToolScope, tool_name: str, arguments: dict[str, object]) -> dict[str, object]:
+    def call(
+        self, scope: ToolScope, tool_name: str, arguments: dict[str, object]
+    ) -> dict[str, object]:
         tool = self._tools.get(tool_name)
         if tool is None:
             raise LookupError("MCP tool is not registered")
