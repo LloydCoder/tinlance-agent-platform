@@ -39,13 +39,11 @@ class ToolGateway:
     def __init__(self) -> None:
         self._tools: dict[str, tuple[ToolRegistration, ToolExecutor]] = {}
 
-    def register(
-        self,
-        registration: ToolRegistration,
-        executor: ToolExecutor,
-    ) -> None:
+    def register(self, registration: ToolRegistration, executor: ToolExecutor) -> None:
         if registration.name in self._tools:
             raise ValueError("tool registration is immutable")
+        if not registration.name or not registration.capability:
+            raise ValueError("tool registration requires name and capability")
         self._tools[registration.name] = (registration, executor)
 
     def authorize(
@@ -58,8 +56,20 @@ class ToolGateway:
             return PolicyDecision(
                 Decision.DENY,
                 "tenant-boundary",
-                "1",
+                "2",
                 "tool tenant mismatch",
+                capability_request.risk,
+            )
+        if (
+            call.capability not in capability_request.capabilities
+            or call.action != capability_request.action
+            or call.resource != capability_request.resource
+        ):
+            return PolicyDecision(
+                Decision.DENY,
+                "complete-mediation",
+                "2",
+                "tool call does not match the authorized capability request",
                 capability_request.risk,
             )
         try:
@@ -68,7 +78,7 @@ class ToolGateway:
             return PolicyDecision(
                 Decision.DENY,
                 "authorization",
-                "1",
+                "2",
                 str(exc),
                 capability_request.risk,
             )

@@ -84,7 +84,9 @@ def test_sandbox_fails_closed() -> None:
     request = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("python",), 10)
     with pytest.raises(SandboxUnavailable):
         validate_request(request, SandboxPolicy(frozenset({"python"})))
-    denied = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",))
+    denied = SandboxRequest(
+        uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",)
+    )
     with pytest.raises(PermissionError):
         validate_request(denied, SandboxPolicy(frozenset({"python"})))
 
@@ -111,3 +113,20 @@ def test_tool_gateway_requires_authorization() -> None:
     decision = gateway.authorize(context, call, request)
     assert decision.decision is Decision.ALLOW
     assert gateway.execute(call, decision) == "executed"
+
+
+def test_tool_gateway_denies_mismatched_action() -> None:
+    gateway = ToolGateway()
+    principal = Principal("u", "human", "t-a", scopes=frozenset({"doc:read"}))
+    context = RequestContext("r", "t-a", principal, "test")
+    call = ToolCall(uuid4(), "t-a", uuid4(), "read", "doc:read", "delete", "doc")
+    request = CapabilityRequest(
+        "read",
+        "doc",
+        frozenset({"doc:read"}),
+        RiskTier.LOW,
+        Reversibility.REVERSIBLE,
+        DataClass.INTERNAL,
+        "single",
+    )
+    assert gateway.authorize(context, call, request).decision is Decision.DENY
