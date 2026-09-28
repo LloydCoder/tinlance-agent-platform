@@ -5,7 +5,7 @@ def test_memory_is_tenant_scoped_and_secrets_are_redacted() -> None:
     service = ContextService()
     service.remember("t1", "API_KEY=secret-value")
     service.remember("t2", "tenant-two")
-    assert service.recall("t1")[0].content == "[REDACTED]"
+    assert service.recall("t1")[0].content == "API_KEY=[REDACTED]"
     assert all(item.tenant_id == "t1" for item in service.recall("t1"))
 
 
