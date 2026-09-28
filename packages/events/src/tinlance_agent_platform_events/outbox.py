@@ -30,7 +30,7 @@ class InMemoryEventStore:
         self._lock = RLock()
 
     def append(self, event: Event) -> Event:
-        if not event.tenant_id or event.tenant_id != event.tenant_id.strip() or not event.event_type:
+        if (\n            not event.tenant_id\n            or event.tenant_id != event.tenant_id.strip()\n            or not event.event_type\n        ):
             raise ValueError("tenant and event type are required")
         if any(not key or not value for key, value in event.payload.items()):
             raise ValueError("event payload keys and values are required")
