@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from tinlance_agent_platform_contracts import Run, RunStatus, TaskSpec
-from tinlance_agent_platform_runtime import RunStateMachine
+from tinlance_agent_platform_runtime import ExecutionTimeout, RunStateMachine, call_with_timeout
 
 
 @dataclass(frozen=True, slots=True)
