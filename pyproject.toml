@@ -11,6 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["mypy>=1.17,<3", "pytest>=8.4,<10", "ruff>=0.12,<1"]
+security = ["pip-audit>=2.9,<3", "cyclonedx-bom>=7,<8"]
 
 [tool.hatch.build.targets.wheel]
 packages = [
