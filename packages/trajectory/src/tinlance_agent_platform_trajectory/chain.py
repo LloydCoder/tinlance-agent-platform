@@ -46,7 +46,7 @@ class InMemoryTrajectoryStore:
             event_id = uuid4()
             material = (
                 f"{tenant_id}|{run_id}|{sequence}|{event_type}|{payload}|{previous}"
-            ).encode("utf-8")
+            ).encode()
             event_hash = sha256(material).hexdigest()
             event = TrajectoryEvent(
                 event_id,
@@ -73,7 +73,7 @@ class InMemoryTrajectoryStore:
                 material = (
                     f"{tenant_id}|{run_id}|{event.sequence}|{event.event_type}|"
                     f"{event.payload}|{previous}"
-                ).encode("utf-8")
+                ).encode()
                 if (
                     event.sequence != expected_sequence
                     or event.previous_hash != previous
