@@ -61,8 +61,17 @@ SERVICE_DEPS = {
     "multi_agent": set(),
     "operations": set(),
     "sdk": {
-        "agents", "approvals", "budgets", "context", "governance", "mcp", "models",
-        "observability", "runtime", "sandbox", "tools",
+        "agents",
+        "approvals",
+        "budgets",
+        "context",
+        "governance",
+        "mcp",
+        "models",
+        "observability",
+        "runtime",
+        "sandbox",
+        "tools",
     },
 }
 

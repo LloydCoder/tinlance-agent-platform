@@ -24,7 +24,13 @@ class ApprovalService:
         if expires_at is not None and expires_at <= datetime.now(UTC):
             raise ValueError("approval expiry must be in the future")
         item = ApprovalRequest(
-            uuid4(), tenant_id, run_id, action, resource, reason, requested_by,
+            uuid4(),
+            tenant_id,
+            run_id,
+            action,
+            resource,
+            reason,
+            requested_by,
             expires_at=expires_at,
         )
         self._items[item.approval_id] = item
@@ -40,9 +46,16 @@ class ApprovalService:
             and current.expires_at <= datetime.now(UTC)
         ):
             current = ApprovalRequest(
-                current.approval_id, current.tenant_id, current.run_id,
-                current.action, current.resource, current.reason, current.requested_by,
-                ApprovalStatus.EXPIRED, current.metadata, current.expires_at,
+                current.approval_id,
+                current.tenant_id,
+                current.run_id,
+                current.action,
+                current.resource,
+                current.reason,
+                current.requested_by,
+                ApprovalStatus.EXPIRED,
+                current.metadata,
+                current.expires_at,
             )
             self._items[approval_id] = current
         return current
@@ -55,9 +68,16 @@ class ApprovalService:
             raise ValueError("approval is no longer pending")
         status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
         updated = ApprovalRequest(
-            current.approval_id, current.tenant_id, current.run_id, current.action,
-            current.resource, current.reason, current.requested_by, status,
-            current.metadata, current.expires_at,
+            current.approval_id,
+            current.tenant_id,
+            current.run_id,
+            current.action,
+            current.resource,
+            current.reason,
+            current.requested_by,
+            status,
+            current.metadata,
+            current.expires_at,
         )
         self._items[approval_id] = updated
         return updated

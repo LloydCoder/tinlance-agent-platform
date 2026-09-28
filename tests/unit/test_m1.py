@@ -84,9 +84,7 @@ def test_sandbox_fails_closed() -> None:
     request = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("python",), 10)
     with pytest.raises(SandboxUnavailable):
         validate_request(request, SandboxPolicy(frozenset({"python"})))
-    denied = SandboxRequest(
-        uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",)
-    )
+    denied = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",))
     with pytest.raises(PermissionError):
         validate_request(denied, SandboxPolicy(frozenset({"python"})))
 

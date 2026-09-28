@@ -60,7 +60,5 @@ class BubblewrapProvider:
         ]
         for path in workspace_paths:
             command.extend(("--bind", path, path))
-        command.extend(
-            ("--chdir", workspace_paths[0] if workspace_paths else "/tmp", "--", *argv)
-        )
+        command.extend(("--chdir", workspace_paths[0] if workspace_paths else "/tmp", "--", *argv))
         return command
