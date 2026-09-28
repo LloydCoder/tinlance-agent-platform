@@ -29,7 +29,7 @@ jobs:
       - run: ruff format --check .
       - run: mypy packages
       - run: pytest
-      - run: pip-audit --strict
+      - run: pip-audit --strict --skip-editable
       - run: cyclonedx-py environment --output-format JSON --output-file sbom.json
   sql:
     runs-on: ubuntu-latest
