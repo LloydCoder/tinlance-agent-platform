@@ -1,19 +1,43 @@
-# Agent Platform Roadmap
+# Canonical Agent Platform Roadmap
 
-M0 Foundation — bounded contracts, kernel, identity, tenancy, authorization, policy.
-M1 Core Domain — agents, runs, approvals, budgets, governed tools, sandbox boundary.
-M2 Execution — model/tool provider ports, runner, secret broker boundary, events/evidence reference stores.
-M3 Durability — PostgreSQL repositories, transactional outbox, idempotency, retries, resumable runs.
-M4 Governance — policy composition, capability grants, approval binding, emergency stop, step-up controls.
-M5 Context — context assembly, memory ports, classification/redaction, prompt-injection boundaries.
-M6 MCP — MCP transport, server/tool registration, per-tool auth, scope step-up and capability mapping.
-M7 Evidence — append-only trajectory, provenance, tamper evidence, audit records and retention contracts.
-M8 Observability — OpenTelemetry traces/metrics/logs, cost accounting, security events and health.
-M9 Evaluation — deterministic eval runner, adversarial suites, regression corpus and safety gates.
-M10 Isolation — production sandbox adapter, resource/network/filesystem controls and kill semantics.
-M11 API/SDK — service API, worker, scheduler, CLI and stable external SDK surface.
-M12 Multi-agent — delegation, handoffs, child-agent authority narrowing, concurrency and cancellation.
-M13 Operations — deployment, migrations, configuration, supply-chain controls, backup/recovery and SLOs.
-M14 Validation — end-to-end conformance, threat-model closure, release hardening and v1.0 readiness.
+This is the canonical milestone sequence for Tinlance Agent Platform and supersedes earlier implementation-order labels in historical status documents.
 
-Each milestone must ship implementation, tests, security validation and documentation; later milestones may not silently backfill earlier security invariants.
+M0 -> M1 Identity -> M2 Authorization -> M3 Approval -> M4 Runtime + M5 Model Gateway -> M6 Tool/MCP Gateway -> M7 Sandbox -> M8 Orchestration -> M9 Memory -> M10 Evidence/Event -> M11 Observability -> M12 Evaluation -> M13 Domain SDK -> M14 Enterprise
+
+## Scope
+
+M0 Foundation: contracts, kernel, package boundaries, RLS and threat model.
+
+M1 Identity: normalized principals, agent identity/versioning and tenant binding.
+
+M2 Authorization: explicit capabilities, deny-by-default checks and complete mediation.
+
+M3 Approval: resumable human-review state, exact action binding and expiry.
+
+M4 Runtime: fail-closed lifecycle, hard budgets and terminal-state integrity.
+
+M5 Model Gateway: provider-neutral model port, usage validation and tenant/agent attribution.
+
+M6 Tool/MCP Gateway: tool registration, capability/resource scoping and transport isolation.
+
+M7 Sandbox: isolated workspace, command/path/network policy and fail-closed provider selection.
+
+M8 Orchestration: agent runner, handoff/delegation boundary and resumable execution contracts.
+
+M9 Memory: tenant-scoped memory/context, trust labels, classification and secret redaction.
+
+M10 Evidence/Event: append-only events, evidence, trajectory hashes and audit records.
+
+M11 Observability: correlated traces, metrics and security events; no secret content by default.
+
+M12 Evaluation: deterministic regression corpus and safety-critical release gates.
+
+M13 Domain SDK: stable public consumer surface and declarative domain registration.
+
+M14 Enterprise: RLS integrity, production configuration, backup/recovery contracts, supply-chain controls, threat-model closure and release gates.
+
+Every milestone must ship implementation, tests, security validation and documentation. Historical status files are retained for traceability; this roadmap and current repository state are authoritative.
+
+## Non-goals
+
+The platform does not become FDSE, TADS, ThreatFade, Hezqara, ReconOS, FusionOps or Agentic OS. The platform does not grant authority based on model confidence, external intelligence, prompt content or tool registration alone.

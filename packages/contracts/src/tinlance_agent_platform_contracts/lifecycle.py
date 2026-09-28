@@ -1,11 +1,12 @@
-"""Versioned M1 domain contracts."""
+"""Versioned lifecycle contracts shared by platform layers."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-API_VERSION = "1.0"
+API_VERSION = "1.1"
 
 
 class TaskStatus(StrEnum):
@@ -57,6 +58,8 @@ class AgentDefinition:
             raise ValueError("agent definition identity fields must be non-empty")
         if not self.capabilities:
             raise ValueError("agent definition must declare capabilities")
+        if not self.instructions_hash:
+            raise ValueError("agent instructions must be content-addressed")
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +102,7 @@ class ApprovalRequest:
     requested_by: str
     status: ApprovalStatus = ApprovalStatus.PENDING
     metadata: dict[str, Any] = field(default_factory=dict)
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +116,10 @@ class Budget:
     consumed_turns: int = 0
     consumed_tool_calls: int = 0
     elapsed_seconds: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.max_turns < 1 or self.max_seconds <= 0 or self.max_tool_calls < 0:
+            raise ValueError("budget limits must be valid")
 
 
 @dataclass(frozen=True, slots=True)

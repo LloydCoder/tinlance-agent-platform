@@ -9,6 +9,18 @@ class ModelRequest:
     model: str
     messages: tuple[dict[str, str], ...]
     max_output_tokens: int = 4096
+    trace_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.tenant_id or not self.agent_id or not self.model:
+            raise ValueError("tenant, agent and model are required")
+        if self.max_output_tokens < 1:
+            raise ValueError("max_output_tokens must be positive")
+        for message in self.messages:
+            if message.get("role") not in {"system", "user", "assistant", "tool"}:
+                raise ValueError("unsupported model message role")
+            if not message.get("content"):
+                raise ValueError("model messages require content")
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +49,7 @@ class ModelGateway:
         selected = self._providers.get(provider)
         if selected is None:
             raise LookupError("model provider is not registered")
-        if request.max_output_tokens < 1:
-            raise ValueError("max_output_tokens must be positive")
-        return selected.complete(request)
+        response = selected.complete(request)
+        if response.input_tokens < 0 or response.output_tokens < 0:
+            raise ValueError("provider returned negative token usage")
+        return response

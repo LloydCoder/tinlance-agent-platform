@@ -1,3 +1,5 @@
-# M6 Status — MCP
+# M6 TOOL/MCP GATEWAY — COMPLETE
 
-M6 adds a provider-neutral MCP tool registry and transport port. Every registered tool carries an explicit capability/resource scope; calls fail closed when the caller scope does not exactly match the registration. Transport remains outside the governance kernel.
+Local tool registration and MCP transport enforce capability/resource scope and preserve tenant context across the transport boundary.
+
+Canonical sequence: docs/ROADMAP.md

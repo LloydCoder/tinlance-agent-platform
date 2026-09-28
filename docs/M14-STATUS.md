@@ -1,14 +1,7 @@
-# M14 Status — Validation and Release Hardening
+# M14 ENTERPRISE — COMPLETE
 
-M14 closes the milestone sequence with conformance coverage across the platform surfaces, explicit fail-closed governance regression checks and release-readiness documentation.
+Enterprise integrity controls, cross-tenant composite foreign keys, RLS tests, append-only evidence/audit surfaces, release documentation and full CI gates are implemented.
 
-## Release gates
+Production infrastructure acceptance remains explicitly documented rather than falsely claimed.
 
-- CI: lint, formatting, mypy, pytest and SQL/RLS checks green.
-- Security: tenant isolation, fail-closed authorization, approvals, budgets and sandbox boundaries remain enforced.
-- Evidence: trajectory hash-chain verification is available.
-- Evaluation: safety-critical regression failures stop the evaluator.
-- Operations: readiness is false if any required component is unhealthy.
-- Isolation: production execution requires an explicit sandbox provider; unavailable isolation fails closed.
-
-M14 does not claim that a reference in-memory provider is a production database, observability backend or sandbox. Those adapters remain explicit deployment responsibilities.
+Canonical sequence: docs/ROADMAP.md

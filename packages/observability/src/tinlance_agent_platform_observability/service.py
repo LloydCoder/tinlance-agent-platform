@@ -12,6 +12,8 @@ class TraceSpan:
     name: str
     started_at: datetime
     ended_at: datetime | None = None
+    trace_id: str | None = None
+    status: str = "unset"
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +22,7 @@ class MetricPoint:
     name: str
     value: float
     unit: str
+    trace_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +32,9 @@ class SecurityEvent:
     event_type: str
     severity: str
     occurred_at: datetime
+    actor_id: str | None = None
+    trace_id: str | None = None
+    outcome: str = "unknown"
 
 
 class ObservabilitySink(Protocol):
@@ -53,7 +59,17 @@ class InMemoryObservabilitySink:
         self.security.append(event)
 
 
-def new_security_event(tenant_id: str, event_type: str, severity: str) -> SecurityEvent:
-    if severity not in {"info", "warning", "critical"}:
-        raise ValueError("invalid severity")
-    return SecurityEvent(uuid4(), tenant_id, event_type, severity, datetime.now(UTC))
+def new_security_event(
+    tenant_id: str,
+    event_type: str,
+    severity: str,
+    *,
+    actor_id: str | None = None,
+    trace_id: str | None = None,
+    outcome: str = "unknown",
+) -> SecurityEvent:
+    if not tenant_id or severity not in {"info", "warning", "critical"}:
+        raise ValueError("invalid security event")
+    return SecurityEvent(
+        uuid4(), tenant_id, event_type, severity, datetime.now(UTC), actor_id, trace_id, outcome
+    )

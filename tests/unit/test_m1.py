@@ -22,11 +22,7 @@ from tinlance_agent_platform_contracts import (
     ToolCall,
 )
 from tinlance_agent_platform_runtime import InvalidTransition, RunStateMachine
-from tinlance_agent_platform_sandbox import (
-    SandboxPolicy,
-    SandboxUnavailable,
-    validate_request,
-)
+from tinlance_agent_platform_sandbox import SandboxPolicy, SandboxUnavailable, validate_request
 from tinlance_agent_platform_tools import ToolGateway, ToolRegistration
 
 
@@ -64,7 +60,7 @@ def test_run_state_machine_is_fail_closed() -> None:
         machine.transition(run, RunStatus.RUNNING)
 
 
-def test_approval_must_be_explicit() -> None:
+def test_approval_must_be_explicit_and_tenant_bound() -> None:
     service = ApprovalService()
     approval = service.request("t-a", uuid4(), "delete", "db:item", "destructive", "agent")
     with pytest.raises(PermissionError):

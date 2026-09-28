@@ -1,3 +1,5 @@
-# M4 Status — Governance
+# M4 RUNTIME — COMPLETE
 
-M4 adds explicit capability grants, exact resource matching, expiry, tenant emergency-stop state, and governance tests. The governance decision remains outside model/provider code and is fail-closed when no grant matches.
+Run state transitions are fail-closed and terminal states cannot reopen. Hard turn/tool/time budgets are monotonic.
+
+Canonical sequence: docs/ROADMAP.md
