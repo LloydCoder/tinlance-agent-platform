@@ -77,6 +77,10 @@ def test_tenant_boundary_cannot_be_crossed() -> None:
 
 def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
     """Exercise provider and evidence boundaries without granting authority."""
+    tenant = "tenant-a"
+    principal = Principal("user-1", "human", tenant, scopes=frozenset({"doc:read"}))
+    context = RequestContext("request-mcp", tenant, principal, "test", trace_id="trace-mcp")
+    mcp_run_id = uuid4()
     model = ModelGateway()
 
     class Provider:
@@ -114,9 +118,9 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
         "lookup",
         {"q": "x"},
         mcp_request,
-        run_id=uuid4(),
+        run_id=mcp_run_id,
     )
-    assert result["tenant"] == "tenant-a"
+    assert result["tenant"] == tenant
     with pytest.raises(PermissionError):
         mcp.call(
             context,
@@ -124,7 +128,7 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
             "lookup",
             {},
             mcp_request,
-            run_id=call.run_id,
+            run_id=mcp_run_id,
         )
 
     events = InMemoryEventStore()
