@@ -108,7 +108,7 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
         "single-resource",
     )
     result = mcp.call(
-        RequestContext("request-1", "tenant-a", Principal("user-1", "human", "tenant-a", scopes=frozenset({"doc:read"})), "test"),
+        RequestContext(\n            "request-1",\n            "tenant-a",\n            Principal("user-1", "human", "tenant-a", scopes=frozenset({"doc:read"})),\n            "test",\n        ),
         ToolScope("tenant-a", "doc:read", "doc-1"),
         "lookup",
         {"q": "x"},
