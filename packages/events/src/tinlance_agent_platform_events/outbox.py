@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from threading import RLock
 from types import MappingProxyType
 from typing import Protocol
 from uuid import UUID, uuid4
@@ -26,35 +27,56 @@ class InMemoryEventStore:
     def __init__(self) -> None:
         self._events: list[Event] = []
         self._ids: set[UUID] = set()
+        self._lock = RLock()
 
     def append(self, event: Event) -> Event:
-        if not event.tenant_id or not event.event_type:
+        if not event.tenant_id or event.tenant_id != event.tenant_id.strip() or not event.event_type:
             raise ValueError("tenant and event type are required")
-        if event.event_id in self._ids:
-            raise ValueError("event id already exists")
-        if any("secret" in key.lower() for key in event.payload):
+        if any(not key or not value for key, value in event.payload.items()):
+            raise ValueError("event payload keys and values are required")
+        secret_markers = ("secret", "password", "token", "private_key", "authorization")
+        if any(
+            marker in f"{key}={value}".lower()
+            for key, value in event.payload.items()
+            for marker in secret_markers
+        ):
             raise ValueError("secret-bearing event fields are forbidden")
-        stored = Event(
-            event.event_id,
-            event.tenant_id,
-            event.run_id,
-            event.event_type,
-            MappingProxyType(dict(event.payload)),
-            event.occurred_at,
-        )
-        self._events.append(stored)
-        self._ids.add(event.event_id)
-        return stored
+        with self._lock:
+            if event.event_id in self._ids:
+                raise ValueError("event id already exists")
+            stored = Event(
+                event.event_id,
+                event.tenant_id,
+                event.run_id,
+                event.event_type,
+                MappingProxyType(dict(event.payload)),
+                event.occurred_at,
+            )
+            self._events.append(stored)
+            self._ids.add(event.event_id)
+            return stored
 
     def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Event, ...]:
-        return tuple(
-            event
-            for event in self._events
-            if event.tenant_id == tenant_id and event.run_id == run_id
-        )
+        if not tenant_id:
+            raise ValueError("tenant is required")
+        with self._lock:
+            return tuple(
+                event
+                for event in self._events
+                if event.tenant_id == tenant_id and event.run_id == run_id
+            )
 
 
-def new_event(tenant_id: str, run_id: UUID, event_type: str, payload: Mapping[str, str]) -> Event:
+def new_event(
+    tenant_id: str, run_id: UUID, event_type: str, payload: Mapping[str, str]
+) -> Event:
+    if not tenant_id or tenant_id != tenant_id.strip() or not event_type:
+        raise ValueError("event identity is required")
     return Event(
-        uuid4(), tenant_id, run_id, event_type, MappingProxyType(dict(payload)), datetime.now(UTC)
+        uuid4(),
+        tenant_id,
+        run_id,
+        event_type,
+        MappingProxyType(dict(payload)),
+        datetime.now(UTC),
     )
