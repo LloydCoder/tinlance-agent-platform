@@ -1,61 +1,52 @@
 # Tinlance Agent Platform
 
-Private proprietary control substrate for governed AI-agent execution.
+Tinlance's generic governed AI-agent execution substrate.
 
-## Mission
-
-Tinlance Agent Platform provides the generic security and execution primitives required to operate autonomous and human-supervised agents without giving models implicit authority.
-
-The invariant is:
+## Core invariant
 
 > capability != authority
 
-All consequential execution is mediated by identity, authorization, policy, risk, approval, budgets, isolation, evidence, and audit controls.
-
-## Status
-
-**M0 — Foundation: IN PROGRESS**
-
-The repository was intentionally empty at the start of M0. This first implementation establishes the architecture and kernel boundaries before introducing provider-specific or domain-specific execution.
-
-No subsystem is called production-ready until implementation, tests, security controls, failure semantics, observability, documentation, and deployment validation exist.
+Models do not receive authority merely by producing output. Consequential execution is mediated by explicit identity, tenancy, authorization, deterministic policy, risk, approval, isolation, budgets, evidence and audit controls.
 
 ## Architecture
 
-```text
+```
 CONTROL PLANE
-identity -> authorization -> policy -> approvals -> budgets -> registries
-                         |
-                         v
+identity -> tenancy -> authorization -> policy -> approvals -> registries
+
 EXECUTION PLANE
-orchestration -> agent runtime -> model/tool adapters -> isolated execution
-                         |
-                         v
+runtime -> orchestration -> model/tool gateways -> sandbox -> adapters
+
 EVIDENCE PLANE
-events -> trajectory -> provenance -> audit -> evaluation -> observability
+events -> trajectory -> provenance -> audit -> observability -> evaluation
 ```
 
-## Initial technology posture
+## M0 foundation
 
-- Python 3.12+ for the kernel and control-plane services.
-- FastAPI only at the application/API boundary; core packages remain framework-neutral.
-- PostgreSQL as the durable control-plane store and tenant isolation backstop.
-- PostgreSQL outbox/events before introducing a distributed event broker.
-- OpenTelemetry-compatible telemetry at the platform boundary.
-- Provider-neutral model and tool ports.
-- MCP and other protocols are adapters, never the internal security boundary.
-- Sandbox technology is selected by workload risk rather than assumed to be containers-only.
+The current milestone establishes the clean-room kernel/control boundaries:
+
+- contracts
+- kernel
+- identity
+- tenancy
+- authorization
+- policy
+
+The former `packages/common` dumping ground is removed.
 
 ## Repository boundary
 
-This repository owns generic agent infrastructure. FDSE, TADS, ThreatFade, ReconOS, FadeReach, and other domain products remain consumers/adapters and must not duplicate the platform kernel.
+Agent Platform is separate from the higher-level Tinlance Agentic OS and from FDSE, TADS, ThreatFade, Hezqara, ReconOS, FadeReach and other products. Those systems consume platform contracts; the platform does not import them.
 
-## Security posture
+## Technology posture
 
-The architecture is informed by current NIST agent identity/authorization work, OWASP Agent Control Standard, MCP authorization guidance, and current agent-runtime practices. These sources validate the need for runtime-enforced controls, but they do not replace Tinlance's own authorization and policy enforcement.
+- Python 3.12–3.14
+- framework-free kernel
+- PostgreSQL with application authorization plus database RLS
+- transactional outbox before a distributed broker
+- provider-neutral model/tool ports
+- OpenTelemetry-compatible observability boundary
+- risk-tiered sandbox selection
+- modular monolith before premature microservices
 
-## Development rule
-
-Use feature branch -> inspect -> design -> implement -> test -> security review -> CI -> review -> merge.
-
-Never claim a capability is implemented from the existence of an interface or placeholder alone.
+M0 is foundation-complete, not production-ready. Future capabilities require their own implementation, tests, threat model and operational validation.

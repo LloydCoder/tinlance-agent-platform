@@ -4,27 +4,23 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tinlance-agent-platform"
-version = "0.1.0.dev0"
-description = "Private governed execution substrate for Tinlance AI agents"
-requires-python = ">=3.12,<3.14"
-dependencies = [
-  "pydantic>=2.11,<3",
-]
+version = "0.2.0.dev0"
+description = "Tinlance governed agent execution substrate"
+requires-python = ">=3.12,<3.15"
+dependencies = []
 
 [project.optional-dependencies]
-api = [
-  "fastapi>=0.116,<1",
-  "uvicorn[standard]>=0.35,<1",
-]
-test = [
-  "pytest>=8.4,<9",
-  "pytest-cov>=6,<7",
-  "ruff>=0.12,<1",
-  "mypy>=1.17,<2",
-]
+test = ["mypy>=1.17,<2", "pytest>=8.4,<9", "ruff>=0.12,<1"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["packages/common/src/tinlance_agent_platform"]
+packages = [
+  "packages/contracts/src/tinlance_agent_platform_contracts",
+  "packages/kernel/src/tinlance_agent_platform_kernel",
+  "packages/identity/src/tinlance_agent_platform_identity",
+  "packages/tenancy/src/tinlance_agent_platform_tenancy",
+  "packages/authorization/src/tinlance_agent_platform_authorization",
+  "packages/policy/src/tinlance_agent_platform_policy",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -33,6 +29,7 @@ addopts = "-ra --strict-config --strict-markers"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+src = ["packages", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

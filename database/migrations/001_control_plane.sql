@@ -1,14 +1,9 @@
--- M0 control-plane relational baseline.
--- Tenant-owned tables are intentionally small at M0; later migrations expand the model.
--- RLS policies are added with the first production persistence implementation and must be
--- validated with both application authorization tests and database-level isolation tests.
-
 create schema if not exists platform;
 
 create table if not exists platform.tenants (
     tenant_id uuid primary key,
     name text not null,
-    status text not null default 'active',
+    status text not null default 'active' check (status in ('active', 'suspended', 'disabled')),
     created_at timestamptz not null default now()
 );
 
@@ -23,7 +18,7 @@ create table if not exists platform.agents (
     environment text not null,
     lifecycle_state text not null default 'registered',
     created_at timestamptz not null default now(),
-    unique (tenant_id, agent_id, version)
+    unique (tenant_id, agent_id)
 );
 
 create table if not exists platform.tasks (
@@ -35,7 +30,8 @@ create table if not exists platform.tasks (
     status text not null,
     objective text not null,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
+    updated_at timestamptz not null default now(),
+    foreign key (tenant_id, agent_id) references platform.agents (tenant_id, agent_id)
 );
 
 create index if not exists idx_agents_tenant on platform.agents (tenant_id);

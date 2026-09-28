@@ -1,12 +1,9 @@
-"""Security and execution contracts shared across platform layers."""
+"""Security and execution vocabulary shared across platform layers."""
 
-from __future__ import annotations
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from typing import Any
 from uuid import UUID
-
 
 class AutonomyLevel(IntEnum):
     OBSERVATION = 0
@@ -18,7 +15,6 @@ class AutonomyLevel(IntEnum):
     CONDITIONAL_AUTONOMY = 6
     HIGH_AUTONOMY = 7
 
-
 class RiskTier(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
@@ -26,12 +22,10 @@ class RiskTier(StrEnum):
     CRITICAL = "critical"
     PROHIBITED = "prohibited"
 
-
 class Reversibility(StrEnum):
     REVERSIBLE = "reversible"
     PARTIALLY_REVERSIBLE = "partially_reversible"
     IRREVERSIBLE = "irreversible"
-
 
 class DataClass(StrEnum):
     PUBLIC = "public"
@@ -41,38 +35,40 @@ class DataClass(StrEnum):
     RESTRICTED = "restricted"
     SECRET = "secret"
 
-
 class Decision(StrEnum):
     ALLOW = "allow"
     DENY = "deny"
     REQUIRE_APPROVAL = "require_approval"
 
-
 @dataclass(frozen=True, slots=True)
 class Principal:
-    """Provider-neutral security principal; authentication adapters populate it."""
-
     subject_id: str
     principal_type: str
     tenant_id: str
     roles: frozenset[str] = frozenset()
     scopes: frozenset[str] = frozenset()
 
+    def __post_init__(self) -> None:
+        if not self.subject_id or not self.principal_type or not self.tenant_id:
+            raise ValueError("principal identity fields must be non-empty")
 
 @dataclass(frozen=True, slots=True)
 class RequestContext:
-    """Immutable authority context propagated across platform boundaries."""
-
     request_id: str
     tenant_id: str
     principal: Principal
     environment: str
     trace_id: str | None = None
 
+    def __post_init__(self) -> None:
+        if not self.request_id or not self.tenant_id or not self.environment:
+            raise ValueError("request context fields must be non-empty")
+        if self.principal.tenant_id != self.tenant_id:
+            raise ValueError("principal and request context tenants must match")
+
     def assert_tenant(self, tenant_id: str) -> None:
         if self.tenant_id != tenant_id:
             raise PermissionError("cross-tenant context is forbidden")
-
 
 @dataclass(frozen=True, slots=True)
 class AgentIdentity:
@@ -85,7 +81,6 @@ class AgentIdentity:
     trust_level: str
     environment: str
 
-
 @dataclass(frozen=True, slots=True)
 class CapabilityRequest:
     action: str
@@ -95,8 +90,13 @@ class CapabilityRequest:
     reversibility: Reversibility
     data_class: DataClass
     blast_radius: str
-    parameters: dict[str, Any]
+    parameters: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not self.action or not self.resource or not self.capabilities or not self.blast_radius:
+            raise ValueError("capability request fields must be non-empty")
+        if self.data_class is DataClass.SECRET:
+            raise ValueError("secret data cannot be a normal capability payload")
 
 @dataclass(frozen=True, slots=True)
 class PolicyDecision:
@@ -107,7 +107,6 @@ class PolicyDecision:
     risk: RiskTier
     requires_approval: bool = False
 
-
 @dataclass(frozen=True, slots=True)
 class EvidenceRef:
     evidence_id: UUID
@@ -117,7 +116,6 @@ class EvidenceRef:
     source: str
     provenance: str
     classification: DataClass
-
 
 @dataclass(frozen=True, slots=True)
 class AuditRecord:

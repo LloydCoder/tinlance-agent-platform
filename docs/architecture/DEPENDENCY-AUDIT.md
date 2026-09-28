@@ -1,56 +1,22 @@
-# Dependency and Consumer Audit — M0
+# Dependency and Consumer Audit
 
-## Primary repositories
+Agent Platform is a standalone generic substrate. FDSE, TADS, ThreatFade, ReconOS, FadeReach and Hezqara remain consumers.
 
-| Repository | Observed state | M0 classification |
-|---|---|---|
-| `LloydCoder/tinlance-agent-platform` | Private repository was empty at audit start | CORE — build here |
-| `LloydCoder/tinlance-fdse` | Private repository was empty at audit time | CONSUMER — no platform code to migrate yet |
-| `LloydCoder/tinlance-tads` | Private repository was empty at audit time | CONSUMER — no platform code to migrate yet |
-| `LloydCoder/fde-mastery` | Mature public repository with an extensive `packages/platform-core` | REFERENCE / selective extraction |
-| `LloydCoder/tinlance-threatfade` | Existing cybersecurity product | ISOLATE / adapter boundary |
-| `LloydCoder/Tinlance` | Existing company/product repository | REFERENCE; not a platform dependency |
+## Reuse policy
 
-## FDE Mastery findings
+FDE Mastery is reference material only. Generic concepts may be reimplemented behind clean contracts; domain-specific code and direct package coupling do not migrate into the kernel.
 
-The existing platform-core already contains substantial implementations and tests for identity/multitenancy, runtime, durable workflow ports, authorization, approvals, tool gateway, model gateway, events, evaluation, secrets, privacy, observability, persistence, MCP/A2A adapters and security. The repository also contains domain-specific FDE functionality that must not migrate into the generic platform.
+## M0 boundary
 
-Representative evidence includes:
+The platform currently owns:
+- provider-neutral contracts
+- authority/tenant invariants
+- identity validation
+- authorization
+- deterministic risk policy
 
-- provider-neutral identity and tenant context;
-- PostgreSQL/RLS-oriented tenancy decisions;
-- bounded first-class runtime with checkpoints and cancellation;
-- durable workflow boundary with leased tasks and replay semantics;
-- capability-scoped tool gateway;
-- provider-neutral model gateway;
-- evaluation and security test suites;
-- OpenTelemetry-oriented observability;
-- security/red-team cases and SBOM tooling.
+Future runtime, model/tool, sandbox, event, evidence and observability capabilities must be introduced as bounded packages with tests and adapters.
 
-## Reuse classification
+## Architectural conclusion
 
-### ADOPT conceptually
-
-- immutable `RequestContext` and provider-neutral `Principal`;
-- tenant-first authorization ordering;
-- runtime lifecycle and explicit budgets;
-- port/adapter separation;
-- idempotency as an execution invariant;
-- durable workflow state separate from worker memory;
-- model/tool gateway boundaries.
-
-### ADAPTER
-
-Existing FDE Mastery integrations and domain APIs should be wrapped through the future platform SDK rather than imported into the kernel.
-
-### ISOLATE
-
-FDE-specific engagement workflows, commercial entitlements, customer-value logic, domain adapters and training/curriculum code.
-
-### REJECT as core dependency
-
-Direct coupling to FDE Mastery package names, its historical domain layout, customer-specific logic, or any model/provider SDK used by an individual domain.
-
-## Important architectural conclusion
-
-Do **not** copy the entire FDE Mastery `platform-core` directory into this repository. It already mixes generic platform primitives with FDE-specific concerns. The new repository must be a clean-room platform boundary informed by those implementations, with selective reuse only after code-level review and licensing/ownership checks.
+Do not recreate a `common` dumping ground and do not copy an entire external platform-core. Every dependency must have an explicit direction and owner.

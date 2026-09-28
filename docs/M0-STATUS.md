@@ -1,50 +1,31 @@
-# M0 Status — 2026-09-10
+# M0 Status
 
-## Implemented
+M0 is complete as a **foundation milestone**, not as a production-ready autonomous-agent platform.
 
-- repository initialized on private `main`
-- feature branch `feature/m0-foundation`
-- M0 architecture baseline
-- dependency/reuse audit against FDE Mastery and available consumer repositories
-- provider-neutral identity, principal, request-context and agent-identity contracts
-- autonomy/risk/reversibility/data-classification primitives
-- capability-request, policy-decision, evidence and audit contracts
-- initial PostgreSQL control-plane schema
-- tenant RLS migration boundary
-- threat model and security invariants
-- ADR-001 through ADR-014
-- deterministic unit tests
-- CI quality workflow
-- draft PR #1
+## Delivered
 
-## Verified by repository inspection
+- bounded package structure replacing `packages/common`
+- provider-neutral security contracts
+- tenant-consistent immutable request context
+- kernel authority invariants
+- identity and child-tenant validation
+- deterministic deny-by-default authorization
+- deterministic risk policy decisions
+- executable architecture boundary tests
+- PostgreSQL control-plane migrations
+- executable tenant RLS isolation test
+- Python lint, format, type and unit-test gates
+- dependency review and Dependabot configuration
+- security and contributor guidance
 
-The primary repository was empty before M0. FDSE and TADS repositories were also empty at audit time. FDE Mastery contains a substantial platform-core implementation and test suite covering many of the same conceptual areas, but it also contains FDE-specific functionality; it is therefore treated as reference/selective-reuse rather than copied wholesale.
+## Explicitly deferred
 
-## Not yet implemented
+Runtime execution, durable workflow, model gateway, tool gateway, approvals, secrets broker, sandbox runtime, event/outbox implementation, trajectory/evidence persistence, observability implementation, evaluation harness, SDK packaging and production deployment remain later milestones.
 
-- durable agent runtime
-- durable task/workflow engine
-- authorization service
-- policy engine
-- approval engine
-- model gateway implementation
-- tool gateway implementation
-- secrets broker
-- sandbox execution
-- network/file-system isolation
-- trajectory/evidence persistence
-- event bus/outbox implementation
-- observability pipeline
-- evaluation harness
-- domain SDK
-- world-intelligence domain
-- production deployment
+These are deliberate milestone boundaries, not hidden implementations.
 
 ## Readiness
 
-**M0: IN PROGRESS**
+M0: **FOUNDATION COMPLETE**
 
-**Production readiness: NOT CLAIMED**
-
-The repository currently establishes the foundation and boundaries; it does not yet constitute a functioning autonomous-agent platform.
+Production readiness: **NOT CLAIMED**.
