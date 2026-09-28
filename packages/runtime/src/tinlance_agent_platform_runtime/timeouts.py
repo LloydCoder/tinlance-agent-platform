@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import signal
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from collections.abc import Iterator
 from time import monotonic
 from typing import TypeVar
 
