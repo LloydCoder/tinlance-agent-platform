@@ -17,7 +17,7 @@ from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
 from tinlance_agent_platform_observability import ObservabilitySink, new_security_event
-from tinlance_agent_platform_runtime import RunStateMachine
+from tinlance_agent_platform_runtime import ExecutionTimeout, RunStateMachine, call_with_timeout
 from tinlance_agent_platform_tools.gateway import ApprovalVerifier, ToolGateway
 from tinlance_agent_platform_trajectory import TrajectoryStore
 
