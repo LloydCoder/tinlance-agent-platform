@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tinlance-agent-platform"
-version = "0.2.0.dev0"
+version = "0.3.0.dev0"
 description = "Tinlance governed agent execution substrate"
 requires-python = ">=3.12,<3.15"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["mypy>=1.17,<3", "pytest>=8.4,<9", "ruff>=0.12,<1"]
+test = ["mypy>=1.17,<3", "pytest>=8.4,<10", "ruff>=0.12,<1"]
 
 [tool.hatch.build.targets.wheel]
 packages = [
@@ -20,6 +20,13 @@ packages = [
   "packages/tenancy/src/tinlance_agent_platform_tenancy",
   "packages/authorization/src/tinlance_agent_platform_authorization",
   "packages/policy/src/tinlance_agent_platform_policy",
+  "packages/agents/src/tinlance_agent_platform_agents",
+  "packages/approvals/src/tinlance_agent_platform_approvals",
+  "packages/budgets/src/tinlance_agent_platform_budgets",
+  "packages/runtime/src/tinlance_agent_platform_runtime",
+  "packages/tools/src/tinlance_agent_platform_tools",
+  "packages/sandbox/src/tinlance_agent_platform_sandbox",
+  "packages/sdk/src/tinlance_agent_platform_sdk",
 ]
 
 [tool.pytest.ini_options]
