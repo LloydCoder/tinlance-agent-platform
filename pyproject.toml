@@ -33,6 +33,7 @@ packages = [
   "packages/events/src/tinlance_agent_platform_events",
   "packages/evidence/src/tinlance_agent_platform_evidence",
   "packages/durability/src/tinlance_agent_platform_durability",
+  "packages/governance/src/tinlance_agent_platform_governance",
 ]
 
 [tool.pytest.ini_options]
