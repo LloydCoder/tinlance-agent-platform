@@ -28,12 +28,19 @@ ALLOWED = {
     "approvals": {"tinlance_agent_platform_contracts"},
     "budgets": {"tinlance_agent_platform_contracts"},
     "runtime": {"tinlance_agent_platform_contracts"},
-    "tools": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel", "tinlance_agent_platform_policy"},
+    "tools": {
+        "tinlance_agent_platform_contracts",
+        "tinlance_agent_platform_kernel",
+        "tinlance_agent_platform_policy",
+    },
     "sandbox": {"tinlance_agent_platform_contracts"},
     "sdk": {
-        "tinlance_agent_platform_agents", "tinlance_agent_platform_approvals",
-        "tinlance_agent_platform_budgets", "tinlance_agent_platform_runtime",
-        "tinlance_agent_platform_sandbox", "tinlance_agent_platform_tools",
+        "tinlance_agent_platform_agents",
+        "tinlance_agent_platform_approvals",
+        "tinlance_agent_platform_budgets",
+        "tinlance_agent_platform_runtime",
+        "tinlance_agent_platform_sandbox",
+        "tinlance_agent_platform_tools",
     },
 }
 
