@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 import pytest
-
 from tinlance_agent_platform_events import InMemoryEventStore, new_event
 from tinlance_agent_platform_evidence import InMemoryEvidenceStore
 from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
