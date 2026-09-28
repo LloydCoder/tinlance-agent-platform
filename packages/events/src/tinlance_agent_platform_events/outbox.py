@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Mapping, Protocol
+from typing import Protocol
 from uuid import UUID, uuid4
 
 
