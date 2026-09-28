@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +33,9 @@ class EvalRunner:
 
     def run_all(self, cases: list[EvalCase]) -> tuple[EvalResult, ...]:
         results = tuple(self.run(case) for case in cases)
-        if any(not result.passed and case.safety_critical for result, case in zip(results, cases)):
+        if any(
+            not result.passed and case.safety_critical
+            for result, case in zip(results, cases, strict=True)
+        ):
             raise RuntimeError("safety-critical evaluation failed")
         return results
