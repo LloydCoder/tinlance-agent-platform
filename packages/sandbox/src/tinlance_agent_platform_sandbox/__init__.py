@@ -1,12 +1,12 @@
 from .bubblewrap import BubblewrapProvider, SandboxLimits, SandboxProvider
 from .policy import SandboxPolicy
-from .service import SandboxRequest, SandboxService
+from .service import SandboxUnavailable, validate_request
 
 __all__ = [
     "BubblewrapProvider",
     "SandboxLimits",
-    "SandboxProvider",
     "SandboxPolicy",
-    "SandboxRequest",
-    "SandboxService",
+    "SandboxProvider",
+    "SandboxUnavailable",
+    "validate_request",
 ]
