@@ -86,7 +86,7 @@ class MCPToolGateway:
             raise LookupError("MCP tool is not registered")
         if scope.tenant_id != context.tenant_id:
             return PolicyDecision(
-                Decision.DENY, "mcp-tenant-boundary", "1", "MCP tenant mismatch", capability_request.risk
+                Decision.DENY,\n                "mcp-tenant-boundary",\n                "1",\n                "MCP tenant mismatch",\n                capability_request.risk
             )
         if (
             scope.capability != tool.capability
