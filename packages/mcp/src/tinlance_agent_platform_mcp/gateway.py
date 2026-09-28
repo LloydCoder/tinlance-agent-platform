@@ -24,7 +24,8 @@ class ToolScope:
         if not all((self.tenant_id, self.capability, self.resource)):
             raise ValueError("complete tool scope is required")
         if any(
-            value != value.strip() for value in (self.tenant_id, self.capability, self.resource)
+            value != value.strip()
+            for value in (self.tenant_id, self.capability, self.resource)
         ):
             raise ValueError("tool scope fields must be normalized")
 
@@ -86,7 +87,11 @@ class MCPToolGateway:
             raise LookupError("MCP tool is not registered")
         if scope.tenant_id != context.tenant_id:
             return PolicyDecision(
-                Decision.DENY,\n                "mcp-tenant-boundary",\n                "1",\n                "MCP tenant mismatch",\n                capability_request.risk
+                Decision.DENY,
+                "mcp-tenant-boundary",
+                "1",
+                "MCP tenant mismatch",
+                capability_request.risk,
             )
         if (
             scope.capability != tool.capability
@@ -106,7 +111,11 @@ class MCPToolGateway:
             assert_authority_boundary(capability_request, context.principal)
         except PermissionError as exc:
             return PolicyDecision(
-                Decision.DENY, "mcp-authorization", "1", str(exc), capability_request.risk
+                Decision.DENY,
+                "mcp-authorization",
+                "1",
+                str(exc),
+                capability_request.risk,
             )
         return evaluate(capability_request)
 
@@ -135,4 +144,10 @@ class MCPToolGateway:
                 capability_request.action,
                 capability_request.resource,
             )
-        return self._transport.call(tool_name, MappingProxyType(dict(arguments)), scope)
+        if len(arguments) > 64:
+            raise ValueError("MCP arguments are too large")
+        return self._transport.call(
+            tool_name,
+            MappingProxyType(dict(arguments)),
+            scope,
+        )
