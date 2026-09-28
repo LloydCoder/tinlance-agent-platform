@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Mapping, Protocol
+from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
