@@ -9,6 +9,12 @@ from tinlance_agent_platform_budgets import BudgetService
 from tinlance_agent_platform_contracts import (
     AgentIdentity,
     Budget,
+    CapabilityRequest,
+    DataClass,
+    Principal,
+    RequestContext,
+    Reversibility,
+    RiskTier,
 )
 from tinlance_agent_platform_durability import IdempotencyStore, RetryPolicy
 from tinlance_agent_platform_events import InMemoryEventStore, new_event
@@ -64,12 +70,37 @@ def test_mcp_gateway_rejects_unbounded_or_unsupported_arguments() -> None:
     gateway.register(MCPTool("lookup", "lookup", "doc:read", "doc-1"))
     scope = ToolScope("tenant-a", "doc:read", "doc-1")
 
+    principal = Principal("u1", "human", "tenant-a", scopes=frozenset({"doc:read"}))
+    context = RequestContext("req-mcp", "tenant-a", principal, "test")
+    request = CapabilityRequest(
+        "call",
+        "doc-1",
+        frozenset({"doc:read"}),
+        RiskTier.LOW,
+        Reversibility.REVERSIBLE,
+        DataClass.INTERNAL,
+        "single-resource",
+    )
     deeply_nested = {"nested": {"deep": {"x": {"y": {"z": {"q": {"r": {"s": {"t": 1}}}}}}}}}
     with pytest.raises(ValueError):
-        gateway.call(scope, "lookup", deeply_nested)
+        gateway.call(
+            context,
+            scope,
+            "lookup",
+            deeply_nested,
+            request,
+            run_id=uuid4(),
+        )
 
     with pytest.raises(TypeError):
-        gateway.call(scope, "lookup", {"value": object()})
+        gateway.call(
+            context,
+            scope,
+            "lookup",
+            {"value": object()},
+            request,
+            run_id=uuid4(),
+        )
 
 
 def test_idempotency_claim_is_atomic_across_concurrent_callers() -> None:
