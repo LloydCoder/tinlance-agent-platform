@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from tinlance_agent_platform_authorization import authorize
+from tinlance_agent_platform_authorization import authorize\nfrom tinlance_agent_platform_budgets import BudgetService
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
     Decision,
@@ -65,7 +65,7 @@ class GovernedExecutionService:
         ):
             raise PermissionError("governed execution tenant or identity mismatch")
 
-        decision = authorize(context, capability_request)
+        running = self._state.transition(run, RunStatus.RUNNING)\n        self._budget.consume_turn(0.0)\n        started = monotonic()\n\n        decision = authorize(context, capability_request)
         if decision.decision is Decision.DENY:
             self._observability.emit_security(
                 new_security_event(
@@ -79,7 +79,7 @@ class GovernedExecutionService:
             )
             raise PermissionError(decision.reason)
 
-        model_response = self._models.complete(model_provider, model_request)
+        model_response = self._models.complete(model_provider, model_request)\n        elapsed = monotonic() - started\n        if elapsed > self._budget.budget.max_seconds:\n            raise TimeoutError("runtime budget exceeded before side effects")
         self._events.append(
             new_event(
                 context.tenant_id,
@@ -92,7 +92,7 @@ class GovernedExecutionService:
             context.tenant_id, run.run_id, "model.completed", model_response.output
         )
 
-        tool_decision = self._tools.authorize(context, tool_call, capability_request)
+        self._budget.consume_tool_call()\n        tool_decision = self._tools.authorize(context, tool_call, capability_request)
         tool_output = self._tools.execute(\n            tool_call,\n            tool_decision,\n            approval_id=approval_id,\n            approval_verifier=approval_verifier,\n        )
         evidence = self._evidence.append(context.tenant_id, run.run_id, tool_output)
         self._events.append(
@@ -116,4 +116,4 @@ class GovernedExecutionService:
                 outcome="allow",
             )
         )
-        return GovernedExecutionResult(run, model_response, tool_output, evidence.evidence_id)
+        completed = self._state.transition(running, RunStatus.SUCCEEDED)\n        return GovernedExecutionResult(\n            completed, model_response, tool_output, evidence.evidence_id\n        )
