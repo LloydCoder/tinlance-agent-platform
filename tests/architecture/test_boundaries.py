@@ -57,7 +57,7 @@ SERVICE_DEPS = {
         "trajectory",
     },
     "tools": {"contracts", "kernel", "policy"},
-    "mcp": set(),
+    "mcp": {"contracts", "kernel", "policy"},
     "sandbox": {"contracts"},
     "secrets": set(),
     "events": set(),
