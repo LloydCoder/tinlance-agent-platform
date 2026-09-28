@@ -74,9 +74,9 @@ class ModelGateway:
     ) -> None:
         if not name or name != name.strip() or name in self._providers:
             raise ValueError("model provider name must be unique and normalized")
-        if tenants is not None and any(not tenant or tenant != tenant.strip() for tenant in tenants):
+        if tenants is not None and any(\n            not tenant or tenant != tenant.strip() for tenant in tenants\n        ):
             raise ValueError("model tenant allowlist must be normalized")
-        if agents is not None and any(not agent or agent != agent.strip() for agent in agents):
+        if agents is not None and any(\n            not agent or agent != agent.strip() for agent in agents\n        ):
             raise ValueError("model agent allowlist must be normalized")
         self._providers[name] = _ProviderBinding(provider, tenants, agents)
 
