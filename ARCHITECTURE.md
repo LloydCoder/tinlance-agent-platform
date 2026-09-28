@@ -8,18 +8,19 @@ Agent Platform is Tinlance's generic governed execution substrate, separate from
 - Evidence: events, trajectory, provenance, audit, observability and evaluation.
 
 ## Dependency DAG
-contracts -> kernel -> services -> adapters -> apps
+contracts -> kernel -> services -> domain -> adapters -> apps
 
 Adapters depend inward. The reverse direction is forbidden.
 
 ## M0 packages
-- contracts: provider-neutral vocabulary/value objects
-- kernel: security invariants with no provider/framework dependency
-- identity: principal validation
-- tenancy: tenant propagation rules
-- authorization: deterministic deny-by-default capability checks
-- policy: deterministic risk policy boundary
+contracts, kernel, identity, tenancy, authorization and policy establish authority and tenant invariants.
 
-Runtime, durable workflow, gateways, sandbox implementations and persistence services are later milestones; interfaces alone are not implementations.
+## M1 packages
+- domain: tenant-owned durable entities and lifecycle rules.
+- persistence: repository ports plus deterministic in-memory implementation for contract tests.
+- sandbox: versioned execution boundary and Docker adapter.
 
-Domain repositories consume stable platform contracts and the platform never imports them.
+PostgreSQL is the durable M1 store; tenant RLS is defense in depth. Domain products consume contracts and never import domain-specific product code into the platform.
+
+## Security invariant
+Capability does not imply authority; model output never grants authority; every consequential execution must be attributable to a tenant and actor and pass the policy/approval boundary.
