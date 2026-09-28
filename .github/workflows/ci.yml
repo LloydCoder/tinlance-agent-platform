@@ -29,7 +29,8 @@ jobs:
       - run: ruff format --check .
       - run: mypy packages
       - run: pytest
-      - run: pip-audit --strict --skip-editable
+      - run: python -m pip freeze | grep -v '^tinlance-agent-platform==' > /tmp/audit-requirements.txt
+      - run: pip-audit --strict -r /tmp/audit-requirements.txt
       - run: cyclonedx-py environment --output-format JSON --output-file sbom.json
   sql:
     runs-on: ubuntu-latest
