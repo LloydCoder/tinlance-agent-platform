@@ -14,6 +14,8 @@ from tinlance_agent_platform_kernel import assert_authority_boundary
 from tinlance_agent_platform_policy import evaluate
 
 _MAX_ARGUMENTS = 64
+_MAX_STRING = 16_384
+_MAX_DEPTH = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,31 @@ class MCPTransport(Protocol):
         self, tool_name: str, arguments: Mapping[str, object], scope: ToolScope
     ) -> dict[str, object]: ...
 
+
+def _validate_value(value: object, depth: int = 0) -> None:
+    if depth > _MAX_DEPTH:
+        raise ValueError("MCP argument nesting exceeds safety limit")
+    if isinstance(value, str):
+        if len(value) > _MAX_STRING:
+            raise ValueError("MCP string argument exceeds safety limit")
+        return
+    if value is None or isinstance(value, (bool, int, float)):
+        return
+    if isinstance(value, Mapping):
+        if len(value) > _MAX_ARGUMENTS:
+            raise ValueError("MCP argument mapping exceeds safety limit")
+        for key, nested in value.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError("MCP argument keys must be non-empty strings")
+            _validate_value(nested, depth + 1)
+        return
+    if isinstance(value, (list, tuple)):
+        if len(value) > _MAX_ARGUMENTS:
+            raise ValueError("MCP argument sequence exceeds safety limit")
+        for nested in value:
+            _validate_value(nested, depth + 1)
+        return
+    raise TypeError("unsupported MCP argument type")
 
 class ApprovalVerifier(Protocol):
     def require_approved_for(
@@ -150,8 +177,7 @@ class MCPToolGateway:
                 capability_request.action,
                 capability_request.resource,
             )
-        if len(arguments) > _MAX_ARGUMENTS:
-            raise ValueError("MCP arguments are too large")
+        _validate_value(arguments)
         return self._transport.call(
             tool_name,
             MappingProxyType(dict(arguments)),
