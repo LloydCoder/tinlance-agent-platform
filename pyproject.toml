@@ -40,6 +40,7 @@ packages = [
   "packages/observability/src/tinlance_agent_platform_observability",
   "packages/evaluation/src/tinlance_agent_platform_evaluation",
   "packages/api/src/tinlance_agent_platform_api",
+  "packages/multi_agent/src/tinlance_agent_platform_multi_agent",
 ]
 
 [tool.pytest.ini_options]
