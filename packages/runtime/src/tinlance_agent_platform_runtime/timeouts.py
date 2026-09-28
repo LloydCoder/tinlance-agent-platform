@@ -5,6 +5,7 @@ from __future__ import annotations
 import signal
 from collections.abc import Callable
 from contextlib import contextmanager
+from collections.abc import Iterator
 from time import monotonic
 from typing import TypeVar
 
@@ -16,7 +17,7 @@ class ExecutionTimeout(TimeoutError):
 
 
 @contextmanager
-def wall_clock_timeout(seconds: float):
+def wall_clock_timeout(seconds: float) -> Iterator[None]:
     """Enforce a real wall-clock deadline on Linux/Unix main-thread execution.
 
     Agent Platform's reference execution path is intentionally fail-closed: a
@@ -45,7 +46,7 @@ def wall_clock_timeout(seconds: float):
             signal.setitimer(signal.ITIMER_REAL, previous_timer[0], previous_timer[1])
 
 
-def call_with_timeout(fn: Callable[[], T], seconds: float) -> tuple[T, float]:
+def call_with_timeout[T](fn: Callable[[], T], seconds: float) -> tuple[T, float]:
     """Call *fn* with a hard wall-clock deadline and return result + duration."""
     started = monotonic()
     with wall_clock_timeout(seconds):
