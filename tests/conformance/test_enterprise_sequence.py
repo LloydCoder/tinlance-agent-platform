@@ -109,7 +109,9 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
 
 def test_sandbox_and_evaluation_are_not_authority_sources() -> None:
     sandbox = SandboxPolicy(frozenset({"python"}))
-    request = SandboxRequest(\n        uuid4(), "tenant-a", uuid4(), "ws", ("python",), 10, False, ("/workspace",)\n    )
+    request = SandboxRequest(
+        uuid4(), "tenant-a", uuid4(), "ws", ("python",), 10, False, ("/workspace",)
+    )
     sandbox.validate(request)
 
     evaluation = EvalRunner(lambda value: value)
