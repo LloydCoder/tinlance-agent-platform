@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping, Protocol
+from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,7 +13,9 @@ class ToolScope:
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.capability, self.resource)):
             raise ValueError("complete tool scope is required")
-        if any(value != value.strip() for value in (self.tenant_id, self.capability, self.resource)):
+        if any(
+            value != value.strip() for value in (self.tenant_id, self.capability, self.resource)
+        ):
             raise ValueError("tool scope fields must be normalized")
 
 
@@ -26,7 +29,9 @@ class MCPTool:
     def __post_init__(self) -> None:
         if not all((self.name, self.capability, self.resource_pattern)):
             raise ValueError("MCP tools require identity and resource scope")
-        if any(value != value.strip() for value in (self.name, self.capability, self.resource_pattern)):
+        if any(
+            value != value.strip() for value in (self.name, self.capability, self.resource_pattern)
+        ):
             raise ValueError("MCP tool fields must be normalized")
 
 
