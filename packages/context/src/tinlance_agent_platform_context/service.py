@@ -36,7 +36,7 @@ class ContextService:
         self, tenant_id: str, content: str, classification: str = "internal"
     ) -> MemoryEntry:
         allowed = {"public", "internal", "sensitive"}
-        if not tenant_id or not content or classification not in allowed:
+        if (\n            not tenant_id\n            or tenant_id != tenant_id.strip()\n            or not content\n            or len(content) > self.policy.max_chars\n            or classification not in allowed\n        ):
             raise ValueError("invalid memory entry")
         redacted = self.redact_sensitive(content)
         entry = MemoryEntry(uuid4(), tenant_id, redacted, classification, datetime.now(UTC))
