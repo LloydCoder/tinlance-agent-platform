@@ -38,7 +38,7 @@ class Reader:
 def build_service(
     tenant: str, run_id: UUID, models: ModelGateway, tools: ToolGateway
 ) -> GovernedExecutionService:
-    budget = BudgetService(Budget(uuid4(), tenant, run_id, 1, 30.0, 1))
+    budget = BudgetService(Budget(uuid4(), tenant, run_id, 2, 30.0, 1))
     return GovernedExecutionService(
         models,
         tools,
