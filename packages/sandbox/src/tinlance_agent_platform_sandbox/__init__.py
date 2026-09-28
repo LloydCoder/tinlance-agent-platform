@@ -1,6 +1,6 @@
 from .bubblewrap import BubblewrapProvider, SandboxLimits, SandboxProvider
 from .policy import SandboxPolicy
-from .service import SandboxUnavailable, validate_request
+from .service import SandboxUnavailable, build_command, validate_request
 
 __all__ = [
     "BubblewrapProvider",
@@ -8,5 +8,6 @@ __all__ = [
     "SandboxPolicy",
     "SandboxProvider",
     "SandboxUnavailable",
+    "build_command",
     "validate_request",
 ]
