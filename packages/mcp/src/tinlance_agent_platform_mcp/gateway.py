@@ -4,6 +4,37 @@ from types import MappingProxyType
 from typing import Protocol
 
 
+_MAX_ARGUMENTS = 64
+_MAX_STRING = 16_384
+_MAX_DEPTH = 8
+
+
+def _validate_value(value: object, depth: int = 0) -> None:
+    if depth > _MAX_DEPTH:
+        raise ValueError("MCP argument nesting exceeds safety limit")
+    if isinstance(value, str):
+        if len(value) > _MAX_STRING:
+            raise ValueError("MCP string argument exceeds safety limit")
+        return
+    if value is None or isinstance(value, (bool, int, float)):
+        return
+    if isinstance(value, Mapping):
+        if len(value) > _MAX_ARGUMENTS:
+            raise ValueError("MCP argument mapping exceeds safety limit")
+        for key, nested in value.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError("MCP argument keys must be non-empty strings")
+            _validate_value(nested, depth + 1)
+        return
+    if isinstance(value, (list, tuple)):
+        if len(value) > _MAX_ARGUMENTS:
+            raise ValueError("MCP argument sequence exceeds safety limit")
+        for nested in value:
+            _validate_value(nested, depth + 1)
+        return
+    raise TypeError("unsupported MCP argument type")
+
+
 @dataclass(frozen=True, slots=True)
 class ToolScope:
     tenant_id: str
@@ -59,4 +90,7 @@ class MCPToolGateway:
             raise LookupError("MCP tool is not registered")
         if scope.capability != tool.capability or scope.resource != tool.resource_pattern:
             raise PermissionError("MCP scope does not match registered tool")
+        if not isinstance(arguments, Mapping):
+            raise TypeError("MCP arguments must be a mapping")
+        _validate_value(arguments)
         return self._transport.call(tool_name, MappingProxyType(dict(arguments)), scope)
