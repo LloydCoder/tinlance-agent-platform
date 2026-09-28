@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Protocol
+from uuid import UUID
 
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
@@ -21,6 +22,17 @@ class ToolRegistration:
 
 class ToolExecutor(Protocol):
     def execute(self, call: ToolCall) -> str: ...
+
+
+class ApprovalVerifier(Protocol):
+    def require_approved_for(
+        self,
+        approval_id: UUID,
+        tenant_id: str,
+        run_id: UUID,
+        action: str,
+        resource: str,
+    ) -> None: ...
 
 
 class ToolGateway:
@@ -62,9 +74,25 @@ class ToolGateway:
             )
         return evaluate(capability_request)
 
-    def execute(self, call: ToolCall, decision: PolicyDecision) -> str:
-        if decision.decision is not Decision.ALLOW:
-            raise PermissionError("tool execution denied or requires approval")
+    def execute(
+        self,
+        call: ToolCall,
+        decision: PolicyDecision,
+        approval_id: UUID | None = None,
+        approval_verifier: ApprovalVerifier | None = None,
+    ) -> str:
+        if decision.decision is Decision.DENY:
+            raise PermissionError("tool execution denied")
+        if decision.requires_approval:
+            if approval_id is None or approval_verifier is None:
+                raise PermissionError("approved human review is required")
+            approval_verifier.require_approved_for(
+                approval_id,
+                call.tenant_id,
+                call.run_id,
+                call.action,
+                call.resource,
+            )
         registration = self._tools.get(call.tool_name)
         if registration is None or registration[0].capability != call.capability:
             raise PermissionError("tool is not registered for requested capability")
