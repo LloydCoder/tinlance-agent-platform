@@ -45,7 +45,16 @@ def test_prohibited_and_secret_capabilities_cannot_be_authorized() -> None:
     principal = Principal("owner", "human", "tenant-a", scopes=frozenset({"document:read"}))
     context = RequestContext("req", "tenant-a", principal, "test")
     assert authorize(context, make_request(RiskTier.PROHIBITED)).decision is Decision.DENY
-    assert evaluate(make_request(data_class=DataClass.SECRET)).decision is Decision.DENY
+    with pytest.raises(ValueError, match="secret data"):
+        CapabilityRequest(
+            "read",
+            "document",
+            frozenset({"document:read"}),
+            RiskTier.LOW,
+            Reversibility.REVERSIBLE,
+            DataClass.SECRET,
+            "single-resource",
+        )
 
 
 def test_high_risk_and_irreversible_actions_require_approval() -> None:

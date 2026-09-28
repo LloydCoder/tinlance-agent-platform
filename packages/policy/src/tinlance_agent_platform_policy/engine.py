@@ -10,6 +10,9 @@ from tinlance_agent_platform_contracts import (
 )
 
 
+_SINGLE_RESOURCE = {"single", "single-resource"}
+
+
 def evaluate(request: CapabilityRequest) -> PolicyDecision:
     if request.risk is RiskTier.PROHIBITED or request.data_class is DataClass.SECRET:
         return PolicyDecision(
@@ -19,7 +22,7 @@ def evaluate(request: CapabilityRequest) -> PolicyDecision:
         request.risk in {RiskTier.HIGH, RiskTier.CRITICAL}
         or request.reversibility is Reversibility.IRREVERSIBLE
         or request.data_class in {DataClass.SENSITIVE, DataClass.RESTRICTED}
-        or request.blast_radius != "single-resource"
+        or request.blast_radius not in _SINGLE_RESOURCE
     )
     if needs_approval:
         return PolicyDecision(

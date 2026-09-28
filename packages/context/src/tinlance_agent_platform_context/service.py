@@ -68,9 +68,9 @@ class ContextService:
 
     def redact_sensitive(self, text: str) -> str:
         patterns = (
-            r"(?i)(SECRET|API_KEY|PASSWORD|TOKEN|AUTHORIZATION)\\s*=\\s*[^\\s\\n]+",
-            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-            r"(?i)bearer\\s+[A-Za-z0-9._~+/=-]+",
+            r"(?i)(SECRET|API_KEY|PASSWORD|TOKEN|AUTHORIZATION)\s*=\s*[^\s\n]+",
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+            r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+",
         )
         result = text
         for pattern in patterns:
