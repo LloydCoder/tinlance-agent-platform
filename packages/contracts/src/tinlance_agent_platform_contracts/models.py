@@ -98,6 +98,19 @@ class AgentIdentity:
     trust_level: str
     environment: str
 
+    def __post_init__(self) -> None:
+        values = (
+            self.tenant_id,
+            self.agent_type,
+            self.version,
+            self.owner_subject_id,
+            self.policy_profile,
+            self.trust_level,
+            self.environment,
+        )
+        if not all(values) or any(value != value.strip() for value in values):
+            raise ValueError("agent identity fields must be normalized and non-empty")
+
 
 @dataclass(frozen=True, slots=True)
 class CapabilityRequest:
@@ -113,6 +126,13 @@ class CapabilityRequest:
     def __post_init__(self) -> None:
         if not self.action or not self.resource or not self.capabilities or not self.blast_radius:
             raise ValueError("capability request fields must be non-empty")
+        if any(
+            value != value.strip()
+            for value in (self.action, self.resource, self.blast_radius)
+        ):
+            raise ValueError("capability request fields must be normalized")
+        if any(not capability or capability != capability.strip() for capability in self.capabilities):
+            raise ValueError("capability names must be normalized")
         if self.data_class is DataClass.SECRET:
             raise ValueError("secret data cannot be a normal capability payload")
         object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
