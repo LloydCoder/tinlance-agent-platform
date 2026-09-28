@@ -32,7 +32,9 @@ class ContextService:
         self.policy = policy or ContextPolicy()
         self._memory: list[MemoryEntry] = []
 
-    def remember(self, tenant_id: str, content: str, classification: str = "internal") -> MemoryEntry:
+    def remember(
+        self, tenant_id: str, content: str, classification: str = "internal"
+    ) -> MemoryEntry:
         allowed = {"public", "internal", "sensitive"}
         if not tenant_id or not content or classification not in allowed:
             raise ValueError("invalid memory entry")

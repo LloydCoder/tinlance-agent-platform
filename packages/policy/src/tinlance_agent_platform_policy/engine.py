@@ -5,8 +5,8 @@ from tinlance_agent_platform_contracts import (
     DataClass,
     Decision,
     PolicyDecision,
-    RiskTier,
     Reversibility,
+    RiskTier,
 )
 
 

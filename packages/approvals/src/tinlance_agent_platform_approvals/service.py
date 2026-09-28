@@ -34,14 +34,17 @@ class ApprovalService:
         current = self._items.get(approval_id)
         if current is None:
             raise KeyError("approval does not exist")
-        if current.status is ApprovalStatus.PENDING and current.expires_at is not None:
-            if current.expires_at <= datetime.now(UTC):
-                current = ApprovalRequest(
-                    current.approval_id, current.tenant_id, current.run_id,
-                    current.action, current.resource, current.reason, current.requested_by,
-                    ApprovalStatus.EXPIRED, current.metadata, current.expires_at,
-                )
-                self._items[approval_id] = current
+        if (
+            current.status is ApprovalStatus.PENDING
+            and current.expires_at is not None
+            and current.expires_at <= datetime.now(UTC)
+        ):
+            current = ApprovalRequest(
+                current.approval_id, current.tenant_id, current.run_id,
+                current.action, current.resource, current.reason, current.requested_by,
+                ApprovalStatus.EXPIRED, current.metadata, current.expires_at,
+            )
+            self._items[approval_id] = current
         return current
 
     def decide(self, approval_id: UUID, approved: bool, tenant_id: str) -> ApprovalRequest:

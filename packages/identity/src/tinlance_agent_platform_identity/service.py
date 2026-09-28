@@ -1,7 +1,7 @@
 """Provider-neutral identity normalization and validation."""
 
-from dataclasses import replace
 import re
+from dataclasses import replace
 
 from tinlance_agent_platform_contracts import Principal
 
