@@ -67,12 +67,12 @@ class ContextService:
         return "\n".join(selected)[: self.policy.max_chars]
 
     def redact_sensitive(self, text: str) -> str:
+        marker = r"(?i)(SECRET|API_KEY|PASSWORD|TOKEN|AUTHORIZATION)\s*=\s*[^\s\n]+"
+        result = re.sub(marker, lambda match: f"{match.group(1)}=[REDACTED]", text)
         patterns = (
-            r"(?i)(SECRET|API_KEY|PASSWORD|TOKEN|AUTHORIZATION)\s*=\s*[^\s\n]+",
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
             r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+",
         )
-        result = text
         for pattern in patterns:
             result = re.sub(pattern, "[REDACTED]", result)
         return result
