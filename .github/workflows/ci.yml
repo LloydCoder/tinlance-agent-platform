@@ -51,5 +51,7 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/001_control_plane.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/002_tenant_rls.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/003_m1_runs_approvals.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/004_m3_durability.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/tests/001_rls.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/tests/002_m1_rls.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/tests/003_m3_durability.sql
