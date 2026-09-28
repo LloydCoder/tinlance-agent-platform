@@ -56,6 +56,23 @@ Internal package/migration milestone labels may differ because implementation wa
 
 These controls align with current agent security guidance emphasizing least privilege, tool-level approvals, isolation, tracing/evaluation and protection against excessive agency and prompt injection. See the references in docs/ENTERPRISE-BASELINE.md.
 
+## Enterprise implementation status
+
+The canonical M0-M14 sequence is backed by executable conformance tests. Each milestone may expose a provider-neutral contract/reference implementation rather than a cloud-specific production adapter. Production adapters remain intentionally outside the authority kernel.
+
+| Surface | Repository implementation | Production responsibility |
+|---|---|---|
+| Identity / authorization / approval | governed reference implementation | identity provider and durable policy store |
+| Runtime / orchestration | deterministic reference implementation | durable workers, queues and cancellation infrastructure |
+| Model / tool / MCP | provider-neutral gateways | approved providers and hardened external services |
+| Sandbox | fail-closed Bubblewrap adapter | hardened Linux host/supervisor |
+| Memory / evidence / events | tenant-scoped in-memory reference stores + SQL integrity controls | durable repositories and retention controls |
+| Observability | correlated in-memory sink/contracts | OpenTelemetry collector/backend and alerting |
+| Evaluation | deterministic regression runner | release corpus and continuous evaluation operations |
+| SDK | stable domain registration surface | consumer compatibility/conformance |
+
+See [ARCHITECTURE](ARCHITECTURE.md), [ROADMAP](ROADMAP.md), [ENTERPRISE-BASELINE](ENTERPRISE-BASELINE.md) and the milestone threat models under `security/`.
+
 ## Repository structure
 
 apps/ = thin operational entry points

@@ -22,13 +22,16 @@ jobs:
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install --upgrade pip && pip install -e ".[test]"
+      - run: python -m pip install --upgrade pip && pip install -e ".[test,security]"
       - run: python -m pip check
       - run: python -m compileall -q packages tests
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy packages
       - run: pytest
+      - run: python -m pip freeze | grep -vE '^(tinlance-agent-platform==|-e )' > /tmp/audit-requirements.txt
+      - run: pip-audit --strict -r /tmp/audit-requirements.txt
+      - run: cyclonedx-py environment --output-format JSON --output-file sbom.json
   sql:
     runs-on: ubuntu-latest
     services:

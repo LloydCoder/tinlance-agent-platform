@@ -4,6 +4,7 @@ from .service import (
     ObservabilitySink,
     SecurityEvent,
     TraceSpan,
+    new_security_event,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "ObservabilitySink",
     "SecurityEvent",
     "TraceSpan",
+    "new_security_event",
 ]
