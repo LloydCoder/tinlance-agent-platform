@@ -1,16 +1,18 @@
 # M7 Sandbox Threat Model
 
-## Assets
-Host filesystem, process namespace, credentials, network and execution resources.
+## Abuse cases
 
-## Threats
-- path traversal;
-- sensitive host path exposure;
-- network escape;
-- shell/command substitution;
-- sandbox-provider absence;
-- workspace escape;
-- unbounded process/resource consumption.
+- Workspace path traversal or symlink escape.
+- Sensitive host path exposure.
+- Network access used for exfiltration or SSRF.
+- Arbitrary command execution outside the allowlist.
+- Unbounded CPU, memory, disk, process count or output.
+- Missing isolation provider silently degrading to host execution.
 
-## Required controls
-Commands and paths are allowlisted, network is denied by default, sensitive paths are rejected, workspace identity is validated, and unavailable isolation fails closed. Production supervisors must enforce CPU, memory, process, disk and output limits.
+## Controls
+
+Sandbox requests require normalized isolated workspaces and allowlisted commands/paths. Network is denied by default. Sensitive host paths are rejected. Bubblewrap is fail-closed when unavailable. Production supervisors must enforce resource limits independently of the request contract.
+
+## Test obligations
+
+Traversal, symlink, sensitive-path, network, command, provider-unavailable and resource-boundary cases must be negative tests.
