@@ -1,4 +1,4 @@
-from tinlance_agent_platform_api import APIRequest, APIResponse, AgentPlatformAPI
+from tinlance_agent_platform_api import AgentPlatformAPI, APIRequest, APIResponse
 
 
 class Handler:
@@ -8,4 +8,5 @@ class Handler:
 
 def test_api_requires_tenant_and_subject() -> None:
     api = AgentPlatformAPI(Handler())
-    assert api.dispatch(APIRequest("t1", "u1", "run.create", {})).status == "accepted"
+    result = api.dispatch(APIRequest("t1", "u1", "run.create", {}))
+    assert result.status == "accepted"
