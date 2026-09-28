@@ -91,7 +91,7 @@ The repository contains working provider-neutral implementations and a fail-clos
 
 ## Verification
 
-CI runs Python 3.12-3.14, Ruff lint/format, mypy, pytest, PostgreSQL migrations/RLS/integrity tests and architecture dependency checks. Every milestone requires implementation, tests, security validation and documentation.
+CI runs Python 3.12-3.14, Ruff lint/format, mypy, pytest with an 85% minimum package-coverage gate, PostgreSQL migrations/RLS/integrity tests and architecture dependency checks. Tagged releases are built and Sigstore-signed by a dedicated release workflow. Every milestone requires implementation, tests, security validation and documentation.
 
 ## Relationship to Tinlance
 

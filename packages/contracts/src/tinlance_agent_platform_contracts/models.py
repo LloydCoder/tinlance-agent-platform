@@ -8,6 +8,18 @@ from typing import Any
 from uuid import UUID
 
 
+def _freeze(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(_freeze(item) for item in value)
+    return value
+
+
 class AutonomyLevel(IntEnum):
     OBSERVATION = 0
     ANALYSIS = 1
@@ -133,7 +145,9 @@ class CapabilityRequest:
             raise ValueError("capability names must be normalized")
         if self.data_class is DataClass.SECRET:
             raise ValueError("secret data cannot be a normal capability payload")
-        object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
+        if len(self.parameters) > 64:
+            raise ValueError("capability parameters are too large")
+        object.__setattr__(self, "parameters", _freeze(self.parameters))
 
 
 @dataclass(frozen=True, slots=True)

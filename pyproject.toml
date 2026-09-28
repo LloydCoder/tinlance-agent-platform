@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tinlance-agent-platform"
-version = "1.0.0"
+version = "1.1.0"
 description = "Tinlance governed agent execution substrate"
 requires-python = ">=3.12,<3.15"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["mypy>=1.17,<3", "pytest>=8.4,<10", "ruff>=0.12,<1"]
+test = ["mypy>=1.17,<3", "pytest>=8.4,<10", "pytest-cov>=7.1,<8", "ruff>=0.12,<1"]
 security = ["pip-audit>=2.9,<3", "cyclonedx-bom>=7,<8"]
 
 [tool.hatch.build.targets.wheel]
