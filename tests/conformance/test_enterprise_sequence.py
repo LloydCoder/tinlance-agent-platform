@@ -70,6 +70,7 @@ def test_tenant_boundary_cannot_be_crossed() -> None:
         "single",
     )
     from tinlance_agent_platform_tools import ToolGateway
+
     call = ToolCall(uuid4(), "tenant-b", uuid4(), "reader", "doc:read", "read", "doc-1")
     assert ToolGateway().authorize(context, call, request).decision is Decision.DENY
 
