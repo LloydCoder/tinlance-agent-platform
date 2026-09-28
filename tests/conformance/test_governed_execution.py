@@ -128,7 +128,7 @@ def test_cross_tenant_request_fails_before_model() -> None:
 def test_high_risk_path_requires_exact_human_approval() -> None:
     tenant = "tenant-a"
     agent_id = uuid4()
-    task = TaskSpec(uuid4(), tenant, agent_id, "1.0", "user-1", "write")
+    task = TaskSpec(uuid4(), tenant, agent_id, "1.0", "user-1", "write", max_turns=2)
     run = Run(uuid4(), task.task_id, tenant)
     principal = Principal("user-1", "human", tenant, scopes=frozenset({"doc:write"}))
     context = RequestContext("req-approval", tenant, principal, "test")
