@@ -1,19 +1,9 @@
 # Agent Platform Roadmap
 
-M0 Foundation — bounded contracts, kernel, identity, tenancy, authorization, policy.
-M1 Core Domain — agents, runs, approvals, budgets, governed tools, sandbox boundary.
-M2 Execution — model/tool provider ports, runner, secret broker boundary, events/evidence reference stores.
-M3 Durability — PostgreSQL repositories, transactional outbox, idempotency, retries, resumable runs.
-M4 Governance — policy composition, capability grants, approval binding, emergency stop, step-up controls.
-M5 Context — context assembly, memory ports, classification/redaction, prompt-injection boundaries.
-M6 MCP — MCP transport, server/tool registration, per-tool auth, scope step-up and capability mapping.
-M7 Evidence — append-only trajectory, provenance, tamper evidence, audit records and retention contracts.
-M8 Observability — OpenTelemetry traces/metrics/logs, cost accounting, security events and health.
-M9 Evaluation — deterministic eval runner, adversarial suites, regression corpus and safety gates.
-M10 Isolation — production sandbox adapter, resource/network/filesystem controls and kill semantics.
-M11 API/SDK — service API, worker, scheduler, CLI and stable external SDK surface.
-M12 Multi-agent — delegation, handoffs, child-agent authority narrowing, concurrency and cancellation.
-M13 Operations — deployment, migrations, configuration, supply-chain controls, backup/recovery and SLOs.
-M14 Validation — end-to-end conformance, threat-model closure, release hardening and v1.0 readiness.
+## Canonical enterprise sequence
+M0 Foundation -> M1 Identity -> M2 Authorization -> M3 Approval -> M4 Runtime -> M5 Model Gateway -> M6 Tool/MCP Gateway -> M7 Sandbox -> M8 Orchestration -> M9 Memory -> M10 Evidence/Event -> M11 Observability -> M12 Evaluation -> M13 Domain SDK -> M14 Enterprise.
 
-Each milestone must ship implementation, tests, security validation and documentation; later milestones may not silently backfill earlier security invariants.
+## Implementation mapping
+M0 contracts/kernel/tenancy/boundaries. M1 identity/immutable agent versions. M2 deny-by-default authorization and policy. M3 same-run approval and exact binding. M4 runtime state, budgets and cancellation. M5 provider-neutral model gateway. M6 governed tools and MCP. M7 explicit isolated sandbox. M8 governed orchestration. M9 tenant-scoped memory and prompt-injection boundaries. M10 idempotent events/evidence/trajectory. M11 telemetry interfaces and adapters. M12 deterministic/adversarial evaluation. M13 stable SDK for domain repositories. M14 enterprise operations, SLOs, recovery, supply-chain provenance, tenant isolation and release conformance.
+
+Every milestone requires implementation, tests, security validation and documentation; a green CI run alone is not a production claim.
