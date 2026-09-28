@@ -60,8 +60,13 @@ class InMemoryObservabilitySink:
 
 
 def new_security_event(
-    tenant_id: str, event_type: str, severity: str, *, actor_id: str | None = None,
-    trace_id: str | None = None, outcome: str = "unknown",
+    tenant_id: str,
+    event_type: str,
+    severity: str,
+    *,
+    actor_id: str | None = None,
+    trace_id: str | None = None,
+    outcome: str = "unknown",
 ) -> SecurityEvent:
     if not tenant_id or severity not in {"info", "warning", "critical"}:
         raise ValueError("invalid security event")

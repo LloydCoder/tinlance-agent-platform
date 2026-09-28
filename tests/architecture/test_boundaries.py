@@ -91,7 +91,15 @@ def test_bounded_package_dependencies() -> None:
 
 
 def test_no_provider_or_framework_imports_in_core() -> None:
-    forbidden = {"fastapi", "pydantic", "openai", "anthropic", "boto3", "sqlalchemy", "psycopg"}
+    forbidden = {
+        "fastapi",
+        "pydantic",
+        "openai",
+        "anthropic",
+        "boto3",
+        "sqlalchemy",
+        "psycopg",
+    }
     for package in ("contracts", "kernel"):
         root = ROOT / "packages" / package / "src"
         for path in root.rglob("*.py"):

@@ -47,7 +47,8 @@ class ContextService:
         if not tenant_id:
             raise ValueError("tenant is required")
         return tuple(
-            item for item in self._memory
+            item
+            for item in self._memory
             if item.tenant_id == tenant_id
             and (classification is None or item.classification == classification)
         )

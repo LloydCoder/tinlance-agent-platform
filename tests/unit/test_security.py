@@ -26,8 +26,13 @@ def make_request(
     blast_radius: str = "single-resource",
 ) -> CapabilityRequest:
     return CapabilityRequest(
-        action="read", resource="document", capabilities=frozenset({"document:read"}),
-        risk=risk, reversibility=reversibility, data_class=data_class, blast_radius=blast_radius,
+        action="read",
+        resource="document",
+        capabilities=frozenset({"document:read"}),
+        risk=risk,
+        reversibility=reversibility,
+        data_class=data_class,
+        blast_radius=blast_radius,
     )
 
 

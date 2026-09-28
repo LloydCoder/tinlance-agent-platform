@@ -35,12 +35,32 @@ class BubblewrapProvider:
             if not parsed.is_absolute() or ".." in parsed.parts or path == "/":
                 raise PermissionError("invalid workspace path")
         command = [
-            self.binary, "--die-with-parent", "--new-session", "--unshare-all",
-            "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin",
-            "--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64",
-            "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+            self.binary,
+            "--die-with-parent",
+            "--new-session",
+            "--unshare-all",
+            "--ro-bind",
+            "/usr",
+            "/usr",
+            "--ro-bind",
+            "/bin",
+            "/bin",
+            "--ro-bind",
+            "/lib",
+            "/lib",
+            "--ro-bind",
+            "/lib64",
+            "/lib64",
+            "--proc",
+            "/proc",
+            "--dev",
+            "/dev",
+            "--tmpfs",
+            "/tmp",
         ]
         for path in workspace_paths:
             command.extend(("--bind", path, path))
-        command.extend(("--chdir", workspace_paths[0] if workspace_paths else "/tmp", "--", *argv))
+        command.extend(
+            ("--chdir", workspace_paths[0] if workspace_paths else "/tmp", "--", *argv)
+        )
         return command
