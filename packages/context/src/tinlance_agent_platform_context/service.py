@@ -30,22 +30,32 @@ class MemoryEntry:
 class ContextService:
     def __init__(self, policy: ContextPolicy | None = None) -> None:
         self.policy = policy or ContextPolicy()
+        if self.policy.max_items < 1 or self.policy.max_chars < 1:
+            raise ValueError("context policy limits must be positive")
         self._memory: list[MemoryEntry] = []
 
     def remember(
         self, tenant_id: str, content: str, classification: str = "internal"
     ) -> MemoryEntry:
         allowed = {"public", "internal", "sensitive"}
-        if (\n            not tenant_id\n            or tenant_id != tenant_id.strip()\n            or not content\n            or len(content) > self.policy.max_chars\n            or classification not in allowed\n        ):
+        if (
+            not tenant_id
+            or tenant_id != tenant_id.strip()
+            or not content
+            or len(content) > self.policy.max_chars
+            or classification not in allowed
+        ):
             raise ValueError("invalid memory entry")
         redacted = self.redact_sensitive(content)
         entry = MemoryEntry(uuid4(), tenant_id, redacted, classification, datetime.now(UTC))
         self._memory.append(entry)
         return entry
 
-    def recall(self, tenant_id: str, classification: str | None = None) -> tuple[MemoryEntry, ...]:
-        if not tenant_id:
-            raise ValueError("tenant is required")
+    def recall(
+        self, tenant_id: str, classification: str | None = None
+    ) -> tuple[MemoryEntry, ...]:
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("tenant is required and normalized")
         return tuple(
             item
             for item in self._memory
@@ -54,8 +64,8 @@ class ContextService:
         )
 
     def build(self, tenant_id: str, items: list[ContextItem]) -> str:
-        if not tenant_id:
-            raise ValueError("tenant is required")
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("tenant is required and normalized")
         selected: list[str] = []
         for item in items:
             if not item.trusted and not self.policy.allow_untrusted_content:
