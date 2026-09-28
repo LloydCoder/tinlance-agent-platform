@@ -51,7 +51,12 @@ def test_full_governed_execution_path() -> None:
     call = ToolCall(uuid4(), tenant, run_id, "reader", "doc:read", "read", "doc-1")
 
     models = ModelGateway()
-    models.register("provider", Provider(), tenants=frozenset({tenant}), agents=frozenset({str(agent_id)}))
+    models.register(
+        "provider",
+        Provider(),
+        tenants=frozenset({tenant}),
+        agents=frozenset({str(agent_id)}),
+    )
     tools = ToolGateway()
     tools.register(ToolRegistration("reader", "doc:read", "read documents"), Reader())
 
@@ -107,7 +112,12 @@ def test_full_governed_execution_rejects_cross_tenant_before_model() -> None:
         "single-resource",
     )
     call = ToolCall(uuid4(), "tenant-b", run.run_id, "reader", "doc:read", "read", "doc-1")
-    request = ModelRequest(tenant, str(task.agent_id), "model-1", ({"role": "user", "content": "x"},))
+    request = ModelRequest(
+        tenant,
+        str(task.agent_id),
+        "model-1",
+        ({"role": "user", "content": "x"},),
+    )
 
     try:
         service.execute(context, task, run, "provider", request, capability, call)
