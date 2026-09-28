@@ -28,7 +28,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy packages
-      - run: pytest --cov=packages --cov-report=term-missing --cov-report=xml
+      - run: pytest --cov=packages --cov-report=term-missing --cov-report=xml --cov-fail-under=85
       - run: python -m pip freeze | grep -vE '^(tinlance-agent-platform==|-e )' > /tmp/audit-requirements.txt
       - run: pip-audit --strict -r /tmp/audit-requirements.txt
       - run: cyclonedx-py environment --output-format JSON --output-file sbom.json
