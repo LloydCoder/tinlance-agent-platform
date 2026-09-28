@@ -117,6 +117,7 @@ class MCPToolGateway:
         tool_name: str,
         arguments: Mapping[str, object],
         capability_request: CapabilityRequest,
+        run_id: UUID,
         *,
         approval_id: UUID | None = None,
         approval_verifier: ApprovalVerifier | None = None,
@@ -130,15 +131,8 @@ class MCPToolGateway:
             approval_verifier.require_approved_for(
                 approval_id,
                 context.tenant_id,
-                self._run_id_from_request(capability_request),
+                run_id,
                 capability_request.action,
                 capability_request.resource,
             )
         return self._transport.call(tool_name, MappingProxyType(dict(arguments)), scope)
-
-    @staticmethod
-    def _run_id_from_request(request: CapabilityRequest) -> UUID:
-        run_id = request.parameters.get("run_id")
-        if not isinstance(run_id, UUID):
-            raise PermissionError("governed MCP requests must bind a UUID run_id")
-        return run_id
