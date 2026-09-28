@@ -124,3 +124,76 @@ def test_full_governed_execution_rejects_cross_tenant_before_model() -> None:
     except PermissionError:
         return
     raise AssertionError("cross-tenant execution must fail closed")
+
+
+def test_high_risk_path_requires_exact_human_approval() -> None:
+    from tinlance_agent_platform_approvals import ApprovalService
+
+    tenant = "tenant-a"
+    agent_id = uuid4()
+    task = TaskSpec(uuid4(), tenant, agent_id, "1.0", "user-1", "write")
+    run = Run(uuid4(), task.task_id, tenant)
+    principal = Principal("user-1", "human", tenant, scopes=frozenset({"doc:write"}))
+    context = RequestContext("req-approval", tenant, principal, "test")
+    capability = CapabilityRequest(
+        "write",
+        "doc-1",
+        frozenset({"doc:write"}),
+        RiskTier.HIGH,
+        Reversibility.IRREVERSIBLE,
+        DataClass.SENSITIVE,
+        "single-resource",
+    )
+    call = ToolCall(uuid4(), tenant, run.run_id, "writer", "doc:write", "write", "doc-1")
+    models = ModelGateway()
+    models.register("provider", Provider(), tenants=frozenset({tenant}))
+    tools = ToolGateway()
+
+    class Writer:
+        def execute(self, tool_call: ToolCall) -> str:
+            return f"written:{tool_call.resource}"
+
+    tools.register(ToolRegistration("writer", "doc:write", "write documents"), Writer())
+    approvals = ApprovalService()
+    approval = approvals.request(tenant, run.run_id, "write", "doc-1", "required", "user-1")
+    service = GovernedExecutionService(
+        models,
+        tools,
+        InMemoryEventStore(),
+        InMemoryEvidenceStore(),
+        InMemoryTrajectoryStore(),
+        InMemoryObservabilitySink(),
+    )
+    model_request = ModelRequest(
+        tenant,
+        str(agent_id),
+        "model-1",
+        ({"role": "user", "content": "write"},),
+    )
+
+    import pytest
+
+    with pytest.raises(PermissionError):
+        service.execute(
+            context,
+            task,
+            run,
+            "provider",
+            model_request,
+            capability,
+            call,
+        )
+
+    approvals.decide(approval.approval_id, True, tenant)
+    result = service.execute(
+        context,
+        task,
+        run,
+        "provider",
+        model_request,
+        capability,
+        call,
+        approval_id=approval.approval_id,
+        approval_verifier=approvals,
+    )
+    assert result.tool_output == "written:doc-1"
