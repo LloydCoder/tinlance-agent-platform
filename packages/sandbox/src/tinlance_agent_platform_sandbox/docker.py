@@ -28,7 +28,6 @@ class DockerSandbox:
         name = f"tap-sbx-{execution_id.hex}"
         network = "default" if request.allow_network else "none"
         env_args: list[str] = []
-
         for key in request.allowed_env:
             value = os.environ.get(key)
             if value is not None:
@@ -55,6 +54,8 @@ class DockerSandbox:
             "1",
             "--ulimit",
             f"cpu={request.limits.cpu_seconds}",
+            "--user",
+            f"{os.getuid()}:{os.getgid()}",
             "-w",
             "/workspace",
             "-v",
@@ -63,7 +64,6 @@ class DockerSandbox:
             self.image,
             *request.command,
         ]
-
         try:
             completed = subprocess.run(
                 command,

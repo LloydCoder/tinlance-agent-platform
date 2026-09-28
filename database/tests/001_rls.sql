@@ -9,6 +9,11 @@ $$;
 grant usage on schema platform to platform_app;
 grant select, insert, update, delete on all tables in schema platform to platform_app;
 
+insert into platform.tenants (tenant_id, name) values
+    ('00000000-0000-0000-0000-000000000001', 'tenant-a'),
+    ('00000000-0000-0000-0000-000000000002', 'tenant-b')
+on conflict (tenant_id) do nothing;
+
 begin;
 set role platform_app;
 select set_config(
@@ -16,10 +21,6 @@ select set_config(
     '00000000-0000-0000-0000-000000000001',
     true
 );
-
-insert into platform.tenants (tenant_id, name) values
-    ('00000000-0000-0000-0000-000000000001', 'tenant-a'),
-    ('00000000-0000-0000-0000-000000000002', 'tenant-b');
 
 insert into platform.agents (
     agent_id, tenant_id, agent_type, version, owner_subject_id,

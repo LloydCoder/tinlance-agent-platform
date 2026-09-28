@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import pytest
+
 from tinlance_agent_platform_authorization import authorize
 from tinlance_agent_platform_contracts import (
     AgentIdentity,
@@ -51,8 +52,12 @@ def test_high_risk_requires_approval() -> None:
 
 
 def test_child_context_cannot_cross_tenant() -> None:
-    parent = RequestContext("p", "tenant-a", Principal("a", "human", "tenant-a"), "test")
-    child = RequestContext("c", "tenant-b", Principal("b", "agent", "tenant-b"), "test")
+    parent = RequestContext(
+        "p", "tenant-a", Principal("a", "human", "tenant-a"), "test"
+    )
+    child = RequestContext(
+        "c", "tenant-b", Principal("b", "agent", "tenant-b"), "test"
+    )
     with pytest.raises(PermissionError):
         child_context(parent, child)
 
