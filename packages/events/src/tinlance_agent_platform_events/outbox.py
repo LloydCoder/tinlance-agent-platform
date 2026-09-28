@@ -54,9 +54,7 @@ class InMemoryEventStore:
         )
 
 
-def new_event(
-    tenant_id: str, run_id: UUID, event_type: str, payload: Mapping[str, str]
-) -> Event:
+def new_event(tenant_id: str, run_id: UUID, event_type: str, payload: Mapping[str, str]) -> Event:
     return Event(
         uuid4(), tenant_id, run_id, event_type, MappingProxyType(dict(payload)), datetime.now(UTC)
     )
