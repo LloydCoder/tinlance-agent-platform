@@ -1,3 +1,3 @@
-from .service import MetricPoint, SecurityEvent, TraceSpan, ObservabilitySink
+from .service import MetricPoint, ObservabilitySink, SecurityEvent, TraceSpan
 
 __all__ = ["MetricPoint", "SecurityEvent", "TraceSpan", "ObservabilitySink"]
