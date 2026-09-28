@@ -9,6 +9,13 @@ PACKAGES = {
     "tenancy": "tinlance_agent_platform_tenancy",
     "authorization": "tinlance_agent_platform_authorization",
     "policy": "tinlance_agent_platform_policy",
+    "agents": "tinlance_agent_platform_agents",
+    "approvals": "tinlance_agent_platform_approvals",
+    "budgets": "tinlance_agent_platform_budgets",
+    "runtime": "tinlance_agent_platform_runtime",
+    "tools": "tinlance_agent_platform_tools",
+    "sandbox": "tinlance_agent_platform_sandbox",
+    "sdk": "tinlance_agent_platform_sdk",
 }
 ALLOWED = {
     "contracts": set(),
@@ -17,6 +24,17 @@ ALLOWED = {
     "tenancy": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel"},
     "authorization": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel"},
     "policy": {"tinlance_agent_platform_contracts"},
+    "agents": {"tinlance_agent_platform_contracts"},
+    "approvals": {"tinlance_agent_platform_contracts"},
+    "budgets": {"tinlance_agent_platform_contracts"},
+    "runtime": {"tinlance_agent_platform_contracts"},
+    "tools": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel", "tinlance_agent_platform_policy"},
+    "sandbox": {"tinlance_agent_platform_contracts"},
+    "sdk": {
+        "tinlance_agent_platform_agents", "tinlance_agent_platform_approvals",
+        "tinlance_agent_platform_budgets", "tinlance_agent_platform_runtime",
+        "tinlance_agent_platform_sandbox", "tinlance_agent_platform_tools",
+    },
 }
 
 
