@@ -92,7 +92,9 @@ class GovernedExecutionService:
         remaining_budget = self._budget.budget.max_seconds - self._budget.budget.elapsed_seconds
         timeout_seconds = min(task.timeout_seconds, remaining_budget)
         if timeout_seconds <= 0:
-            self._state.transition(running, RunStatus.FAILED, failure_code="runtime_budget_exceeded")
+            self._state.transition(
+                running, RunStatus.FAILED, failure_code="runtime_budget_exceeded"
+            )
             raise TimeoutError("runtime budget exhausted before model execution")
 
         try:
