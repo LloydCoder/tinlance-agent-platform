@@ -29,15 +29,11 @@ class InMemoryTrajectoryStore:
     def append(
         self, tenant_id: str, run_id: UUID, event_type: str, payload: str
     ) -> TrajectoryEvent:
-        run_events = [
-            e for e in self._events if e.tenant_id == tenant_id and e.run_id == run_id
-        ]
+        run_events = [e for e in self._events if e.tenant_id == tenant_id and e.run_id == run_id]
         previous = run_events[-1].event_hash if run_events else "GENESIS"
         sequence = len(run_events) + 1
         event_id = uuid4()
-        material = (
-            f"{tenant_id}|{run_id}|{sequence}|{event_type}|{payload}|{previous}"
-        ).encode()
+        material = (f"{tenant_id}|{run_id}|{sequence}|{event_type}|{payload}|{previous}").encode()
         event_hash = sha256(material).hexdigest()
         event = TrajectoryEvent(
             event_id,
@@ -53,9 +49,7 @@ class InMemoryTrajectoryStore:
         return event
 
     def verify(self, tenant_id: str, run_id: UUID) -> bool:
-        events = [
-            e for e in self._events if e.tenant_id == tenant_id and e.run_id == run_id
-        ]
+        events = [e for e in self._events if e.tenant_id == tenant_id and e.run_id == run_id]
         previous = "GENESIS"
         for event in events:
             material = (
