@@ -8,6 +8,7 @@ from tinlance_agent_platform_contracts import (
     Reversibility,
     RiskTier,
 )
+
 _SINGLE_RESOURCE = {"single", "single-resource"}
 
 
