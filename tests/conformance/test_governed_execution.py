@@ -16,8 +16,8 @@ from tinlance_agent_platform_contracts import (
     TaskSpec,
     ToolCall,
 )
-from tinlance_agent_platform_evidence import InMemoryEvidenceStore
 from tinlance_agent_platform_events import InMemoryEventStore
+from tinlance_agent_platform_evidence import InMemoryEvidenceStore
 from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
 from tinlance_agent_platform_observability import InMemoryObservabilitySink
 from tinlance_agent_platform_orchestration import GovernedExecutionService
