@@ -25,7 +25,14 @@ class ToolScope:
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.capability, self.resource)):
             raise ValueError("complete tool scope is required")
-        if any(value != value.strip() for value in (self.tenant_id, self.capability, self.resource)):
+        if any(
+            value != value.strip()
+            for value in (
+                self.tenant_id,
+                self.capability,
+                self.resource,
+            )
+        ):
             raise ValueError("tool scope fields must be normalized")
 
 
