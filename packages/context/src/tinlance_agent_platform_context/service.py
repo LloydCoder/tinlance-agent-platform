@@ -55,4 +55,4 @@ class ContextService:
 
     def redact_sensitive(self, text: str) -> str:
         pattern = r"(SECRET|API_KEY|PASSWORD)=[^\\s\\n]*"
-        return re.sub(pattern, r"\\1=[REDACTED]", text)
+        return re.sub(pattern, lambda match: match.group(1) + "=[REDACTED]", text)
