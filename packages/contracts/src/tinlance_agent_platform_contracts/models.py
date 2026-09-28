@@ -1,8 +1,8 @@
 """Security and execution vocabulary shared across platform layers."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
-from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any
 from uuid import UUID
