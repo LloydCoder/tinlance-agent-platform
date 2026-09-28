@@ -64,9 +64,7 @@ def test_mcp_gateway_rejects_unbounded_or_unsupported_arguments() -> None:
     gateway.register(MCPTool("lookup", "lookup", "doc:read", "doc-1"))
     scope = ToolScope("tenant-a", "doc:read", "doc-1")
 
-    deeply_nested = {
-        "nested": {"deep": {"x": {"y": {"z": {"q": {"r": {"s": {"t": 1}}}}}}}}
-    }
+    deeply_nested = {"nested": {"deep": {"x": {"y": {"z": {"q": {"r": {"s": {"t": 1}}}}}}}}}
     with pytest.raises(ValueError):
         gateway.call(scope, "lookup", deeply_nested)
 
