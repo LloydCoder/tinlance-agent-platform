@@ -13,9 +13,12 @@ PACKAGES = {
     "sandbox": "tinlance_agent_platform_sandbox", "secrets": "tinlance_agent_platform_secrets",
     "events": "tinlance_agent_platform_events", "evidence": "tinlance_agent_platform_evidence",
     "durability": "tinlance_agent_platform_durability", "governance": "tinlance_agent_platform_governance",
-    "context": "tinlance_agent_platform_context", "trajectory": "tinlance_agent_platform_trajectory",
-    "observability": "tinlance_agent_platform_observability", "evaluation": "tinlance_agent_platform_evaluation",
-    "api": "tinlance_agent_platform_api", "multi_agent": "tinlance_agent_platform_multi_agent",
+    "context": "tinlance_agent_platform_context",
+    "trajectory": "tinlance_agent_platform_trajectory",
+    "observability": "tinlance_agent_platform_observability",
+    "evaluation": "tinlance_agent_platform_evaluation",
+    "api": "tinlance_agent_platform_api",
+    "multi_agent": "tinlance_agent_platform_multi_agent",
     "operations": "tinlance_agent_platform_operations", "sdk": "tinlance_agent_platform_sdk",
 }
 
@@ -54,7 +57,9 @@ def test_bounded_package_dependencies() -> None:
         for path in root.rglob("*.py"):
             external = imports_for(path) & names
             allowed_names = {PACKAGES[name] for name in SERVICE_DEPS[package]}
-            assert external <= allowed_names, f"{path}: forbidden imports {external - allowed_names}"
+            assert external <= allowed_names, (
+                f"{path}: forbidden imports {external - allowed_names}"
+            )
 
 
 def test_no_provider_or_framework_imports_in_core() -> None:

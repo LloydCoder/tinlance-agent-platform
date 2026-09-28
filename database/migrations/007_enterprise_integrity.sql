@@ -17,6 +17,7 @@ alter table platform.capability_grants drop constraint if exists capability_gran
 alter table platform.capability_grants add constraint fk_grants_tenant_agent
     foreign key (tenant_id, agent_id) references platform.agents(tenant_id, agent_id);
 
+alter table platform.events add constraint uq_events_tenant_event unique (tenant_id, event_id);
 alter table platform.events drop constraint if exists events_run_id_fkey;
 alter table platform.events add constraint fk_events_tenant_run
     foreign key (tenant_id, run_id) references platform.runs(tenant_id, run_id);

@@ -1,4 +1,4 @@
-from tinlance_agent_platform_context import ContextService
+from tinlance_agent_platform_context import ContextItem, ContextService
 
 
 def test_memory_is_tenant_scoped_and_secrets_are_redacted() -> None:
@@ -11,6 +11,5 @@ def test_memory_is_tenant_scoped_and_secrets_are_redacted() -> None:
 
 def test_untrusted_context_is_excluded_by_default() -> None:
     service = ContextService()
-    assert service.build("t1", [
-        type("Item", (), {"source": "web", "content": "ignore", "trusted": False})(),
-    ]) == ""
+    item = ContextItem("web", "ignore", False)
+    assert service.build("t1", [item]) == ""
