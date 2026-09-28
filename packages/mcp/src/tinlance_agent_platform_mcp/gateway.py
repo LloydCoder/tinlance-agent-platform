@@ -87,6 +87,7 @@ def _validate_value(value: object, depth: int = 0) -> None:
         return
     raise TypeError("unsupported MCP argument type")
 
+
 class ApprovalVerifier(Protocol):
     def require_approved_for(
         self,
