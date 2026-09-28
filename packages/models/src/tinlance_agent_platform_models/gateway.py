@@ -51,17 +51,46 @@ class ModelProvider(Protocol):
     def complete(self, request: ModelRequest) -> ModelResponse: ...
 
 
-class ModelGateway:
-    def __init__(self) -> None:
-        self._providers: dict[str, ModelProvider] = {}
+@dataclass(frozen=True, slots=True)
+class _ProviderBinding:
+    provider: ModelProvider
+    tenants: frozenset[str] | None
+    agents: frozenset[str] | None
 
-    def register(self, name: str, provider: ModelProvider) -> None:
+
+class ModelGateway:
+    """Provider-neutral gateway enforcing tenant/agent binding and response limits."""
+
+    def __init__(self) -> None:
+        self._providers: dict[str, _ProviderBinding] = {}
+
+    def register(
+        self,
+        name: str,
+        provider: ModelProvider,
+        *,
+        tenants: frozenset[str] | None = None,
+        agents: frozenset[str] | None = None,
+    ) -> None:
         if not name or name != name.strip() or name in self._providers:
             raise ValueError("model provider name must be unique and normalized")
-        self._providers[name] = provider
+        if tenants is not None and any(not tenant or tenant != tenant.strip() for tenant in tenants):
+            raise ValueError("model tenant allowlist must be normalized")
+        if agents is not None and any(not agent or agent != agent.strip() for agent in agents):
+            raise ValueError("model agent allowlist must be normalized")
+        self._providers[name] = _ProviderBinding(provider, tenants, agents)
 
     def complete(self, provider: str, request: ModelRequest) -> ModelResponse:
-        selected = self._providers.get(provider)
-        if selected is None:
+        binding = self._providers.get(provider)
+        if binding is None:
             raise LookupError("model provider is not registered")
-        return selected.complete(request)
+        if binding.tenants is not None and request.tenant_id not in binding.tenants:
+            raise PermissionError("model provider is not enabled for this tenant")
+        if binding.agents is not None and request.agent_id not in binding.agents:
+            raise PermissionError("model provider is not enabled for this agent")
+        response = binding.provider.complete(request)
+        if response.model != request.model:
+            raise ValueError("model provider returned an unexpected model")
+        if response.output_tokens > request.max_output_tokens:
+            raise ValueError("model provider exceeded the requested output-token budget")
+        return response
