@@ -1,5 +1,6 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
@@ -40,8 +41,7 @@ def test_mcp_gateway_requires_governed_scope() -> None:
     gateway = MCPToolGateway(FakeTransport())
     gateway.register(MCPTool("search", "search", "read", "read", "repo:a"))
     scope = ToolScope("t1", "read", "repo:a")
-    run_id = uuid4()
-    result = gateway.call(context(), scope, "search", {}, request(), run_id=run_id)
+    result = gateway.call(context(), scope, "search", {}, request(), run_id=uuid4())
     assert result["tenant"] == "t1"
 
 
