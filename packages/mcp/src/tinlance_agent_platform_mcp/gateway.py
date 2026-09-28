@@ -1,7 +1,9 @@
 from collections.abc import Mapping
+# isort: off
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol
+# isort: on
 
 
 _MAX_ARGUMENTS = 64
