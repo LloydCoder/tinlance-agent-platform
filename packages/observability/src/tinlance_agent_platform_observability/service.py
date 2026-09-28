@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from threading import RLock
 from typing import Protocol
 from uuid import UUID, uuid4
 
@@ -45,18 +46,37 @@ class ObservabilitySink(Protocol):
 
 class InMemoryObservabilitySink:
     def __init__(self) -> None:
-        self.spans: list[TraceSpan] = []
-        self.metrics: list[MetricPoint] = []
-        self.security: list[SecurityEvent] = []
+        self._spans: list[TraceSpan] = []
+        self._metrics: list[MetricPoint] = []
+        self._security: list[SecurityEvent] = []
+        self._lock = RLock()
+
+    @property
+    def spans(self) -> tuple[TraceSpan, ...]:
+        with self._lock:
+            return tuple(self._spans)
+
+    @property
+    def metrics(self) -> tuple[MetricPoint, ...]:
+        with self._lock:
+            return tuple(self._metrics)
+
+    @property
+    def security(self) -> tuple[SecurityEvent, ...]:
+        with self._lock:
+            return tuple(self._security)
 
     def emit_span(self, span: TraceSpan) -> None:
-        self.spans.append(span)
+        with self._lock:
+            self._spans.append(span)
 
     def emit_metric(self, metric: MetricPoint) -> None:
-        self.metrics.append(metric)
+        with self._lock:
+            self._metrics.append(metric)
 
     def emit_security(self, event: SecurityEvent) -> None:
-        self.security.append(event)
+        with self._lock:
+            self._security.append(event)
 
 
 def new_security_event(
@@ -68,7 +88,14 @@ def new_security_event(
     trace_id: str | None = None,
     outcome: str = "unknown",
 ) -> SecurityEvent:
-    if not tenant_id or severity not in {"info", "warning", "critical"}:
+    if (
+        not tenant_id
+        or tenant_id != tenant_id.strip()
+        or not event_type
+        or event_type != event_type.strip()
+        or severity not in {"info", "warning", "critical"}
+        or outcome not in {"allow", "deny", "unknown", "error"}
+    ):
         raise ValueError("invalid security event")
     return SecurityEvent(
         uuid4(), tenant_id, event_type, severity, datetime.now(UTC), actor_id, trace_id, outcome
