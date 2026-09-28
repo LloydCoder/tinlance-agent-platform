@@ -39,6 +39,7 @@ packages = [
   "packages/trajectory/src/tinlance_agent_platform_trajectory",
   "packages/observability/src/tinlance_agent_platform_observability",
   "packages/evaluation/src/tinlance_agent_platform_evaluation",
+  "packages/api/src/tinlance_agent_platform_api",
 ]
 
 [tool.pytest.ini_options]
