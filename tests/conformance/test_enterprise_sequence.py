@@ -73,9 +73,13 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
             return ModelResponse(request.model, "ok", 2, 1)
 
     model.register("test-provider", Provider())
-    response = model.complete(
-        "test-provider", ModelRequest("tenant-a", "agent-1", "model-1", ({"role": "user", "content": "hi"},))
+    request = ModelRequest(
+        "tenant-a",
+        "agent-1",
+        "model-1",
+        ({"role": "user", "content": "hi"},),
     )
+    response = model.complete("test-provider", request)
     assert response.output == "ok"
 
     class Transport:
