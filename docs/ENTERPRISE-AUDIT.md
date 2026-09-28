@@ -5,3 +5,6 @@ The Agent Platform is the lower-level governed execution substrate. Tinlance Age
 This audit closes the dangerous gap between having interfaces and actually enforcing boundaries: model tool calls are tenant checked, MCP has a governed path, memory is tenant scoped and redacted, events support idempotency, the sandbox has an execution contract, and the SDK aggregates the current public surface.
 
 Production adapters still remain explicit: durable PostgreSQL repositories, external IdP/token verification, telemetry export, secret-manager integrations, artifact signing/provenance, backup/restore and deployment infrastructure. The core must fail closed when those adapters are unavailable.
+
+
+The final branch is validated by both formatting automation and repository CI before merge.
