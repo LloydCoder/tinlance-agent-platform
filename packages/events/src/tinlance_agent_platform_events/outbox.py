@@ -6,6 +6,10 @@ from types import MappingProxyType
 from typing import Protocol
 from uuid import UUID, uuid4
 
+_MAX_EVENT_TYPE = 128
+_MAX_PAYLOAD_FIELDS = 32
+_MAX_PAYLOAD_VALUE = 4096
+
 
 @dataclass(frozen=True, slots=True)
 class Event:
@@ -30,11 +34,24 @@ class InMemoryEventStore:
         self._lock = RLock()
 
     def append(self, event: Event) -> Event:
-        if (\n            not event.tenant_id\n            or event.tenant_id != event.tenant_id.strip()\n            or not event.event_type\n        ):
-            raise ValueError("tenant and event type are required")
-        if any(not key or not value for key, value in event.payload.items()):
-            raise ValueError("event payload keys and values are required")
-        secret_markers = ("secret", "password", "token", "private_key", "authorization")
+        if (
+            not event.tenant_id
+            or event.tenant_id != event.tenant_id.strip()
+            or not event.event_type
+            or len(event.event_type) > _MAX_EVENT_TYPE
+        ):
+            raise ValueError("tenant and event type are required and bounded")
+        if len(event.payload) > _MAX_PAYLOAD_FIELDS:
+            raise ValueError("event payload has too many fields")
+        if any(
+            not key
+            or not value
+            or len(key) > 128
+            or len(value) > _MAX_PAYLOAD_VALUE
+            for key, value in event.payload.items()
+        ):
+            raise ValueError("event payload keys and values are required and bounded")
+        secret_markers = ("secret", "password", "token", "private_key")
         if any(
             marker in f"{key}={value}".lower()
             for key, value in event.payload.items()
