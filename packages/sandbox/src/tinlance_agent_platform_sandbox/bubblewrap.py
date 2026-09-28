@@ -7,14 +7,17 @@ from typing import Protocol
 
 from tinlance_agent_platform_contracts import ExecutionResult, SandboxRequest
 
+
 @dataclass(frozen=True, slots=True)
 class SandboxLimits:
     timeout_seconds: int = 30
     max_output_bytes: int = 1_000_000
 
+
 class SandboxProvider(Protocol):
     def command(self, request: SandboxRequest, limits: SandboxLimits) -> list[str]: ...
     def execute(self, request: SandboxRequest, limits: SandboxLimits) -> ExecutionResult: ...
+
 
 class BubblewrapProvider:
     def __init__(self, binary: str = "bwrap") -> None:
@@ -50,7 +53,26 @@ class BubblewrapProvider:
         started = monotonic()
         env = {key: value for key, value in environ.items() if key in request.environment_keys}
         try:
-            completed: CompletedProcess[str] = run(argv, capture_output=True, text=True, timeout=request.timeout_seconds, check=False, env=env)
-            return ExecutionResult(request.request_id, completed.returncode, completed.stdout[:limits.max_output_bytes], completed.stderr[:limits.max_output_bytes], monotonic() - started)
+            completed: CompletedProcess[str] = run(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=request.timeout_seconds,
+                check=False,
+                env=env,
+            )
+            return ExecutionResult(
+                request.request_id,
+                completed.returncode,
+                completed.stdout[: limits.max_output_bytes],
+                completed.stderr[: limits.max_output_bytes],
+                monotonic() - started,
+            )
         except TimeoutExpired as exc:
-            return ExecutionResult(request.request_id, 124, str(exc.stdout or "")[:limits.max_output_bytes], str(exc.stderr or "")[:limits.max_output_bytes], monotonic() - started)
+            return ExecutionResult(
+                request.request_id,
+                124,
+                str(exc.stdout or "")[: limits.max_output_bytes],
+                str(exc.stderr or "")[: limits.max_output_bytes],
+                monotonic() - started,
+            )
