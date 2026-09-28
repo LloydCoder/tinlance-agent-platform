@@ -1,43 +1,82 @@
 # Canonical Agent Platform Roadmap
 
-This is the canonical milestone sequence for Tinlance Agent Platform and supersedes earlier implementation-order labels in historical status documents.
+This is the **authoritative milestone sequence** for Tinlance Agent Platform. It supersedes historical implementation-order labels retained in status documents and commit history.
 
-M0 -> M1 Identity -> M2 Authorization -> M3 Approval -> M4 Runtime + M5 Model Gateway -> M6 Tool/MCP Gateway -> M7 Sandbox -> M8 Orchestration -> M9 Memory -> M10 Evidence/Event -> M11 Observability -> M12 Evaluation -> M13 Domain SDK -> M14 Enterprise
+**Canonical sequence**
 
-## Scope
+M0 Foundation → M1 Identity → M2 Authorization → M3 Approval → M4 Runtime → M5 Model Gateway → M6 Tool/MCP Gateway → M7 Sandbox → M8 Orchestration → M9 Memory → M10 Evidence/Event → M11 Observability → M12 Evaluation → M13 Domain SDK → M14 Enterprise
 
-M0 Foundation: contracts, kernel, package boundaries, RLS and threat model.
+## Milestone contracts
 
-M1 Identity: normalized principals, agent identity/versioning and tenant binding.
+| Milestone | Required capability | Completion evidence |
+|---|---|---|
+| M0 | Contracts, kernel, package boundaries, PostgreSQL RLS, threat model | Architecture, SQL and boundary tests |
+| M1 | Normalized principals, agent identity/versioning, tenant binding | Identity contracts and conformance tests |
+| M2 | Explicit capabilities, deny-by-default authorization, complete mediation | Positive/negative authorization tests |
+| M3 | Resumable human review, exact action binding, expiry | Approval lifecycle and replay/scope tests |
+| M4 | Fail-closed runtime lifecycle, hard budgets, terminal-state integrity | Runtime invariants and failure-path tests |
+| M5 | Provider-neutral model port and usage validation | Model gateway contracts and usage tests |
+| M6 | Scoped tool/MCP registration, resource binding, transport isolation | Tool/MCP conformance and tenancy tests |
+| M7 | Isolated workspace plus command/path/network policy | Sandbox isolation and fail-closed tests |
+| M8 | Agent runner, handoff/delegation and resumable execution | Orchestration and authority-propagation tests |
+| M9 | Tenant-scoped memory/context, trust labels, classification and redaction | Memory isolation and secret-redaction tests |
+| M10 | Append-oriented events/evidence, audit records and trajectory integrity | Evidence/event and integrity tests |
+| M11 | Correlated traces, metrics and security events | Observability correlation and redaction tests |
+| M12 | Deterministic safety/regression evaluation | Evaluation corpus and release-gate tests |
+| M13 | Stable public consumer surface and declarative domain registration | SDK compatibility/conformance tests |
+| M14 | Enterprise integrity, production configuration, recovery, supply chain and release gates | RLS/integrity, supply-chain, release and operational contracts |
 
-M2 Authorization: explicit capabilities, deny-by-default checks and complete mediation.
+## Completion definition
 
-M3 Approval: resumable human-review state, exact action binding and expiry.
+A milestone is considered implemented only when its capability exists in the repository **and** its security invariants, executable tests, documentation and boundary contracts are reconciled.
 
-M4 Runtime: fail-closed lifecycle, hard budgets and terminal-state integrity.
+A passing CI run is evidence for the repository gates; it is not evidence that external production infrastructure has been deployed.
 
-M5 Model Gateway: provider-neutral model port, usage validation and tenant/agent attribution.
+## Architectural boundary
 
-M6 Tool/MCP Gateway: tool registration, capability/resource scoping and transport isolation.
+The platform is the governed execution substrate beneath Tinlance Agentic OS. It must remain independent from:
 
-M7 Sandbox: isolated workspace, command/path/network policy and fail-closed provider selection.
+- FAS / FAS-Bench
+- FDSE
+- TADS / ReconOS
+- ThreatFade
+- Hezqara
+- FusionOps
+- Tinlance Agentic OS
 
-M8 Orchestration: agent runner, handoff/delegation boundary and resumable execution contracts.
+These systems consume platform contracts/SDK surfaces; they do not become platform dependencies.
 
-M9 Memory: tenant-scoped memory/context, trust labels, classification and secret redaction.
+## Production boundary
 
-M10 Evidence/Event: append-only events, evidence, trajectory hashes and audit records.
+Reference implementations intentionally remain provider-neutral. Production deployments must supply durable persistence, secret management, isolated compute, telemetry infrastructure, backup/restore, incident response, provider-specific controls and operational ownership.
 
-M11 Observability: correlated traces, metrics and security events; no secret content by default.
+The production acceptance criteria are maintained in [ENTERPRISE-BASELINE.md](ENTERPRISE-BASELINE.md).
 
-M12 Evaluation: deterministic regression corpus and safety-critical release gates.
+## Security invariants carried through every milestone
 
-M13 Domain SDK: stable public consumer surface and declarative domain registration.
+1. Tenant scope is immutable.
+2. Capability possession does not bypass policy.
+3. Prohibited and secret-data actions cannot be approved.
+4. Consequential actions are re-authorized immediately before execution.
+5. Approval is tenant/run/action/resource bound and expires.
+6. Child agents cannot widen authority or change tenant.
+7. Untrusted content cannot silently become trusted instructions.
+8. Secrets remain execution-only handles.
+9. Evidence remains attributable and integrity-protected.
+10. Evaluation never grants authority.
 
-M14 Enterprise: RLS integrity, production configuration, backup/recovery contracts, supply-chain controls, threat-model closure and release gates.
+## Documentation authority
 
-Every milestone must ship implementation, tests, security validation and documentation. Historical status files are retained for traceability; this roadmap and current repository state are authoritative.
+When documentation conflicts:
+
+1. **Current implementation and executable tests** define what is actually implemented.
+2. This roadmap defines the canonical product milestone vocabulary.
+3. [ARCHITECTURE.md](../ARCHITECTURE.md) defines the stable system boundary and invariants.
+4. [ENTERPRISE-BASELINE.md](ENTERPRISE-BASELINE.md) defines deployment/enterprise acceptance.
+5. Historical status documents and ADRs provide traceability and rationale; they do not override the canonical definitions.
+
+Any change to milestone meaning requires updating the roadmap, affected architecture/security documentation, tests and README in the same change.
 
 ## Non-goals
 
-The platform does not become FDSE, TADS, ThreatFade, Hezqara, ReconOS, FusionOps or Agentic OS. The platform does not grant authority based on model confidence, external intelligence, prompt content or tool registration alone.
+The platform does not become an application or domain product. It does not grant authority from model confidence, prompt content, retrieved intelligence, tool registration, evaluation output or external data alone.
