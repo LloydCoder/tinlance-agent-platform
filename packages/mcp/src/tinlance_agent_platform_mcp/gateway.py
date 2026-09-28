@@ -1,7 +1,7 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol
-from dataclasses import dataclass
 
 
 _MAX_ARGUMENTS = 64
