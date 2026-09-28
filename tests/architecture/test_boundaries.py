@@ -9,14 +9,28 @@ PACKAGES = {
     "tenancy": "tinlance_agent_platform_tenancy",
     "authorization": "tinlance_agent_platform_authorization",
     "policy": "tinlance_agent_platform_policy",
+    "domain": "tinlance_agent_platform_domain",
+    "persistence": "tinlance_agent_platform_persistence",
+    "sandbox": "tinlance_agent_platform_sandbox",
 }
 ALLOWED = {
     "contracts": set(),
     "kernel": {"tinlance_agent_platform_contracts"},
     "identity": {"tinlance_agent_platform_contracts"},
-    "tenancy": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel"},
-    "authorization": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel"},
+    "tenancy": {
+        "tinlance_agent_platform_contracts",
+        "tinlance_agent_platform_kernel",
+    },
+    "authorization": {
+        "tinlance_agent_platform_contracts",
+        "tinlance_agent_platform_kernel",
+    },
     "policy": {"tinlance_agent_platform_contracts"},
+    "domain": set(),
+    "persistence": {
+        "tinlance_agent_platform_domain",
+    },
+    "sandbox": {"tinlance_agent_platform_contracts"},
 }
 
 
@@ -41,8 +55,18 @@ def test_bounded_package_dependencies() -> None:
 
 
 def test_no_provider_or_framework_imports_in_core() -> None:
-    forbidden = {"fastapi", "pydantic", "openai", "anthropic", "boto3", "sqlalchemy", "psycopg"}
-    for package in ("contracts", "kernel"):
+    forbidden = {
+        "fastapi",
+        "pydantic",
+        "openai",
+        "anthropic",
+        "boto3",
+        "sqlalchemy",
+        "psycopg",
+    }
+    for package in ("contracts", "kernel", "domain"):
         root = ROOT / "packages" / package / "src"
         for path in root.rglob("*.py"):
-            assert not imports_for(path) & forbidden, f"{path}: forbidden dependency"
+            assert not imports_for(path) & forbidden, (
+                f"{path}: forbidden dependency"
+            )
