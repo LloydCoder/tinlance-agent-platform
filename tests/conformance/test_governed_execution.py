@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from tinlance_agent_platform_contracts import (
+from tinlance_agent_platform_budgets import BudgetService\nfrom tinlance_agent_platform_contracts import (
     CapabilityRequest,
     DataClass,
     Principal,
