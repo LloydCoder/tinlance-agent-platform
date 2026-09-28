@@ -133,7 +133,9 @@ class CapabilityRequest:
             raise ValueError("capability names must be normalized")
         if self.data_class is DataClass.SECRET:
             raise ValueError("secret data cannot be a normal capability payload")
-        if len(self.parameters) > 64:\n            raise ValueError("capability parameters are too large")\n        object.__setattr__(self, "parameters", _freeze(self.parameters))
+        if len(self.parameters) > 64:
+            raise ValueError("capability parameters are too large")
+        object.__setattr__(self, "parameters", _freeze(self.parameters))
 
 
 @dataclass(frozen=True, slots=True)
