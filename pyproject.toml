@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tinlance-agent-platform"
-version = "0.3.0.dev0"
+version = "1.0.0"
 description = "Tinlance governed agent execution substrate"
 requires-python = ">=3.12,<3.15"
 dependencies = []
@@ -70,6 +70,21 @@ known-first-party = [
   "tinlance_agent_platform_sandbox",
   "tinlance_agent_platform_tenancy",
   "tinlance_agent_platform_tools",
+  "tinlance_agent_platform_models",
+  "tinlance_agent_platform_orchestration",
+  "tinlance_agent_platform_secrets",
+  "tinlance_agent_platform_events",
+  "tinlance_agent_platform_evidence",
+  "tinlance_agent_platform_durability",
+  "tinlance_agent_platform_governance",
+  "tinlance_agent_platform_context",
+  "tinlance_agent_platform_mcp",
+  "tinlance_agent_platform_trajectory",
+  "tinlance_agent_platform_observability",
+  "tinlance_agent_platform_evaluation",
+  "tinlance_agent_platform_api",
+  "tinlance_agent_platform_multi_agent",
+  "tinlance_agent_platform_operations",
 ]
 
 [tool.mypy]
