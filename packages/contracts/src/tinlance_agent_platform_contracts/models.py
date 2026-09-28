@@ -131,7 +131,10 @@ class CapabilityRequest:
             for value in (self.action, self.resource, self.blast_radius)
         ):
             raise ValueError("capability request fields must be normalized")
-        if any(\n            not capability or capability != capability.strip()\n            for capability in self.capabilities\n        ):
+        if any(
+            not capability or capability != capability.strip()
+            for capability in self.capabilities
+        ):
             raise ValueError("capability names must be normalized")
         if self.data_class is DataClass.SECRET:
             raise ValueError("secret data cannot be a normal capability payload")
