@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+
 @dataclass(frozen=True, slots=True)
 class SecretHandle:
     name: str
     version: str
 
+
 class SecretProvider(Protocol):
     def resolve(self, handle: SecretHandle) -> str: ...
+
 
 class SecretBroker:
     def __init__(self, provider: SecretProvider) -> None:

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+
 @dataclass(frozen=True, slots=True)
 class ModelRequest:
     tenant_id: str
@@ -8,6 +9,7 @@ class ModelRequest:
     model: str
     messages: tuple[dict[str, str], ...]
     max_output_tokens: int = 4096
+
 
 @dataclass(frozen=True, slots=True)
 class ModelResponse:
@@ -17,8 +19,10 @@ class ModelResponse:
     output_tokens: int = 0
     finish_reason: str = "stop"
 
+
 class ModelProvider(Protocol):
     def complete(self, request: ModelRequest) -> ModelResponse: ...
+
 
 class ModelGateway:
     def __init__(self) -> None:
