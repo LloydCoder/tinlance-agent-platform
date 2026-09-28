@@ -1,6 +1,12 @@
-"""Sandbox execution contracts; no unrestricted fallback."""
-
+from .bubblewrap import BubblewrapProvider, SandboxLimits, SandboxProvider
 from .policy import SandboxPolicy
-from .service import SandboxUnavailable, validate_request
+from .service import SandboxRequest, SandboxService
 
-__all__ = ["SandboxPolicy", "SandboxUnavailable", "validate_request"]
+__all__ = [
+    "BubblewrapProvider",
+    "SandboxLimits",
+    "SandboxProvider",
+    "SandboxPolicy",
+    "SandboxRequest",
+    "SandboxService",
+]
