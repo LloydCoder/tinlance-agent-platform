@@ -20,11 +20,11 @@ insert into platform.tasks (
     '00000000-0000-0000-0000-000000000001',
     '10000000-0000-0000-0000-000000000001', '1.0.0', 'owner-a', 'queued', 'durability test'
 );
-insert into platform.runs (run_id, tenant_id, task_id)
+insert into platform.runs (run_id, tenant_id, task_id, status)
 values (
     '40000000-0000-0000-0000-000000000001',
     '00000000-0000-0000-0000-000000000001',
-    '30000000-0000-0000-0000-000000000001'
+    '30000000-0000-0000-0000-000000000001', 'created'
 );
 set role m3_app;
 select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000001', true);
