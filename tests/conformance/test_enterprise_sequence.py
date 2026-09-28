@@ -83,7 +83,8 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
 
     mcp = MCPToolGateway(Transport())
     mcp.register(MCPTool("lookup", "lookup", "doc:read", "doc-1"))
-    result = mcp.call(ToolScope("tenant-a", "doc:read", "doc-1"), "lookup", {"q": "x"})\n    assert result["tenant"] == "tenant-a"
+    result = mcp.call(ToolScope("tenant-a", "doc:read", "doc-1"), "lookup", {"q": "x"})
+    assert result["tenant"] == "tenant-a"
     with pytest.raises(PermissionError):
         mcp.call(ToolScope("tenant-a", "doc:write", "doc-1"), "lookup", {})
 
