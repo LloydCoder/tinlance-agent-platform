@@ -26,3 +26,6 @@ Identity -> Authorization -> Approval -> Runtime -> Model Gateway -> Tool/MCP Ga
 ## Production boundary
 
 The repository provides a governed, provider-neutral core and reference adapters. Customer production deployment still requires real durable stores, secret management, approved model/tool providers, isolated execution infrastructure, telemetry backends, backup/restore, incident response, key management and operational SLOs.
+
+
+Conformance is enforced by CI on every pull request.
