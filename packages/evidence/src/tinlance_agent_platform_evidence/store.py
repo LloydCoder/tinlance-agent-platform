@@ -4,6 +4,8 @@ from threading import RLock
 from typing import Protocol
 from uuid import UUID, uuid4
 
+_MAX_CONTENT = 1_000_000
+
 
 @dataclass(frozen=True, slots=True)
 class Evidence:
@@ -20,7 +22,7 @@ class EvidenceStore(Protocol):
 
     def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Evidence, ...]: ...
 
-    def verify(self, tenant_id: str, run_id: UUID) -> bool: ...
+    def verify(self, tenant_id: str, run_id: UUID) -> bool:
 
 
 class InMemoryEvidenceStore:
@@ -31,8 +33,13 @@ class InMemoryEvidenceStore:
         self._lock = RLock()
 
     def append(self, tenant_id: str, run_id: UUID, content: str) -> Evidence:
-        if not tenant_id or tenant_id != tenant_id.strip() or not content:
-            raise ValueError("tenant and content are required")
+        if (
+            not tenant_id
+            or tenant_id != tenant_id.strip()
+            or not content
+            or len(content) > _MAX_CONTENT
+        ):
+            raise ValueError("tenant and bounded content are required")
         with self._lock:
             sequence = 1 + max(
                 (
