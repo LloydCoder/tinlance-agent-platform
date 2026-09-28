@@ -83,7 +83,7 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
 
     mcp = MCPToolGateway(Transport())
     mcp.register(MCPTool("lookup", "lookup", "doc:read", "doc-1"))
-    assert mcp.call(ToolScope("tenant-a", "doc:read", "doc-1"), "lookup", {"q": "x"})["tenant"] == "tenant-a"
+    result = mcp.call(ToolScope("tenant-a", "doc:read", "doc-1"), "lookup", {"q": "x"})\n    assert result["tenant"] == "tenant-a"
     with pytest.raises(PermissionError):
         mcp.call(ToolScope("tenant-a", "doc:write", "doc-1"), "lookup", {})
 
@@ -107,7 +107,7 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
 
 def test_sandbox_and_evaluation_are_not_authority_sources() -> None:
     sandbox = SandboxPolicy(frozenset({"python"}))
-    request = SandboxRequest(uuid4(), "tenant-a", uuid4(), "ws", ("python",), 10, False, ("/workspace",))
+    request = SandboxRequest(\n        uuid4(), "tenant-a", uuid4(), "ws", ("python",), 10, False, ("/workspace",)\n    )
     sandbox.validate(request)
 
     evaluation = EvalRunner(lambda value: value)
