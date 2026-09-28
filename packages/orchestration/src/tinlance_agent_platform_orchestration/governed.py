@@ -14,7 +14,7 @@ from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
 from tinlance_agent_platform_observability import ObservabilitySink, new_security_event
-from tinlance_agent_platform_tools import ToolGateway
+from tinlance_agent_platform_tools.gateway import ApprovalVerifier, ToolGateway
 from tinlance_agent_platform_trajectory import TrajectoryStore
 
 
@@ -93,7 +93,7 @@ class GovernedExecutionService:
         )
 
         tool_decision = self._tools.authorize(context, tool_call, capability_request)
-        tool_output = self._tools.execute(tool_call, tool_decision)
+        tool_output = self._tools.execute(\n            tool_call,\n            tool_decision,\n            approval_id=approval_id,\n            approval_verifier=approval_verifier,\n        )
         evidence = self._evidence.append(context.tenant_id, run.run_id, tool_output)
         self._events.append(
             new_event(
