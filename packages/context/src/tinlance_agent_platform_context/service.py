@@ -78,9 +78,7 @@ class ContextService:
             raise ValueError("tenant is required")
         return self._memory.list(tenant_id, limit)
 
-    def build(
-        self, tenant_id: str, items: list[ContextItem], include_memory: bool = True
-    ) -> str:
+    def build(self, tenant_id: str, items: list[ContextItem], include_memory: bool = True) -> str:
         if not tenant_id:
             raise ValueError("tenant is required")
         selected: list[str] = []
@@ -95,10 +93,7 @@ class ContextService:
             if not item.trusted and not self.policy.allow_untrusted_content:
                 continue
             marker = "trusted" if item.trusted else "untrusted"
-            selected.append(
-                f"<{marker} source={item.source}>\n"
-                f"{item.content}\n</{marker}>"
-            )
+            selected.append(f"<{marker} source={item.source}>\n{item.content}\n</{marker}>")
             if len(selected) >= self.policy.max_items:
                 break
         return "\n".join(selected)[: self.policy.max_chars]
