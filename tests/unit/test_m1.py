@@ -6,50 +6,21 @@ from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_budgets import BudgetService
 from tinlance_agent_platform_contracts import (
-    AgentDefinition,
-    ApprovalStatus,
-    Budget,
-    CapabilityRequest,
-    DataClass,
-    Decision,
-    Principal,
-    RequestContext,
-    Reversibility,
-    RiskTier,
-    Run,
-    RunStatus,
-    SandboxRequest,
-    ToolCall,
+    AgentDefinition, ApprovalStatus, Budget, CapabilityRequest, DataClass, Decision,
+    Principal, RequestContext, Reversibility, RiskTier, Run, RunStatus, SandboxRequest, ToolCall,
 )
 from tinlance_agent_platform_runtime import InvalidTransition, RunStateMachine
-from tinlance_agent_platform_sandbox import (
-    SandboxPolicy,
-    SandboxUnavailable,
-    validate_request,
-)
+from tinlance_agent_platform_sandbox import SandboxPolicy, SandboxUnavailable, validate_request
 from tinlance_agent_platform_tools import ToolGateway, ToolRegistration
 
 
 def test_agent_versions_are_immutable_and_tenant_scoped() -> None:
     registry = AgentRegistry()
-    agent = AgentDefinition(
-        uuid4(), "t-a", "fdse", "1.0.0", "owner", "default", frozenset({"code:run"}), "h"
-    )
+    agent = AgentDefinition(uuid4(), "t-a", "fdse", "1.0.0", "owner", "default", frozenset({"code:run"}), "h")
     registry.register(agent)
     registry.register(agent)
     with pytest.raises(ValueError):
-        registry.register(
-            AgentDefinition(
-                agent.agent_id,
-                "t-a",
-                "fdse",
-                "1.0.0",
-                "owner",
-                "other",
-                agent.capabilities,
-                "x",
-            )
-        )
+        registry.register(AgentDefinition(agent.agent_id, "t-a", "fdse", "1.0.0", "owner", "other", agent.capabilities, "x"))
     with pytest.raises(KeyError):
         registry.get("t-b", agent.agent_id, "1.0.0")
 
@@ -64,7 +35,7 @@ def test_run_state_machine_is_fail_closed() -> None:
         machine.transition(run, RunStatus.RUNNING)
 
 
-def test_approval_must_be_explicit() -> None:
+def test_approval_must_be_explicit_and_tenant_bound() -> None:
     service = ApprovalService()
     approval = service.request("t-a", uuid4(), "delete", "db:item", "destructive", "agent")
     with pytest.raises(PermissionError):
@@ -103,15 +74,7 @@ def test_tool_gateway_requires_authorization() -> None:
     principal = Principal("u", "human", "t-a", scopes=frozenset({"doc:read"}))
     context = RequestContext("r", "t-a", principal, "test")
     call = ToolCall(uuid4(), "t-a", uuid4(), "read", "doc:read", "read", "doc")
-    request = CapabilityRequest(
-        "read",
-        "doc",
-        frozenset({"doc:read"}),
-        RiskTier.LOW,
-        Reversibility.REVERSIBLE,
-        DataClass.INTERNAL,
-        "single",
-    )
+    request = CapabilityRequest("read", "doc", frozenset({"doc:read"}), RiskTier.LOW, Reversibility.REVERSIBLE, DataClass.INTERNAL, "single")
     decision = gateway.authorize(context, call, request)
     assert decision.decision is Decision.ALLOW
     assert gateway.execute(call, decision) == "executed"

@@ -1,4 +1,4 @@
-from tinlance_agent_platform_api import AgentPlatformAPI, APIRequest, APIResponse
+from tinlance_agent_platform_api import APIRequest, APIResponse, AgentPlatformAPI
 
 
 class Handler:
@@ -10,3 +10,10 @@ def test_api_requires_tenant_and_subject() -> None:
     api = AgentPlatformAPI(Handler())
     result = api.dispatch(APIRequest("t1", "u1", "run.create", {}))
     assert result.status == "accepted"
+
+
+def test_api_rejects_missing_identity() -> None:
+    api = AgentPlatformAPI(Handler())
+    import pytest
+    with pytest.raises(PermissionError):
+        api.dispatch(APIRequest("", "u1", "run.create", {}))

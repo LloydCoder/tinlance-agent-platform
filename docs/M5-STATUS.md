@@ -1,3 +1,5 @@
-# M5 Status — Context and Memory
+# M5 MODEL GATEWAY — COMPLETE
 
-M5 adds bounded context assembly, explicit trust labels, tenant-scoped memory storage, classification validation, and deterministic secret-marker redaction. Untrusted context is excluded unless policy explicitly permits it, reducing prompt-injection exposure.
+Provider-neutral model request/response contracts preserve tenant/agent attribution and validate provider usage responses.
+
+Canonical sequence: docs/ROADMAP.md

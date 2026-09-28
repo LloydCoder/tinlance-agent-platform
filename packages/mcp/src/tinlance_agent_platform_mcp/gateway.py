@@ -8,6 +8,10 @@ class ToolScope:
     capability: str
     resource: str
 
+    def __post_init__(self) -> None:
+        if not self.tenant_id or not self.capability or not self.resource:
+            raise ValueError("complete tool scope is required")
+
 
 @dataclass(frozen=True, slots=True)
 class MCPTool:
@@ -18,7 +22,9 @@ class MCPTool:
 
 
 class MCPTransport(Protocol):
-    def call(self, tool_name: str, arguments: dict[str, object]) -> dict[str, object]: ...
+    def call(
+        self, tool_name: str, arguments: dict[str, object], scope: ToolScope
+    ) -> dict[str, object]: ...
 
 
 class MCPToolGateway:
@@ -29,6 +35,8 @@ class MCPToolGateway:
     def register(self, tool: MCPTool) -> None:
         if not tool.name or tool.name in self._tools:
             raise ValueError("tool name must be unique and non-empty")
+        if not tool.capability or not tool.resource_pattern:
+            raise ValueError("MCP tools require capability and resource scope")
         self._tools[tool.name] = tool
 
     def call(
@@ -39,4 +47,4 @@ class MCPToolGateway:
             raise LookupError("MCP tool is not registered")
         if scope.capability != tool.capability or scope.resource != tool.resource_pattern:
             raise PermissionError("MCP scope does not match registered tool")
-        return self._transport.call(tool_name, dict(arguments))
+        return self._transport.call(tool_name, dict(arguments), scope)

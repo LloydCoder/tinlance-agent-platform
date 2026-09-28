@@ -1,3 +1,5 @@
-# M13 Status — Operations
+# M13 DOMAIN SDK — COMPLETE
 
-M13 adds validated deployment configuration, fail-closed readiness semantics and an operations contract covering secrets, migrations, outbox delivery, sandbox isolation, backups and restore verification.
+The stable SDK surface and content-addressed declarative domain registration are implemented for domain consumers.
+
+Canonical sequence: docs/ROADMAP.md

@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
+    fail-fast: false
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -22,6 +23,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip && pip install -e ".[test]"
+      - run: python -m pip check
+      - run: python -m compileall -q packages tests
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy packages
@@ -48,12 +51,10 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/001_control_plane.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/002_tenant_rls.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/003_m1_runs_approvals.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/004_m3_durability.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/005_m4_governance.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/migrations/006_m5_context.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/tests/001_rls.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/tests/002_m1_rls.sql
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f database/tests/003_m3_durability.sql
+          set -euo pipefail
+          for migration in database/migrations/*.sql; do
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          for test in database/tests/*.sql; do
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$test"
+          done
