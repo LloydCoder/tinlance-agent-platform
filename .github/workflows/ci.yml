@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, "feature/**", "m1-*"]
+    branches: [main, "feature/**", "m1-*", "enterprise-hardening"]
   pull_request:
 permissions:
   contents: read
