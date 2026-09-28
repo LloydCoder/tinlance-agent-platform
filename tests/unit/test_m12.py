@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 import pytest
-
 from tinlance_agent_platform_multi_agent import DelegationService
 
 
@@ -9,7 +8,9 @@ def test_child_authority_is_narrowed() -> None:
     service = DelegationService()
     parent = uuid4()
     child = uuid4()
-    delegation = service.delegate("t1", parent, child, frozenset({"read", "write"}), frozenset({"read"}))
+    delegation = service.delegate(
+        "t1", parent, child, frozenset({"read", "write"}), frozenset({"read"})
+    )
     assert delegation.capabilities == frozenset({"read"})
 
 
