@@ -28,7 +28,7 @@ ALLOWED = {
     "approvals": {"tinlance_agent_platform_contracts"},
     "budgets": {"tinlance_agent_platform_contracts"},
     "runtime": {"tinlance_agent_platform_contracts"},
-    "tools": {"tinlance_agent_platform_contracts", "tinlance_agent_platform_kernel", "tinlance_agent_platform_policy"},
+    "tools": {\n        "tinlance_agent_platform_contracts",\n        "tinlance_agent_platform_kernel",\n        "tinlance_agent_platform_policy",\n    },
     "sandbox": {"tinlance_agent_platform_contracts"},
     "sdk": {
         "tinlance_agent_platform_agents", "tinlance_agent_platform_approvals",
