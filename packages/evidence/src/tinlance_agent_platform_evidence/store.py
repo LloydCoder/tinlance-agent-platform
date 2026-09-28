@@ -22,7 +22,7 @@ class EvidenceStore(Protocol):
 
     def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Evidence, ...]: ...
 
-    def verify(self, tenant_id: str, run_id: UUID) -> bool:
+    def verify(self, tenant_id: str, run_id: UUID) -> bool: ...
 
 
 class InMemoryEvidenceStore:
