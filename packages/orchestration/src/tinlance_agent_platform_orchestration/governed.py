@@ -1,12 +1,15 @@
 from dataclasses import dataclass
+from time import monotonic
 from uuid import UUID
 
-from tinlance_agent_platform_authorization import authorize\nfrom tinlance_agent_platform_budgets import BudgetService
+from tinlance_agent_platform_authorization import authorize
+from tinlance_agent_platform_budgets import BudgetService
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
     Decision,
     RequestContext,
     Run,
+    RunStatus,
     TaskSpec,
     ToolCall,
 )
@@ -14,6 +17,7 @@ from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
 from tinlance_agent_platform_observability import ObservabilitySink, new_security_event
+from tinlance_agent_platform_runtime import RunStateMachine
 from tinlance_agent_platform_tools.gateway import ApprovalVerifier, ToolGateway
 from tinlance_agent_platform_trajectory import TrajectoryStore
 
@@ -33,6 +37,7 @@ class GovernedExecutionService:
         self,
         model_gateway: ModelGateway,
         tool_gateway: ToolGateway,
+        budget_service: BudgetService,
         events: EventStore,
         evidence: EvidenceStore,
         trajectory: TrajectoryStore,
@@ -40,10 +45,12 @@ class GovernedExecutionService:
     ) -> None:
         self._models = model_gateway
         self._tools = tool_gateway
+        self._budget = budget_service
         self._events = events
         self._evidence = evidence
         self._trajectory = trajectory
         self._observability = observability
+        self._state = RunStateMachine()
 
     def execute(
         self,
@@ -54,6 +61,9 @@ class GovernedExecutionService:
         model_request: ModelRequest,
         capability_request: CapabilityRequest,
         tool_call: ToolCall,
+        *,
+        approval_id: UUID | None = None,
+        approval_verifier: ApprovalVerifier | None = None,
     ) -> GovernedExecutionResult:
         if (
             run.tenant_id != context.tenant_id
@@ -65,7 +75,7 @@ class GovernedExecutionService:
         ):
             raise PermissionError("governed execution tenant or identity mismatch")
 
-        running = self._state.transition(run, RunStatus.RUNNING)\n        self._budget.consume_turn(0.0)\n        started = monotonic()\n\n        decision = authorize(context, capability_request)
+        decision = authorize(context, capability_request)
         if decision.decision is Decision.DENY:
             self._observability.emit_security(
                 new_security_event(
@@ -79,7 +89,17 @@ class GovernedExecutionService:
             )
             raise PermissionError(decision.reason)
 
-        model_response = self._models.complete(model_provider, model_request)\n        elapsed = monotonic() - started\n        if elapsed > self._budget.budget.max_seconds:\n            raise TimeoutError("runtime budget exceeded before side effects")
+        running = self._state.transition(run, RunStatus.RUNNING)
+        self._budget.consume_turn(0.0)
+        started = monotonic()
+
+        model_response = self._models.complete(model_provider, model_request)
+        if monotonic() - started > self._budget.budget.max_seconds:
+            failed = self._state.transition(
+                running, RunStatus.FAILED, failure_code="runtime_budget_exceeded"
+            )
+            raise TimeoutError(f"runtime budget exceeded for run {failed.run_id}")
+
         self._events.append(
             new_event(
                 context.tenant_id,
@@ -92,8 +112,14 @@ class GovernedExecutionService:
             context.tenant_id, run.run_id, "model.completed", model_response.output
         )
 
-        self._budget.consume_tool_call()\n        tool_decision = self._tools.authorize(context, tool_call, capability_request)
-        tool_output = self._tools.execute(\n            tool_call,\n            tool_decision,\n            approval_id=approval_id,\n            approval_verifier=approval_verifier,\n        )
+        self._budget.consume_tool_call()
+        tool_decision = self._tools.authorize(context, tool_call, capability_request)
+        tool_output = self._tools.execute(
+            tool_call,
+            tool_decision,
+            approval_id=approval_id,
+            approval_verifier=approval_verifier,
+        )
         evidence = self._evidence.append(context.tenant_id, run.run_id, tool_output)
         self._events.append(
             new_event(
@@ -116,4 +142,7 @@ class GovernedExecutionService:
                 outcome="allow",
             )
         )
-        completed = self._state.transition(running, RunStatus.SUCCEEDED)\n        return GovernedExecutionResult(\n            completed, model_response, tool_output, evidence.evidence_id\n        )
+        completed = self._state.transition(running, RunStatus.SUCCEEDED)
+        return GovernedExecutionResult(
+            completed, model_response, tool_output, evidence.evidence_id
+        )
