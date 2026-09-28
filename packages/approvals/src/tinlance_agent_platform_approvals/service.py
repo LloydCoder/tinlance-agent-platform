@@ -23,7 +23,8 @@ class ApprovalService:
     ) -> ApprovalRequest:
         if not all((tenant_id, action, resource, reason, requested_by)):
             raise ValueError("approval request fields are required")
-        if any(value != value.strip() for value in (tenant_id, action, resource, reason, requested_by)):
+        approval_fields = (tenant_id, action, resource, reason, requested_by)
+        if any(value != value.strip() for value in approval_fields):
             raise ValueError("approval request fields must be normalized")
         if expires_at is not None and expires_at <= datetime.now(UTC):
             raise ValueError("approval expiry must be in the future")
