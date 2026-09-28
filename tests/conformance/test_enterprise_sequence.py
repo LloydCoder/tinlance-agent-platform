@@ -65,6 +65,7 @@ def test_tenant_boundary_cannot_be_crossed() -> None:
 
 
 def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
+    """Exercise provider and evidence boundaries without granting authority."""
     model = ModelGateway()
 
     class Provider:
