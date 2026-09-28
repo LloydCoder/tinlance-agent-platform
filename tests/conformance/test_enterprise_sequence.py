@@ -98,11 +98,34 @@ def test_model_mcp_event_evidence_and_observability_boundaries() -> None:
             return {"tool": tool_name, "tenant": scope.tenant_id}
 
     mcp = MCPToolGateway(Transport())
-    mcp.register(MCPTool("lookup", "lookup", "doc:read", "doc-1"))
-    result = mcp.call(ToolScope("tenant-a", "doc:read", "doc-1"), "lookup", {"q": "x"})
+    mcp.register(MCPTool("lookup", "lookup", "doc:read", "doc-1", "call"))
+    mcp_request = CapabilityRequest(
+        "call",
+        "doc-1",
+        frozenset({"doc:read"}),
+        RiskTier.LOW,
+        Reversibility.REVERSIBLE,
+        DataClass.INTERNAL,
+        "single-resource",
+    )
+    result = mcp.call(
+        context,
+        ToolScope("tenant-a", "doc:read", "doc-1"),
+        "lookup",
+        {"q": "x"},
+        mcp_request,
+        run_id=call.run_id,
+    )
     assert result["tenant"] == "tenant-a"
     with pytest.raises(PermissionError):
-        mcp.call(ToolScope("tenant-a", "doc:write", "doc-1"), "lookup", {})
+        mcp.call(
+            context,
+            ToolScope("tenant-a", "doc:write", "doc-1"),
+            "lookup",
+            {},
+            mcp_request,
+            run_id=call.run_id,
+        )
 
     events = InMemoryEventStore()
     event = new_event("tenant-a", uuid4(), "tool.executed", {"outcome": "allow"})
