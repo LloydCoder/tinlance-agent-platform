@@ -144,6 +144,4 @@ class GovernedExecutionService:
             )
         )
         completed = self._state.transition(running, RunStatus.SUCCEEDED)
-        return GovernedExecutionResult(
-            completed, model_response, tool_output, evidence.evidence_id
-        )
+        return GovernedExecutionResult(completed, model_response, tool_output, evidence.evidence_id)
