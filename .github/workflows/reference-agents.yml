@@ -40,4 +40,5 @@ jobs:
       - run: ruff format --check reference_agents
       - run: mypy reference_agents/src
       - run: PYTHONPATH=/tmp/tinlance-agent-platform-sdk/src:. pytest -q --cov=reference_agents/src/tinlance_reference_agents --cov-report=term-missing --cov-fail-under=90 reference_agents/tests
-      - run: pip-audit --strict --skip-editable
+      - run: pip freeze --exclude-editable > /tmp/reference-agent-audit-requirements.txt
+          pip-audit --strict -r /tmp/reference-agent-audit-requirements.txt
