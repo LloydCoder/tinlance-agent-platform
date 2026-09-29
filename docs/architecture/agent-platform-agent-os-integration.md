@@ -108,7 +108,7 @@ Sensitive prompts, credentials and secret values must not be copied into OS tele
 
 ## Reliability
 
-Only operations explicitly classified as idempotent may be automatically retried by Agent OS. Run creation, cancellation and approval requests are not automatically retried.
+Agent OS automatically retries only operations whose contract is idempotent. Consequential run creation, cancellation and approval requests now use deterministic request IDs derived from the operation and canonical payload, so transport retries and process restarts reuse the same replay key. Exactly-once side effects still require durable Platform-side idempotency and recovery.
 
 The request ID can support server-side idempotency, but a production deployment must provide durable idempotency and recovery before claiming exactly-once side effects.
 
