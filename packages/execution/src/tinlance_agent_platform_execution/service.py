@@ -56,6 +56,7 @@ class ExecutionState(StrEnum):
 class ExecutionErrorCode(StrEnum):
     AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR"
     AUTHORIZATION_DENIED = "AUTHORIZATION_DENIED"
+    ADDITIONAL_AUTHORIZATION_REQUIRED = "ADDITIONAL_AUTHORIZATION_REQUIRED"
     TENANT_ACCESS_DENIED = "TENANT_ACCESS_DENIED"
     IDENTITY_BINDING_FAILED = "IDENTITY_BINDING_FAILED"
     POLICY_DENIED = "POLICY_DENIED"
@@ -456,20 +457,36 @@ class GovernedExecutionService:
                         ExecutionErrorCode.AUTHORIZATION_DENIED,
                         "requested risk exceeds the registered tool risk ceiling",
                     )
-            policy = evaluate(
-                CapabilityRequest(
-                    request.action,
-                    request.resource,
-                    frozenset({request.capability_id}),
-                    request.risk,
-                    request.reversibility,
-                    request.data_class,
-                    request.blast_radius,
-                    request.input,
+            try:
+                policy = evaluate(
+                    CapabilityRequest(
+                        request.action,
+                        request.resource,
+                        frozenset({request.capability_id}),
+                        request.risk,
+                        request.reversibility,
+                        request.data_class,
+                        request.blast_radius,
+                        request.input,
+                    )
                 )
-            )
+            except Exception as exc:
+                raise ExecutionFailure(
+                    ExecutionErrorCode.POLICY_UNAVAILABLE,
+                    "policy evaluation could not be established",
+                ) from exc
             if policy.decision is Decision.DENY:
                 self._deny(execution_id, request, ExecutionErrorCode.POLICY_DENIED, audit_ids)
+            if (
+                policy.decision is Decision.REQUIRE_AUTHORIZATION
+                and not policy.requires_approval
+            ):
+                self._deny(
+                    execution_id,
+                    request,
+                    ExecutionErrorCode.ADDITIONAL_AUTHORIZATION_REQUIRED,
+                    audit_ids,
+                )
             if policy.decision is not Decision.ALLOW and not policy.requires_approval:
                 self._deny(
                     execution_id,
