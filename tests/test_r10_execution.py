@@ -294,3 +294,32 @@ def test_sqlite_idempotency_survives_reinstantiation(
     restored = second_store.get(principal.tenant_id, item.idempotency_key)
     assert restored is not None
     assert restored.result == result
+
+
+def test_authoritative_tool_timeout_returns_terminal_timeout(harness: object) -> None:
+    service, principal, agent, tools = harness
+
+    class Slow:
+        def execute(self, call: ToolCall) -> str:
+            return "unexpected"
+
+        def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str:
+            raise TimeoutError("simulated timeout")
+
+    replacement = ToolGateway()
+    replacement.register(
+        ToolRegistration(
+            "reference.echo",
+            "repository.read",
+            "reference tool",
+            version="1",
+            risk=RiskTier.HIGH,
+            timeout_seconds=10,
+            max_tool_calls=1,
+        ),
+        Slow(),
+    )
+    service.tools = replacement
+    result = service.execute(principal, request(principal, agent))
+    assert result.state is ExecutionState.TIMED_OUT
+    assert result.error_code is ExecutionErrorCode.TIMEOUT
