@@ -90,7 +90,7 @@ The repository includes both an in-memory conformance implementation and a durab
 
 ## Budgets and timeouts
 
-R10 enforces the registered maximum tool-call budget and computes an effective timeout bounded by the client request, tool registration and Platform maximum.
+R10 enforces both the registered tool-call ceiling and an optional Platform budget reservation. Reservations are tenant/run scoped, race-safe, and are consumed or released explicitly; a reservation failure fails closed. The effective timeout is bounded by the client request, tool registration and Platform maximum.
 
 R10 refuses a governed execution when the registered tool adapter cannot provide the hard-timeout interface. Adapters implement `execute_with_timeout(call, timeout_seconds)`; an adapter timeout becomes the explicit `timed_out` terminal state. Process/container cancellation remains an adapter responsibility, but the Platform no longer silently treats a non-enforcing adapter as governed execution.
 
@@ -136,7 +136,7 @@ Authentication/identity/tenant/capability/policy/approval/sandbox/evidence/audit
 ## External standards considered
 
 - NIST 2026 software-agent identity and authorization work
-- NIST IR 8587 (2026) for token/assertion protection and lifecycle controls
+- NIST IR 8587 (final, September 2026) for token/assertion protection and lifecycle controls
 - OWASP Top 10 for Agentic Applications 2026
 - OWASP Agent Control Standard (2026)
 - RFC 9449 DPoP where sender-constrained OAuth tokens are applicable
@@ -156,7 +156,7 @@ The reference Platform implementation is intentionally explicit about provider b
 | policy | deterministic | authoritative policy provider |
 | approval | in-memory reference | durable transactional approval store |
 | idempotency | in-memory reference | durable uniqueness/transactional store |
-| budget | registered tool-call ceiling | distributed reservation/accounting provider |
+| budget | race-safe reference reservation/accounting | durable distributed reservation/accounting provider |
 | timeout | mandatory hard-timeout adapter contract | real cancellation-capable tool/sandbox adapter |
 | sandbox | required-provider gate | real isolation provider |
 | secrets | injected authorization gate | real scoped secret broker |
