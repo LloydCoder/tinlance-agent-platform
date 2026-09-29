@@ -162,14 +162,15 @@ class ReferencePlatformGateway(APIHandler):
             raise PermissionError("agent is not registered for tenant") from exc
 
     def _capabilities(self, request: APIRequest) -> APIResponse:
-        agent = self._agent(
-            request.tenant_id, self._required_text(request.payload, "agent_id")
+        agent = self._agent(request.tenant_id, self._required_text(request.payload, "agent_id"))
+        return APIResponse(
+            "ok",
+            {
+                "capabilities": [
+                    {"capability_id": capability} for capability in sorted(agent.capabilities)
+                ]
+            },
         )
-        return APIResponse("ok", {
-            "capabilities": [
-                {"capability_id": capability} for capability in sorted(agent.capabilities)
-            ]
-        })
 
     def _create_run(self, request: APIRequest) -> APIResponse:
         task_id = self._required_text(request.payload, "task_id")
@@ -183,14 +184,21 @@ class ReferencePlatformGateway(APIHandler):
         run = Run(uuid4(), parsed_task, request.tenant_id)
         with self._lock:
             self._runs[run.run_id] = self._state.transition(run, RunStatus.RUNNING)
-        self.events.append(new_event(
-            request.tenant_id, run.run_id, "run.created",
-            {"task_id": task_id, "agent_id": agent_id, "request_id": request.request_id},
-        ))
-        return APIResponse("accepted", {
-            "run_id": str(run.run_id), "task_id": str(parsed_task),
-            "state": RunStatus.RUNNING.value, "agent_id": str(parsed_agent),
-        })
+        self.events.append(
+            new_event(
+                request.tenant_id, run.run_id, "run.created",
+                {"task_id": task_id, "agent_id": agent_id, "request_id": request.request_id},
+            )
+        )
+        return APIResponse(
+            "accepted",
+            {
+                "run_id": str(run.run_id),
+                "task_id": str(parsed_task),
+                "state": RunStatus.RUNNING.value,
+                "agent_id": str(parsed_agent),
+            },
+        )
 
     def _cancel_run(self, request: APIRequest) -> APIResponse:
         run_id = self._required_text(request.payload, "run_id")
@@ -201,12 +209,14 @@ class ReferencePlatformGateway(APIHandler):
                 raise PermissionError("run is not owned by tenant")
             updated = self._state.transition(run, RunStatus.CANCELLED)
             self._runs[parsed] = updated
-        self.events.append(new_event(
-            request.tenant_id, parsed, "run.cancelled", {"request_id": request.request_id}
-        ))
-        return APIResponse("accepted", {
-            "run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value
-        })
+        self.events.append(
+            new_event(
+                request.tenant_id, parsed, "run.cancelled", {"request_id": request.request_id}
+            )
+        )
+        return APIResponse(
+            "accepted", {"run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value}
+        )
 
     def _intent_fingerprint(self, request: APIRequest) -> str | None:
         raw = request.payload.get("execution_intent")
