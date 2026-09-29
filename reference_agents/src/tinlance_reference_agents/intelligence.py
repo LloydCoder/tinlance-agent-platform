@@ -57,9 +57,27 @@ class IntelligenceAgent(ReferenceAgent):
 
     def plan_tools(self) -> tuple[ToolPlan, ...]:
         return (
-            ToolPlan(self.tools.get("research.search"), "research.search", "public-web", "low", False),
-            ToolPlan(self.tools.get("research.source"), "research.source", "source", "low", False),
-            ToolPlan(self.tools.get("research.report"), "research.report", "report", "medium", False),
+            ToolPlan(
+                self.tools.get("research.search"),
+                "research.search",
+                "public-web",
+                "low",
+                False,
+            ),
+            ToolPlan(
+                self.tools.get("research.source"),
+                "research.source",
+                "source",
+                "low",
+                False,
+            ),
+            ToolPlan(
+                self.tools.get("research.report"),
+                "research.report",
+                "report",
+                "medium",
+                False,
+            ),
             ToolPlan(
                 self.tools.get("external.action"),
                 "external.action",
