@@ -246,6 +246,16 @@ class SandboxGate(Protocol):
 class SecretGate(Protocol):
     def authorize(self, request: ExecutionRequest) -> None: ...
 
+    def redact_output(self, request: ExecutionRequest, output: str) -> str: ...
+
+
+class BudgetGate(Protocol):
+    def reserve(self, tenant_id: str, run_id: UUID, *, tool_calls: int, seconds: float) -> Any: ...
+
+    def consume(self, reservation: Any, elapsed_seconds: float) -> None: ...
+
+    def release(self, reservation: Any) -> None: ...
+
 
 class SQLiteIdempotencyRepository:
     """Durable single-host idempotency store using SQLite transactions."""
@@ -358,6 +368,7 @@ class GovernedExecutionService:
         idempotency: IdempotencyRepository | None = None,
         sandbox: SandboxGate | None = None,
         secrets: SecretGate | None = None,
+        budget: BudgetGate | None = None,
         platform_max_timeout_seconds: float = 300.0,
     ) -> None:
         self.agents = agents
@@ -368,6 +379,7 @@ class GovernedExecutionService:
         self.idempotency = idempotency or InMemoryIdempotencyRepository()
         self.sandbox = sandbox
         self.secrets = secrets
+        self.budget = budget
         self.platform_max_timeout_seconds = platform_max_timeout_seconds
         self._lock = RLock()
         self._identities: dict[UUID, ExecutionIdentity] = {}
@@ -418,6 +430,7 @@ class GovernedExecutionService:
         self._states[execution_id] = ExecutionState.REQUESTED
         self._trace_ids[execution_id] = trace_id
         audit_ids: list[UUID] = []
+        budget_reservation: Any | None = None
         try:
             self._event(request, execution_id, "execution.requested", audit_ids)
             self._event(request, execution_id, "execution.authenticated", audit_ids)
@@ -498,6 +511,22 @@ class GovernedExecutionService:
             )
             if effective_timeout <= 0:
                 raise ExecutionFailure(ExecutionErrorCode.TIMEOUT, "effective timeout is invalid")
+            if self.budget is not None:
+                try:
+                    budget_reservation = self.budget.reserve(
+                        request.tenant_id,
+                        request.run_id,
+                        tool_calls=request.requested_tool_calls,
+                        seconds=effective_timeout,
+                    )
+                except (PermissionError, TimeoutError, ValueError) as exc:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.BUDGET_EXCEEDED,
+                        "platform execution budget could not be reserved",
+                    ) from exc
+                self._event(request, execution_id, "execution.budget_reserved", audit_ids)
+            else:
+                self._event(request, execution_id, "execution.budget_reserved", audit_ids)
             if not self.tools.supports_hard_timeout(request.tool_name):
                 raise ExecutionFailure(
                     ExecutionErrorCode.TIMEOUT,
@@ -577,7 +606,8 @@ class GovernedExecutionService:
                 raise ExecutionFailure(code, "approval could not authorize this execution") from exc
             if request.approval_id is not None:
                 self._event(request, execution_id, "approval.consumed", audit_ids)
-            if monotonic() - started > effective_timeout:
+            elapsed = monotonic() - started
+            if elapsed > effective_timeout:
                 self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
@@ -589,9 +619,34 @@ class GovernedExecutionService:
                     ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
                     False,
                 )
+                if budget_reservation is not None:
+                    self.budget.release(budget_reservation)
+                    budget_reservation = None
                 self.idempotency.complete(record, result)
                 self._results[execution_id] = result
                 return result
+            if self.secrets is not None:
+                try:
+                    output = self.secrets.redact_output(request, output)
+                except Exception as exc:
+                    if budget_reservation is not None:
+                        self.budget.release(budget_reservation)
+                        budget_reservation = None
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.SECRET_ACCESS_DENIED,
+                        "secret redaction could not be established",
+                    ) from exc
+            if budget_reservation is not None:
+                try:
+                    self.budget.consume(budget_reservation, elapsed)
+                except Exception as exc:
+                    self.budget.release(budget_reservation)
+                    budget_reservation = None
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.BUDGET_EXCEEDED,
+                        "execution exceeded the reserved platform budget",
+                    ) from exc
+                budget_reservation = None
             evidence_ids: list[UUID] = []
             if request.evidence_required:
                 try:
@@ -627,6 +682,10 @@ class GovernedExecutionService:
             self._results[execution_id] = result
             return result
         except ExecutionFailure as exc:
+            if budget_reservation is not None:
+                with suppress(Exception):
+                    self.budget.release(budget_reservation)
+                budget_reservation = None
             state = {
                 ExecutionErrorCode.APPROVAL_REQUIRED: ExecutionState.WAITING_APPROVAL,
                 ExecutionErrorCode.BUDGET_EXCEEDED: ExecutionState.BUDGET_EXCEEDED,
@@ -645,6 +704,10 @@ class GovernedExecutionService:
                 self._results[execution_id] = result
             raise
         except Exception as exc:
+            if budget_reservation is not None:
+                with suppress(Exception):
+                    self.budget.release(budget_reservation)
+                budget_reservation = None
             self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
             with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
