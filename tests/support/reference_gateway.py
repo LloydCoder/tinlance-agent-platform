@@ -114,10 +114,19 @@ class ReferencePlatformGateway(APIHandler):
             return APIResponse("ok", {"user_id": request.subject_id})
         if operation == "agents.list":
             items = self.agents.list_for_tenant(request.tenant_id)
-            return APIResponse("ok", {"agents": [
-                {"agent_id": str(agent.agent_id), "name": agent.name, "version": agent.version}
-                for agent in items
-            ]})
+            return APIResponse(
+                "ok",
+                {
+                    "agents": [
+                        {
+                            "agent_id": str(agent.agent_id),
+                            "name": agent.name,
+                            "version": agent.version,
+                        }
+                        for agent in items
+                    ]
+                },
+            )
         if operation == "capabilities.list":
             return self._capabilities(request)
         if operation == "runs.create":
@@ -250,8 +259,11 @@ class ReferencePlatformGateway(APIHandler):
             request.tenant_id, parsed, action, resource, reason, request.subject_id,
             expires_at=datetime.now(UTC) + timedelta(minutes=10),
             intent_fingerprint=self._intent_fingerprint(request)
-            or (request.payload.get("intent_fingerprint")
-                if isinstance(request.payload.get("intent_fingerprint"), str) else None),
+            or (
+                request.payload.get("intent_fingerprint")
+                if isinstance(request.payload.get("intent_fingerprint"), str)
+                else None
+            ),
         )
         with self._lock:
             self._runs[parsed] = self._state.transition(run, RunStatus.WAITING_APPROVAL)
