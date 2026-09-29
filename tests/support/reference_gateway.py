@@ -279,7 +279,7 @@ class ReferencePlatformGateway(APIHandler):
         self.events.append(new_event(
             request.tenant_id, item.run_id, "approval.decided",
             {"approval_id": str(item.approval_id), "request_id": request.request_id,
-             "decision": item.status.value},
+             "decision": item.status.value, "approver_subject_id": request.subject_id},
         ))
         return APIResponse("accepted", {
             "approval_id": str(item.approval_id), "state": item.status.value
