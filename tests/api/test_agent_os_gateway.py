@@ -164,7 +164,6 @@ def test_http_golden_path_and_evidence_references() -> None:
         thread.join(timeout=2)
 
 
-# fmt: on
 
 
 def test_http_rejects_tenant_spoofing() -> None:
