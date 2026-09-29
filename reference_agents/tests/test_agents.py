@@ -39,6 +39,9 @@ def test_security_plan_marks_mutation_as_approval_bound(client):
     write = next(plan for plan in plans if plan.descriptor.name == "repository.write")
     assert write.requires_approval is True
     assert write.risk == "high"
+    assert write.requested_timeout_seconds == 30.0
+    assert write.requested_tool_calls == 1
+    assert write.evidence_required is True
 
 
 def test_engineering_plan_uses_governed_execution_boundary(client):
@@ -77,7 +80,18 @@ class FakeRuns:
 
 
 class FakeApprovals:
-    def request(self, run_id, action, resource, reason, request_id=None):
+    def request(
+        self,
+        run_id,
+        action,
+        resource,
+        reason,
+        *,
+        execution_intent=None,
+        request_id=None,
+        idempotency_key=None,
+    ):
+        assert execution_intent is not None
         return ApprovalRef(uuid4())
 
 
@@ -131,10 +145,11 @@ def test_shared_approval_and_collection_use_sdk_contract():
         agent_id=uuid4(),
         objective="inspect",
     )
+    plan = next(item for item in agent.plan_tools() if item.descriptor.name == "repository.write")
     approval_id = agent.request_approval(
         run,
-        action="repository.write",
-        resource="repo:example",
+        plan=plan,
+        arguments={"path": "README.md"},
         reason="mutation requires review",
         request_id="req-approval",
     )
