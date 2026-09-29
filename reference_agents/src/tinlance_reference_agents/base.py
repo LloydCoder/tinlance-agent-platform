@@ -10,9 +10,11 @@ from tinlance_agent_platform_sdk import (
     AgentPlatform,
     Event,
     EvidenceRef,
+    Execution,
     Run,
     ToolContractRegistry,
     ToolDescriptor,
+    ToolInvocation,
 )
 
 
@@ -123,6 +125,45 @@ class ReferenceAgent:
             request_id=request_id,
         )
         return AgentRun(run, objective, workflow, planned_tools)
+
+    def execute_tool(
+        self,
+        agent_run: AgentRun,
+        *,
+        plan: ToolPlan,
+        arguments: dict[str, object] | None = None,
+        capability_version: str | None = None,
+        risk: str = "low",
+        reversibility: str = "reversible",
+        data_class: str = "internal",
+        blast_radius: str = "single",
+        approval_id: UUID | str | None = None,
+        request_id: str | None = None,
+        idempotency_key: str | None = None,
+        sandbox_required: bool = False,
+        evidence_required: bool = True,
+    ) -> Execution:
+        """Request consequential execution through the external Platform SDK only."""
+        descriptor = plan.descriptor
+        return self.client.tools.execute(
+            agent_run.run.run_id,
+            agent_run.run.agent_id,
+            ToolInvocation(
+                descriptor.name, descriptor.capability, plan.action, plan.resource, arguments or {},
+            ),
+            capability_version=capability_version or descriptor.version,
+            tool_version=descriptor.version,
+            requested_timeout_seconds=30.0,
+            risk=risk,
+            reversibility=reversibility,
+            data_class=data_class,
+            blast_radius=blast_radius,
+            approval_id=approval_id,
+            request_id=request_id,
+            idempotency_key=idempotency_key,
+            sandbox_required=sandbox_required,
+            evidence_required=evidence_required,
+        )
 
     def request_approval(
         self,
