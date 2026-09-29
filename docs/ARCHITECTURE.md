@@ -116,6 +116,8 @@ The Platform HTTP boundary verifies the authenticated principal before dispatch 
 
 The reference HTTP server is for contract/integration testing. Production deployments must place a hardened TLS/reverse-proxy boundary in front of it and inject a standards-based token verifier with issuer, audience, signature, expiry and lifecycle controls.
 
+See [docs/architecture/agent-platform-agent-os-integration.md](architecture/agent-platform-agent-os-integration.md) for the canonical API v1.1 wire, identity, approval, reliability and production-boundary contract.
+
 ## Integration verification
 
 The Agent OS boundary is covered by the v1.1 gateway golden-path and identity-binding tests in tests/api/test_agent_os_gateway.py. The companion Agent OS repository validates the adapter against the same request/response envelope and exercises the local OS lifecycle delegation. Authentication and tenant context are resolved server-side; request-body identity is never treated as authority.
