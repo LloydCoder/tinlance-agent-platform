@@ -3,8 +3,6 @@ from typing import Protocol
 
 from tinlance_agent_platform_contracts import Principal
 
-from tinlance_agent_platform_contracts import Principal
-
 API_VERSION = "1.1"
 
 
@@ -32,10 +30,15 @@ class AuthenticationError(PermissionError):
     """Raised when bearer authentication cannot establish a principal."""
 
 
+class AuthenticatedPrincipal(Protocol):
+    tenant_id: str
+    subject_id: str
+
+
 class PrincipalResolver(Protocol):
     """Resolve an already-authenticated bearer credential to a platform principal."""
 
-    def resolve(self, bearer_token: str) -> Principal: ...
+    def resolve(self, bearer_token: str) -> AuthenticatedPrincipal: ...
 
 
 class PrincipalResolver(Protocol):
