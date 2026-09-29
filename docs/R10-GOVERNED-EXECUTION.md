@@ -21,8 +21,8 @@ The SDK request contains:
 - request ID
 - idempotency key
 - tenant/principal/agent/run identity
-- capability and version
-- tool and version
+- capability and capability version
+- tool and tool version
 - action/resource
 - normalized input
 - timeout/tool-call budget
@@ -68,7 +68,7 @@ Changing any material security context requires a new authorization/execution in
 
 Policy is evaluated before consequential execution. The existing deterministic policy returns explicit allow/deny/approval-required outcomes. Policy failure is not converted to allow.
 
-Tool registrations also carry a risk ceiling, capability, version, timeout, tool-call ceiling, sandbox requirement and evidence requirement. A request cannot exceed the registered ceiling.
+Tool registrations also carry a risk ceiling, capability, capability version, tool version, timeout, tool-call ceiling, sandbox requirement and evidence requirement. A request must match both registered versions; version substitution is denied.
 
 ## Approval
 
@@ -78,7 +78,7 @@ Approval lifecycle:
 
 `APPROVED → CONSUMED`
 
-A consumed approval cannot be reused. The approval service uses locking for the reference implementation; distributed deployments must provide transactional/optimistic concurrency semantics in the durable adapter.
+A consumed approval cannot be reused. Approval decisions require an authenticated approver identity; the requester cannot approve its own consequential request. The approval service uses locking for the reference implementation; distributed deployments must provide transactional/optimistic concurrency semantics in the durable adapter.
 
 ## Idempotency
 
@@ -164,6 +164,10 @@ The reference Platform implementation is intentionally explicit about provider b
 | audit | correlated event store | durable/immutable audit pipeline |
 
 R10 is complete as a contract and reference authority boundary only where these distinctions remain explicit; a deployment must not advertise provider capabilities it has not actually supplied.
+
+## Agent certification
+
+Every future Tinlance agent that can reach consequential execution must pass `docs/R10-CERTIFICATION.md` and the independent `R10 Certification` workflow. The suite is adversarial and covers tenant escape, forged capability/version identity, approval substitution/replay/self-approval, idempotency and budget races, timeout/ambiguous outcomes, recovery, secret leakage, malicious metadata, hostile MCP boundaries, and evidence/audit causality.
 
 ## Security references
 
