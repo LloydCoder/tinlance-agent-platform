@@ -92,7 +92,7 @@ The repository includes both an in-memory conformance implementation and a durab
 
 R10 enforces the registered maximum tool-call budget and computes an effective timeout bounded by the client request, tool registration and Platform maximum.
 
-The reference boundary measures elapsed execution and represents a late/ambiguous completion as `outcome_unknown`. Hard process/container cancellation remains an execution-adapter responsibility; production tool adapters MUST provide an authoritative timeout/cancellation primitive before advertising hard timeout enforcement.
+R10 refuses a governed execution when the registered tool adapter cannot provide the hard-timeout interface. Adapters implement `execute_with_timeout(call, timeout_seconds)`; an adapter timeout becomes the explicit `timed_out` terminal state. Process/container cancellation remains an adapter responsibility, but the Platform no longer silently treats a non-enforcing adapter as governed execution.
 
 No agent can increase a registered ceiling.
 
