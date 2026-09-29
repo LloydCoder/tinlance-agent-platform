@@ -6,7 +6,7 @@ import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .gateway import AuthenticationError, PrincipalResolver
+from .service import AuthenticationError, PrincipalResolver
 from .service import AgentPlatformAPI, APIRequest
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
