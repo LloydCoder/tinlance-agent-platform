@@ -130,7 +130,10 @@ def serve(
             except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             except IdempotencyConflictError:
-                self._respond(HTTPStatus.CONFLICT, {"error": "IDEMPOTENCY_CONFLICT", "retryable": False})
+                self._respond(
+                    HTTPStatus.CONFLICT,
+                    {"error": "IDEMPOTENCY_CONFLICT", "retryable": False},
+                )
             except ExecutionAPIError as exc:
                 self._respond(
                     HTTPStatus.CONFLICT,
