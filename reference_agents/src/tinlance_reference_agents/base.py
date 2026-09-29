@@ -142,9 +142,7 @@ class ReferenceAgent:
         )
         return str(ref.approval_id)
 
-    def collect(
-        self, agent_run: AgentRun
-    ) -> tuple[tuple[Event, ...], tuple[EvidenceRef, ...]]:
+    def collect(self, agent_run: AgentRun) -> tuple[tuple[Event, ...], tuple[EvidenceRef, ...]]:
         return (
             self.client.runs.events(agent_run.run.run_id),
             self.client.runs.evidence(agent_run.run.run_id),
