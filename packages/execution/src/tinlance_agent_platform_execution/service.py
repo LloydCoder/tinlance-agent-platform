@@ -28,10 +28,10 @@ from tinlance_agent_platform_contracts import (
     Reversibility,
     RiskTier,
 )
-from tinlance_agent_platform_events import EventStore, new_event
-from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_policy import evaluate
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
+from tinlance_agent_platform_events import EventStore, new_event
+from tinlance_agent_platform_evidence import EvidenceStore
 
 
 CONTRACT_VERSION = "governed-execution.v1"
