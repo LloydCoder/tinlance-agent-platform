@@ -254,7 +254,9 @@ def test_execution_status_is_tenant_scoped(harness: object) -> None:
         service.status("tenant-other", result.execution_id)
 
 
-def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: object) -> None:
+def test_sqlite_idempotency_survives_reinstantiation(
+    tmp_path: Path, harness: object
+) -> None:
     _, principal, agent, _ = harness
     path = str(tmp_path / "idempotency.sqlite3")
     first_store = SQLiteIdempotencyRepository(path)
@@ -284,5 +286,6 @@ def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: ob
     item = request(principal, agent)
     result = service.execute(principal, item)
     second_store = SQLiteIdempotencyRepository(path)
-    assert second_store.get(principal.tenant_id, item.idempotency_key) is not None
-    assert second_store.get(principal.tenant_id, item.idempotency_key).result == result
+    restored = second_store.get(principal.tenant_id, item.idempotency_key)
+    assert restored is not None
+    assert restored.result == result
