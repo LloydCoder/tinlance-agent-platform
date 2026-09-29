@@ -25,6 +25,7 @@ class ToolRegistration:
     timeout_seconds: float = 300.0
     max_tool_calls: int = 1
     evidence_required: bool = True
+    secret_required: bool = False
 
     def __post_init__(self) -> None:
         if not self.name.strip() or not self.capability.strip() or not self.description.strip():
