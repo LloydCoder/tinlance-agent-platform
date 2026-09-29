@@ -17,6 +17,7 @@ from tinlance_agent_platform_api.service import (
     APIRequest,
     APIResponse,
     AuthenticationError,
+    ExecutionAPIError,
 )
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
@@ -279,8 +280,8 @@ class ReferencePlatformGateway(APIHandler):
             if exc.code is ExecutionErrorCode.APPROVAL_REQUIRED:
                 return APIResponse("accepted", {"state": ExecutionState.WAITING_APPROVAL.value})
             if exc.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT:
-                raise ValueError("idempotency conflict") from exc
-            raise PermissionError(str(exc)) from exc
+                raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
+            raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
         return APIResponse("accepted", {
             "execution_id": str(execution.execution_id),
             "state": execution.state.value,
