@@ -9,7 +9,11 @@ from uuid import uuid4
 import pytest
 
 from tinlance_agent_platform_agents import AgentRegistry
-from tinlance_agent_platform_api import AgentPlatformAPI, ReferencePlatformGateway, StaticPrincipalResolver
+from tinlance_agent_platform_api import (
+    AgentPlatformAPI,
+    ReferencePlatformGateway,
+    StaticPrincipalResolver,
+)
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_contracts import AgentDefinition, Principal
 from tinlance_agent_platform_events import InMemoryEventStore
@@ -21,7 +25,9 @@ SUBJECT = "user-a"
 TOKEN = "token-a"
 
 
-def _request(url: str, body: dict[str, object], token: str = TOKEN) -> tuple[int, dict[str, object]]:
+def _request(
+    url: str, body: dict[str, object], token: str = TOKEN
+) -> tuple[int, dict[str, object]]:
     raw = json.dumps(body).encode()
     request = urllib.request.Request(
         url,
