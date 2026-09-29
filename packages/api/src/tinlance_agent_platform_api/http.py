@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .service import AgentPlatformAPI, APIRequest, AuthenticationError, PrincipalResolver
+from .service import API_VERSION, AgentPlatformAPI, APIRequest, AuthenticationError, PrincipalResolver
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
+_TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
 
 def _bearer(value: str | None) -> str:
@@ -18,6 +20,16 @@ def _bearer(value: str | None) -> str:
     if not token or any(character.isspace() for character in token):
         raise AuthenticationError("invalid bearer authentication")
     return token
+
+
+def _traceparent(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if not _TRACEPARENT.fullmatch(value):
+        raise ValueError("traceparent must use W3C Trace Context format")
+    if value[2:34] == "0" * 32 or value[35:51] == "0" * 16:
+        raise ValueError("traceparent identifiers must not be all zero")
+    return value
 
 
 def serve(
@@ -35,6 +47,7 @@ def serve(
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "TinlanceAgentPlatform/1.1"
+        sys_version = ""
 
         def do_POST(self) -> None:  # noqa: N802
             if self.path != "/v1/agent-platform":
@@ -46,16 +59,25 @@ def serve(
                 self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_content_length"})
                 return
             if length < 0 or length > MAX_REQUEST_BYTES:
-                self._respond(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"})
+                self._respond(
+                    HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                    {"error": "request_too_large"},
+                )
                 return
             if "application/json" not in self.headers.get("Content-Type", "").lower():
                 self._respond(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_required"})
                 return
             try:
                 raw = self.rfile.read(length)
+                if len(raw) != length:
+                    raise ValueError("request body is truncated")
                 body = json.loads(raw.decode("utf-8"))
                 if not isinstance(body, dict):
                     raise ValueError("request must be a JSON object")
+                request_version = self.headers.get("X-Tinlance-API-Version")
+                if request_version != API_VERSION:
+                    self._respond(HTTPStatus.UPGRADE_REQUIRED, {"error": "api_version_required"})
+                    return
                 token = _bearer(self.headers.get("Authorization"))
                 principal = resolver.resolve(token)
                 tenant_id = body.get("tenant_id")
@@ -74,7 +96,7 @@ def serve(
                     operation,
                     payload,
                     self.headers.get("X-Request-ID", ""),
-                    self.headers.get("traceparent"),
+                    _traceparent(self.headers.get("traceparent")),
                 )
                 if not request.request_id or request.request_id != request.request_id.strip():
                     raise ValueError("X-Request-ID is required")
@@ -97,7 +119,9 @@ def serve(
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(raw)))
-            self.send_header("X-Tinlance-API-Version", "1.1")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Tinlance-API-Version", API_VERSION)
             self.end_headers()
             self.wfile.write(raw)
 
