@@ -31,6 +31,10 @@ from tinlance_agent_platform_runtime import RunStateMachine
 from .service import APIHandler, APIRequest, APIResponse
 
 
+class AuthenticationError(PermissionError):
+    """Raised when bearer authentication cannot establish a principal."""
+
+
 class PrincipalResolver(Protocol):
     """Resolve an already-authenticated bearer credential to a platform principal."""
 
@@ -46,7 +50,7 @@ class StaticPrincipalResolver:
     def resolve(self, bearer_token: str) -> Principal:
         principal = self.principals.get(bearer_token)
         if principal is None:
-            raise PermissionError("authentication failed")
+            raise AuthenticationError("authentication failed")
         return principal
 
 
