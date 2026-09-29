@@ -284,6 +284,12 @@ class ReferencePlatformGateway(APIHandler):
             if exc.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT:
                 raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
             raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
+        if execution.state is ExecutionState.COMPLETED:
+            with self._lock:
+                run = self._runs.get(UUID(self._required_text(payload, "run_id")))
+                if run is not None and run.tenant_id == request.tenant_id:
+                    running = self._state.transition(run, RunStatus.RUNNING)
+                    self._runs[running.run_id] = self._state.transition(running, RunStatus.SUCCEEDED)
         return APIResponse("accepted", {
             "execution_id": str(execution.execution_id),
             "state": execution.state.value,
