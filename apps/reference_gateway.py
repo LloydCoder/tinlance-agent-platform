@@ -15,7 +15,6 @@ from threading import RLock
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_agents import AgentRegistry
-
 from tinlance_agent_platform_api.service import (
     APIHandler,
     APIRequest,
