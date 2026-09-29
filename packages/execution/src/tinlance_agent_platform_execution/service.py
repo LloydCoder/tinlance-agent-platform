@@ -500,6 +500,11 @@ class GovernedExecutionService:
             )
             if effective_timeout <= 0:
                 raise ExecutionFailure(ExecutionErrorCode.TIMEOUT, "effective timeout is invalid")
+            if not self.tools.supports_hard_timeout(request.tool_name):
+                raise ExecutionFailure(
+                    ExecutionErrorCode.TIMEOUT,
+                    "tool adapter cannot enforce the authoritative execution timeout",
+                )
             if request.sandbox_required or registration.sandbox_required:
                 if self.sandbox is None:
                     raise ExecutionFailure(
@@ -536,7 +541,23 @@ class GovernedExecutionService:
                     request.approval_id,
                     self.approvals,
                     intent_fingerprint=request.fingerprint,
+                    timeout_seconds=effective_timeout,
                 )
+            except TimeoutError as exc:
+                self._states[execution_id] = ExecutionState.TIMED_OUT
+                self._event(request, execution_id, "execution.timed_out", audit_ids)
+                result = ExecutionResult(
+                    execution_id,
+                    ExecutionState.TIMED_OUT,
+                    None,
+                    (),
+                    tuple(audit_ids),
+                    ExecutionErrorCode.TIMEOUT,
+                    False,
+                )
+                self.idempotency.complete(record, result)
+                self._results[execution_id] = result
+                return result
             except PermissionError as exc:
                 if request.approval_id is None:
                     raise ExecutionFailure(
