@@ -3,12 +3,14 @@ from .service import (
     APIRequest,
     APIResponse,
     AuthenticationError,
+    ExecutionAPIError,
     IdempotencyConflictError,
     PrincipalResolver,
 )
 
 __all__ = [
     "AuthenticationError",
+    "ExecutionAPIError",
     "IdempotencyConflictError",
     "PrincipalResolver",
     "APIRequest",
