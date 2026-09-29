@@ -128,3 +128,12 @@ class AgentPlatformAPI:
             principal,
         )
         return self.dispatch(authenticated_request)
+
+
+class ExecutionAPIError(PermissionError):
+    """Structured failure emitted by the governed execution contract."""
+
+    def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
