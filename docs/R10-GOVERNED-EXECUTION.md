@@ -86,7 +86,7 @@ Consequential calls use `Idempotency-Key`. The Platform derives a canonical SHA-
 
 The same tenant + key + fingerprint returns the original result. Reusing the key for a different fingerprint is a conflict. An unresolved in-flight/approval-gated request remains resumable with the same intent; an already ambiguous execution is represented as `outcome_unknown` and is never silently replayed.
 
-The repository includes an in-memory reference idempotency implementation for deterministic conformance tests. Production deployment MUST inject a durable, transactional implementation with a uniqueness constraint on tenant + key and atomic claim/complete semantics. The reference implementation does not claim distributed durability.
+The repository includes both an in-memory conformance implementation and a durable SQLite implementation. The SQLite provider uses a unique `(tenant_id, idempotency_key)` primary key and transactional claim/complete operations. SQLite is suitable for a durable single-host deployment; distributed production deployments should inject a transactional Postgres-equivalent provider with the same repository contract. The Platform never silently falls back from a required durable provider to process memory.
 
 ## Budgets and timeouts
 
