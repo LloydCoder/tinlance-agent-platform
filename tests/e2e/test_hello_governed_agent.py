@@ -95,7 +95,7 @@ def test_hello_governed_agent_executes_only_after_complete_mediation() -> None:
         "high-risk write requires human review",
         "user-1",
     )
-    approvals.decide(approval.approval_id, True, tenant_id)
+    approvals.decide(approval.approval_id, True, tenant_id, "approver-1")
 
     executed: list[ToolCall] = []
 
