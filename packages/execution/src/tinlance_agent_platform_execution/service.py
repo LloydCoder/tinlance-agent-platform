@@ -115,9 +115,17 @@ class ExecutionRequest:
 
     def __post_init__(self) -> None:
         text_fields = (
-            self.request_id, self.idempotency_key, self.tenant_id, self.principal_id,
-            self.capability_id, self.capability_version, self.tool_name, self.tool_version,
-            self.action, self.resource, self.blast_radius,
+            self.request_id,
+            self.idempotency_key,
+            self.tenant_id,
+            self.principal_id,
+            self.capability_id,
+            self.capability_version,
+            self.tool_name,
+            self.tool_version,
+            self.action,
+            self.resource,
+            self.blast_radius,
         )
         if self.contract_version != CONTRACT_VERSION:
             raise ValueError("unsupported governed execution contract version")
@@ -297,9 +305,17 @@ class GovernedExecutionService:
                 return self.execute(principal, request, trace_id=trace_id)
 
         identity = ExecutionIdentity(
-            execution_id, request.tenant_id, request.principal_id, request.agent_id,
-            request.run_id, request.capability_id, request.tool_name, "", request.approval_id,
-            request.request_id, trace_id,
+            execution_id,
+            request.tenant_id,
+            request.principal_id,
+            request.agent_id,
+            request.run_id,
+            request.capability_id,
+            request.tool_name,
+            "",
+            request.approval_id,
+            request.request_id,
+            trace_id,
         )
         self._states[execution_id] = ExecutionState.REQUESTED
         self._trace_ids[execution_id] = trace_id
@@ -329,15 +345,20 @@ class GovernedExecutionService:
                         ExecutionErrorCode.AUTHORIZATION_DENIED,
                         "requested risk exceeds the registered tool risk ceiling",
                     )
-            policy = evaluate(CapabilityRequest(
-                request.action, request.resource, frozenset({request.capability_id}),
-                request.risk, request.reversibility, request.data_class,
-                request.blast_radius, request.input,
-            ))
-            if policy.decision is Decision.DENY:
-                self._deny(
-                    execution_id, request, ExecutionErrorCode.POLICY_DENIED, audit_ids
+            policy = evaluate(
+                CapabilityRequest(
+                    request.action,
+                    request.resource,
+                    frozenset({request.capability_id}),
+                    request.risk,
+                    request.reversibility,
+                    request.data_class,
+                    request.blast_radius,
+                    request.input,
                 )
+            )
+            if policy.decision is Decision.DENY:
+                self._deny(execution_id, request, ExecutionErrorCode.POLICY_DENIED, audit_ids)
             if policy.decision is not Decision.ALLOW and not policy.requires_approval:
                 self._deny(
                     execution_id,
@@ -347,9 +368,17 @@ class GovernedExecutionService:
                 )
             policy_id = f"{policy.policy_id}:{policy.policy_version}"
             identity = ExecutionIdentity(
-                execution_id, request.tenant_id, request.principal_id, request.agent_id,
-                request.capability_id, request.tool_name, policy_id, request.approval_id,
-                request.request_id, trace_id,
+                execution_id,
+                request.tenant_id,
+                request.principal_id,
+                request.agent_id,
+                request.run_id,
+                request.capability_id,
+                request.tool_name,
+                policy_id,
+                request.approval_id,
+                request.request_id,
+                trace_id,
             )
             self._identities[execution_id] = identity
             self._event(request, execution_id, "execution.identity_bound", audit_ids)
@@ -392,8 +421,13 @@ class GovernedExecutionService:
             self._event(request, execution_id, "execution.started", audit_ids)
             started = monotonic()
             call = ToolCall(
-                uuid4(), request.tenant_id, request.run_id, request.tool_name,
-                request.capability_id, request.action, request.resource,
+                uuid4(),
+                request.tenant_id,
+                request.run_id,
+                request.tool_name,
+                request.capability_id,
+                request.action,
+                request.resource,
             )
             try:
                 output = self.tools.execute(
@@ -428,8 +462,13 @@ class GovernedExecutionService:
                 self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
-                    execution_id, ExecutionState.OUTCOME_UNKNOWN, None, (), tuple(audit_ids),
-                    ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN, False,
+                    execution_id,
+                    ExecutionState.OUTCOME_UNKNOWN,
+                    None,
+                    (),
+                    tuple(audit_ids),
+                    ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                    False,
                 )
                 self.idempotency.complete(record, result)
                 self._results[execution_id] = result
@@ -491,8 +530,13 @@ class GovernedExecutionService:
             with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
             result = ExecutionResult(
-                execution_id, ExecutionState.OUTCOME_UNKNOWN, None, (), tuple(audit_ids),
-                ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN, False,
+                execution_id,
+                ExecutionState.OUTCOME_UNKNOWN,
+                None,
+                (),
+                tuple(audit_ids),
+                ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                False,
             )
             self.idempotency.complete(record, result)
             self._results[execution_id] = result
