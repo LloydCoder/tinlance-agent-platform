@@ -40,7 +40,6 @@ from tinlance_agent_platform_execution import (
 from tinlance_agent_platform_mcp import MCPTool, MCPToolGateway, ToolScope
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
-
 TENANT_A = "tenant-a"
 TENANT_B = "tenant-b"
 SUBJECT = "user-1"
