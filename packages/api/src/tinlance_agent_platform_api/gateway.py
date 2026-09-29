@@ -10,9 +10,9 @@ durable implementations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
 from datetime import UTC, datetime, timedelta
 from threading import RLock
+from typing import Protocol
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_agents import AgentRegistry
