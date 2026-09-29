@@ -14,6 +14,7 @@ from enum import StrEnum
 from hashlib import sha256
 from threading import RLock
 from time import monotonic
+from collections.abc import Mapping
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -266,6 +267,7 @@ class GovernedExecutionService:
         self._identities: dict[UUID, ExecutionIdentity] = {}
         self._states: dict[UUID, ExecutionState] = {}
         self._results: dict[UUID, ExecutionResult] = {}
+        self._trace_ids: dict[UUID, str | None] = {}
 
     def execute(
         self,
@@ -300,6 +302,7 @@ class GovernedExecutionService:
             request.request_id, trace_id,
         )
         self._states[execution_id] = ExecutionState.REQUESTED
+        self._trace_ids[execution_id] = trace_id
         audit_ids: list[UUID] = []
         try:
             self._event(request, execution_id, "execution.requested", audit_ids)
@@ -417,7 +420,13 @@ class GovernedExecutionService:
                         request.tenant_id, request.run_id, output, execution_id
                     )
                     evidence_ids.append(item.evidence_id)
-                    self._event(request, execution_id, "execution.evidence_committed", audit_ids)
+                    self._event(
+                        request,
+                        execution_id,
+                        "execution.evidence_committed",
+                        audit_ids,
+                        {"evidence_id": str(item.evidence_id)},
+                    )
                 except Exception as exc:
                     self._states[execution_id] = ExecutionState.FAILED
                     self._event(request, execution_id, "execution.failed", audit_ids)
@@ -558,6 +567,7 @@ class GovernedExecutionService:
         request: ExecutionRequest,
         code: ExecutionErrorCode,
         audit_ids: list[UUID],
+        extra: Mapping[str, str] | None = None,
     ) -> None:
         self._states[execution_id] = ExecutionState.DENIED
         self._event(request, execution_id, "authorization.denied", audit_ids)
@@ -570,18 +580,24 @@ class GovernedExecutionService:
         event_type: str,
         audit_ids: list[UUID],
     ) -> None:
-        event = new_event(
-            request.tenant_id,
-            request.run_id,
-            event_type,
-            {
-                "request_id": request.request_id,
-                "principal_id": request.principal_id,
-                "agent_id": str(request.agent_id),
-                "capability_id": request.capability_id,
-                "tool_name": request.tool_name,
-                "execution_id": str(execution_id),
-            },
-        )
+        identity = self._identities.get(execution_id)
+        payload: dict[str, str] = {
+            "request_id": request.request_id,
+            "principal_id": request.principal_id,
+            "agent_id": str(request.agent_id),
+            "capability_id": request.capability_id,
+            "tool_name": request.tool_name,
+            "execution_id": str(execution_id),
+        }
+        if request.approval_id is not None:
+            payload["approval_id"] = str(request.approval_id)
+        trace_id = self._trace_ids.get(execution_id)
+        if trace_id is not None:
+            payload["trace_id"] = trace_id
+        if identity is not None and identity.policy_decision_id:
+            payload["policy_decision_id"] = identity.policy_decision_id
+        if extra:
+            payload.update(extra)
+        event = new_event(request.tenant_id, request.run_id, event_type, payload)
         stored = self.events.append(event)
         audit_ids.append(stored.event_id)
