@@ -297,7 +297,7 @@ def test_sqlite_idempotency_survives_reinstantiation(
 
 
 def test_authoritative_tool_timeout_returns_terminal_timeout(harness: object) -> None:
-    service, principal, agent, tools = harness
+    service, principal, agent, _ = harness
 
     class Slow:
         def execute(self, call: ToolCall) -> str:
