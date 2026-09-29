@@ -205,3 +205,11 @@ def test_tenant_scoped_approval_cannot_be_read_or_consumed_cross_tenant(harness:
             ),
         )
     assert exc.value.code is ExecutionErrorCode.IDENTITY_BINDING_FAILED
+
+
+def test_execution_status_is_tenant_scoped(harness: object) -> None:
+    service, principal, agent, _ = harness
+    result = service.execute(principal, request(principal, agent))
+    assert service.status(principal.tenant_id, result.execution_id) == result
+    with pytest.raises(PermissionError):
+        service.status("tenant-other", result.execution_id)
