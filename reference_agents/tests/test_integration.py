@@ -88,11 +88,32 @@ def test_golden_contract_path(integration_client):
     assert any(item.agent_id == agent_id for item in listed)
 
     run = client.runs.create(task_id, agent_id, "inspect repository")
+    execution_intent = {
+        "contract_version": "governed-execution.v1",
+        "run_id": str(run.run_id),
+        "agent_id": str(agent_id),
+        "capability_id": "repository.read",
+        "capability_version": "1",
+        "tool_name": "reference.echo",
+        "tool_version": "1",
+        "action": "read",
+        "resource": "repo:reference",
+        "input": {"path": "README.md"},
+        "requested_timeout_seconds": 5,
+        "requested_tool_calls": 1,
+        "risk": "high",
+        "reversibility": "reversible",
+        "data_class": "internal",
+        "blast_radius": "single",
+        "sandbox_required": False,
+        "evidence_required": True,
+    }
     approval = client.approvals.request(
         run.run_id,
         "read",
         "repo:reference",
         "human review is required before supervised execution",
+        execution_intent=execution_intent,
     )
     decision = approver_client.approvals.decide(approval.approval_id, True)
     assert decision.state == "approved"
