@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from tinlance_agent_platform_contracts import Principal
-
 API_VERSION = "1.1"
 
 
@@ -40,9 +38,6 @@ class PrincipalResolver(Protocol):
 
     def resolve(self, bearer_token: str) -> AuthenticatedPrincipal: ...
 
-
-class PrincipalResolver(Protocol):
-    def resolve(self, bearer_token: str) -> Principal: ...
 
 
 class AgentPlatformAPI:
