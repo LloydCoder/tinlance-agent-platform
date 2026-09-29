@@ -1,5 +1,7 @@
 """Actual SDK -> Platform HTTP integration against the reference Platform implementation."""
 
+# ruff: isort: skip_file
+
 from __future__ import annotations
 
 from threading import Thread
