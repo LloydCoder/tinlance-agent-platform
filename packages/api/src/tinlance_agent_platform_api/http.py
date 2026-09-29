@@ -12,6 +12,7 @@ from .service import (
     AgentPlatformAPI,
     APIRequest,
     AuthenticationError,
+    ExecutionAPIError,
     IdempotencyConflictError,
     PrincipalResolver,
 )
@@ -129,7 +130,12 @@ def serve(
             except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             except IdempotencyConflictError:
-                self._respond(HTTPStatus.CONFLICT, {"error": "idempotency_conflict"})
+                self._respond(HTTPStatus.CONFLICT, {"error": "IDEMPOTENCY_CONFLICT", "retryable": False})
+            except ExecutionAPIError as exc:
+                self._respond(
+                    HTTPStatus.CONFLICT,
+                    {"error": exc.code, "retryable": exc.retryable},
+                )
             except PermissionError:
                 self._respond(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             except (ValueError, KeyError):
