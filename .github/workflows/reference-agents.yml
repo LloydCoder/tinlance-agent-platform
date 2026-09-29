@@ -30,7 +30,7 @@ jobs:
       - name: Install platform and reference-agent dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          pip install -e ".[test,security]"
           pip install -e "reference_agents[test]"
       - run: python -m pip check
       - run: ruff check reference_agents
