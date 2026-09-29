@@ -15,8 +15,8 @@ from tinlance_agent_platform_api import AgentPlatformAPI
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import AgentDefinition, Principal
-from tinlance_agent_platform_events import EventStore
-from tinlance_agent_platform_evidence import EvidenceStore
+from tinlance_agent_platform_events import InMemoryEventStore
+from tinlance_agent_platform_evidence import InMemoryEvidenceStore
 from tinlance_agent_platform_sdk import AgentPlatform
 
 
@@ -26,8 +26,8 @@ def integration_client():
     subject = "reference-user"
     token = "reference-token"
     agent_id = uuid4()
-    events = EventStore()
-    evidence = EvidenceStore()
+    events = InMemoryEventStore()
+    evidence = InMemoryEvidenceStore()
     gateway = ReferencePlatformGateway(
         agents=AgentRegistry(),
         approvals=ApprovalService(),
