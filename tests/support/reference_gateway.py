@@ -215,7 +215,8 @@ class ReferencePlatformGateway(APIHandler):
             )
         )
         return APIResponse(
-            "accepted", {"run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value}
+            "accepted",
+            {"run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value},
         )
 
     def _intent_fingerprint(self, request: APIRequest) -> str | None:
