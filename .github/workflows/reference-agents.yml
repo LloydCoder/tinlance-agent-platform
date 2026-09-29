@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[test,security]"
           git clone --filter=blob:none https://github.com/LloydCoder/tinlance-agent-platform-sdk.git /tmp/tinlance-agent-platform-sdk
-          git -C /tmp/tinlance-agent-platform-sdk checkout 75a438f8e6ebd037faec538053ffc7c84f5524db
+          git -C /tmp/tinlance-agent-platform-sdk checkout 3a820d2137ea09c43399d429c46b801542ad0784
           pip install -e /tmp/tinlance-agent-platform-sdk
           pip install -e "reference_agents[test]" --no-deps
       - run: python -m pip check

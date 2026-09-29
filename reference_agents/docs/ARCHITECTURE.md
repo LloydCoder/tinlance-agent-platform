@@ -57,4 +57,21 @@ Each planned tool records:
 - risk;
 - approval requirement.
 
-Actual invocation is intentionally absent from API 1.1 and must be added to the Platform contract before any agent exposes it.
+Actual consequential invocation uses the published R10 contract. The agent derives security-relevant execution fields from an immutable ToolPlan, requests approval with the exact execution intent when required, and sends the final invocation through SDK `tools.execute`. The Platform—not the agent—performs authorization, approval validation, timeout/budget/sandbox/secret enforcement, evidence and audit handling.
+
+
+## R10 execution sequence
+
+For a consequential plan:
+
+1. The agent creates a Platform run.
+2. The agent submits `tools.execute` through the external SDK.
+3. Platform evaluates identity, tenant, capability, registration, policy, limits and required controls.
+4. If approval is required, Platform returns a stable `execution_id` with `waiting_approval`; no tool side effect occurs.
+5. The agent requests approval with the exact execution intent.
+6. An authenticated approval authority decides through `approvals.decide`; requester self-approval is rejected by the Platform.
+7. The agent resumes the exact intent with the same idempotency key and approved execution ID binding.
+8. Platform re-authorizes and executes through the registered tool adapter, then commits evidence and audit events.
+9. The agent may retrieve the authoritative terminal result with `executions.get`.
+
+The reference agents never execute a tool locally and never treat approval state, model output, MCP metadata, or tool discovery as authority.

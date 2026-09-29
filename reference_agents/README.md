@@ -2,7 +2,7 @@
 
 Reference implementations that exercise the **external Tinlance Agent Platform SDK** against the governed Tinlance Agent Platform.
 
-These agents are intentionally domain-oriented. They do not implement identity, tenancy, authorization, policy, approvals, secrets, sandboxing, evidence authority, or tool execution.
+These agents are intentionally domain-oriented. They do not implement identity, tenancy, authorization, policy, approvals, secrets, sandboxing, evidence authority, or a local tool executor. Consequential tool invocation is now delegated to the authoritative R10 Platform contract through the external SDK.
 
 ## Reference agents
 
@@ -32,20 +32,22 @@ Tinlance Agent Platform
 
 The local tool registry in this package is **metadata only**. A tool descriptor never grants authority and no reference agent contains a local unrestricted executor.
 
-## Current Platform API boundary
+## R10 Platform contract
 
-The current API 1.1 contract exposes:
+The reference suite targets the implemented `governed-execution.v1` contract through SDK 0.1.x / Platform API 1.1.
 
-- health
-- principal lookup
-- tenant-scoped agent discovery
-- capability discovery
-- governed run creation/cancellation
-- approval request creation
-- run event references
-- evidence references
+The governed path is:
 
-It does **not** expose approval decisions, direct remote tool execution, evidence content retrieval, run waiting, or streaming. The reference agents therefore do not invent those operations. The complete external golden path is tested through the currently published contract, while the unavailable execution-after-approval segment is explicitly tracked as a Platform API capability gap rather than simulated.
+`agent → SDK → tools.execute → Platform identity/capability/policy → approval when required → budget/timeout/sandbox/secret gates → tool adapter → evidence/audit → execution result`
+
+Public R10 operations exercised by the suite:
+
+- `approvals.request`
+- `approvals.decide`
+- `tools.execute`
+- `executions.get`
+
+The suite verifies the approval-gated path with the real SDK over the real reference HTTP Platform. A pending execution receives a stable execution ID; the same idempotency key can resume the exact intent after approval without replaying a completed side effect.
 
 ## Evidence discipline
 
@@ -62,7 +64,7 @@ An LLM assertion or untrusted tool/source payload is never promoted to authorita
 
 ## Security posture
 
-The suite is designed around current OWASP agentic-security guidance and NIST work on agent identity/authorization:
+The suite is designed around current OWASP agentic-security guidance, NIST agent identity/authorization work, and the final September 2026 NIST IR 8587 token/assertion guidance:
 
 - least privilege and complete mediation;
 - explicit tenant binding;
@@ -71,9 +73,11 @@ The suite is designed around current OWASP agentic-security guidance and NIST wo
 - no secret handling in agent context;
 - bounded tool/request plans;
 - replay-sensitive consequential calls;
+- exact approval-to-execution intent binding;
+- immutable execution-plan security fields;
 - deterministic adversarial evaluation.
 
-MCP integrations must remain behind the Platform gateway. The suite does not treat MCP discovery metadata as authority.
+MCP integrations must remain behind the Platform gateway. MCP tool annotations and discovery metadata are treated as untrusted hints, not authority; enforcement remains in the Platform policy and execution boundary.
 
 ## Development
 
@@ -85,7 +89,7 @@ ruff format --check .
 mypy src tests
 ```
 
-The CI job pins the SDK to the exact audited commit used by the compatibility matrix.
+The CI job and package metadata pin the SDK to the exact audited R10 commit used by the compatibility matrix.
 
 ## Compatibility
 

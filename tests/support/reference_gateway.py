@@ -85,19 +85,111 @@ class ReferencePlatformGateway(APIHandler):
         self._state = RunStateMachine()
         self.tools = tools or ToolGateway()
         if tools is None:
-            self.tools.register(
+            executor = _ReferenceTool()
+            registrations = (
                 ToolRegistration(
-                    name="reference.echo",
+                    name="repository.read",
                     capability="repository.read",
-                    description="Deterministic reference tool used by conformance tests.",
+                    description="Deterministic reference repository-read capability.",
+                    version="1",
+                    risk=RiskTier.LOW,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="security.scan",
+                    capability="security.scan",
+                    description="Deterministic reference security-analysis capability.",
+                    version="1",
+                    risk=RiskTier.MEDIUM,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="repository.write",
+                    capability="repository.write",
+                    description="Deterministic reference repository mutation capability.",
                     version="1",
                     risk=RiskTier.HIGH,
                     timeout_seconds=30.0,
                     max_tool_calls=1,
                     evidence_required=True,
                 ),
-                _ReferenceTool(),
+                ToolRegistration(
+                    name="ci.inspect",
+                    capability="ci.inspect",
+                    description="Deterministic reference CI inspection capability.",
+                    version="1",
+                    risk=RiskTier.LOW,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="pull_request.merge",
+                    capability="pull_request.merge",
+                    description="Deterministic reference pull-request mutation capability.",
+                    version="1",
+                    risk=RiskTier.HIGH,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="deployment.trigger",
+                    capability="deployment.trigger",
+                    description="Deterministic reference deployment capability.",
+                    version="1",
+                    risk=RiskTier.CRITICAL,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="research.search",
+                    capability="research.search",
+                    description="Deterministic reference research-search capability.",
+                    version="1",
+                    risk=RiskTier.LOW,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="research.source",
+                    capability="research.source",
+                    description="Deterministic reference source-retrieval capability.",
+                    version="1",
+                    risk=RiskTier.LOW,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="research.report",
+                    capability="research.report",
+                    description="Deterministic reference research-report capability.",
+                    version="1",
+                    risk=RiskTier.MEDIUM,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                ToolRegistration(
+                    name="external.action",
+                    capability="external.action",
+                    description="Deterministic reference external-action capability.",
+                    version="1",
+                    risk=RiskTier.HIGH,
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
             )
+            for registration in registrations:
+                self.tools.register(registration, executor)
         self.approver_subjects = approver_subjects
         self.execution = GovernedExecutionService(
             agents=self.agents,
@@ -373,7 +465,24 @@ class ReferencePlatformGateway(APIHandler):
             )
         except ExecutionFailure as exc:
             if exc.code is ExecutionErrorCode.APPROVAL_REQUIRED:
-                return APIResponse("accepted", {"state": ExecutionState.WAITING_APPROVAL.value})
+                if exc.execution_id is None:
+                    raise ExecutionAPIError(
+                        ExecutionErrorCode.INTERNAL_ERROR.value,
+                        "approval-gated execution has no execution identity",
+                        retryable=False,
+                    ) from exc
+                return APIResponse(
+                    "accepted",
+                    {
+                        "execution_id": str(exc.execution_id),
+                        "state": ExecutionState.WAITING_APPROVAL.value,
+                        "output": None,
+                        "evidence_ids": [],
+                        "audit_event_ids": [],
+                        "error_code": ExecutionErrorCode.APPROVAL_REQUIRED.value,
+                        "retryable": False,
+                    },
+                )
             if exc.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT:
                 raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
             raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
