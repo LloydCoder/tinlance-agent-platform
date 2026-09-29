@@ -56,6 +56,7 @@ This design reflects current agent-security guidance emphasizing least privilege
 - Deterministic safety/regression evaluation.
 - PostgreSQL migrations with tenant RLS and cross-tenant integrity controls.
 - Architecture/dependency-boundary tests.
+- Agent OS API v1.1 contract tests, authenticated tenant binding, and bounded request-idempotency for consequential requests.
 - Dependency auditing and SBOM generation.
 - Immutable CI action references.
 - Signed release artifacts through the release workflow.
@@ -316,6 +317,7 @@ Human approval remains a control for high-impact operations; it is not replaced 
 | Document | Purpose |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System boundary, planes, authority chain and invariants |
+| [docs/architecture/agent-platform-agent-os-integration.md](docs/architecture/agent-platform-agent-os-integration.md) | Canonical Agent OS integration contract and API v1.1 boundary |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Canonical M0–M14 milestone definition |
 | [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md) | Enterprise controls and production acceptance |
 | [SECURITY.md](SECURITY.md) | Security policy and vulnerability handling |
