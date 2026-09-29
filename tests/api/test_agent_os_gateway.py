@@ -23,6 +23,8 @@ TENANT = "tenant-a"
 SUBJECT = "user-a"
 TOKEN = "token-a"
 
+# fmt: off
+
 
 def _request(
     url: str, body: dict[str, object], token: str = TOKEN
@@ -160,6 +162,9 @@ def test_http_golden_path_and_evidence_references() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+# fmt: on
 
 
 def test_http_rejects_tenant_spoofing() -> None:
