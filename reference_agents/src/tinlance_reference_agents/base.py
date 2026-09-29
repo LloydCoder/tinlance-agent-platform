@@ -39,12 +39,23 @@ class ToolPlan:
     resource: str
     risk: str
     requires_approval: bool
+    requested_timeout_seconds: float = 30.0
+    requested_tool_calls: int = 1
+    reversibility: str = "reversible"
+    data_class: str = "internal"
+    blast_radius: str = "single"
+    sandbox_required: bool = False
+    evidence_required: bool = True
 
     def __post_init__(self) -> None:
         if not self.action.strip() or not self.resource.strip() or not self.risk.strip():
             raise ValueError("tool plan fields are required")
         if self.requires_approval and self.risk == "prohibited":
             raise ValueError("prohibited actions cannot be made approvable")
+        if self.requested_timeout_seconds <= 0 or self.requested_tool_calls < 1:
+            raise ValueError("tool plan execution limits must be positive")
+        if not self.reversibility.strip() or not self.data_class.strip() or not self.blast_radius.strip():
+            raise ValueError("tool plan execution classifications are required")
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,11 +99,7 @@ class PlatformClient(Protocol):
 
 
 class ReferenceAgent:
-    """Base workflow composer.
-
-    This class intentionally knows only the public SDK contract. It never reaches
-    into Platform implementation packages and never executes a tool locally.
-    """
+    """Shared workflow composer; Platform remains the authority boundary."""
 
     name = "reference-agent"
     version = "0.1.0"
@@ -132,18 +139,11 @@ class ReferenceAgent:
         *,
         plan: ToolPlan,
         arguments: dict[str, Any] | None = None,
-        capability_version: str | None = None,
-        risk: str = "low",
-        reversibility: str = "reversible",
-        data_class: str = "internal",
-        blast_radius: str = "single",
         approval_id: UUID | str | None = None,
         request_id: str | None = None,
         idempotency_key: str | None = None,
-        sandbox_required: bool = False,
-        evidence_required: bool = True,
     ) -> Execution:
-        """Request consequential execution through the external Platform SDK only."""
+        """Execute only through R10; security fields come from the immutable plan."""
         descriptor = plan.descriptor
         return self.client.tools.execute(
             agent_run.run.run_id,
@@ -155,35 +155,42 @@ class ReferenceAgent:
                 plan.resource,
                 arguments or {},
             ),
-            capability_version=capability_version or descriptor.version,
+            capability_version=descriptor.version,
             tool_version=descriptor.version,
-            requested_timeout_seconds=30.0,
-            risk=risk,
-            reversibility=reversibility,
-            data_class=data_class,
-            blast_radius=blast_radius,
+            requested_timeout_seconds=plan.requested_timeout_seconds,
+            requested_tool_calls=plan.requested_tool_calls,
+            risk=plan.risk,
+            reversibility=plan.reversibility,
+            data_class=plan.data_class,
+            blast_radius=plan.blast_radius,
             approval_id=approval_id,
             request_id=request_id,
             idempotency_key=idempotency_key,
-            sandbox_required=sandbox_required,
-            evidence_required=evidence_required,
+            sandbox_required=plan.sandbox_required,
+            evidence_required=plan.evidence_required,
         )
 
     def request_approval(
         self,
         agent_run: AgentRun,
         *,
-        action: str,
-        resource: str,
+        plan: ToolPlan,
+        arguments: dict[str, Any] | None = None,
         reason: str,
         request_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> str:
+        """Request approval bound to the exact R10 execution intent."""
+        if not plan.requires_approval:
+            raise ValueError("approval is not required for this tool plan")
         ref = self.client.approvals.request(
             agent_run.run.run_id,
-            action,
-            resource,
+            plan.action,
+            plan.resource,
             reason,
+            execution_intent=self._execution_intent(agent_run, plan, arguments),
             request_id=request_id,
+            idempotency_key=idempotency_key,
         )
         return str(ref.approval_id)
 
@@ -198,13 +205,37 @@ class ReferenceAgent:
         steps = ", ".join(step.name for step in workflow)
         return f"objective:{objective.strip()}|workflow:{steps}"
 
+    @staticmethod
+    def _execution_intent(
+        agent_run: AgentRun,
+        plan: ToolPlan,
+        arguments: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        descriptor = plan.descriptor
+        return {
+            "contract_version": "governed-execution.v1",
+            "agent_id": str(agent_run.run.agent_id),
+            "run_id": str(agent_run.run.run_id),
+            "capability_id": descriptor.capability,
+            "capability_version": descriptor.version,
+            "tool_name": descriptor.name,
+            "tool_version": descriptor.version,
+            "action": plan.action,
+            "resource": plan.resource,
+            "input": arguments or {},
+            "requested_timeout_seconds": plan.requested_timeout_seconds,
+            "requested_tool_calls": plan.requested_tool_calls,
+            "risk": plan.risk,
+            "reversibility": plan.reversibility,
+            "data_class": plan.data_class,
+            "blast_radius": plan.blast_radius,
+            "sandbox_required": plan.sandbox_required,
+            "evidence_required": plan.evidence_required,
+        }
+
 
 def reject_untrusted_instructions(content: str) -> str:
-    """Return untrusted content as data; never reinterpret it as agent instructions.
-
-    This function deliberately performs no 'prompt sanitization'. The security
-    boundary is architectural: untrusted content is never used as authority.
-    """
+    """Return untrusted content as data; never reinterpret it as authority."""
     if not isinstance(content, str):
         raise TypeError("untrusted content must be text")
     return content
