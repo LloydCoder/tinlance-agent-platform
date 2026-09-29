@@ -359,7 +359,7 @@ class GovernedExecutionService:
             evidence_ids: list[UUID] = []
             if request.evidence_required:
                 try:
-                    item = self.evidence.append(request.tenant_id, execution_id, output)
+                    item = self.evidence.append(request.tenant_id, request.run_id, output, execution_id)
                     evidence_ids.append(item.evidence_id)
                     self._event(request, execution_id, "execution.evidence_committed", audit_ids)
                 except Exception as exc:
@@ -446,7 +446,7 @@ class GovernedExecutionService:
     def _event(self, request: ExecutionRequest, execution_id: UUID, event_type: str, audit_ids: list[UUID]) -> None:
         event = new_event(
             request.tenant_id,
-            execution_id,
+            request.run_id,
             event_type,
             {
                 "request_id": request.request_id,
@@ -454,6 +454,7 @@ class GovernedExecutionService:
                 "agent_id": str(request.agent_id),
                 "capability_id": request.capability_id,
                 "tool_name": request.tool_name,
+                "execution_id": str(execution_id),
             },
         )
         stored = self.events.append(event)
