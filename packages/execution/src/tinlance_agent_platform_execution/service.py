@@ -8,6 +8,7 @@ No caller can turn a client assertion into authority.
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
@@ -244,6 +245,105 @@ class SandboxGate(Protocol):
 
 class SecretGate(Protocol):
     def authorize(self, request: ExecutionRequest) -> None: ...
+
+
+class SQLiteIdempotencyRepository:
+    """Durable single-host idempotency store using SQLite transactions."""
+
+    def __init__(self, path: str) -> None:
+        if not path.strip():
+            raise ValueError("idempotency database path is required")
+        self.path = path
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA busy_timeout=10000")
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS governed_execution_idempotency (
+                    tenant_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    fingerprint TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    result_json TEXT,
+                    PRIMARY KEY (tenant_id, idempotency_key)
+                )
+                """
+            )
+            connection.commit()
+
+    @staticmethod
+    def _decode(row: tuple[object, ...]) -> IdempotencyRecord:
+        tenant_id, key, fingerprint, execution_id, result_json = row
+        result = None
+        if isinstance(result_json, str):
+            payload = json.loads(result_json)
+            result = ExecutionResult(
+                UUID(payload["execution_id"]),
+                ExecutionState(payload["state"]),
+                payload.get("output"),
+                tuple(UUID(item) for item in payload.get("evidence_ids", [])),
+                tuple(UUID(item) for item in payload.get("audit_event_ids", [])),
+                ExecutionErrorCode(payload["error_code"])
+                if payload.get("error_code")
+                else None,
+                bool(payload.get("retryable", False)),
+            )
+        return IdempotencyRecord(
+            str(tenant_id),
+            str(key),
+            str(fingerprint),
+            UUID(str(execution_id)),
+            result,
+        )
+
+    def get(self, tenant_id: str, key: str) -> IdempotencyRecord | None:
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            row = connection.execute(
+                "SELECT tenant_id, idempotency_key, fingerprint, execution_id, result_json "
+                "FROM governed_execution_idempotency WHERE tenant_id = ? AND idempotency_key = ?",
+                (tenant_id, key),
+            ).fetchone()
+        return self._decode(row) if row is not None else None
+
+    def claim(self, record: IdempotencyRecord) -> bool:
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA busy_timeout=10000")
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO governed_execution_idempotency "
+                "(tenant_id, idempotency_key, fingerprint, execution_id) VALUES (?, ?, ?, ?)",
+                (
+                    record.tenant_id,
+                    record.key,
+                    record.fingerprint,
+                    str(record.execution_id),
+                ),
+            )
+            connection.commit()
+        return cursor.rowcount == 1
+
+    def complete(self, record: IdempotencyRecord, result: ExecutionResult) -> None:
+        payload = json.dumps(
+            {
+                "execution_id": str(result.execution_id),
+                "state": result.state.value,
+                "output": result.output,
+                "evidence_ids": [str(item) for item in result.evidence_ids],
+                "audit_event_ids": [str(item) for item in result.audit_event_ids],
+                "error_code": result.error_code.value if result.error_code else None,
+                "retryable": result.retryable,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA busy_timeout=10000")
+            connection.execute(
+                "UPDATE governed_execution_idempotency SET result_json = ? "
+                "WHERE tenant_id = ? AND idempotency_key = ? AND fingerprint = ?",
+                (payload, record.tenant_id, record.key, record.fingerprint),
+            )
+            connection.commit()
 
 
 class GovernedExecutionService:
