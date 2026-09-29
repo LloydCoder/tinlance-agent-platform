@@ -6,7 +6,7 @@ from uuid import UUID
 
 from tinlance_agent_platform_sdk import AgentPlatform, ToolDescriptor
 
-from .base import ReferenceAgent, ToolPlan, WorkflowStep
+from .base import AgentRun, ReferenceAgent, ToolPlan, WorkflowStep
 
 
 class IntelligenceAgent(ReferenceAgent):
@@ -94,7 +94,7 @@ class IntelligenceAgent(ReferenceAgent):
         agent_id: UUID | str,
         objective: str,
         request_id: str | None = None,
-    ):
+    ) -> AgentRun:
         return self.start(
             task_id=task_id,
             agent_id=agent_id,
