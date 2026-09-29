@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -20,6 +21,7 @@ from tinlance_agent_platform_execution import (
     ExecutionResult,
     ExecutionState,
     GovernedExecutionService,
+    SQLiteIdempotencyRepository,
 )
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
@@ -250,3 +252,45 @@ def test_execution_status_is_tenant_scoped(harness: object) -> None:
     assert service.status(principal.tenant_id, result.execution_id) == result
     with pytest.raises(PermissionError):
         service.status("tenant-other", result.execution_id)
+
+
+def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: object) -> None:
+    _, principal, agent, _ = harness
+    path = str(tmp_path / "idempotency.sqlite3")
+    first_store = SQLiteIdempotencyRepository(path)
+    service = GovernedExecutionService(
+        agents=AgentRegistry(),
+        approvals=ApprovalService(),
+        tools=ToolGateway(),
+        events=InMemoryEventStore(),
+        evidence=InMemoryEvidenceStore(),
+        idempotency=first_store,
+    )
+    agent_registry = AgentRegistry()
+    agent_registry.register(agent)
+    tools = ToolGateway()
+    tools.register(
+        ToolRegistration(
+            "reference.echo",
+            "repository.read",
+            "reference tool",
+            version="1",
+            risk=RiskTier.HIGH,
+            timeout_seconds=10,
+            max_tool_calls=1,
+        ),
+        Echo(),
+    )
+    service = GovernedExecutionService(
+        agents=agent_registry,
+        approvals=ApprovalService(),
+        tools=tools,
+        events=InMemoryEventStore(),
+        evidence=InMemoryEvidenceStore(),
+        idempotency=first_store,
+    )
+    item = request(principal, agent)
+    result = service.execute(principal, item)
+    second_store = SQLiteIdempotencyRepository(path)
+    assert second_store.get(principal.tenant_id, item.idempotency_key) is not None
+    assert second_store.get(principal.tenant_id, item.idempotency_key).result == result
