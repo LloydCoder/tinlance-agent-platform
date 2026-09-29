@@ -14,13 +14,14 @@ from datetime import UTC, datetime, timedelta
 from threading import RLock
 from uuid import UUID, uuid4
 
+from tinlance_agent_platform_agents import AgentRegistry
+
 from tinlance_agent_platform_api.service import (
     APIHandler,
     APIRequest,
     APIResponse,
     AuthenticationError,
 )
-from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
