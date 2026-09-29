@@ -43,3 +43,6 @@ known-first-party = ["tinlance_reference_agents"]
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
