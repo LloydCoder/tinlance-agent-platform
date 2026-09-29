@@ -1,10 +1,7 @@
-"""Reference authority-preserving gateway for the Agent OS integration contract.
+"""Reference authority gateway for the executable Platform contract.
 
-The gateway is intentionally transport-neutral. Authentication is resolved before
-this layer by an injected PrincipalResolver; request tenant/subject fields are
-checked against the authenticated principal rather than trusted as authority.
-Production deployments should replace the resolver and in-memory stores with
-durable implementations.
+R10 consequential execution is delegated to the authoritative governed-execution
+service; this gateway only translates the public HTTP envelope.
 """
 
 from __future__ import annotations
@@ -22,21 +19,22 @@ from tinlance_agent_platform_api.service import (
     AuthenticationError,
 )
 from tinlance_agent_platform_approvals import ApprovalService
-from tinlance_agent_platform_contracts import (
-    AgentDefinition,
-    Principal,
-    Run,
-    RunStatus,
-)
+from tinlance_agent_platform_contracts import AgentDefinition, Principal, Run, RunStatus
 from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
+from tinlance_agent_platform_execution import (
+    ExecutionErrorCode,
+    ExecutionFailure,
+    ExecutionRequest,
+    ExecutionState,
+    GovernedExecutionService,
+)
 from tinlance_agent_platform_runtime import RunStateMachine
+from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 
 @dataclass(frozen=True, slots=True)
 class StaticPrincipalResolver:
-    """Deterministic resolver for local tests and development only."""
-
     principals: dict[str, Principal]
 
     def resolve(self, bearer_token: str) -> Principal:
@@ -46,9 +44,12 @@ class StaticPrincipalResolver:
         return principal
 
 
-class ReferencePlatformGateway(APIHandler):
-    """Executable reference gateway used by the HTTP boundary and conformance tests."""
+class _ReferenceTool:
+    def execute(self, call: ToolCall) -> str:
+        return f"governed:{call.tool_name}:{call.action}:{call.resource}"
 
+
+class ReferencePlatformGateway(APIHandler):
     def __init__(
         self,
         *,
@@ -56,6 +57,8 @@ class ReferencePlatformGateway(APIHandler):
         approvals: ApprovalService | None = None,
         events: EventStore,
         evidence: EvidenceStore,
+        approver_subjects: frozenset[str] = frozenset(),
+        tools: ToolGateway | None = None,
     ) -> None:
         self.agents = agents or AgentRegistry()
         self.approvals = approvals or ApprovalService()
@@ -64,6 +67,29 @@ class ReferencePlatformGateway(APIHandler):
         self._runs: dict[UUID, Run] = {}
         self._lock = RLock()
         self._state = RunStateMachine()
+        self.tools = tools or ToolGateway()
+        if tools is None:
+            self.tools.register(
+                ToolRegistration(
+                    name="reference.echo",
+                    capability="repository.read",
+                    description="Deterministic reference tool used by conformance tests.",
+                    version="1",
+                    timeout_seconds=30.0,
+                    max_tool_calls=1,
+                    evidence_required=True,
+                ),
+                _ReferenceTool(),
+            )
+        self.approver_subjects = approver_subjects
+        self.execution = GovernedExecutionService(
+            agents=self.agents,
+            approvals=self.approvals,
+            tools=self.tools,
+            events=self.events,
+            evidence=self.evidence,
+            platform_max_timeout_seconds=60.0,
+        )
 
     def register_agent(self, agent: AgentDefinition) -> AgentDefinition:
         return self.agents.register(agent)
@@ -76,19 +102,10 @@ class ReferencePlatformGateway(APIHandler):
             return APIResponse("ok", {"user_id": request.subject_id})
         if operation == "agents.list":
             items = self.agents.list_for_tenant(request.tenant_id)
-            return APIResponse(
-                "ok",
-                {
-                    "agents": [
-                        {
-                            "agent_id": str(agent.agent_id),
-                            "name": agent.name,
-                            "version": agent.version,
-                        }
-                        for agent in items
-                    ]
-                },
-            )
+            return APIResponse("ok", {"agents": [
+                {"agent_id": str(agent.agent_id), "name": agent.name, "version": agent.version}
+                for agent in items
+            ]})
         if operation == "capabilities.list":
             return self._capabilities(request)
         if operation == "runs.create":
@@ -97,6 +114,10 @@ class ReferencePlatformGateway(APIHandler):
             return self._cancel_run(request)
         if operation == "approvals.request":
             return self._request_approval(request)
+        if operation == "approvals.decide":
+            return self._decide_approval(request)
+        if operation == "tools.execute":
+            return self._execute_tool(request)
         if operation == "runs.events":
             return self._events(request)
         if operation == "runs.evidence":
@@ -113,23 +134,15 @@ class ReferencePlatformGateway(APIHandler):
     def _agent(self, tenant_id: str, agent_id: str) -> AgentDefinition:
         try:
             parsed = UUID(agent_id)
-        except ValueError as exc:
-            raise ValueError("agent_id must be a UUID") from exc
-        return self.agents.get(tenant_id, parsed, self.agents.latest_version(tenant_id, parsed))
+            return self.agents.get(tenant_id, parsed, self.agents.latest_version(tenant_id, parsed))
+        except (KeyError, ValueError) as exc:
+            raise PermissionError("agent is not registered for tenant") from exc
 
     def _capabilities(self, request: APIRequest) -> APIResponse:
-        agent = self._agent(
-            request.tenant_id,
-            self._required_text(request.payload, "agent_id"),
-        )
-        return APIResponse(
-            "ok",
-            {
-                "capabilities": [
-                    {"capability_id": capability} for capability in sorted(agent.capabilities)
-                ]
-            },
-        )
+        agent = self._agent(request.tenant_id, self._required_text(request.payload, "agent_id"))
+        return APIResponse("ok", {
+            "capabilities": [{"capability_id": capability} for capability in sorted(agent.capabilities)]
+        })
 
     def _create_run(self, request: APIRequest) -> APIResponse:
         task_id = self._required_text(request.payload, "task_id")
@@ -143,23 +156,14 @@ class ReferencePlatformGateway(APIHandler):
         run = Run(uuid4(), parsed_task, request.tenant_id)
         with self._lock:
             self._runs[run.run_id] = self._state.transition(run, RunStatus.RUNNING)
-        self.events.append(
-            new_event(
-                request.tenant_id,
-                run.run_id,
-                "run.created",
-                {"task_id": task_id, "agent_id": agent_id, "request_id": request.request_id},
-            )
-        )
-        return APIResponse(
-            "accepted",
-            {
-                "run_id": str(run.run_id),
-                "task_id": str(parsed_task),
-                "state": RunStatus.RUNNING.value,
-                "agent_id": str(parsed_agent),
-            },
-        )
+        self.events.append(new_event(
+            request.tenant_id, run.run_id, "run.created",
+            {"task_id": task_id, "agent_id": agent_id, "request_id": request.request_id},
+        ))
+        return APIResponse("accepted", {
+            "run_id": str(run.run_id), "task_id": str(parsed_task),
+            "state": RunStatus.RUNNING.value, "agent_id": str(parsed_agent),
+        })
 
     def _cancel_run(self, request: APIRequest) -> APIResponse:
         run_id = self._required_text(request.payload, "run_id")
@@ -170,18 +174,12 @@ class ReferencePlatformGateway(APIHandler):
                 raise PermissionError("run is not owned by tenant")
             updated = self._state.transition(run, RunStatus.CANCELLED)
             self._runs[parsed] = updated
-        self.events.append(
-            new_event(
-                request.tenant_id,
-                parsed,
-                "run.cancelled",
-                {"request_id": request.request_id},
-            )
-        )
-        return APIResponse(
-            "accepted",
-            {"run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value},
-        )
+        self.events.append(new_event(
+            request.tenant_id, parsed, "run.cancelled", {"request_id": request.request_id}
+        ))
+        return APIResponse("accepted", {
+            "run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value
+        })
 
     def _request_approval(self, request: APIRequest) -> APIResponse:
         run_id = self._required_text(request.payload, "run_id")
@@ -194,25 +192,101 @@ class ReferencePlatformGateway(APIHandler):
             if run is None or run.tenant_id != request.tenant_id:
                 raise PermissionError("run is not owned by tenant")
         approval = self.approvals.request(
-            request.tenant_id,
-            parsed,
-            action,
-            resource,
-            reason,
-            request.subject_id,
+            request.tenant_id, parsed, action, resource, reason, request.subject_id,
             expires_at=datetime.now(UTC) + timedelta(minutes=10),
+            intent_fingerprint=request.payload.get("intent_fingerprint")
+            if isinstance(request.payload.get("intent_fingerprint"), str) else None,
         )
         with self._lock:
             self._runs[parsed] = self._state.transition(run, RunStatus.WAITING_APPROVAL)
-        self.events.append(
-            new_event(
-                request.tenant_id,
-                parsed,
-                "approval.requested",
-                {"approval_id": str(approval.approval_id), "request_id": request.request_id},
-            )
-        )
+        self.events.append(new_event(
+            request.tenant_id, parsed, "approval.requested",
+            {"approval_id": str(approval.approval_id), "request_id": request.request_id},
+        ))
         return APIResponse("accepted", {"approval_id": str(approval.approval_id)})
+
+    def _decide_approval(self, request: APIRequest) -> APIResponse:
+        approval_id = UUID(self._required_text(request.payload, "approval_id"))
+        approved = request.payload.get("approved")
+        if not isinstance(approved, bool):
+            raise ValueError("approved must be boolean")
+        if self.approver_subjects and request.subject_id not in self.approver_subjects:
+            raise PermissionError("authenticated principal is not an approval authority")
+        item = self.approvals.decide(
+            approval_id,
+            approved,
+            request.tenant_id,
+            request.subject_id,
+            intent_fingerprint=request.payload.get("intent_fingerprint")
+            if isinstance(request.payload.get("intent_fingerprint"), str) else None,
+        )
+        self.events.append(new_event(
+            request.tenant_id, item.run_id, "approval.decided",
+            {"approval_id": str(item.approval_id), "request_id": request.request_id,
+             "decision": item.status.value},
+        ))
+        return APIResponse("accepted", {
+            "approval_id": str(item.approval_id), "state": item.status.value
+        })
+
+    def _execute_tool(self, request: APIRequest) -> APIResponse:
+        payload = request.payload
+        approval_id = payload.get("approval_id")
+        risk = payload.get("risk", "low")
+        reversibility = payload.get("reversibility", "reversible")
+        data_class = payload.get("data_class", "internal")
+        if not all(isinstance(value, str) for value in (risk, reversibility, data_class)):
+            raise ValueError("risk, reversibility and data_class must be strings")
+        try:
+            execution = self.execution.execute(
+                self._principal(request),
+                ExecutionRequest(
+                    request_id=request.request_id,
+                    idempotency_key=request.idempotency_key or request.request_id,
+                    tenant_id=request.tenant_id,
+                    principal_id=request.subject_id,
+                    agent_id=UUID(self._required_text(payload, "agent_id")),
+                    run_id=UUID(self._required_text(payload, "run_id")),
+                    capability_id=self._required_text(payload, "capability_id"),
+                    capability_version=self._required_text(payload, "capability_version"),
+                    tool_name=self._required_text(payload, "tool_name"),
+                    tool_version=self._required_text(payload, "tool_version"),
+                    action=self._required_text(payload, "action"),
+                    resource=self._required_text(payload, "resource"),
+                    input=payload.get("input") if isinstance(payload.get("input"), dict) else {},
+                    requested_timeout_seconds=float(payload.get("requested_timeout_seconds", 30.0)),
+                    requested_tool_calls=int(payload.get("requested_tool_calls", 1)),
+                    risk=__import__("tinlance_agent_platform_contracts").RiskTier(risk),
+                    reversibility=__import__("tinlance_agent_platform_contracts").Reversibility(reversibility),
+                    data_class=__import__("tinlance_agent_platform_contracts").DataClass(data_class),
+                    blast_radius=str(payload.get("blast_radius", "single")),
+                    approval_id=UUID(approval_id) if isinstance(approval_id, str) else None,
+                    sandbox_required=bool(payload.get("sandbox_required", False)),
+                    evidence_required=bool(payload.get("evidence_required", True)),
+                ),
+                trace_id=request.trace_id,
+            )
+        except ExecutionFailure as exc:
+            if exc.code is ExecutionErrorCode.APPROVAL_REQUIRED:
+                return APIResponse("accepted", {"state": ExecutionState.WAITING_APPROVAL.value})
+            if exc.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT:
+                raise ValueError("idempotency conflict") from exc
+            raise PermissionError(str(exc)) from exc
+        return APIResponse("accepted", {
+            "execution_id": str(execution.execution_id),
+            "state": execution.state.value,
+            "output": execution.output,
+            "evidence_ids": [str(item) for item in execution.evidence_ids],
+            "audit_event_ids": [str(item) for item in execution.audit_event_ids],
+            "error_code": execution.error_code.value if execution.error_code else None,
+            "retryable": execution.retryable,
+        })
+
+    def _principal(self, request: APIRequest) -> Principal:
+        value = request.authenticated_principal
+        if isinstance(value, Principal):
+            return value
+        return Principal(request.subject_id, "user", request.tenant_id)
 
     def _events(self, request: APIRequest) -> APIResponse:
         run_id = request.payload.get("run_id")
@@ -220,26 +294,21 @@ class ReferencePlatformGateway(APIHandler):
             raise ValueError("run_id is required")
         parsed = UUID(run_id)
         items = self.events.list_for_run(request.tenant_id, parsed)
-        return APIResponse(
-            "ok",
+        return APIResponse("ok", {"events": [
             {
-                "events": [
-                    {
-                        "event_id": str(item.event_id),
-                        "event_type": item.event_type,
-                        "occurred_at": item.occurred_at.isoformat(),
-                        "request_id": request.request_id,
-                        "correlation_id": request.request_id,
-                        "workspace_id": request.tenant_id,
-                        "task_id": None,
-                        "agent_id": None,
-                        "platform_run_id": str(item.run_id),
-                        "payload": dict(item.payload),
-                    }
-                    for item in items
-                ]
-            },
-        )
+                "event_id": str(item.event_id),
+                "event_type": item.event_type,
+                "occurred_at": item.occurred_at.isoformat(),
+                "request_id": item.payload.get("request_id", request.request_id),
+                "correlation_id": item.payload.get("request_id", request.request_id),
+                "workspace_id": request.tenant_id,
+                "task_id": None,
+                "agent_id": None,
+                "platform_run_id": str(item.run_id),
+                "payload": dict(item.payload),
+            }
+            for item in items
+        ]})
 
     def _evidence(self, request: APIRequest) -> APIResponse:
         run_id = request.payload.get("run_id")
@@ -247,7 +316,4 @@ class ReferencePlatformGateway(APIHandler):
             raise ValueError("run_id is required")
         parsed = UUID(run_id)
         items = self.evidence.list_for_run(request.tenant_id, parsed)
-        return APIResponse(
-            "ok",
-            {"evidence": [{"evidence_id": str(item.evidence_id)} for item in items]},
-        )
+        return APIResponse("ok", {"evidence": [{"evidence_id": str(item.evidence_id)} for item in items]})
