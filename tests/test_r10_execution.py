@@ -153,6 +153,7 @@ def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) ->
             risk=RiskTier.HIGH,
             approval_id=approval.approval_id,
             idempotency_key=high.idempotency_key,
+            run_id=high.run_id,
         ),
         trace_id="trace-r10",
     )
