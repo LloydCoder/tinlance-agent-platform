@@ -146,7 +146,7 @@ def test_approval_decision_is_single_use_under_concurrency() -> None:
 
     def decide() -> str:
         try:
-            service.decide(item.approval_id, True, "tenant-a")
+            service.decide(item.approval_id, True, "tenant-a", "approver-1")
         except ValueError:
             return "lost"
         return "won"
