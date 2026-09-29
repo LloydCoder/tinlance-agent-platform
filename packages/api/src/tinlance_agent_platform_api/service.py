@@ -94,19 +94,15 @@ class AgentPlatformAPI:
                     raise IdempotencyConflictError("request ID was reused for a different request")
                 return deepcopy(existing[1])
 
-        response = self._handler.handle(request)
-        with self._idempotency_lock:
-            existing = self._idempotency.get(request.request_id)
-            if existing is not None:
-                if existing[0] != fingerprint:
-                    raise IdempotencyConflictError("request ID was reused for a different request")
-                return deepcopy(existing[1])
+            # The reference boundary serializes guarded side effects so two
+            # concurrent deliveries with the same request ID cannot both execute.
+            response = self._handler.handle(request)
             self._idempotency[request.request_id] = (fingerprint, deepcopy(response))
             self._idempotency_order.append(request.request_id)
             while len(self._idempotency_order) > _MAX_IDEMPOTENCY_ENTRIES:
                 evicted = self._idempotency_order.pop(0)
                 self._idempotency.pop(evicted, None)
-        return response
+            return response
 
     def dispatch_authenticated(
         self,
