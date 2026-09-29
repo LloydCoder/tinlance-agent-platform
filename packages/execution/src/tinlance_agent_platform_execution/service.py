@@ -581,7 +581,7 @@ class GovernedExecutionService:
                     ExecutionErrorCode.TIMEOUT,
                     False,
                 )
-                if budget_reservation is not None:
+                if budget_reservation is not None and self.budget is not None:
                     self.budget.release(budget_reservation)
                     budget_reservation = None
                 self.idempotency.complete(record, result)
@@ -621,7 +621,7 @@ class GovernedExecutionService:
                     ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
                     False,
                 )
-                if budget_reservation is not None:
+                if budget_reservation is not None and self.budget is not None:
                     self.budget.release(budget_reservation)
                     budget_reservation = None
                 self.idempotency.complete(record, result)
@@ -631,14 +631,14 @@ class GovernedExecutionService:
                 try:
                     output = self.secrets.redact_output(request, output)
                 except Exception as exc:
-                    if budget_reservation is not None:
+                    if budget_reservation is not None and self.budget is not None:
                         self.budget.release(budget_reservation)
                         budget_reservation = None
                     raise ExecutionFailure(
                         ExecutionErrorCode.SECRET_ACCESS_DENIED,
                         "secret redaction could not be established",
                     ) from exc
-            if budget_reservation is not None:
+            if budget_reservation is not None and self.budget is not None:
                 try:
                     self.budget.consume(budget_reservation, elapsed)
                 except Exception as exc:
@@ -684,7 +684,7 @@ class GovernedExecutionService:
             self._results[execution_id] = result
             return result
         except ExecutionFailure as exc:
-            if budget_reservation is not None:
+            if budget_reservation is not None and self.budget is not None:
                 with suppress(Exception):
                     self.budget.release(budget_reservation)
                 budget_reservation = None
@@ -706,7 +706,7 @@ class GovernedExecutionService:
                 self._results[execution_id] = result
             raise
         except Exception as exc:
-            if budget_reservation is not None:
+            if budget_reservation is not None and self.budget is not None:
                 with suppress(Exception):
                     self.budget.release(budget_reservation)
                 budget_reservation = None
