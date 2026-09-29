@@ -54,4 +54,4 @@ def test_approval_cannot_cross_tenant_or_resource() -> None:
     approvals = ApprovalService()
     approval = approvals.request("t1", uuid4(), "delete", "db:item", "destructive", "agent")
     with pytest.raises(PermissionError):
-        approvals.decide(approval.approval_id, True, "t2")
+        approvals.decide(approval.approval_id, True, "t2", "approver-1")
