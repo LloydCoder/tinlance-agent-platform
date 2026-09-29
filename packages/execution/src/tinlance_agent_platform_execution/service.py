@@ -503,7 +503,6 @@ class GovernedExecutionService:
                     )
             elif request.approval_id is not None:
                 self.approvals.require_approved(request.approval_id)
-            self._event(request, execution_id, "execution.budget_reserved", audit_ids)
             effective_timeout = min(
                 request.requested_timeout_seconds,
                 registration.timeout_seconds,
@@ -582,6 +581,9 @@ class GovernedExecutionService:
                     ExecutionErrorCode.TIMEOUT,
                     False,
                 )
+                if budget_reservation is not None:
+                    self.budget.release(budget_reservation)
+                    budget_reservation = None
                 self.idempotency.complete(record, result)
                 self._results[execution_id] = result
                 return result
