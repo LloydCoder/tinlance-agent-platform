@@ -162,6 +162,7 @@ class ExecutionIdentity:
     tenant_id: str
     principal_id: str
     agent_id: UUID
+    run_id: UUID
     capability_id: str
     tool_name: str
     policy_decision_id: str
@@ -282,7 +283,7 @@ class GovernedExecutionService:
 
         identity = ExecutionIdentity(
             execution_id, request.tenant_id, request.principal_id, request.agent_id,
-            request.capability_id, request.tool_name, "", request.approval_id,
+            request.run_id, request.capability_id, request.tool_name, "", request.approval_id,
             request.request_id, trace_id,
         )
         self._states[execution_id] = ExecutionState.REQUESTED
