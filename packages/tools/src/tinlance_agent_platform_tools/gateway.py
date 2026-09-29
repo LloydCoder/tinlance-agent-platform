@@ -27,11 +27,17 @@ class ToolRegistration:
     max_tool_calls: int = 1
     evidence_required: bool = True
     secret_required: bool = False
+    capability_version: str = "1"
 
     def __post_init__(self) -> None:
         if not self.name.strip() or not self.capability.strip() or not self.description.strip():
             raise ValueError("tool registration requires name, capability, and description")
-        if not self.version.strip() or self.timeout_seconds <= 0 or self.max_tool_calls < 1:
+        if (
+            not self.version.strip()
+            or not self.capability_version.strip()
+            or self.timeout_seconds <= 0
+            or self.max_tool_calls < 1
+        ):
             raise ValueError("tool registration limits must be valid")
 
 
