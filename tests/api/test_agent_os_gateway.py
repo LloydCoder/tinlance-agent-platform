@@ -478,3 +478,96 @@ def test_http_rejects_malformed_boundary_requests() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_http_accepts_valid_traceparent_and_rejects_zero_identifiers() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
+        body = {
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "health",
+            "payload": {},
+        }
+        request = urllib.request.Request(
+            base,
+            data=json.dumps(body).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+                "traceparent": "00-11111111111111111111111111111111-2222222222222222-01",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            assert response.status == 200
+
+        for traceparent in (
+            "00-00000000000000000000000000000000-2222222222222222-01",
+            "00-11111111111111111111111111111111-0000000000000000-01",
+        ):
+            request = urllib.request.Request(
+                base,
+                data=json.dumps(body).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {TOKEN}",
+                    "X-Tinlance-API-Version": "1.1",
+                    "X-Request-ID": str(uuid4()),
+                    "traceparent": traceparent,
+                },
+                method="POST",
+            )
+            with pytest.raises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(request, timeout=2)
+            assert error.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_http_rejects_blank_or_oversized_request_id() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
+        body = {
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "health",
+            "payload": {},
+        }
+        for request_id in ("   ", "x" * 257):
+            request = urllib.request.Request(
+                base,
+                data=json.dumps(body).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {TOKEN}",
+                    "X-Tinlance-API-Version": "1.1",
+                    "X-Request-ID": request_id,
+                },
+                method="POST",
+            )
+            with pytest.raises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(request, timeout=2)
+            assert error.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
