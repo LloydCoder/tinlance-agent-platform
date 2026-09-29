@@ -8,6 +8,7 @@ No caller can turn a client assertion into authority.
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
@@ -436,7 +437,6 @@ class GovernedExecutionService:
             raise
         except Exception as exc:
             self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
-            from contextlib import suppress
             with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
             result = ExecutionResult(
