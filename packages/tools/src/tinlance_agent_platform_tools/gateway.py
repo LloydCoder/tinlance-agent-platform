@@ -45,6 +45,8 @@ class ApprovalVerifier(Protocol):
         run_id: UUID,
         action: str,
         resource: str,
+        *,
+        intent_fingerprint: str | None = None,
     ) -> None: ...
 
 
@@ -103,6 +105,8 @@ class ToolGateway:
         decision: PolicyDecision,
         approval_id: UUID | None = None,
         approval_verifier: ApprovalVerifier | None = None,
+        *,
+        intent_fingerprint: str | None = None,
     ) -> str:
         if decision.decision is Decision.DENY:
             raise PermissionError("tool execution denied")
