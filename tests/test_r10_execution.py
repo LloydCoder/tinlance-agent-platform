@@ -150,6 +150,7 @@ def test_unknown_prior_idempotent_execution_never_replays(harness: object) -> No
     key = str(uuid4())
     record = request(principal, agent, idempotency_key=key)
     from tinlance_agent_platform_execution import IdempotencyRecord
+
     service.idempotency.claim(
         IdempotencyRecord(principal.tenant_id, key, record.fingerprint, uuid4())
     )
