@@ -122,8 +122,12 @@ def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) ->
     service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
     completed = service.execute(principal, high, trace_id="trace-r10")
     assert completed.state is ExecutionState.COMPLETED
-    with pytest.raises(ExecutionFailure):
-        service.execute(principal, high)
+    replay = request(
+        principal, agent, risk=RiskTier.HIGH, approval_id=approval.approval_id
+    )
+    with pytest.raises(ExecutionFailure) as replay_error:
+        service.execute(principal, replay)
+    assert replay_error.value.code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
 
 
 def test_unknown_prior_idempotent_execution_never_replays(harness: object) -> None:
