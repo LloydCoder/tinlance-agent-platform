@@ -17,6 +17,7 @@ from tinlance_agent_platform_execution import (
     ExecutionErrorCode,
     ExecutionFailure,
     ExecutionRequest,
+    ExecutionResult,
     ExecutionState,
     GovernedExecutionService,
 )
