@@ -373,15 +373,18 @@ class ReferencePlatformGateway(APIHandler):
                     self._runs[running.run_id] = self._state.transition(
                         running, RunStatus.SUCCEEDED
                     )
-        return APIResponse("accepted", {
-            "execution_id": str(execution.execution_id),
-            "state": execution.state.value,
-            "output": execution.output,
-            "evidence_ids": [str(item) for item in execution.evidence_ids],
-            "audit_event_ids": [str(item) for item in execution.audit_event_ids],
-            "error_code": execution.error_code.value if execution.error_code else None,
-            "retryable": execution.retryable,
-        })
+        return APIResponse(
+            "accepted",
+            {
+                "execution_id": str(execution.execution_id),
+                "state": execution.state.value,
+                "output": execution.output,
+                "evidence_ids": [str(item) for item in execution.evidence_ids],
+                "audit_event_ids": [str(item) for item in execution.audit_event_ids],
+                "error_code": execution.error_code.value if execution.error_code else None,
+                "retryable": execution.retryable,
+            },
+        )
 
     def _execution_status(self, request: APIRequest) -> APIResponse:
         execution_id = UUID(self._required_text(request.payload, "execution_id"))
@@ -389,15 +392,18 @@ class ReferencePlatformGateway(APIHandler):
             result = self.execution.status(request.tenant_id, execution_id)
         except KeyError as exc:
             raise PermissionError("execution is not accessible") from exc
-        return APIResponse("ok", {
-            "execution_id": str(result.execution_id),
-            "state": result.state.value,
-            "output": result.output,
-            "evidence_ids": [str(item) for item in result.evidence_ids],
-            "audit_event_ids": [str(item) for item in result.audit_event_ids],
-            "error_code": result.error_code.value if result.error_code else None,
-            "retryable": result.retryable,
-        })
+        return APIResponse(
+            "ok",
+            {
+                "execution_id": str(result.execution_id),
+                "state": result.state.value,
+                "output": result.output,
+                "evidence_ids": [str(item) for item in result.evidence_ids],
+                "audit_event_ids": [str(item) for item in result.audit_event_ids],
+                "error_code": result.error_code.value if result.error_code else None,
+                "retryable": result.retryable,
+            },
+        )
 
     def _principal(self, request: APIRequest) -> Principal:
         value = request.authenticated_principal
@@ -411,21 +417,26 @@ class ReferencePlatformGateway(APIHandler):
             raise ValueError("run_id is required")
         parsed = UUID(run_id)
         items = self.events.list_for_run(request.tenant_id, parsed)
-        return APIResponse("ok", {"events": [
+        return APIResponse(
+            "ok",
             {
-                "event_id": str(item.event_id),
-                "event_type": item.event_type,
-                "occurred_at": item.occurred_at.isoformat(),
-                "request_id": item.payload.get("request_id", request.request_id),
-                "correlation_id": item.payload.get("request_id", request.request_id),
-                "workspace_id": request.tenant_id,
-                "task_id": None,
-                "agent_id": None,
-                "platform_run_id": str(item.run_id),
-                "payload": dict(item.payload),
-            }
-            for item in items
-        ]})
+                "events": [
+                    {
+                        "event_id": str(item.event_id),
+                        "event_type": item.event_type,
+                        "occurred_at": item.occurred_at.isoformat(),
+                        "request_id": item.payload.get("request_id", request.request_id),
+                        "correlation_id": item.payload.get("request_id", request.request_id),
+                        "workspace_id": request.tenant_id,
+                        "task_id": None,
+                        "agent_id": None,
+                        "platform_run_id": str(item.run_id),
+                        "payload": dict(item.payload),
+                    }
+                    for item in items
+                ]
+            },
+        )
 
     def _evidence(self, request: APIRequest) -> APIResponse:
         run_id = request.payload.get("run_id")
