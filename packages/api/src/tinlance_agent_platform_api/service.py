@@ -12,7 +12,7 @@ class APIRequest:
     subject_id: str
     operation: str
     payload: dict[str, object]
-    request_id: str
+    request_id: str = "in-process"
     trace_id: str | None = None
 
 
