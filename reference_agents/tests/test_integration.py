@@ -10,7 +10,8 @@ import pytest
 from tests.support.reference_gateway import (
     ReferencePlatformGateway,
     StaticPrincipalResolver,
-)from tinlance_agent_platform_agents import AgentRegistry
+)
+from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_api import AgentPlatformAPI
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_approvals import ApprovalService
