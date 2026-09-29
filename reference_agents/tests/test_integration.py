@@ -7,8 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-from tests.support.reference_gateway import ReferencePlatformGateway, StaticPrincipalResolver
-from tinlance_agent_platform_agents import AgentRegistry
+from tests.support.reference_gateway import (
+    ReferencePlatformGateway,
+    StaticPrincipalResolver,
+)from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_api import AgentPlatformAPI
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_approvals import ApprovalService
@@ -193,7 +195,12 @@ def test_r10_pending_execution_is_resumable_without_replay(integration_clients):
     key = str(uuid4())
 
     first = agent.execute_tool(run, plan=plan, arguments={"path": "README.md"}, idempotency_key=key)
-    second = agent.execute_tool(run, plan=plan, arguments={"path": "README.md"}, idempotency_key=key)
+    second = agent.execute_tool(
+        run,
+        plan=plan,
+        arguments={"path": "README.md"},
+        idempotency_key=key,
+    )
 
     assert first.execution_id == second.execution_id
     assert first.state == second.state == "waiting_approval"
