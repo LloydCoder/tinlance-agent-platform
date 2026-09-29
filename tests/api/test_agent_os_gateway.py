@@ -4,7 +4,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -203,7 +203,7 @@ def test_http_rejects_missing_authentication() -> None:
         )
         with pytest.raises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(request, timeout=2)
-        assert error.value.code == 403
+        assert error.value.code == 401
     finally:
         server.shutdown()
         server.server_close()
