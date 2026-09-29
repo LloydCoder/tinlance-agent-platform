@@ -543,7 +543,7 @@ class GovernedExecutionService:
                     intent_fingerprint=request.fingerprint,
                     timeout_seconds=effective_timeout,
                 )
-            except TimeoutError as exc:
+            except TimeoutError:
                 self._states[execution_id] = ExecutionState.TIMED_OUT
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
