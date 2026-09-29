@@ -85,6 +85,7 @@ class ReferencePlatformGateway(APIHandler):
                     capability="repository.read",
                     description="Deterministic reference tool used by conformance tests.",
                     version="1",
+                    risk=RiskTier.HIGH,
                     timeout_seconds=30.0,
                     max_tool_calls=1,
                     evidence_required=True,
