@@ -33,6 +33,7 @@ def _request(
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            "X-Tinlance-API-Version": "1.1",
             "X-Request-ID": str(uuid4()),
         },
         method="POST",
@@ -204,12 +205,89 @@ def test_http_rejects_missing_authentication() -> None:
         request = urllib.request.Request(
             base,
             data=raw,
-            headers={"Content-Type": "application/json", "X-Request-ID": str(uuid4())},
+            headers={
+                "Content-Type": "application/json",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+            },
             method="POST",
         )
         with pytest.raises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(request, timeout=2)
         assert error.value.code == 401
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_http_rejects_incompatible_api_version() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
+        raw = json.dumps({
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "health",
+            "payload": {},
+        }).encode()
+        request = urllib.request.Request(
+            base,
+            data=raw,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "9.9",
+                "X-Request-ID": str(uuid4()),
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 426
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_http_rejects_invalid_traceparent() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
+        raw = json.dumps({
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "health",
+            "payload": {},
+        }).encode()
+        request = urllib.request.Request(
+            base,
+            data=raw,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+                "traceparent": "invalid",
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 400
     finally:
         server.shutdown()
         server.server_close()
