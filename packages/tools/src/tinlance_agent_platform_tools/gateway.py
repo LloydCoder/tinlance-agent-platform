@@ -7,8 +7,8 @@ from tinlance_agent_platform_contracts import (
     Decision,
     PolicyDecision,
     RequestContext,
-    ToolCall,
     RiskTier,
+    ToolCall,
 )
 from tinlance_agent_platform_kernel import assert_authority_boundary
 from tinlance_agent_platform_policy import evaluate
@@ -71,7 +71,11 @@ class ToolGateway:
     ) -> PolicyDecision:
         if call.tenant_id != context.tenant_id:
             return PolicyDecision(
-                Decision.DENY, "tenant-boundary", "2", "tool tenant mismatch", capability_request.risk
+                Decision.DENY,
+                "tenant-boundary",
+                "2",
+                "tool tenant mismatch",
+                capability_request.risk,
             )
         if (
             call.capability not in capability_request.capabilities
