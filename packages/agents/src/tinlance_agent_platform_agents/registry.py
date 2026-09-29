@@ -25,7 +25,8 @@ class AgentRegistry:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("tenant identifier must be normalized")
         return tuple(
-            agent for (agent_tenant, _agent_id, _version), agent in self._agents.items()
+            agent
+            for (agent_tenant, _agent_id, _version), agent in self._agents.items()
             if agent_tenant == tenant_id
         )
 
