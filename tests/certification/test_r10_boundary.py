@@ -33,8 +33,8 @@ from tinlance_agent_platform_execution import (
     ExecutionRequest,
     ExecutionResult,
     ExecutionState,
-    IdempotencyRecord,
     GovernedExecutionService,
+    IdempotencyRecord,
     SQLiteIdempotencyRepository,
 )
 from tinlance_agent_platform_mcp import MCPTool, MCPToolGateway, ToolScope
