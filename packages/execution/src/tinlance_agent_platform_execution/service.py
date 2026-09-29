@@ -328,7 +328,16 @@ class GovernedExecutionService:
                 request.blast_radius, request.input,
             ))
             if policy.decision is Decision.DENY:
-                self._deny(execution_id, request, ExecutionErrorCode.POLICY_DENIED, audit_ids)
+                self._deny(
+                    execution_id, request, ExecutionErrorCode.POLICY_DENIED, audit_ids
+                )
+            if policy.decision is not Decision.ALLOW and not policy.requires_approval:
+                self._deny(
+                    execution_id,
+                    request,
+                    ExecutionErrorCode.AUTHORIZATION_DENIED,
+                    audit_ids,
+                )
             policy_id = f"{policy.policy_id}:{policy.policy_version}"
             identity = ExecutionIdentity(
                 execution_id, request.tenant_id, request.principal_id, request.agent_id,
