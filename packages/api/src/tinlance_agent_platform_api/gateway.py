@@ -9,7 +9,7 @@ durable implementations.
 
 from __future__ import annotations
 
-from collections.abc import Protocol
+from typing import Protocol
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from threading import RLock
@@ -110,6 +110,13 @@ class ReferencePlatformGateway(APIHandler):
             return self._evidence(request)
         raise ValueError("unsupported Platform operation")
 
+    @staticmethod
+    def _required_text(payload: dict[str, object], key: str) -> str:
+        value = payload.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{key} is required")
+        return value
+
     def _agent(self, tenant_id: str, agent_id: str) -> AgentDefinition:
         try:
             parsed = UUID(agent_id)
@@ -118,7 +125,10 @@ class ReferencePlatformGateway(APIHandler):
         return self.agents.get(tenant_id, parsed, self.agents.latest_version(tenant_id, parsed))
 
     def _capabilities(self, request: APIRequest) -> APIResponse:
-        agent = self._agent(request.tenant_id, str(request.payload.get("agent_id", "")))
+        agent = self._agent(
+            request.tenant_id,
+            self._required_text(request.payload, "agent_id"),
+        )
         return APIResponse(
             "ok",
             {
@@ -129,13 +139,9 @@ class ReferencePlatformGateway(APIHandler):
         )
 
     def _create_run(self, request: APIRequest) -> APIResponse:
-        task_id = request.payload.get("task_id")
-        agent_id = request.payload.get("agent_id")
-        intent = request.payload.get("intent")
-        if not all(
-            isinstance(value, str) and value.strip() for value in (task_id, agent_id, intent)
-        ):
-            raise ValueError("task_id, agent_id and intent are required")
+        task_id = self._required_text(request.payload, "task_id")
+        agent_id = self._required_text(request.payload, "agent_id")
+        intent = self._required_text(request.payload, "intent")
         agent = self._agent(request.tenant_id, agent_id)
         if agent.owner_subject_id != request.subject_id:
             raise PermissionError("requester is not the registered agent owner")
@@ -163,9 +169,7 @@ class ReferencePlatformGateway(APIHandler):
         )
 
     def _cancel_run(self, request: APIRequest) -> APIResponse:
-        run_id = request.payload.get("run_id")
-        if not isinstance(run_id, str):
-            raise ValueError("run_id is required")
+        run_id = self._required_text(request.payload, "run_id")
         parsed = UUID(run_id)
         with self._lock:
             run = self._runs.get(parsed)
@@ -187,14 +191,10 @@ class ReferencePlatformGateway(APIHandler):
         )
 
     def _request_approval(self, request: APIRequest) -> APIResponse:
-        run_id = request.payload.get("run_id")
-        action = request.payload.get("action")
-        resource = request.payload.get("resource")
-        reason = request.payload.get("reason")
-        if not all(
-            isinstance(value, str) and value.strip() for value in (run_id, action, resource, reason)
-        ):
-            raise ValueError("run_id, action, resource and reason are required")
+        run_id = self._required_text(request.payload, "run_id")
+        action = self._required_text(request.payload, "action")
+        resource = self._required_text(request.payload, "resource")
+        reason = self._required_text(request.payload, "reason")
         parsed = UUID(run_id)
         with self._lock:
             run = self._runs.get(parsed)
