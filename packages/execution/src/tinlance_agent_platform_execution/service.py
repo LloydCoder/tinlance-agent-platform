@@ -372,7 +372,14 @@ class GovernedExecutionService:
                     )
                 self.sandbox.establish(request)
                 self._event(request, execution_id, "execution.sandbox_started", audit_ids)
-            if self.secrets is not None:
+            if registration.secret_required:
+                if self.secrets is None:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.SECRET_ACCESS_DENIED,
+                        "required secret authority is unavailable",
+                    )
+                self.secrets.authorize(request)
+            elif self.secrets is not None:
                 self.secrets.authorize(request)
             self._states[execution_id] = ExecutionState.AUTHORIZED
             self._event(request, execution_id, "execution.started", audit_ids)
