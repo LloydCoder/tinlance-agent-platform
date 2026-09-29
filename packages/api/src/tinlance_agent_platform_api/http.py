@@ -14,10 +14,10 @@ MAX_REQUEST_BYTES = 1 * 1024 * 1024
 
 def _bearer(value: str | None) -> str:
     if value is None or not value.startswith("Bearer "):
-        raise PermissionError("bearer authentication is required")
+        raise AuthenticationError("bearer authentication is required")
     token = value[7:].strip()
     if not token or any(character.isspace() for character in token):
-        raise PermissionError("invalid bearer authentication")
+        raise AuthenticationError("invalid bearer authentication")
     return token
 
 
