@@ -238,7 +238,7 @@ def test_approval_substitution_replay_and_self_approval_are_denied() -> None:
         intent_fingerprint=intent,
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(PermissionError):
         approvals.require_approved_for(
             approval.approval_id,
             TENANT_A,
