@@ -21,6 +21,7 @@ from uuid import UUID, uuid4
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
+    ApprovalStatus,
     CapabilityRequest,
     DataClass,
     Decision,
@@ -395,13 +396,33 @@ class GovernedExecutionService:
                 uuid4(), request.tenant_id, request.run_id, request.tool_name,
                 request.capability_id, request.action, request.resource,
             )
-            output = self.tools.execute(
-                call,
-                policy,
-                request.approval_id,
-                self.approvals,
-                intent_fingerprint=request.fingerprint,
-            )
+            try:
+                output = self.tools.execute(
+                    call,
+                    policy,
+                    request.approval_id,
+                    self.approvals,
+                    intent_fingerprint=request.fingerprint,
+                )
+            except PermissionError as exc:
+                if request.approval_id is None:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.AUTHORIZATION_DENIED,
+                        "tool execution was not authorized",
+                    ) from exc
+                try:
+                    approval = self.approvals.get(request.approval_id, request.tenant_id)
+                except (KeyError, PermissionError) as lookup_error:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.APPROVAL_BINDING_MISMATCH,
+                        "approval could not be bound to execution",
+                    ) from lookup_error
+                code = {
+                    ApprovalStatus.EXPIRED: ExecutionErrorCode.APPROVAL_EXPIRED,
+                    ApprovalStatus.REJECTED: ExecutionErrorCode.APPROVAL_REJECTED,
+                    ApprovalStatus.CONSUMED: ExecutionErrorCode.APPROVAL_REPLAY,
+                }.get(approval.status, ExecutionErrorCode.APPROVAL_BINDING_MISMATCH)
+                raise ExecutionFailure(code, "approval could not authorize this execution") from exc
             if request.approval_id is not None:
                 self._event(request, execution_id, "approval.consumed", audit_ids)
             if monotonic() - started > effective_timeout:
