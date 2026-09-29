@@ -17,7 +17,7 @@ import pytest
 from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_budgets import BudgetService
-from tinlance_agent_platform_contracts import AgentDefinition, Budget, DataClass, Principal, RiskTier, Reversibility
+from tinlance_agent_platform_contracts import (\n    AgentDefinition,\n    Budget,\n    DataClass,\n    Principal,\n    Reversibility,\n    RiskTier,\n)
 from tinlance_agent_platform_events import InMemoryEventStore
 from tinlance_agent_platform_evidence import InMemoryEvidenceStore
 from tinlance_agent_platform_execution import (
