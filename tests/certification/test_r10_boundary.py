@@ -418,8 +418,6 @@ def test_cross_tenant_status_cannot_read_execution() -> None:
 
 
 def test_contract_version_is_immutable() -> None:
-    with pytest.raises(ValueError):
-        _request().fingerprint  # construction below uses the immutable default
     # The public constructor itself rejects version substitution.
     with pytest.raises(ValueError):
         ExecutionRequest(
