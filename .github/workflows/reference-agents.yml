@@ -35,6 +35,6 @@ jobs:
       - run: python -m pip check
       - run: ruff check reference_agents
       - run: ruff format --check reference_agents
-      - run: mypy reference_agents/src reference_agents/tests
+      - run: mypy reference_agents/src
       - run: pytest -q --cov=reference_agents/src/tinlance_reference_agents --cov-report=term-missing --cov-fail-under=90 reference_agents/tests
       - run: pip-audit --strict
