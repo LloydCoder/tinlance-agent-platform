@@ -49,10 +49,12 @@ def integration_client():
             instructions_hash="sha256:reference-security-instructions",
         )
     )
-    resolver = StaticPrincipalResolver({
-        token: Principal(subject, "user", tenant),
-        approver_token: Principal(approver, "user", tenant),
-    })
+    resolver = StaticPrincipalResolver(
+        {
+            token: Principal(subject, "user", tenant),
+            approver_token: Principal(approver, "user", tenant),
+        }
+    )
     api = AgentPlatformAPI(gateway)
     server = serve(api, resolver)
     thread = Thread(target=server.serve_forever, daemon=True)
