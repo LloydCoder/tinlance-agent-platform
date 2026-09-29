@@ -93,6 +93,7 @@ class ExecutionRequest:
     tenant_id: str
     principal_id: str
     agent_id: UUID
+    run_id: UUID
     capability_id: str
     capability_version: str
     tool_name: str
@@ -132,6 +133,7 @@ class ExecutionRequest:
                 "tenant_id": self.tenant_id,
                 "principal_id": self.principal_id,
                 "agent_id": str(self.agent_id),
+                "run_id": str(self.run_id),
                 "capability_id": self.capability_id,
                 "capability_version": self.capability_version,
                 "tool_name": self.tool_name,
@@ -330,7 +332,7 @@ class GovernedExecutionService:
             self._event(request, execution_id, "execution.started", audit_ids)
             started = monotonic()
             call = ToolCall(
-                uuid4(), request.tenant_id, execution_id, request.tool_name,
+                uuid4(), request.tenant_id, request.run_id, request.tool_name,
                 request.capability_id, request.action, request.resource,
             )
             output = self.tools.execute(
