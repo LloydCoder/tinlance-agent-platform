@@ -2,9 +2,9 @@ from uuid import uuid4
 
 import pytest
 from tinlance_agent_platform_sdk import AgentPlatform, ApprovalRef, EvidenceRef, Run
-from tinlance_reference_agents.base import EvidenceBackedConclusion
 
 from tinlance_reference_agents import EngineeringAgent, IntelligenceAgent, SecurityResearchAgent
+from tinlance_reference_agents.base import EvidenceBackedConclusion
 
 
 class UnusedTransport:
