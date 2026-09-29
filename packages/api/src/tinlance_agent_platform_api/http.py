@@ -7,7 +7,14 @@ import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .service import API_VERSION, AgentPlatformAPI, APIRequest, AuthenticationError, PrincipalResolver
+from .service import (
+    API_VERSION,
+    AgentPlatformAPI,
+    APIRequest,
+    AuthenticationError,
+    IdempotencyConflictError,
+    PrincipalResolver,
+)
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
@@ -107,6 +114,8 @@ def serve(
                 )
             except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+            except IdempotencyConflictError:
+                self._respond(HTTPStatus.CONFLICT, {"error": "idempotency_conflict"})
             except PermissionError:
                 self._respond(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             except (ValueError, KeyError):
