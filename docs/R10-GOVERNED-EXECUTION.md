@@ -157,7 +157,7 @@ The reference Platform implementation is intentionally explicit about provider b
 | approval | in-memory reference | durable transactional approval store |
 | idempotency | in-memory reference | durable uniqueness/transactional store |
 | budget | registered tool-call ceiling | distributed reservation/accounting provider |
-| timeout | elapsed-time + ambiguity semantics | hard cancellation-capable execution adapter |
+| timeout | mandatory hard-timeout adapter contract | real cancellation-capable tool/sandbox adapter |
 | sandbox | required-provider gate | real isolation provider |
 | secrets | injected authorization gate | real scoped secret broker |
 | evidence | SHA-256 + execution binding | durable evidence store |
