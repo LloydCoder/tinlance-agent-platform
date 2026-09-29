@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Callable
 
 from .gateway import AuthenticationError, PrincipalResolver
-from .service import APIRequest, AgentPlatformAPI
+from .service import AgentPlatformAPI, APIRequest
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 
