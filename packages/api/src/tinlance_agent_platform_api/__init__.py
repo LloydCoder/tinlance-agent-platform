@@ -3,11 +3,13 @@ from .service import (
     APIRequest,
     APIResponse,
     AuthenticationError,
+    IdempotencyConflictError,
     PrincipalResolver,
 )
 
 __all__ = [
     "AuthenticationError",
+    "IdempotencyConflictError",
     "PrincipalResolver",
     "APIRequest",
     "APIResponse",
