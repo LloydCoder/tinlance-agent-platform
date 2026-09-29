@@ -9,8 +9,8 @@ durable implementations.
 
 from __future__ import annotations
 
-from typing import Protocol
 from dataclasses import dataclass
+from typing import Protocol
 from datetime import UTC, datetime, timedelta
 from threading import RLock
 from uuid import UUID, uuid4
@@ -141,7 +141,7 @@ class ReferencePlatformGateway(APIHandler):
     def _create_run(self, request: APIRequest) -> APIResponse:
         task_id = self._required_text(request.payload, "task_id")
         agent_id = self._required_text(request.payload, "agent_id")
-        intent = self._required_text(request.payload, "intent")
+        self._required_text(request.payload, "intent")
         agent = self._agent(request.tenant_id, agent_id)
         if agent.owner_subject_id != request.subject_id:
             raise PermissionError("requester is not the registered agent owner")
