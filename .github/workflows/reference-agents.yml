@@ -31,10 +31,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[test,security]"
-          pip install -e "reference_agents[test]"
+          git clone --filter=blob:none https://github.com/LloydCoder/tinlance-agent-platform-sdk.git /tmp/tinlance-agent-platform-sdk
+          git -C /tmp/tinlance-agent-platform-sdk checkout da195be854fc54a77976c4f78ea5093cb957750a
+          pip install -e /tmp/tinlance-agent-platform-sdk
+          pip install -e "reference_agents[test]" --no-deps
       - run: python -m pip check
       - run: ruff check reference_agents
       - run: ruff format --check reference_agents
       - run: mypy reference_agents/src
       - run: PYTHONPATH=. pytest -q --cov=reference_agents/src/tinlance_reference_agents --cov-report=term-missing --cov-fail-under=90 reference_agents/tests
-      - run: pip-audit --strict
+      - run: pip-audit --strict --skip-editable
