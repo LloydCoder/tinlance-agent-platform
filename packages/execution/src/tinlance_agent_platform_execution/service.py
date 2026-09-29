@@ -29,7 +29,11 @@ from tinlance_agent_platform_contracts import (
 from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_policy import evaluate
-from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
+from tinlance_agent_platform_tools import (
+    ToolCall,
+    ToolGateway,
+    ToolRegistration,
+)
 
 
 CONTRACT_VERSION = "governed-execution.v1"
@@ -120,7 +124,9 @@ class ExecutionRequest:
             raise ValueError("execution identity and scope fields must be normalized")
         if self.requested_timeout_seconds <= 0 or self.requested_tool_calls < 1:
             raise ValueError("execution limits must be positive")
-        encoded = json.dumps(self.input, sort_keys=True, separators=(",", ":"), default=str).encode()
+        encoded = json.dumps(
+            self.input, sort_keys=True, separators=(",", ":"), default=str
+        ).encode()
         if len(encoded) > MAX_INPUT_BYTES:
             raise ValueError("execution input exceeds the maximum size")
 
@@ -261,7 +267,13 @@ class GovernedExecutionService:
         self._states: dict[UUID, ExecutionState] = {}
         self._results: dict[UUID, ExecutionResult] = {}
 
-    def execute(self, principal: Principal, request: ExecutionRequest, *, trace_id: str | None = None) -> ExecutionResult:
+    def execute(
+        self,
+        principal: Principal,
+        request: ExecutionRequest,
+        *,
+        trace_id: str | None = None,
+    ) -> ExecutionResult:
         self._bind_principal(principal, request)
         existing = self.idempotency.get(request.tenant_id, request.idempotency_key)
         if existing is not None:
@@ -333,16 +345,25 @@ class GovernedExecutionService:
                 if request.approval_id is None:
                     self._states[execution_id] = ExecutionState.WAITING_APPROVAL
                     self._event(request, execution_id, "execution.approval_required", audit_ids)
-                    raise ExecutionFailure(ExecutionErrorCode.APPROVAL_REQUIRED, "approval is required")
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.APPROVAL_REQUIRED, "approval is required"
+                    )
             elif request.approval_id is not None:
                 self.approvals.require_approved(request.approval_id)
             self._event(request, execution_id, "execution.budget_reserved", audit_ids)
-            effective_timeout = min(request.requested_timeout_seconds, registration.timeout_seconds, self.platform_max_timeout_seconds)
+            effective_timeout = min(
+                request.requested_timeout_seconds,
+                registration.timeout_seconds,
+                self.platform_max_timeout_seconds,
+            )
             if effective_timeout <= 0:
                 raise ExecutionFailure(ExecutionErrorCode.TIMEOUT, "effective timeout is invalid")
             if request.sandbox_required or registration.sandbox_required:
                 if self.sandbox is None:
-                    raise ExecutionFailure(ExecutionErrorCode.SANDBOX_UNAVAILABLE, "required sandbox is unavailable")
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.SANDBOX_UNAVAILABLE,
+                        "required sandbox is unavailable",
+                    )
                 self.sandbox.establish(request)
                 self._event(request, execution_id, "execution.sandbox_started", audit_ids)
             if self.secrets is not None:
@@ -370,17 +391,28 @@ class GovernedExecutionService:
             evidence_ids: list[UUID] = []
             if request.evidence_required:
                 try:
-                    item = self.evidence.append(request.tenant_id, request.run_id, output, execution_id)
+                    item = self.evidence.append(
+                        request.tenant_id, request.run_id, output, execution_id
+                    )
                     evidence_ids.append(item.evidence_id)
                     self._event(request, execution_id, "execution.evidence_committed", audit_ids)
                 except Exception as exc:
                     self._states[execution_id] = ExecutionState.FAILED
                     self._event(request, execution_id, "execution.failed", audit_ids)
-                    raise ExecutionFailure(ExecutionErrorCode.EVIDENCE_FAILURE, "mandatory evidence could not be committed") from exc
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.EVIDENCE_FAILURE,
+                        "mandatory evidence could not be committed",
+                    ) from exc
             self._states[execution_id] = ExecutionState.COMPLETED
             self._event(request, execution_id, "execution.completed", audit_ids)
             self._event(request, execution_id, "execution.finalized", audit_ids)
-            result = ExecutionResult(execution_id, ExecutionState.COMPLETED, output, tuple(evidence_ids), tuple(audit_ids))
+            result = ExecutionResult(
+                execution_id,
+                ExecutionState.COMPLETED,
+                output,
+                tuple(evidence_ids),
+                tuple(audit_ids),
+            )
             self.idempotency.complete(record, result)
             self._results[execution_id] = result
             return result
@@ -404,10 +436,9 @@ class GovernedExecutionService:
             raise
         except Exception as exc:
             self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
-            try:
+            from contextlib import suppress
+            with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
-            except Exception:
-                pass
             result = ExecutionResult(
                 execution_id, ExecutionState.OUTCOME_UNKNOWN, None, (), tuple(audit_ids),
                 ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN, False,
@@ -435,43 +466,89 @@ class GovernedExecutionService:
 
     def _bind_principal(self, principal: Principal, request: ExecutionRequest) -> None:
         if principal.tenant_id != request.tenant_id or principal.subject_id != request.principal_id:
-            raise ExecutionFailure(ExecutionErrorCode.IDENTITY_BINDING_FAILED, "authenticated principal does not match execution identity")
+            raise ExecutionFailure(
+                ExecutionErrorCode.IDENTITY_BINDING_FAILED,
+                "authenticated principal does not match execution identity",
+            )
 
     def _agent(self, request: ExecutionRequest) -> AgentDefinition:
         try:
-            return self.agents.get(request.tenant_id, request.agent_id, self.agents.latest_version(request.tenant_id, request.agent_id))
+            version = self.agents.latest_version(request.tenant_id, request.agent_id)
+            return self.agents.get(request.tenant_id, request.agent_id, version)
         except (KeyError, ValueError) as exc:
-            raise ExecutionFailure(ExecutionErrorCode.IDENTITY_BINDING_FAILED, "agent is not registered for the tenant") from exc
+            raise ExecutionFailure(
+                ExecutionErrorCode.IDENTITY_BINDING_FAILED,
+                "agent is not registered for the tenant",
+            ) from exc
 
     @staticmethod
-    def _bind_agent(principal: Principal, request: ExecutionRequest, agent: AgentDefinition) -> None:
+    def _bind_agent(
+        principal: Principal, request: ExecutionRequest, agent: AgentDefinition
+    ) -> None:
         if agent.tenant_id != request.tenant_id or agent.owner_subject_id != principal.subject_id:
-            raise ExecutionFailure(ExecutionErrorCode.IDENTITY_BINDING_FAILED, "agent is not bound to the authenticated principal")
+            raise ExecutionFailure(
+                ExecutionErrorCode.IDENTITY_BINDING_FAILED,
+                "agent is not bound to the authenticated principal",
+            )
 
     def _tool(self, request: ExecutionRequest) -> ToolRegistration:
         try:
             registration = self.tools.registration(request.tool_name)
         except KeyError as exc:
-            raise ExecutionFailure(ExecutionErrorCode.TOOL_NOT_FOUND, "tool is not registered") from exc
-        if registration.capability != request.capability_id or registration.version != request.tool_version:
-            raise ExecutionFailure(ExecutionErrorCode.CAPABILITY_NOT_FOUND, "tool capability/version binding failed")
+            raise ExecutionFailure(
+                ExecutionErrorCode.TOOL_NOT_FOUND, "tool is not registered"
+            ) from exc
+        if (
+            registration.capability != request.capability_id
+            or registration.version != request.tool_version
+        ):
+            raise ExecutionFailure(
+                ExecutionErrorCode.CAPABILITY_NOT_FOUND,
+                "tool capability/version binding failed",
+            )
         return registration
 
     @staticmethod
-    def _authorize_capability(agent: AgentDefinition, principal: Principal, request: ExecutionRequest, registration: ToolRegistration) -> None:
+    def _authorize_capability(
+        agent: AgentDefinition,
+        principal: Principal,
+        request: ExecutionRequest,
+        registration: ToolRegistration,
+    ) -> None:
         if request.capability_id not in agent.capabilities:
-            raise ExecutionFailure(ExecutionErrorCode.AUTHORIZATION_DENIED, "agent lacks requested capability")
+            raise ExecutionFailure(
+                ExecutionErrorCode.AUTHORIZATION_DENIED,
+                "agent lacks requested capability",
+            )
         if principal.scopes and request.capability_id not in principal.scopes:
-            raise ExecutionFailure(ExecutionErrorCode.AUTHORIZATION_DENIED, "principal lacks requested capability scope")
+            raise ExecutionFailure(
+                ExecutionErrorCode.AUTHORIZATION_DENIED,
+                "principal lacks requested capability scope",
+            )
         if registration.risk.value == "prohibited":
-            raise ExecutionFailure(ExecutionErrorCode.AUTHORIZATION_DENIED, "prohibited capability cannot execute")
+            raise ExecutionFailure(
+                ExecutionErrorCode.AUTHORIZATION_DENIED,
+                "prohibited capability cannot execute",
+            )
 
-    def _deny(self, execution_id: UUID, request: ExecutionRequest, code: ExecutionErrorCode, audit_ids: list[UUID]) -> None:
+    def _deny(
+        self,
+        execution_id: UUID,
+        request: ExecutionRequest,
+        code: ExecutionErrorCode,
+        audit_ids: list[UUID],
+    ) -> None:
         self._states[execution_id] = ExecutionState.DENIED
         self._event(request, execution_id, "authorization.denied", audit_ids)
         raise ExecutionFailure(code, "execution denied")
 
-    def _event(self, request: ExecutionRequest, execution_id: UUID, event_type: str, audit_ids: list[UUID]) -> None:
+    def _event(
+        self,
+        request: ExecutionRequest,
+        execution_id: UUID,
+        event_type: str,
+        audit_ids: list[UUID],
+    ) -> None:
         event = new_event(
             request.tenant_id,
             request.run_id,
