@@ -259,6 +259,7 @@ class GovernedExecutionService:
         self._lock = RLock()
         self._identities: dict[UUID, ExecutionIdentity] = {}
         self._states: dict[UUID, ExecutionState] = {}
+        self._results: dict[UUID, ExecutionResult] = {}
 
     def execute(self, principal: Principal, request: ExecutionRequest, *, trace_id: str | None = None) -> ExecutionResult:
         self._bind_principal(principal, request)
@@ -356,6 +357,7 @@ class GovernedExecutionService:
                     ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN, False,
                 )
                 self.idempotency.complete(record, result)
+                self._results[execution_id] = result
                 return result
             evidence_ids: list[UUID] = []
             if request.evidence_required:
@@ -372,6 +374,7 @@ class GovernedExecutionService:
             self._event(request, execution_id, "execution.finalized", audit_ids)
             result = ExecutionResult(execution_id, ExecutionState.COMPLETED, output, tuple(evidence_ids), tuple(audit_ids))
             self.idempotency.complete(record, result)
+            self._results[execution_id] = result
             return result
         except ExecutionFailure as exc:
             state = {
@@ -389,6 +392,7 @@ class GovernedExecutionService:
                     execution_id, state, None, (), tuple(audit_ids), exc.code, exc.retryable
                 )
                 self.idempotency.complete(record, result)
+                self._results[execution_id] = result
             raise
         except Exception as exc:
             self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
@@ -401,10 +405,25 @@ class GovernedExecutionService:
                 ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN, False,
             )
             self.idempotency.complete(record, result)
+            self._results[execution_id] = result
             raise ExecutionFailure(
                 ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
                 "execution outcome could not be established",
             ) from exc
+
+    def status(self, tenant_id: str, execution_id: UUID) -> ExecutionResult:
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("tenant identifier must be normalized")
+        result = self._results.get(execution_id)
+        identity = self._identities.get(execution_id)
+        if identity is None or identity.tenant_id != tenant_id:
+            raise PermissionError("execution is not owned by tenant")
+        if result is not None:
+            return result
+        state = self._states.get(execution_id)
+        if state is None:
+            raise KeyError("execution does not exist")
+        return ExecutionResult(execution_id, state, None, (), ())
 
     def _bind_principal(self, principal: Principal, request: ExecutionRequest) -> None:
         if principal.tenant_id != request.tenant_id or principal.subject_id != request.principal_id:
