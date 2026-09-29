@@ -807,6 +807,7 @@ class GovernedExecutionService:
         if (
             registration.capability != request.capability_id
             or registration.version != request.tool_version
+            or registration.capability_version != request.capability_version
         ):
             raise ExecutionFailure(
                 ExecutionErrorCode.CAPABILITY_NOT_FOUND,
