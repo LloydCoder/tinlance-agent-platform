@@ -33,6 +33,7 @@ from tinlance_agent_platform_contracts import (
 from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_execution import (
+    CONTRACT_VERSION,
     ExecutionErrorCode,
     ExecutionFailure,
     ExecutionRequest,
@@ -280,6 +281,7 @@ class ReferencePlatformGateway(APIHandler):
                     approval_id=UUID(approval_id) if isinstance(approval_id, str) else None,
                     sandbox_required=bool(payload.get("sandbox_required", False)),
                     evidence_required=bool(payload.get("evidence_required", True)),
+                    contract_version=self._required_text(payload, "contract_version"),
                 ),
                 trace_id=request.trace_id,
             )
