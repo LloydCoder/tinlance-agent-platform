@@ -1,5 +1,7 @@
 """Tool capability boundary."""
 
-from .gateway import ToolCall, ToolGateway, ToolRegistration
+from tinlance_agent_platform_contracts import ToolCall
+
+from .gateway import ToolGateway, ToolRegistration
 
 __all__ = ["ToolCall", "ToolGateway", "ToolRegistration"]
