@@ -55,9 +55,6 @@ class AgentPlatformAPI:
         resolver: PrincipalResolver,
     ) -> APIResponse:
         principal = resolver.resolve(bearer_token)
-        if (
-            principal.tenant_id != request.tenant_id
-            or principal.subject_id != request.subject_id
-        ):
+        if principal.tenant_id != request.tenant_id or principal.subject_id != request.subject_id:
             raise PermissionError("request identity does not match authenticated principal")
         return self.dispatch(request)
