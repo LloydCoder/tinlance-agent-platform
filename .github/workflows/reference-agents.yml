@@ -1,0 +1,45 @@
+name: Reference Agents
+
+on:
+  push:
+    branches: [main, "feature/**", "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reference-agents-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install platform and reference-agent dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,security]"
+          git clone --filter=blob:none https://github.com/LloydCoder/tinlance-agent-platform-sdk.git /tmp/tinlance-agent-platform-sdk
+          git -C /tmp/tinlance-agent-platform-sdk checkout da195be854fc54a77976c4f78ea5093cb957750a
+          pip install -e /tmp/tinlance-agent-platform-sdk
+          pip install -e "reference_agents[test]" --no-deps
+      - run: python -m pip check
+      - run: ruff check reference_agents
+      - run: ruff format --check reference_agents
+      - run: mypy reference_agents/src
+      - run: PYTHONPATH=/tmp/tinlance-agent-platform-sdk/src:. pytest -q --cov=reference_agents/src/tinlance_reference_agents --cov-report=term-missing --cov-fail-under=90 reference_agents/tests
+      - run: |
+          pip freeze --exclude-editable > /tmp/reference-agent-audit-requirements.txt
+          pip-audit --strict -r /tmp/reference-agent-audit-requirements.txt
