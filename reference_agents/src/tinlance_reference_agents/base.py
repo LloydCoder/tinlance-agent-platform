@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from tinlance_agent_platform_sdk import (
@@ -131,7 +131,7 @@ class ReferenceAgent:
         agent_run: AgentRun,
         *,
         plan: ToolPlan,
-        arguments: dict[str, object] | None = None,
+        arguments: dict[str, Any] | None = None,
         capability_version: str | None = None,
         risk: str = "low",
         reversibility: str = "reversible",
