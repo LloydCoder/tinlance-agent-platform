@@ -465,7 +465,24 @@ class ReferencePlatformGateway(APIHandler):
             )
         except ExecutionFailure as exc:
             if exc.code is ExecutionErrorCode.APPROVAL_REQUIRED:
-                return APIResponse("accepted", {"state": ExecutionState.WAITING_APPROVAL.value})
+                if exc.execution_id is None:
+                    raise ExecutionAPIError(
+                        ExecutionErrorCode.INTERNAL_ERROR.value,
+                        "approval-gated execution has no execution identity",
+                        retryable=False,
+                    ) from exc
+                return APIResponse(
+                    "accepted",
+                    {
+                        "execution_id": str(exc.execution_id),
+                        "state": ExecutionState.WAITING_APPROVAL.value,
+                        "output": None,
+                        "evidence_ids": [],
+                        "audit_event_ids": [],
+                        "error_code": ExecutionErrorCode.APPROVAL_REQUIRED.value,
+                        "retryable": False,
+                    },
+                )
             if exc.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT:
                 raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
             raise ExecutionAPIError(exc.code.value, str(exc), retryable=exc.retryable) from exc
