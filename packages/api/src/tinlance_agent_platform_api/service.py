@@ -4,6 +4,11 @@ from typing import Protocol
 API_VERSION = "1.1"
 
 
+class AuthenticatedPrincipal(Protocol):
+    tenant_id: str
+    subject_id: str
+
+
 @dataclass(frozen=True, slots=True)
 class APIRequest:
     tenant_id: str
@@ -26,11 +31,6 @@ class APIHandler(Protocol):
 
 class AuthenticationError(PermissionError):
     """Raised when bearer authentication cannot establish a principal."""
-
-
-class AuthenticatedPrincipal(Protocol):
-    tenant_id: str
-    subject_id: str
 
 
 class PrincipalResolver(Protocol):
@@ -63,7 +63,16 @@ class AgentPlatformAPI:
         bearer_token: str,
         resolver: PrincipalResolver,
     ) -> APIResponse:
+        """Dispatch only after binding request identity to the authenticated principal."""
         principal = resolver.resolve(bearer_token)
         if principal.tenant_id != request.tenant_id or principal.subject_id != request.subject_id:
             raise PermissionError("request identity does not match authenticated principal")
-        return self.dispatch(request)
+        authenticated_request = APIRequest(
+            principal.tenant_id,
+            principal.subject_id,
+            request.operation,
+            request.payload,
+            request.request_id,
+            request.trace_id,
+        )
+        return self.dispatch(authenticated_request)
