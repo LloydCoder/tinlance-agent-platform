@@ -61,6 +61,7 @@ def test_workflow_approval_invariant(client):
     )
     assert uuid4()
 
+
 class FakeRuns:
     def __init__(self):
         self.run = Run(uuid4(), uuid4(), "created", uuid4())
