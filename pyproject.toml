@@ -44,6 +44,7 @@ packages = [
   "packages/api/src/tinlance_agent_platform_api",
   "packages/multi_agent/src/tinlance_agent_platform_multi_agent",
   "packages/operations/src/tinlance_agent_platform_operations",
+  "packages/execution/src/tinlance_agent_platform_execution",
 ]
 
 [tool.pytest.ini_options]
@@ -88,6 +89,7 @@ known-first-party = [
   "tinlance_agent_platform_api",
   "tinlance_agent_platform_multi_agent",
   "tinlance_agent_platform_operations",
+  "tinlance_agent_platform_execution",
 ]
 
 [tool.mypy]
