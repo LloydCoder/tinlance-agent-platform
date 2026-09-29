@@ -6,7 +6,7 @@ from threading import RLock
 from typing import Protocol
 
 API_VERSION = "1.1"
-_IDEMPOTENT_GUARDED_OPERATIONS = frozenset({"runs.create", "runs.cancel", "approvals.request"})
+_IDEMPOTENT_GUARDED_OPERATIONS = frozenset({"runs.create", "runs.cancel", "approvals.request", "approvals.decide", "tools.execute"})
 _MAX_IDEMPOTENCY_ENTRIES = 1024
 
 
@@ -23,6 +23,7 @@ class APIRequest:
     payload: dict[str, object]
     request_id: str = "in-process"
     trace_id: str | None = None
+    idempotency_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +89,8 @@ class AgentPlatformAPI:
 
         fingerprint = self._fingerprint(request)
         with self._idempotency_lock:
-            existing = self._idempotency.get(request.request_id)
+            key = request.idempotency_key or request.request_id
+            existing = self._idempotency.get(key)
             if existing is not None:
                 if existing[0] != fingerprint:
                     raise IdempotencyConflictError("request ID was reused for a different request")
@@ -97,8 +99,8 @@ class AgentPlatformAPI:
             # The reference boundary serializes guarded side effects so two
             # concurrent deliveries with the same request ID cannot both execute.
             response = self._handler.handle(request)
-            self._idempotency[request.request_id] = (fingerprint, deepcopy(response))
-            self._idempotency_order.append(request.request_id)
+            self._idempotency[key] = (fingerprint, deepcopy(response))
+            self._idempotency_order.append(key)
             while len(self._idempotency_order) > _MAX_IDEMPOTENCY_ENTRIES:
                 evicted = self._idempotency_order.pop(0)
                 self._idempotency.pop(evicted, None)
@@ -121,5 +123,6 @@ class AgentPlatformAPI:
             request.payload,
             request.request_id,
             request.trace_id,
+            request.idempotency_key,
         )
         return self.dispatch(authenticated_request)
