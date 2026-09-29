@@ -33,7 +33,10 @@ The HTTP boundary now resolves the bearer credential before dispatch and require
 Agent OS and the Platform boundary now require API v1.1 explicitly. Incompatible versions receive HTTP 426.
 
 ### 3. Trace-context ambiguity
-Optional traceparent is validated against W3C Trace Context syntax and rejects all-zero identifiers.
+Optional traceparent is validated against W3C Trace Context syntax and rejects all-zero identifiers. The validation was corrected to inspect the exact 32-hex trace ID and 16-hex span ID fields rather than adjacent delimiter positions.
+
+### 3a. Request-ID boundary ambiguity
+Request IDs are now required to be non-blank, printable, normalized and bounded to 256 characters; this prevents whitespace-only or oversized identifiers from entering the idempotency boundary.
 
 ### 4. Consequential-request replay
 Guarded side-effect operations now have bounded request-idempotency. Identical deliveries replay the original response; reusing a request ID for a different consequential request returns HTTP 409. Concurrent deliveries are serialized at the reference boundary so duplicate side effects cannot race through.
@@ -44,13 +47,16 @@ If Idempotency-Key is supplied, the HTTP boundary requires it to match X-Request
 ### 6. OS task spoofing
 Agent OS dispatch now requires a durable local task and verifies the request against persisted task identity. An arbitrary task payload can no longer manufacture an OS task at dispatch time.
 
-### 7. OS lifecycle drift
+### 7. OS consequential-request replay
+Agent OS now derives deterministic request IDs from canonical operation/payload data for run creation, cancellation and approval requests. These operations are explicitly retryable because the same logical request reuses the same replay key across transport retries and process restarts.
+
+### 8. OS lifecycle drift
 Agent OS now reconciles durable task state when a Platform run is cancelled or an approval is requested. Session/task/workflow ownership remains in OS while governed execution remains in Platform.
 
-### 8. Test-fixture import failure
+### 9. Test-fixture import failure
 Repository-local test package resolution was made explicit so CI does not accidentally import an unrelated installed tests package.
 
-### 9. Documentation drift
+### 10. Documentation drift
 Historical M0 architecture wording was separated from the current M2-M11 implementation boundary. Canonical Platform↔OS integration contracts were added to both repositories.
 
 ## Canonical artifacts
@@ -69,13 +75,14 @@ Platform quality matrices: Python 3.12, 3.13 and 3.14 passed; SQL job passed.
 Agent OS final CI: success.
 Agent OS final matrix: Python 3.12, 3.13 and 3.14 passed; architecture boundary passed.
 Agent OS final lifecycle regression suite passed in all matrix jobs.
+Latest hardening changes additionally add regression coverage for deterministic consequential replay keys and exact W3C trace-context field validation.
 Both repositories currently have zero open pull requests.
 
 ## Security model verified
 
 The integration boundary explicitly treats model output, retrieved content, tool output, memory, extension data and peer-agent messages as untrusted. Authority comes from authenticated principals, Platform authorization/policy and Platform-owned approvals—not from model output or OS state.
 
-Repository tests cover authenticated tenant binding, malformed boundary inputs, API-version mismatch, trace-context validation, request replay/conflict, OS task persistence, Platform run cancellation reconciliation and approval-state reconciliation.
+Repository tests cover authenticated tenant binding, malformed boundary inputs, API-version mismatch, exact trace-context validation, request-ID constraints, request replay/conflict, deterministic OS consequential replay keys, OS task persistence, Platform run cancellation reconciliation and approval-state reconciliation.
 
 ## Adversarial conclusions
 
