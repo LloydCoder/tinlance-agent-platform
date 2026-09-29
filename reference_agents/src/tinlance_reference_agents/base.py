@@ -149,7 +149,11 @@ class ReferenceAgent:
             agent_run.run.run_id,
             agent_run.run.agent_id,
             ToolInvocation(
-                descriptor.name, descriptor.capability, plan.action, plan.resource, arguments or {},
+                descriptor.name,
+                descriptor.capability,
+                plan.action,
+                plan.resource,
+                arguments or {},
             ),
             capability_version=capability_version or descriptor.version,
             tool_version=descriptor.version,
