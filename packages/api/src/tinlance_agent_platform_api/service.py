@@ -24,6 +24,7 @@ class APIRequest:
     request_id: str = "in-process"
     trace_id: str | None = None
     idempotency_key: str | None = None
+    authenticated_principal: object | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,5 +125,6 @@ class AgentPlatformAPI:
             request.request_id,
             request.trace_id,
             request.idempotency_key,
+            principal,
         )
         return self.dispatch(authenticated_request)
