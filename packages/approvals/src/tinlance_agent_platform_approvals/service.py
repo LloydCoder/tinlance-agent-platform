@@ -30,8 +30,15 @@ class ApprovalService:
         if expires_at is not None and expires_at <= datetime.now(UTC):
             raise ValueError("approval expiry must be in the future")
         item = ApprovalRequest(
-            uuid4(), tenant_id, run_id, action, resource, reason, requested_by,
-            expires_at=expires_at, intent_fingerprint=intent_fingerprint,
+            uuid4(),
+            tenant_id,
+            run_id,
+            action,
+            resource,
+            reason,
+            requested_by,
+            expires_at=expires_at,
+            intent_fingerprint=intent_fingerprint,
         )
         with self._lock:
             self._items[item.approval_id] = item
@@ -47,10 +54,19 @@ class ApprovalService:
             and current.expires_at <= datetime.now(UTC)
         ):
             current = ApprovalRequest(
-                current.approval_id, current.tenant_id, current.run_id, current.action,
-                current.resource, current.reason, current.requested_by, ApprovalStatus.EXPIRED,
-                current.metadata, current.expires_at, current.intent_fingerprint,
-                current.approved_by, current.consumed_at,
+                current.approval_id,
+                current.tenant_id,
+                current.run_id,
+                current.action,
+                current.resource,
+                current.reason,
+                current.requested_by,
+                ApprovalStatus.EXPIRED,
+                current.metadata,
+                current.expires_at,
+                current.intent_fingerprint,
+                current.approved_by,
+                current.consumed_at,
             )
             self._items[approval_id] = current
         return current
@@ -70,10 +86,7 @@ class ApprovalService:
                 raise PermissionError("approval is owned by another tenant")
             if current.status is not ApprovalStatus.PENDING:
                 raise ValueError("approval is no longer pending")
-            if (
-                intent_fingerprint is not None
-                and current.intent_fingerprint != intent_fingerprint
-            ):
+            if intent_fingerprint is not None and current.intent_fingerprint != intent_fingerprint:
                 raise PermissionError("approval intent does not match")
             if (
                 approved
@@ -83,10 +96,19 @@ class ApprovalService:
                 raise PermissionError("requester cannot approve the same consequential request")
             status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
             updated = ApprovalRequest(
-                current.approval_id, current.tenant_id, current.run_id, current.action,
-                current.resource, current.reason, current.requested_by, status,
-                current.metadata, current.expires_at, current.intent_fingerprint,
-                approver_subject_id, current.consumed_at,
+                current.approval_id,
+                current.tenant_id,
+                current.run_id,
+                current.action,
+                current.resource,
+                current.reason,
+                current.requested_by,
+                status,
+                current.metadata,
+                current.expires_at,
+                current.intent_fingerprint,
+                approver_subject_id,
+                current.consumed_at,
             )
             self._items[approval_id] = updated
             return updated
@@ -122,10 +144,19 @@ class ApprovalService:
             ):
                 raise PermissionError("approval does not bind to this action")
             consumed = ApprovalRequest(
-                current.approval_id, current.tenant_id, current.run_id, current.action,
-                current.resource, current.reason, current.requested_by, ApprovalStatus.CONSUMED,
-                current.metadata, current.expires_at, current.intent_fingerprint,
-                current.approved_by, datetime.now(UTC),
+                current.approval_id,
+                current.tenant_id,
+                current.run_id,
+                current.action,
+                current.resource,
+                current.reason,
+                current.requested_by,
+                ApprovalStatus.CONSUMED,
+                current.metadata,
+                current.expires_at,
+                current.intent_fingerprint,
+                current.approved_by,
+                datetime.now(UTC),
             )
             self._items[approval_id] = consumed
 
