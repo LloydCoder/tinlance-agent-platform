@@ -54,7 +54,11 @@ class ToolPlan:
             raise ValueError("prohibited actions cannot be made approvable")
         if self.requested_timeout_seconds <= 0 or self.requested_tool_calls < 1:
             raise ValueError("tool plan execution limits must be positive")
-        if not self.reversibility.strip() or not self.data_class.strip() or not self.blast_radius.strip():
+        if (
+            not self.reversibility.strip()
+            or not self.data_class.strip()
+            or not self.blast_radius.strip()
+        ):
             raise ValueError("tool plan execution classifications are required")
 
 
