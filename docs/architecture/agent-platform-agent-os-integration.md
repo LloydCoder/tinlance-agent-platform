@@ -73,10 +73,19 @@ Current v1.1 operations:
 - runs.create
 - runs.cancel
 - approvals.request
+- approvals.decide
+- tools.execute
+- executions.get
 - runs.events
 - runs.evidence
 
 Operations are versioned contracts, not permission grants. Their authorization semantics remain Platform-owned.
+
+### Official external developer surface
+
+The official external Agent Developer Surface is the standalone `tinlance-agent-platform-sdk` repository. Consumers should use that SDK rather than importing `packages/*` implementation modules. The SDK provides typed R10 contracts, lifecycle interpretation, declarative capability metadata, approval workflow composition, execution/result and evidence-reference handling, structured errors, explicit idempotency helpers, W3C trace-context propagation, and agent scaffolding.
+
+The SDK remains a transport/contract client. It does not duplicate identity, tenant authority, authorization, policy, approval authority, budgets, sandboxing, secrets, execution, or evidence validity. The Platform and its R10 contract remain authoritative.
 
 ## Identity model
 

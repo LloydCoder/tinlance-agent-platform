@@ -301,7 +301,7 @@ For the database gates, run the SQL migrations and tests against a PostgreSQL in
 
 ## Integration model
 
-Domain systems should consume the platform through contracts and the SDK rather than importing internal authority implementation.
+Domain systems should consume the platform through the official external SDK and versioned contracts rather than importing internal authority implementation. The standalone `tinlance-agent-platform-sdk` repository is the public Agent Developer Surface; the in-repository `packages/sdk` package remains an internal domain-registration/composition package.
 
 Current and planned Tinlance consumers include:
 
