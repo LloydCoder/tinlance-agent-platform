@@ -477,10 +477,7 @@ class GovernedExecutionService:
                 ) from exc
             if policy.decision is Decision.DENY:
                 self._deny(execution_id, request, ExecutionErrorCode.POLICY_DENIED, audit_ids)
-            if (
-                policy.decision is Decision.REQUIRE_AUTHORIZATION
-                and not policy.requires_approval
-            ):
+            if policy.decision is Decision.REQUIRE_AUTHORIZATION and not policy.requires_approval:
                 self._deny(
                     execution_id,
                     request,
