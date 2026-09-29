@@ -19,12 +19,11 @@ from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
-    ApprovalRequest,
     Principal,
     Run,
     RunStatus,
 )
-from tinlance_agent_platform_events import Event, EventStore, new_event
+from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_runtime import RunStateMachine
 
@@ -122,14 +121,21 @@ class ReferencePlatformGateway(APIHandler):
         agent = self._agent(request.tenant_id, str(request.payload.get("agent_id", "")))
         return APIResponse(
             "ok",
-            {"capabilities": [{"capability_id": capability} for capability in sorted(agent.capabilities)]},
+            {
+                "capabilities": [
+                    {"capability_id": capability} for capability in sorted(agent.capabilities)
+                ]
+            },
         )
 
     def _create_run(self, request: APIRequest) -> APIResponse:
         task_id = request.payload.get("task_id")
         agent_id = request.payload.get("agent_id")
         intent = request.payload.get("intent")
-        if not all(isinstance(value, str) and value.strip() for value in (task_id, agent_id, intent)):
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (task_id, agent_id, intent)
+        ):
             raise ValueError("task_id, agent_id and intent are required")
         agent = self._agent(request.tenant_id, agent_id)
         if agent.owner_subject_id != request.subject_id:
@@ -169,7 +175,12 @@ class ReferencePlatformGateway(APIHandler):
             updated = self._state.transition(run, RunStatus.CANCELLED)
             self._runs[parsed] = updated
         self.events.append(
-            new_event(request.tenant_id, parsed, "run.cancelled", {"request_id": request.request_id})
+            new_event(
+                request.tenant_id,
+                parsed,
+                "run.cancelled",
+                {"request_id": request.request_id},
+            )
         )
         return APIResponse(
             "accepted",
@@ -181,7 +192,10 @@ class ReferencePlatformGateway(APIHandler):
         action = request.payload.get("action")
         resource = request.payload.get("resource")
         reason = request.payload.get("reason")
-        if not all(isinstance(value, str) and value.strip() for value in (run_id, action, resource, reason)):
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (run_id, action, resource, reason)
+        ):
             raise ValueError("run_id, action, resource and reason are required")
         parsed = UUID(run_id)
         with self._lock:
