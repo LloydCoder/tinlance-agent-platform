@@ -32,6 +32,8 @@ class ApprovalStatus(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     EXPIRED = "expired"
+    CANCELLED = "cancelled"
+    CONSUMED = "consumed"
 
 
 class ToolCallStatus(StrEnum):
@@ -103,6 +105,9 @@ class ApprovalRequest:
     status: ApprovalStatus = ApprovalStatus.PENDING
     metadata: dict[str, Any] = field(default_factory=dict)
     expires_at: datetime | None = None
+    intent_fingerprint: str | None = None
+    approved_by: str | None = None
+    consumed_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
