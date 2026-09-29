@@ -138,8 +138,6 @@ class ToolGateway:
         executor = registration[1]
         timed = getattr(executor, "execute_with_timeout", None)
         if timeout_seconds is not None and callable(timed):
-            run_with_timeout = cast(
-                Callable[[ToolCall, float], str], timed
-            )
+            run_with_timeout = cast(Callable[[ToolCall, float], str], timed)
             return run_with_timeout(call, timeout_seconds)
         return executor.execute(call)
