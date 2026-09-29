@@ -31,6 +31,8 @@ from tinlance_agent_platform_execution import (
     ExecutionErrorCode,
     ExecutionFailure,
     ExecutionRequest,
+    ExecutionResult,
+    IdempotencyRecord,
     ExecutionState,
     GovernedExecutionService,
     SQLiteIdempotencyRepository,
@@ -268,7 +270,6 @@ def test_sqlite_idempotency_claim_survives_repository_recreation() -> None:
         path = str(Path(directory) / "idempotency.sqlite")
         first = SQLiteIdempotencyRepository(path)
         execution_id = uuid4()
-        from tinlance_agent_platform_execution import IdempotencyRecord, ExecutionResult
 
         record = IdempotencyRecord(TENANT_A, "durable-key", "fingerprint", execution_id)
         assert first.claim(record)
