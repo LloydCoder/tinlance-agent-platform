@@ -119,6 +119,7 @@ def serve(
                     request_id,
                     _traceparent(self.headers.get("traceparent")),
                     idempotency_key,
+                    principal,
                 )
                 response = api.dispatch(request)
                 self._respond(
