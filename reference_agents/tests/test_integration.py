@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from http.client import HTTPConnection
 from threading import Thread
 from uuid import uuid4
 
@@ -40,12 +39,12 @@ def integration_client():
             name="security-reference",
             version="0.1.0",
             owner_subject_id=subject,
+            policy_profile="reference-security",
             capabilities=frozenset({"repository.read", "security.scan", "repository.write"}),
+            instructions_hash="sha256:reference-security-instructions",
         )
     )
-    resolver = StaticPrincipalResolver(
-        {token: Principal(subject, "user", tenant)}
-    )
+    resolver = StaticPrincipalResolver({token: Principal(subject, "user", tenant)})
     api = AgentPlatformAPI(gateway)
     server = serve(api, resolver)
     thread = Thread(target=server.serve_forever, daemon=True)
