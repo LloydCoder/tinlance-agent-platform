@@ -19,7 +19,6 @@ from tinlance_agent_platform_contracts import AgentDefinition, Principal
 from tinlance_agent_platform_events import InMemoryEventStore
 from tinlance_agent_platform_evidence import InMemoryEvidenceStore
 
-
 TENANT = "tenant-a"
 SUBJECT = "user-a"
 TOKEN = "token-a"
