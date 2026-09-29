@@ -34,8 +34,18 @@ def _traceparent(value: str | None) -> str | None:
         return None
     if not _TRACEPARENT.fullmatch(value):
         raise ValueError("traceparent must use W3C Trace Context format")
-    if value[2:34] == "0" * 32 or value[35:51] == "0" * 16:
+    trace_id = value[3:35]
+    span_id = value[36:52]
+    if trace_id == "0" * 32 or span_id == "0" * 16:
         raise ValueError("traceparent identifiers must not be all zero")
+    return value
+
+
+def _request_id(value: str | None) -> str:
+    if value is None or not value or value != value.strip() or len(value) > 256:
+        raise ValueError("X-Request-ID is required and must be normalized")
+    if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
+        raise ValueError("X-Request-ID contains invalid characters")
     return value
 
 
@@ -97,9 +107,9 @@ def serve(
                     raise ValueError("operation is required")
                 if not isinstance(payload, dict):
                     raise ValueError("payload must be an object")
-                request_id = self.headers.get("X-Request-ID", "")
+                request_id = _request_id(self.headers.get("X-Request-ID"))
                 idempotency_key = self.headers.get("Idempotency-Key")
-                if idempotency_key is not None and idempotency_key != request_id:
+                if idempotency_key is not None and _request_id(idempotency_key) != request_id:
                     raise ValueError("Idempotency-Key must match X-Request-ID")
                 request = APIRequest(
                     principal.tenant_id,
@@ -109,8 +119,6 @@ def serve(
                     request_id,
                     _traceparent(self.headers.get("traceparent")),
                 )
-                if not request.request_id or request.request_id != request.request_id.strip():
-                    raise ValueError("X-Request-ID is required")
                 response = api.dispatch(request)
                 self._respond(
                     HTTPStatus.OK,
