@@ -8,6 +8,7 @@ from tinlance_agent_platform_contracts import (
     PolicyDecision,
     RequestContext,
     ToolCall,
+    RiskTier,
 )
 from tinlance_agent_platform_kernel import assert_authority_boundary
 from tinlance_agent_platform_policy import evaluate
@@ -19,7 +20,7 @@ class ToolRegistration:
     capability: str
     description: str
     version: str = "1"
-    risk: object | None = None
+    risk: RiskTier | None = None
     sandbox_required: bool = False
     timeout_seconds: float = 300.0
     max_tool_calls: int = 1
