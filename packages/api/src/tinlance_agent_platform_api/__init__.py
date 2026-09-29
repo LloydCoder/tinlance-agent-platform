@@ -1,5 +1,4 @@
-from .service import AuthenticationError, PrincipalResolver
-from .service import AgentPlatformAPI, APIRequest, APIResponse
+from .service import AgentPlatformAPI, APIRequest, APIResponse, AuthenticationError, PrincipalResolver
 
 __all__ = [
     "AuthenticationError",
