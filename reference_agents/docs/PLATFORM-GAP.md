@@ -1,27 +1,28 @@
 # Platform Contract Gap Register
 
-## GAP-RA-001 — Approval decision and governed tool execution are not public in API 1.1
+## GAP-RA-001 — Approval decision and governed tool execution
 
-**Status:** documented, non-blocking for the current reference-agent release.
+**Status: CLOSED by R10 (2026-09-29)**
 
-The current Platform API 1.1 exposes `approvals.request` but not approval retrieval/decision and exposes no remote `tools.execute` operation.
+This gap existed when the reference-agent suite first landed: Platform API 1.1 exposed approval request creation but did not publish approval decisions or governed remote tool execution.
 
-The reference agents therefore:
-- request approval through the SDK;
-- observe the resulting event;
-- never fabricate approval decisions;
-- never execute a tool locally.
+R10 now publishes and tests:
 
-A future Platform API that publishes governed execution must first define:
-- authenticated approval actor semantics;
-- exact approval binding;
-- action/resource/capability binding;
-- expiry and replay behavior;
-- pre-execution re-authorization;
-- tool input/output contracts;
-- evidence attribution;
-- audit/security event semantics;
-- idempotency;
-- failure and timeout behavior.
+- `approvals.decide`
+- `tools.execute`
+- `executions.get`
+- exact execution-intent fingerprints;
+- authenticated, tenant-scoped approval decisions;
+- requester self-approval rejection;
+- single-use approval consumption;
+- durable/conformance idempotency semantics;
+- explicit pending, terminal and ambiguous execution outcomes;
+- evidence/audit correlation.
 
-Only after that contract exists should the external SDK and reference agents add those operations.
+The reference-agent suite has been migrated from the pre-R10 boundary to the authoritative R10 contract. All three agents now exercise the real SDK → Platform HTTP path for approval-gated execution.
+
+### Residual deployment responsibilities
+
+R10 is the authority contract, not a claim that every external deployment has production infrastructure. Operators must still supply the durable identity, approval, idempotency, budget, sandbox, secret, evidence and audit adapters described in `docs/R10-GOVERNED-EXECUTION.md`.
+
+No reference-agent implementation may recreate those controls locally.
