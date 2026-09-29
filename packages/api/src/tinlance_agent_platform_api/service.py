@@ -1,7 +1,7 @@
+import json
 from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
-import json
 from threading import RLock
 from typing import Protocol
 
