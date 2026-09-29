@@ -1,7 +1,13 @@
+from copy import deepcopy
 from dataclasses import dataclass
+from hashlib import sha256
+import json
+from threading import RLock
 from typing import Protocol
 
 API_VERSION = "1.1"
+_IDEMPOTENT_GUARDED_OPERATIONS = frozenset({"runs.create", "runs.cancel", "approvals.request"})
+_MAX_IDEMPOTENCY_ENTRIES = 1024
 
 
 class AuthenticatedPrincipal(Protocol):
@@ -33,6 +39,10 @@ class AuthenticationError(PermissionError):
     """Raised when bearer authentication cannot establish a principal."""
 
 
+class IdempotencyConflictError(ValueError):
+    """Raised when one request ID is reused for a different consequential request."""
+
+
 class PrincipalResolver(Protocol):
     """Resolve an already-authenticated bearer credential to a platform principal."""
 
@@ -42,6 +52,23 @@ class PrincipalResolver(Protocol):
 class AgentPlatformAPI:
     def __init__(self, handler: APIHandler) -> None:
         self._handler = handler
+        self._idempotency: dict[str, tuple[str, APIResponse]] = {}
+        self._idempotency_order: list[str] = []
+        self._idempotency_lock = RLock()
+
+    @staticmethod
+    def _fingerprint(request: APIRequest) -> str:
+        canonical = json.dumps(
+            {
+                "tenant_id": request.tenant_id,
+                "subject_id": request.subject_id,
+                "operation": request.operation,
+                "payload": request.payload,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return sha256(canonical.encode("utf-8")).hexdigest()
 
     def dispatch(self, request: APIRequest) -> APIResponse:
         if (
@@ -55,7 +82,31 @@ class AgentPlatformAPI:
             or request.request_id != request.request_id.strip()
         ):
             raise PermissionError("authenticated request context is required")
-        return self._handler.handle(request)
+
+        if request.operation not in _IDEMPOTENT_GUARDED_OPERATIONS:
+            return self._handler.handle(request)
+
+        fingerprint = self._fingerprint(request)
+        with self._idempotency_lock:
+            existing = self._idempotency.get(request.request_id)
+            if existing is not None:
+                if existing[0] != fingerprint:
+                    raise IdempotencyConflictError("request ID was reused for a different request")
+                return deepcopy(existing[1])
+
+        response = self._handler.handle(request)
+        with self._idempotency_lock:
+            existing = self._idempotency.get(request.request_id)
+            if existing is not None:
+                if existing[0] != fingerprint:
+                    raise IdempotencyConflictError("request ID was reused for a different request")
+                return deepcopy(existing[1])
+            self._idempotency[request.request_id] = (fingerprint, deepcopy(response))
+            self._idempotency_order.append(request.request_id)
+            while len(self._idempotency_order) > _MAX_IDEMPOTENCY_ENTRIES:
+                evicted = self._idempotency_order.pop(0)
+                self._idempotency.pop(evicted, None)
+        return response
 
     def dispatch_authenticated(
         self,
