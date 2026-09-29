@@ -314,14 +314,8 @@ class GovernedExecutionService:
                     self._states[execution_id] = ExecutionState.WAITING_APPROVAL
                     self._event(request, execution_id, "execution.approval_required", audit_ids)
                     raise ExecutionFailure(ExecutionErrorCode.APPROVAL_REQUIRED, "approval is required")
-                self.approvals.require_approved_for(
-                    request.approval_id, request.tenant_id, execution_id, request.action, request.resource
-                )
-                self._event(request, execution_id, "approval.consumed", audit_ids)
             elif request.approval_id is not None:
-                self.approvals.require_approved_for(
-                    request.approval_id, request.tenant_id, execution_id, request.action, request.resource
-                )
+                self.approvals.require_approved(request.approval_id)
             self._event(request, execution_id, "execution.budget_reserved", audit_ids)
             effective_timeout = min(request.requested_timeout_seconds, registration.timeout_seconds, self.platform_max_timeout_seconds)
             if effective_timeout <= 0:
