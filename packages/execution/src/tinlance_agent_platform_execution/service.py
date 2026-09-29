@@ -293,6 +293,16 @@ class GovernedExecutionService:
             self._bind_agent(principal, request, agent)
             registration = self._tool(request)
             self._authorize_capability(agent, principal, request, registration)
+            if request.requested_tool_calls > registration.max_tool_calls:
+                raise ExecutionFailure(
+                    ExecutionErrorCode.BUDGET_EXCEEDED,
+                    "requested tool-call budget exceeds the registered tool limit",
+                )
+            if registration.risk is not None and registration.risk is not request.risk:
+                raise ExecutionFailure(
+                    ExecutionErrorCode.AUTHORIZATION_DENIED,
+                    "requested risk does not match registered tool risk",
+                )
             policy = evaluate(CapabilityRequest(
                 request.action, request.resource, frozenset({request.capability_id}),
                 request.risk, request.reversibility, request.data_class,
