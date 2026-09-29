@@ -18,6 +18,18 @@ class ToolRegistration:
     name: str
     capability: str
     description: str
+    version: str = "1"
+    risk: object | None = None
+    sandbox_required: bool = False
+    timeout_seconds: float = 300.0
+    max_tool_calls: int = 1
+    evidence_required: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.name.strip() or not self.capability.strip() or not self.description.strip():
+            raise ValueError("tool registration requires name, capability, and description")
+        if not self.version.strip() or self.timeout_seconds <= 0 or self.max_tool_calls < 1:
+            raise ValueError("tool registration limits must be valid")
 
 
 class ToolExecutor(Protocol):
@@ -42,9 +54,13 @@ class ToolGateway:
     def register(self, registration: ToolRegistration, executor: ToolExecutor) -> None:
         if registration.name in self._tools:
             raise ValueError("tool registration is immutable")
-        if not registration.name or not registration.capability:
-            raise ValueError("tool registration requires name and capability")
         self._tools[registration.name] = (registration, executor)
+
+    def registration(self, name: str) -> ToolRegistration:
+        item = self._tools.get(name)
+        if item is None:
+            raise KeyError("tool is not registered")
+        return item[0]
 
     def authorize(
         self,
@@ -54,11 +70,7 @@ class ToolGateway:
     ) -> PolicyDecision:
         if call.tenant_id != context.tenant_id:
             return PolicyDecision(
-                Decision.DENY,
-                "tenant-boundary",
-                "2",
-                "tool tenant mismatch",
-                capability_request.risk,
+                Decision.DENY, "tenant-boundary", "2", "tool tenant mismatch", capability_request.risk
             )
         if (
             call.capability not in capability_request.capabilities
@@ -76,11 +88,7 @@ class ToolGateway:
             assert_authority_boundary(capability_request, context.principal)
         except PermissionError as exc:
             return PolicyDecision(
-                Decision.DENY,
-                "authorization",
-                "2",
-                str(exc),
-                capability_request.risk,
+                Decision.DENY, "authorization", "2", str(exc), capability_request.risk
             )
         return evaluate(capability_request)
 
@@ -97,11 +105,7 @@ class ToolGateway:
             if approval_id is None or approval_verifier is None:
                 raise PermissionError("approved human review is required")
             approval_verifier.require_approved_for(
-                approval_id,
-                call.tenant_id,
-                call.run_id,
-                call.action,
-                call.resource,
+                approval_id, call.tenant_id, call.run_id, call.action, call.resource
             )
         registration = self._tools.get(call.tool_name)
         if registration is None or registration[0].capability != call.capability:
