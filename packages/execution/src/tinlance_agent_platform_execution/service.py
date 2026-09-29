@@ -264,21 +264,27 @@ class GovernedExecutionService:
         existing = self.idempotency.get(request.tenant_id, request.idempotency_key)
         if existing is not None:
             if existing.fingerprint != request.fingerprint:
-                raise ExecutionFailure(ExecutionErrorCode.IDEMPOTENCY_CONFLICT, "idempotency key conflicts with a different execution")
+                raise ExecutionFailure(
+                    ExecutionErrorCode.IDEMPOTENCY_CONFLICT,
+                    "idempotency key conflicts with a different execution",
+                )
             if existing.result is not None:
                 return existing.result
-            raise ExecutionFailure(ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN, "prior execution outcome is unresolved")
+            execution_id = existing.execution_id
+            record = existing
+        else:
+            execution_id = uuid4()
+            record = IdempotencyRecord(
+                request.tenant_id, request.idempotency_key, request.fingerprint, execution_id
+            )
+            if not self.idempotency.claim(record):
+                return self.execute(principal, request, trace_id=trace_id)
 
-        execution_id = uuid4()
         identity = ExecutionIdentity(
             execution_id, request.tenant_id, request.principal_id, request.agent_id,
             request.capability_id, request.tool_name, "", request.approval_id,
             request.request_id, trace_id,
         )
-        record = IdempotencyRecord(request.tenant_id, request.idempotency_key, request.fingerprint, execution_id)
-        if not self.idempotency.claim(record):
-            return self.execute(principal, request, trace_id=trace_id)
-
         self._states[execution_id] = ExecutionState.REQUESTED
         audit_ids: list[UUID] = []
         try:
@@ -374,8 +380,10 @@ class GovernedExecutionService:
             self._states[execution_id] = state
             if state is not ExecutionState.WAITING_APPROVAL:
                 self._event(request, execution_id, "execution.failed", audit_ids)
-            result = ExecutionResult(execution_id, state, None, (), tuple(audit_ids), exc.code, exc.retryable)
-            self.idempotency.complete(record, result)
+                result = ExecutionResult(
+                    execution_id, state, None, (), tuple(audit_ids), exc.code, exc.retryable
+                )
+                self.idempotency.complete(record, result)
             raise
         except Exception as exc:
             self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
