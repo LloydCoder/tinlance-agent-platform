@@ -41,10 +41,19 @@ class SecurityResearchAgent(ReferenceAgent):
             raise ValueError("objective is required")
         return (
             WorkflowStep("scope", "Establish the requested security-research objective."),
-            WorkflowStep("inspect", "Inspect repository evidence through governed read capabilities."),
-            WorkflowStep("analyze", "Interpret observations without promoting model output to evidence."),
+            WorkflowStep(
+                "inspect",
+                "Inspect repository evidence through governed read capabilities.",
+            ),
+            WorkflowStep(
+                "analyze",
+                "Interpret observations without promoting model output to evidence.",
+            ),
             WorkflowStep("synthesize", "Produce findings only where evidence supports the claim."),
-            WorkflowStep("remediate", "Prepare a remediation proposal; no mutation is performed here."),
+            WorkflowStep(
+                "remediate",
+                "Prepare a remediation proposal; no mutation is performed here.",
+            ),
             WorkflowStep(
                 "modify",
                 "Apply a repository change only after Platform policy and human approval.",
