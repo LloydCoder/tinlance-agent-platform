@@ -14,6 +14,12 @@ from datetime import UTC, datetime, timedelta
 from threading import RLock
 from uuid import UUID, uuid4
 
+from tinlance_agent_platform_api.service import (
+    APIHandler,
+    APIRequest,
+    APIResponse,
+    AuthenticationError,
+)
 from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
@@ -25,13 +31,6 @@ from tinlance_agent_platform_contracts import (
 from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_runtime import RunStateMachine
-
-from tinlance_agent_platform_api.service import (
-    APIHandler,
-    APIRequest,
-    APIResponse,
-    AuthenticationError,
-)
 
 
 @dataclass(frozen=True, slots=True)
