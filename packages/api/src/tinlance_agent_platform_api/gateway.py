@@ -133,8 +133,7 @@ class ReferencePlatformGateway(APIHandler):
         agent_id = request.payload.get("agent_id")
         intent = request.payload.get("intent")
         if not all(
-            isinstance(value, str) and value.strip()
-            for value in (task_id, agent_id, intent)
+            isinstance(value, str) and value.strip() for value in (task_id, agent_id, intent)
         ):
             raise ValueError("task_id, agent_id and intent are required")
         agent = self._agent(request.tenant_id, agent_id)
@@ -193,8 +192,7 @@ class ReferencePlatformGateway(APIHandler):
         resource = request.payload.get("resource")
         reason = request.payload.get("reason")
         if not all(
-            isinstance(value, str) and value.strip()
-            for value in (run_id, action, resource, reason)
+            isinstance(value, str) and value.strip() for value in (run_id, action, resource, reason)
         ):
             raise ValueError("run_id, action, resource and reason are required")
         parsed = UUID(run_id)
