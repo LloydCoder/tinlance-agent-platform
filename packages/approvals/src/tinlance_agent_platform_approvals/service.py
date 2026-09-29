@@ -70,9 +70,16 @@ class ApprovalService:
                 raise PermissionError("approval is owned by another tenant")
             if current.status is not ApprovalStatus.PENDING:
                 raise ValueError("approval is no longer pending")
-            if intent_fingerprint is not None and current.intent_fingerprint not in {None, intent_fingerprint}:
+            if (
+                intent_fingerprint is not None
+                and current.intent_fingerprint not in {None, intent_fingerprint}
+            ):
                 raise PermissionError("approval intent does not match")
-            if approved and approver_subject_id is not None and approver_subject_id == current.requested_by:
+            if (
+                approved
+                and approver_subject_id is not None
+                and approver_subject_id == current.requested_by
+            ):
                 raise PermissionError("requester cannot approve the same consequential request")
             status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
             updated = ApprovalRequest(
