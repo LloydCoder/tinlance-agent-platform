@@ -15,7 +15,7 @@ from enum import StrEnum
 from hashlib import sha256
 from threading import RLock
 from time import monotonic
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_approvals import ApprovalService
@@ -569,7 +569,10 @@ class GovernedExecutionService:
     def _agent(self, request: ExecutionRequest) -> AgentDefinition:
         try:
             version = self.agents.latest_version(request.tenant_id, request.agent_id)
-            return self.agents.get(request.tenant_id, request.agent_id, version)
+            return cast(
+                AgentDefinition,
+                self.agents.get(request.tenant_id, request.agent_id, version),
+            )
         except (KeyError, ValueError) as exc:
             raise ExecutionFailure(
                 ExecutionErrorCode.IDENTITY_BINDING_FAILED,
@@ -620,7 +623,7 @@ class GovernedExecutionService:
                 ExecutionErrorCode.AUTHORIZATION_DENIED,
                 "principal lacks requested capability scope",
             )
-        if registration.risk.value == "prohibited":
+        if registration.risk is RiskTier.PROHIBITED:
             raise ExecutionFailure(
                 ExecutionErrorCode.AUTHORIZATION_DENIED,
                 "prohibited capability cannot execute",
