@@ -7,7 +7,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
-from .gateway import PrincipalResolver
+from .gateway import AuthenticationError, PrincipalResolver
 from .service import APIRequest, AgentPlatformAPI
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
@@ -85,6 +85,8 @@ def serve(
                     HTTPStatus.OK,
                     {"status": response.status, "payload": response.payload},
                 )
+            except AuthenticationError:
+                self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             except PermissionError:
                 self._respond(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             except (ValueError, KeyError):
