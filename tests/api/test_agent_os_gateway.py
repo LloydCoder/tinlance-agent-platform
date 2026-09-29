@@ -8,12 +8,9 @@ from uuid import uuid4
 
 import pytest
 
+from apps.reference_gateway import ReferencePlatformGateway, StaticPrincipalResolver
 from tinlance_agent_platform_agents import AgentRegistry
-from tinlance_agent_platform_api import (
-    AgentPlatformAPI,
-    ReferencePlatformGateway,
-    StaticPrincipalResolver,
-)
+from tinlance_agent_platform_api import AgentPlatformAPI
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_contracts import AgentDefinition, Principal
 from tinlance_agent_platform_events import InMemoryEventStore
