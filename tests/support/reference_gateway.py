@@ -59,6 +59,11 @@ class _ReferenceTool:
     def execute(self, call: ToolCall) -> str:
         return f"governed:{call.tool_name}:{call.action}:{call.resource}"
 
+    def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str:
+        if timeout_seconds <= 0:
+            raise TimeoutError("invalid timeout")
+        return self.execute(call)
+
 
 class ReferencePlatformGateway(APIHandler):
     def __init__(
