@@ -266,7 +266,12 @@ class ReferencePlatformGateway(APIHandler):
             if run is None or run.tenant_id != request.tenant_id:
                 raise PermissionError("run is not owned by tenant")
         approval = self.approvals.request(
-            request.tenant_id, parsed, action, resource, reason, request.subject_id,
+            request.tenant_id,
+            parsed,
+            action,
+            resource,
+            reason,
+            request.subject_id,
             expires_at=datetime.now(UTC) + timedelta(minutes=10),
             intent_fingerprint=self._intent_fingerprint(request)
             or (
@@ -277,10 +282,12 @@ class ReferencePlatformGateway(APIHandler):
         )
         with self._lock:
             self._runs[parsed] = self._state.transition(run, RunStatus.WAITING_APPROVAL)
-        self.events.append(new_event(
-            request.tenant_id, parsed, "approval.requested",
-            {"approval_id": str(approval.approval_id), "request_id": request.request_id},
-        ))
+        self.events.append(
+            new_event(
+                request.tenant_id, parsed, "approval.requested",
+                {"approval_id": str(approval.approval_id), "request_id": request.request_id},
+            )
+        )
         return APIResponse("accepted", {"approval_id": str(approval.approval_id)})
 
     def _decide_approval(self, request: APIRequest) -> APIResponse:
@@ -296,16 +303,23 @@ class ReferencePlatformGateway(APIHandler):
             request.tenant_id,
             request.subject_id,
             intent_fingerprint=request.payload.get("intent_fingerprint")
-            if isinstance(request.payload.get("intent_fingerprint"), str) else None,
+            if isinstance(request.payload.get("intent_fingerprint"), str)
+            else None,
         )
-        self.events.append(new_event(
-            request.tenant_id, item.run_id, "approval.decided",
-            {"approval_id": str(item.approval_id), "request_id": request.request_id,
-             "decision": item.status.value, "approver_subject_id": request.subject_id},
-        ))
-        return APIResponse("accepted", {
-            "approval_id": str(item.approval_id), "state": item.status.value
-        })
+        self.events.append(
+            new_event(
+                request.tenant_id, item.run_id, "approval.decided",
+                {
+                    "approval_id": str(item.approval_id),
+                    "request_id": request.request_id,
+                    "decision": item.status.value,
+                    "approver_subject_id": request.subject_id,
+                },
+            )
+        )
+        return APIResponse(
+            "accepted", {"approval_id": str(item.approval_id), "state": item.status.value}
+        )
 
     def _execute_tool(self, request: APIRequest) -> APIResponse:
         payload = request.payload
