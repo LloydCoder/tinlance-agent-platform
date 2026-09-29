@@ -7,7 +7,7 @@ from typing import Protocol
 
 API_VERSION = "1.1"
 _IDEMPOTENT_GUARDED_OPERATIONS = frozenset(
-    {"runs.create", "runs.cancel", "approvals.request", "approvals.decide", "tools.execute"}
+    {"runs.create", "runs.cancel", "approvals.request", "approvals.decide"}
 )
 _MAX_IDEMPOTENCY_ENTRIES = 1024
 
