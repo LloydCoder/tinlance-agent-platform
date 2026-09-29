@@ -12,6 +12,7 @@ from .service import (
     AgentPlatformAPI,
     APIRequest,
     AuthenticationError,
+    ExecutionAPIError,
     IdempotencyConflictError,
     PrincipalResolver,
 )
@@ -109,8 +110,8 @@ def serve(
                     raise ValueError("payload must be an object")
                 request_id = _request_id(self.headers.get("X-Request-ID"))
                 idempotency_key = self.headers.get("Idempotency-Key")
-                if idempotency_key is not None and _request_id(idempotency_key) != request_id:
-                    raise ValueError("Idempotency-Key must match X-Request-ID")
+                if idempotency_key is not None:
+                    idempotency_key = _request_id(idempotency_key)
                 request = APIRequest(
                     principal.tenant_id,
                     principal.subject_id,
@@ -118,6 +119,8 @@ def serve(
                     payload,
                     request_id,
                     _traceparent(self.headers.get("traceparent")),
+                    idempotency_key,
+                    principal,
                 )
                 response = api.dispatch(request)
                 self._respond(
@@ -127,7 +130,15 @@ def serve(
             except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             except IdempotencyConflictError:
-                self._respond(HTTPStatus.CONFLICT, {"error": "idempotency_conflict"})
+                self._respond(
+                    HTTPStatus.CONFLICT,
+                    {"error": "IDEMPOTENCY_CONFLICT", "retryable": False},
+                )
+            except ExecutionAPIError as exc:
+                self._respond(
+                    HTTPStatus.CONFLICT,
+                    {"error": exc.code, "retryable": exc.retryable},
+                )
             except PermissionError:
                 self._respond(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
             except (ValueError, KeyError):

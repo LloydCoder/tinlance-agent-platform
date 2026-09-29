@@ -109,6 +109,47 @@ This design reflects current agent-security guidance emphasizing least privilege
 
 The final execution boundary is the enforcement point. A successful model response, tool registration, retrieved document, or prior approval does not by itself authorize a side effect.
 
+
+## R10 — Governed Execution Contract
+
+The Platform publishes the versioned `governed-execution.v1` contract for consequential actions.
+
+```text
+Agent
+  ↓
+SDK
+  ↓
+authenticated identity
+  ↓
+tenant + agent binding
+  ↓
+capability + tool version
+  ↓
+policy
+  ↓
+approval (when required)
+  ↓
+budget + timeout
+  ↓
+sandbox / secret gates
+  ↓
+tools.execute
+  ↓
+evidence + audit
+  ↓
+execution result / outcome
+```
+
+Public R10 operations include:
+
+- `tools.execute`
+- `approvals.decide`
+- `executions.get`
+
+The contract enforces canonical intent fingerprints, tenant-scoped idempotency, approval binding and single-use consumption, explicit terminal/ambiguous outcomes, execution-bound evidence, correlated audit events, and fail-closed required-control failures.
+
+See [R10 Governed Execution Contract](docs/R10-GOVERNED-EXECUTION.md) for the normative repository contract and the explicit distinction between reference implementations and production deployment adapters.
+
 ### Agent Platform vs Agentic OS
 
 | Concern | Agent Platform | Tinlance Agentic OS |

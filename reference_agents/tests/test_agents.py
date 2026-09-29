@@ -41,9 +41,9 @@ def test_security_plan_marks_mutation_as_approval_bound(client):
     assert write.risk == "high"
 
 
-def test_engineering_plan_has_no_local_executor(client):
+def test_engineering_plan_uses_governed_execution_boundary(client):
     agent = EngineeringAgent(client)
-    assert not hasattr(agent, "execute_tool")
+    assert callable(agent.execute_tool)
     assert not hasattr(agent, "_executor")
 
 

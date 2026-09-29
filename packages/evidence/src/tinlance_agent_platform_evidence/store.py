@@ -15,10 +15,13 @@ class Evidence:
     content_hash: str
     content: str
     sequence: int
+    execution_id: UUID | None = None
 
 
 class EvidenceStore(Protocol):
-    def append(self, tenant_id: str, run_id: UUID, content: str) -> Evidence: ...
+    def append(
+        self, tenant_id: str, run_id: UUID, content: str, execution_id: UUID | None = None
+    ) -> Evidence: ...
 
     def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Evidence, ...]: ...
 
@@ -30,7 +33,9 @@ class InMemoryEvidenceStore:
         self._items: list[Evidence] = []
         self._lock = RLock()
 
-    def append(self, tenant_id: str, run_id: UUID, content: str) -> Evidence:
+    def append(
+        self, tenant_id: str, run_id: UUID, content: str, execution_id: UUID | None = None
+    ) -> Evidence:
         if (
             not tenant_id
             or tenant_id != tenant_id.strip()
@@ -48,7 +53,7 @@ class InMemoryEvidenceStore:
                 default=0,
             )
             digest = sha256(content.encode()).hexdigest()
-            item = Evidence(uuid4(), tenant_id, run_id, digest, content, sequence)
+            item = Evidence(uuid4(), tenant_id, run_id, digest, content, sequence, execution_id)
             self._items.append(item)
             return item
 

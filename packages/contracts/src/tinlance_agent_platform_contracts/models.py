@@ -58,6 +58,7 @@ class Decision(StrEnum):
     ALLOW = "allow"
     DENY = "deny"
     REQUIRE_APPROVAL = "require_approval"
+    REQUIRE_AUTHORIZATION = "require_additional_authorization"
 
 
 @dataclass(frozen=True, slots=True)

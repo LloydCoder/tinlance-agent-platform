@@ -1,5 +1,5 @@
 """Deterministic run budgets."""
 
-from .service import BudgetService
+from .service import BudgetReservation, BudgetService
 
-__all__ = ["BudgetService"]
+__all__ = ["BudgetReservation", "BudgetService"]

@@ -385,7 +385,7 @@ def test_http_rejects_idempotency_key_reuse_with_different_request() -> None:
         assert _request(base, first_body, request_id=request_id)[0] == 200
         status, response = _request(base, second_body, request_id=request_id)
         assert status == 409
-        assert response == {"error": "idempotency_conflict"}
+        assert response == {"error": "IDEMPOTENCY_CONFLICT", "retryable": False}
     finally:
         server.shutdown()
         server.server_close()

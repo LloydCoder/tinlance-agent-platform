@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import UUID
 
 from tinlance_agent_platform_contracts import (
@@ -7,6 +8,7 @@ from tinlance_agent_platform_contracts import (
     Decision,
     PolicyDecision,
     RequestContext,
+    RiskTier,
     ToolCall,
 )
 from tinlance_agent_platform_kernel import assert_authority_boundary
@@ -18,10 +20,27 @@ class ToolRegistration:
     name: str
     capability: str
     description: str
+    version: str = "1"
+    risk: RiskTier | None = None
+    sandbox_required: bool = False
+    timeout_seconds: float = 300.0
+    max_tool_calls: int = 1
+    evidence_required: bool = True
+    secret_required: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.name.strip() or not self.capability.strip() or not self.description.strip():
+            raise ValueError("tool registration requires name, capability, and description")
+        if not self.version.strip() or self.timeout_seconds <= 0 or self.max_tool_calls < 1:
+            raise ValueError("tool registration limits must be valid")
 
 
 class ToolExecutor(Protocol):
     def execute(self, call: ToolCall) -> str: ...
+
+
+class TimedToolExecutor(Protocol):
+    def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str: ...
 
 
 class ApprovalVerifier(Protocol):
@@ -32,6 +51,8 @@ class ApprovalVerifier(Protocol):
         run_id: UUID,
         action: str,
         resource: str,
+        *,
+        intent_fingerprint: str | None = None,
     ) -> None: ...
 
 
@@ -42,9 +63,17 @@ class ToolGateway:
     def register(self, registration: ToolRegistration, executor: ToolExecutor) -> None:
         if registration.name in self._tools:
             raise ValueError("tool registration is immutable")
-        if not registration.name or not registration.capability:
-            raise ValueError("tool registration requires name and capability")
         self._tools[registration.name] = (registration, executor)
+
+    def supports_hard_timeout(self, name: str) -> bool:
+        item = self._tools.get(name)
+        return item is not None and hasattr(item[1], "execute_with_timeout")
+
+    def registration(self, name: str) -> ToolRegistration:
+        item = self._tools.get(name)
+        if item is None:
+            raise KeyError("tool is not registered")
+        return item[0]
 
     def authorize(
         self,
@@ -76,11 +105,7 @@ class ToolGateway:
             assert_authority_boundary(capability_request, context.principal)
         except PermissionError as exc:
             return PolicyDecision(
-                Decision.DENY,
-                "authorization",
-                "2",
-                str(exc),
-                capability_request.risk,
+                Decision.DENY, "authorization", "2", str(exc), capability_request.risk
             )
         return evaluate(capability_request)
 
@@ -90,6 +115,9 @@ class ToolGateway:
         decision: PolicyDecision,
         approval_id: UUID | None = None,
         approval_verifier: ApprovalVerifier | None = None,
+        *,
+        intent_fingerprint: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> str:
         if decision.decision is Decision.DENY:
             raise PermissionError("tool execution denied")
@@ -102,8 +130,14 @@ class ToolGateway:
                 call.run_id,
                 call.action,
                 call.resource,
+                intent_fingerprint=intent_fingerprint,
             )
         registration = self._tools.get(call.tool_name)
         if registration is None or registration[0].capability != call.capability:
             raise PermissionError("tool is not registered for requested capability")
-        return registration[1].execute(call)
+        executor = registration[1]
+        timed = getattr(executor, "execute_with_timeout", None)
+        if timeout_seconds is not None and callable(timed):
+            run_with_timeout = cast(Callable[[ToolCall, float], str], timed)
+            return run_with_timeout(call, timeout_seconds)
+        return executor.execute(call)

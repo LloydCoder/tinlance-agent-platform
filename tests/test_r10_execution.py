@@ -1,0 +1,347 @@
+from __future__ import annotations
+
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+
+from tinlance_agent_platform_agents import AgentRegistry
+from tinlance_agent_platform_approvals import ApprovalService
+from tinlance_agent_platform_budgets import BudgetService
+from tinlance_agent_platform_contracts import (
+    AgentDefinition,
+    Budget,
+    Principal,
+    RiskTier,
+)
+from tinlance_agent_platform_events import InMemoryEventStore
+from tinlance_agent_platform_evidence import InMemoryEvidenceStore
+from tinlance_agent_platform_execution import (
+    ExecutionErrorCode,
+    ExecutionFailure,
+    ExecutionRequest,
+    ExecutionResult,
+    ExecutionState,
+    GovernedExecutionService,
+    SQLiteIdempotencyRepository,
+)
+from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
+
+
+class Echo:
+    def execute(self, call: ToolCall) -> str:
+        return f"executed:{call.action}:{call.resource}"
+
+    def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str:
+        if timeout_seconds <= 0:
+            raise TimeoutError("invalid timeout")
+        return self.execute(call)
+
+
+@pytest.fixture
+def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, object]:
+    tenant = "tenant-r10"
+    principal = Principal("user-r10", "user", tenant, scopes=frozenset({"repository.read"}))
+    agent = AgentDefinition(
+        uuid4(),
+        tenant,
+        "r10-agent",
+        "1.0.0",
+        principal.subject_id,
+        "default",
+        frozenset({"repository.read"}),
+        "sha256:instructions",
+    )
+    agents = AgentRegistry()
+    agents.register(agent)
+    tools = ToolGateway()
+    tools.register(
+        ToolRegistration(
+            "reference.echo",
+            "repository.read",
+            "reference tool",
+            version="1",
+            risk=RiskTier.HIGH,
+            timeout_seconds=10,
+            max_tool_calls=1,
+        ),
+        Echo(),
+    )
+    service = GovernedExecutionService(
+        agents=agents,
+        approvals=ApprovalService(),
+        tools=tools,
+        events=InMemoryEventStore(),
+        evidence=InMemoryEvidenceStore(),
+    )
+    return service, principal, agent, tools
+
+
+def request(principal: Principal, agent: AgentDefinition, **overrides: object) -> ExecutionRequest:
+    values: dict[str, object] = {
+        "request_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "principal_id": principal.subject_id,
+        "agent_id": agent.agent_id,
+        "run_id": uuid4(),
+        "capability_id": "repository.read",
+        "capability_version": "1",
+        "tool_name": "reference.echo",
+        "tool_version": "1",
+        "action": "read",
+        "resource": "repo:example",
+        "input": {"safe": True},
+        "requested_timeout_seconds": 5,
+    }
+    values.update(overrides)
+    return ExecutionRequest(**values)  # type: ignore[arg-type]
+
+
+def test_golden_path_binds_identity_evidence_and_audit(harness: object) -> None:
+    service, principal, agent, _ = harness
+    item = service.execute(principal, request(principal, agent))
+    assert item.state is ExecutionState.COMPLETED
+    assert item.output == "executed:read:repo:example"
+    assert len(item.evidence_ids) == 1
+    assert len(item.audit_event_ids) >= 5
+
+
+def test_cross_tenant_identity_is_denied(harness: object) -> None:
+    service, principal, agent, _ = harness
+    foreign = Principal(principal.subject_id, "user", "tenant-other")
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(foreign, request(principal, agent))
+    assert exc.value.code is ExecutionErrorCode.IDENTITY_BINDING_FAILED
+
+
+def test_idempotency_returns_same_result_and_conflicting_key_fails(harness: object) -> None:
+    service, principal, agent, _ = harness
+    key = str(uuid4())
+    first = request(principal, agent, idempotency_key=key)
+    result = service.execute(principal, first)
+    assert service.execute(principal, first) == result
+    conflicting = request(principal, agent, idempotency_key=key, resource="repo:other")
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, conflicting)
+    assert exc.value.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT
+
+
+def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) -> None:
+    service, principal, agent, _ = harness
+    high = request(principal, agent, risk=RiskTier.HIGH)
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, high)
+    assert exc.value.code is ExecutionErrorCode.APPROVAL_REQUIRED
+    approval = service.approvals.request(
+        principal.tenant_id,
+        high.run_id,
+        high.action,
+        high.resource,
+        "high-risk",
+        principal.subject_id,
+        intent_fingerprint=high.fingerprint,
+    )
+    with pytest.raises(PermissionError):
+        service.approvals.decide(
+            approval.approval_id, True, principal.tenant_id, principal.subject_id
+        )
+    service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
+    completed = service.execute(
+        principal,
+        request(
+            principal,
+            agent,
+            risk=RiskTier.HIGH,
+            approval_id=approval.approval_id,
+            idempotency_key=high.idempotency_key,
+            run_id=high.run_id,
+        ),
+        trace_id="trace-r10",
+    )
+    assert completed.state is ExecutionState.COMPLETED
+    replay = request(principal, agent, risk=RiskTier.HIGH, approval_id=approval.approval_id)
+    with pytest.raises(ExecutionFailure) as replay_error:
+        service.execute(principal, replay)
+    assert replay_error.value.code is ExecutionErrorCode.APPROVAL_REPLAY
+
+
+def test_unknown_prior_idempotent_execution_never_replays(harness: object) -> None:
+    service, principal, agent, _ = harness
+    key = str(uuid4())
+    record = request(principal, agent, idempotency_key=key)
+    from tinlance_agent_platform_execution import IdempotencyRecord
+
+    claimed = IdempotencyRecord(principal.tenant_id, key, record.fingerprint, uuid4())
+    service.idempotency.claim(claimed)
+    unknown = ExecutionResult(
+        claimed.execution_id,
+        ExecutionState.OUTCOME_UNKNOWN,
+        None,
+        (),
+        (),
+        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+        False,
+    )
+    service.idempotency.complete(claimed, unknown)
+    assert service.execute(principal, record) == unknown
+
+
+def test_required_sandbox_fails_closed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, request(principal, agent, sandbox_required=True))
+    assert exc.value.code is ExecutionErrorCode.SANDBOX_UNAVAILABLE
+
+
+def test_budget_limit_is_enforced(harness: object) -> None:
+    service, principal, agent, _ = harness
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, request(principal, agent, requested_tool_calls=2))
+    assert exc.value.code is ExecutionErrorCode.BUDGET_EXCEEDED
+
+
+def test_approval_fingerprint_mismatch_fails_closed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    high = request(principal, agent, risk=RiskTier.HIGH)
+    approval = service.approvals.request(
+        principal.tenant_id,
+        high.run_id,
+        high.action,
+        high.resource,
+        "high-risk",
+        principal.subject_id,
+        intent_fingerprint="wrong-fingerprint",
+    )
+    service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(
+            principal,
+            request(
+                principal,
+                agent,
+                risk=RiskTier.HIGH,
+                approval_id=approval.approval_id,
+            ),
+            trace_id="trace-r10",
+        )
+    assert exc.value.code is ExecutionErrorCode.APPROVAL_BINDING_MISMATCH
+
+
+def test_tenant_scoped_approval_cannot_be_read_or_consumed_cross_tenant(harness: object) -> None:
+    service, principal, agent, _ = harness
+    approval = service.approvals.request(
+        principal.tenant_id,
+        uuid4(),
+        "read",
+        "repo:example",
+        "test",
+        principal.subject_id,
+    )
+    with pytest.raises(PermissionError):
+        service.approvals.get(approval.approval_id, "tenant-other")
+    foreign = Principal("foreign", "user", "tenant-other")
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(
+            foreign,
+            request(
+                principal,
+                agent,
+                tenant_id="tenant-other",
+                principal_id="foreign",
+            ),
+        )
+    assert exc.value.code is ExecutionErrorCode.IDENTITY_BINDING_FAILED
+
+
+def test_execution_status_is_tenant_scoped(harness: object) -> None:
+    service, principal, agent, _ = harness
+    result = service.execute(principal, request(principal, agent))
+    assert service.status(principal.tenant_id, result.execution_id) == result
+    with pytest.raises(PermissionError):
+        service.status("tenant-other", result.execution_id)
+
+
+def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: object) -> None:
+    _, principal, agent, _ = harness
+    path = str(tmp_path / "idempotency.sqlite3")
+    first_store = SQLiteIdempotencyRepository(path)
+    agent_registry = AgentRegistry()
+    agent_registry.register(agent)
+    tools = ToolGateway()
+    tools.register(
+        ToolRegistration(
+            "reference.echo",
+            "repository.read",
+            "reference tool",
+            version="1",
+            risk=RiskTier.HIGH,
+            timeout_seconds=10,
+            max_tool_calls=1,
+        ),
+        Echo(),
+    )
+    service = GovernedExecutionService(
+        agents=agent_registry,
+        approvals=ApprovalService(),
+        tools=tools,
+        events=InMemoryEventStore(),
+        evidence=InMemoryEvidenceStore(),
+        idempotency=first_store,
+    )
+    item = request(principal, agent)
+    result = service.execute(principal, item)
+    second_store = SQLiteIdempotencyRepository(path)
+    restored = second_store.get(principal.tenant_id, item.idempotency_key)
+    assert restored is not None
+    assert restored.result == result
+
+
+def test_authoritative_tool_timeout_returns_terminal_timeout(harness: object) -> None:
+    service, principal, agent, _ = harness
+
+    class Slow:
+        def execute(self, call: ToolCall) -> str:
+            return "unexpected"
+
+        def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str:
+            raise TimeoutError("simulated timeout")
+
+    replacement = ToolGateway()
+    replacement.register(
+        ToolRegistration(
+            "reference.echo",
+            "repository.read",
+            "reference tool",
+            version="1",
+            risk=RiskTier.HIGH,
+            timeout_seconds=10,
+            max_tool_calls=1,
+        ),
+        Slow(),
+    )
+    service.tools = replacement
+    result = service.execute(principal, request(principal, agent))
+    assert result.state is ExecutionState.TIMED_OUT
+    assert result.error_code is ExecutionErrorCode.TIMEOUT
+
+
+def test_platform_budget_reservation_is_enforced_and_consumed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    budget = BudgetService(Budget(uuid4(), principal.tenant_id, uuid4(), 10, 30.0, 1))
+    service.budget = budget
+    item = request(principal, agent, run_id=budget.budget.run_id)
+    result = service.execute(principal, item)
+    assert result.state is ExecutionState.COMPLETED
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds >= 0
+
+
+def test_platform_budget_exhaustion_fails_closed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    budget = BudgetService(Budget(uuid4(), principal.tenant_id, uuid4(), 10, 30.0, 0))
+    service.budget = budget
+    item = request(principal, agent, run_id=budget.budget.run_id)
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, item)
+    assert exc.value.code is ExecutionErrorCode.BUDGET_EXCEEDED
