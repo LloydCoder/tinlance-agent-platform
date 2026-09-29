@@ -7,7 +7,6 @@ import urllib.request
 from uuid import uuid4
 
 import pytest
-
 from apps.reference_gateway import ReferencePlatformGateway, StaticPrincipalResolver
 from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_api import AgentPlatformAPI
