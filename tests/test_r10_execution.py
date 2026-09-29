@@ -30,6 +30,11 @@ class Echo:
     def execute(self, call: ToolCall) -> str:
         return f"executed:{call.action}:{call.resource}"
 
+    def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str:
+        if timeout_seconds <= 0:
+            raise TimeoutError("invalid timeout")
+        return self.execute(call)
+
 
 @pytest.fixture
 def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, object]:
