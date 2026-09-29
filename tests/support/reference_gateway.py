@@ -199,6 +199,43 @@ class ReferencePlatformGateway(APIHandler):
             "run_id": run_id, "task_id": str(updated.task_id), "state": updated.status.value
         })
 
+    def _intent_fingerprint(self, request: APIRequest) -> str | None:
+        raw = request.payload.get("execution_intent")
+        if raw is None:
+            return None
+        if not isinstance(raw, dict):
+            raise ValueError("execution_intent must be an object")
+        risk = raw.get("risk", "low")
+        reversibility = raw.get("reversibility", "reversible")
+        data_class = raw.get("data_class", "internal")
+        if not all(isinstance(value, str) for value in (risk, reversibility, data_class)):
+            raise ValueError("execution intent classifications must be strings")
+        intent = ExecutionRequest(
+            request_id=request.request_id,
+            idempotency_key=request.idempotency_key or request.request_id,
+            tenant_id=request.tenant_id,
+            principal_id=request.subject_id,
+            agent_id=UUID(self._required_text(raw, "agent_id")),
+            run_id=UUID(self._required_text(raw, "run_id")),
+            capability_id=self._required_text(raw, "capability_id"),
+            capability_version=self._required_text(raw, "capability_version"),
+            tool_name=self._required_text(raw, "tool_name"),
+            tool_version=self._required_text(raw, "tool_version"),
+            action=self._required_text(raw, "action"),
+            resource=self._required_text(raw, "resource"),
+            input=raw.get("input") if isinstance(raw.get("input"), dict) else {},
+            requested_timeout_seconds=float(raw.get("requested_timeout_seconds", 30.0)),
+            requested_tool_calls=int(raw.get("requested_tool_calls", 1)),
+            risk=RiskTier(risk),
+            reversibility=Reversibility(reversibility),
+            data_class=DataClass(data_class),
+            blast_radius=str(raw.get("blast_radius", "single")),
+            sandbox_required=bool(raw.get("sandbox_required", False)),
+            evidence_required=bool(raw.get("evidence_required", True)),
+            contract_version=str(raw.get("contract_version", CONTRACT_VERSION)),
+        )
+        return intent.fingerprint
+
     def _request_approval(self, request: APIRequest) -> APIResponse:
         run_id = self._required_text(request.payload, "run_id")
         action = self._required_text(request.payload, "action")
@@ -212,8 +249,9 @@ class ReferencePlatformGateway(APIHandler):
         approval = self.approvals.request(
             request.tenant_id, parsed, action, resource, reason, request.subject_id,
             expires_at=datetime.now(UTC) + timedelta(minutes=10),
-            intent_fingerprint=request.payload.get("intent_fingerprint")
-            if isinstance(request.payload.get("intent_fingerprint"), str) else None,
+            intent_fingerprint=self._intent_fingerprint(request)
+            or (request.payload.get("intent_fingerprint")
+                if isinstance(request.payload.get("intent_fingerprint"), str) else None),
         )
         with self._lock:
             self._runs[parsed] = self._state.transition(run, RunStatus.WAITING_APPROVAL)
