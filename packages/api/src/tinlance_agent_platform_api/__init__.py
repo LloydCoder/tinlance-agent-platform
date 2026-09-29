@@ -1,5 +1,5 @@
 from .gateway import AuthenticationError, ReferencePlatformGateway, StaticPrincipalResolver
-from .service import APIRequest, APIResponse, AgentPlatformAPI
+from .service import AgentPlatformAPI, APIRequest, APIResponse
 
 __all__ = [
     "AuthenticationError",
