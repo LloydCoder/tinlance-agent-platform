@@ -1,7 +1,8 @@
 from uuid import uuid4
 
 import pytest
-from tinlance_agent_platform_sdk import AgentPlatform
+from tinlance_agent_platform_sdk import AgentPlatform, ApprovalRef, EvidenceRef, Run
+from tinlance_reference_agents.base import EvidenceBackedConclusion
 
 from tinlance_reference_agents import EngineeringAgent, IntelligenceAgent, SecurityResearchAgent
 
@@ -59,10 +60,6 @@ def test_workflow_approval_invariant(client):
         for step in agent.workflow("fix failing tests")
     )
     assert uuid4()
-
-
-from tinlance_agent_platform_sdk import ApprovalRef, EvidenceRef, Event, Run
-
 
 class FakeRuns:
     def __init__(self):
@@ -147,16 +144,13 @@ def test_shared_approval_and_collection_use_sdk_contract():
 
 
 def test_untrusted_input_rejects_non_text():
-    with pytest.raises(TypeError):
-        from tinlance_reference_agents.base import reject_untrusted_instructions
+    from tinlance_reference_agents.base import reject_untrusted_instructions
 
+    with pytest.raises(TypeError):
         reject_untrusted_instructions(object())
 
 
 def test_evidence_backed_conclusion_accepts_platform_reference():
     ref = EvidenceRef(uuid4())
-    conclusion = __import__(
-        "tinlance_reference_agents.base",
-        fromlist=["EvidenceBackedConclusion"],
-    ).EvidenceBackedConclusion("supported", (ref,), "medium")
+    conclusion = EvidenceBackedConclusion("supported", (ref,), "medium")
     assert conclusion.evidence == (ref,)
