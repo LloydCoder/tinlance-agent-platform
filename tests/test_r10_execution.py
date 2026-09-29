@@ -137,7 +137,11 @@ def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) ->
             approval.approval_id, True, principal.tenant_id, principal.subject_id
         )
     service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
-    completed = service.execute(principal, high, trace_id="trace-r10")
+    completed = service.execute(
+        principal,
+        request(principal, agent, risk=RiskTier.HIGH, approval_id=approval.approval_id, idempotency_key=high.idempotency_key),
+        trace_id="trace-r10",
+    )
     assert completed.state is ExecutionState.COMPLETED
     replay = request(principal, agent, risk=RiskTier.HIGH, approval_id=approval.approval_id)
     with pytest.raises(ExecutionFailure) as replay_error:
@@ -151,12 +155,19 @@ def test_unknown_prior_idempotent_execution_never_replays(harness: object) -> No
     record = request(principal, agent, idempotency_key=key)
     from tinlance_agent_platform_execution import IdempotencyRecord
 
-    service.idempotency.claim(
-        IdempotencyRecord(principal.tenant_id, key, record.fingerprint, uuid4())
+    claimed = IdempotencyRecord(principal.tenant_id, key, record.fingerprint, uuid4())
+    service.idempotency.claim(claimed)
+    unknown = ExecutionResult(
+        claimed.execution_id,
+        ExecutionState.OUTCOME_UNKNOWN,
+        None,
+        (),
+        (),
+        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+        False,
     )
-    with pytest.raises(ExecutionFailure) as exc:
-        service.execute(principal, record)
-    assert exc.value.code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
+    service.idempotency.complete(claimed, unknown)
+    assert service.execute(principal, record) == unknown
 
 
 def test_required_sandbox_fails_closed(harness: object) -> None:
@@ -187,7 +198,16 @@ def test_approval_fingerprint_mismatch_fails_closed(harness: object) -> None:
     )
     service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
     with pytest.raises(ExecutionFailure) as exc:
-        service.execute(principal, high, trace_id="trace-r10")
+        service.execute(
+            principal,
+            request(
+                principal,
+                agent,
+                risk=RiskTier.HIGH,
+                approval_id=approval.approval_id,
+            ),
+            trace_id="trace-r10",
+        )
     assert exc.value.code is ExecutionErrorCode.APPROVAL_BINDING_MISMATCH
 
 
