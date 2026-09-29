@@ -8,8 +8,8 @@ from uuid import UUID
 
 from tinlance_agent_platform_sdk import (
     AgentPlatform,
-    EvidenceRef,
     Event,
+    EvidenceRef,
     Run,
     ToolContractRegistry,
     ToolDescriptor,
@@ -95,7 +95,12 @@ class ReferenceAgent:
     name = "reference-agent"
     version = "0.1.0"
 
-    def __init__(self, client: AgentPlatform, *, tool_registry: ToolContractRegistry | None = None):
+    def __init__(
+        self,
+        client: AgentPlatform,
+        *,
+        tool_registry: ToolContractRegistry | None = None,
+    ):
         self.client = client
         self.tools = tool_registry or ToolContractRegistry()
 
