@@ -119,6 +119,7 @@ def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) ->
         high.resource,
         "high-risk",
         principal.subject_id,
+        intent_fingerprint=high.fingerprint,
     )
     with pytest.raises(PermissionError):
         service.approvals.decide(
