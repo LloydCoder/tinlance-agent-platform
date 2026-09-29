@@ -390,3 +390,91 @@ def test_http_rejects_idempotency_key_reuse_with_different_request() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_http_rejects_malformed_boundary_requests() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        raw = json.dumps({
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "health",
+            "payload": {},
+        }).encode()
+
+        request = urllib.request.Request(f"{base}/bad", data=raw, method="POST")
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 404
+
+        request = urllib.request.Request(
+            f"{base}/v1/agent-platform",
+            data=raw,
+            headers={
+                "Content-Type": "text/plain",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 415
+
+        request = urllib.request.Request(
+            f"{base}/v1/agent-platform",
+            data=b"",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+                "Content-Length": str(2 * 1024 * 1024),
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 413
+
+        request = urllib.request.Request(
+            f"{base}/v1/agent-platform",
+            data=b"not-json",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 400
+
+        request = urllib.request.Request(
+            f"{base}/v1/agent-platform",
+            data=json.dumps([]).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Tinlance-API-Version": "1.1",
+                "X-Request-ID": str(uuid4()),
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        assert error.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
