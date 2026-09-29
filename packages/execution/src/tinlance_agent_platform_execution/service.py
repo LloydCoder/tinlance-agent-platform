@@ -34,7 +34,6 @@ from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_policy import evaluate
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
-
 CONTRACT_VERSION = "governed-execution.v1"
 MAX_INPUT_BYTES = 1 * 1024 * 1024
 
