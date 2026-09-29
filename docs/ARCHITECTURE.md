@@ -87,3 +87,31 @@ Those deployment responsibilities must not be mistaken for authority logic embed
 ## Design references
 
 The architecture is consistent with current external guidance on agent identity/authorization, least privilege, high-impact approvals, isolation, observability and evaluation. External guidance informs the design; repository tests and contracts remain the implementation authority.
+
+## Agent OS integration boundary
+
+Agent OS is the higher-level lifecycle and experience layer. It sends intent to Platform through the versioned API contract in packages/api and receives authoritative run, approval-reference, event and evidence-reference results.
+
+The reference boundary is:
+
+    Agent OS
+      |
+      | HTTPS JSON API v1.1
+      | bearer authentication
+      | X-Request-ID / W3C traceparent
+      v
+    Platform API
+      |
+      v
+    authenticated principal
+      |
+      v
+    governed Platform services
+      +--> run lifecycle
+      +--> capabilities
+      +--> approvals
+      +--> events/evidence
+
+The Platform HTTP boundary verifies the authenticated principal before dispatch and rejects request-body tenant/subject values that do not match that principal. The HTTP server does not implement a second authorization engine; it hands the authenticated context to the Platform handler.
+
+The reference HTTP server is for contract/integration testing. Production deployments must place a hardened TLS/reverse-proxy boundary in front of it and inject a standards-based token verifier with issuer, audience, signature, expiry and lifecycle controls.
