@@ -1,3 +1,15 @@
-from .service import AgentPlatformAPI, APIRequest, APIResponse
+from .service import (
+    AgentPlatformAPI,
+    APIRequest,
+    APIResponse,
+    AuthenticationError,
+    PrincipalResolver,
+)
 
-__all__ = ["APIRequest", "APIResponse", "AgentPlatformAPI"]
+__all__ = [
+    "AuthenticationError",
+    "PrincipalResolver",
+    "APIRequest",
+    "APIResponse",
+    "AgentPlatformAPI",
+]

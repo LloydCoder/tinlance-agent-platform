@@ -20,3 +20,22 @@ class AgentRegistry:
         if agent is None:
             raise KeyError("agent version is not registered")
         return agent
+
+    def list_for_tenant(self, tenant_id: str) -> tuple[AgentDefinition, ...]:
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("tenant identifier must be normalized")
+        return tuple(
+            agent
+            for (agent_tenant, _agent_id, _version), agent in self._agents.items()
+            if agent_tenant == tenant_id
+        )
+
+    def latest_version(self, tenant_id: str, agent_id: UUID) -> str:
+        candidates = [
+            agent.version
+            for (agent_tenant, registered_id, _version), agent in self._agents.items()
+            if agent_tenant == tenant_id and registered_id == agent_id
+        ]
+        if not candidates:
+            raise KeyError("agent version is not registered")
+        return sorted(candidates)[-1]
