@@ -8,13 +8,13 @@ No caller can turn a client assertion into authority.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from threading import RLock
 from time import monotonic
-from collections.abc import Mapping
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -28,10 +28,10 @@ from tinlance_agent_platform_contracts import (
     Reversibility,
     RiskTier,
 )
-from tinlance_agent_platform_policy import evaluate
-from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
+from tinlance_agent_platform_policy import evaluate
+from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 
 CONTRACT_VERSION = "governed-execution.v1"
