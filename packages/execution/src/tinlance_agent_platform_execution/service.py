@@ -567,7 +567,6 @@ class GovernedExecutionService:
         request: ExecutionRequest,
         code: ExecutionErrorCode,
         audit_ids: list[UUID],
-        extra: Mapping[str, str] | None = None,
     ) -> None:
         self._states[execution_id] = ExecutionState.DENIED
         self._event(request, execution_id, "authorization.denied", audit_ids)
@@ -579,6 +578,7 @@ class GovernedExecutionService:
         execution_id: UUID,
         event_type: str,
         audit_ids: list[UUID],
+        extra: Mapping[str, str] | None = None,
     ) -> None:
         identity = self._identities.get(execution_id)
         payload: dict[str, str] = {
