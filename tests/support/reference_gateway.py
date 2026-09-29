@@ -222,7 +222,7 @@ class ReferencePlatformGateway(APIHandler):
         approved = request.payload.get("approved")
         if not isinstance(approved, bool):
             raise ValueError("approved must be boolean")
-        if self.approver_subjects and request.subject_id not in self.approver_subjects:
+        if request.subject_id not in self.approver_subjects:
             raise PermissionError("authenticated principal is not an approval authority")
         item = self.approvals.decide(
             approval_id,
