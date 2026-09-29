@@ -128,6 +128,8 @@ class ReferencePlatformGateway(APIHandler):
             return self._decide_approval(request)
         if operation == "tools.execute":
             return self._execute_tool(request)
+        if operation == "executions.get":
+            return self._execution_status(request)
         if operation == "runs.events":
             return self._events(request)
         if operation == "runs.evidence":
@@ -290,6 +292,22 @@ class ReferencePlatformGateway(APIHandler):
             "audit_event_ids": [str(item) for item in execution.audit_event_ids],
             "error_code": execution.error_code.value if execution.error_code else None,
             "retryable": execution.retryable,
+        })
+
+    def _execution_status(self, request: APIRequest) -> APIResponse:
+        execution_id = UUID(self._required_text(request.payload, "execution_id"))
+        try:
+            result = self.execution.status(request.tenant_id, execution_id)
+        except KeyError as exc:
+            raise PermissionError("execution is not accessible") from exc
+        return APIResponse("ok", {
+            "execution_id": str(result.execution_id),
+            "state": result.state.value,
+            "output": result.output,
+            "evidence_ids": [str(item) for item in result.evidence_ids],
+            "audit_event_ids": [str(item) for item in result.audit_event_ids],
+            "error_code": result.error_code.value if result.error_code else None,
+            "retryable": result.retryable,
         })
 
     def _principal(self, request: APIRequest) -> Principal:
