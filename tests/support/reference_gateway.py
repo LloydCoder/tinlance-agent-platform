@@ -152,9 +152,13 @@ class ReferencePlatformGateway(APIHandler):
             raise PermissionError("agent is not registered for tenant") from exc
 
     def _capabilities(self, request: APIRequest) -> APIResponse:
-        agent = self._agent(request.tenant_id, self._required_text(request.payload, "agent_id"))
+        agent = self._agent(
+            request.tenant_id, self._required_text(request.payload, "agent_id")
+        )
         return APIResponse("ok", {
-            "capabilities": [{"capability_id": capability} for capability in sorted(agent.capabilities)]
+            "capabilities": [
+                {"capability_id": capability} for capability in sorted(agent.capabilities)
+            ]
         })
 
     def _create_run(self, request: APIRequest) -> APIResponse:
@@ -290,7 +294,9 @@ class ReferencePlatformGateway(APIHandler):
                 run = self._runs.get(UUID(self._required_text(payload, "run_id")))
                 if run is not None and run.tenant_id == request.tenant_id:
                     running = self._state.transition(run, RunStatus.RUNNING)
-                    self._runs[running.run_id] = self._state.transition(running, RunStatus.SUCCEEDED)
+                    self._runs[running.run_id] = self._state.transition(
+                        running, RunStatus.SUCCEEDED
+                    )
         return APIResponse("accepted", {
             "execution_id": str(execution.execution_id),
             "state": execution.state.value,
@@ -351,4 +357,6 @@ class ReferencePlatformGateway(APIHandler):
             raise ValueError("run_id is required")
         parsed = UUID(run_id)
         items = self.evidence.list_for_run(request.tenant_id, parsed)
-        return APIResponse("ok", {"evidence": [{"evidence_id": str(item.evidence_id)} for item in items]})
+        return APIResponse(
+            "ok", {"evidence": [{"evidence_id": str(item.evidence_id)} for item in items]}
+        )
