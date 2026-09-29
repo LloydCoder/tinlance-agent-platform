@@ -73,8 +73,20 @@ class EngineeringAgent(ReferenceAgent):
 
     def plan_tools(self) -> tuple[ToolPlan, ...]:
         return (
-            ToolPlan(self.tools.get("repository.read"), "repository.read", "repository", "low", False),
-            ToolPlan(self.tools.get("ci.inspect"), "ci.inspect", "ci", "low", False),
+            ToolPlan(
+                self.tools.get("repository.read"),
+                "repository.read",
+                "repository",
+                "low",
+                False,
+            ),
+            ToolPlan(
+                self.tools.get("ci.inspect"),
+                "ci.inspect",
+                "ci",
+                "low",
+                False,
+            ),
             ToolPlan(
                 self.tools.get("repository.write"),
                 "repository.write",
