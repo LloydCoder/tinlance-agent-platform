@@ -258,14 +258,6 @@ def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: ob
     _, principal, agent, _ = harness
     path = str(tmp_path / "idempotency.sqlite3")
     first_store = SQLiteIdempotencyRepository(path)
-    service = GovernedExecutionService(
-        agents=AgentRegistry(),
-        approvals=ApprovalService(),
-        tools=ToolGateway(),
-        events=InMemoryEventStore(),
-        evidence=InMemoryEvidenceStore(),
-        idempotency=first_store,
-    )
     agent_registry = AgentRegistry()
     agent_registry.register(agent)
     tools = ToolGateway()
