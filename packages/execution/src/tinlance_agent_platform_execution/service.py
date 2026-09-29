@@ -395,8 +395,22 @@ class GovernedExecutionService:
         self._states: dict[UUID, ExecutionState] = {}
         self._results: dict[UUID, ExecutionResult] = {}
         self._trace_ids: dict[UUID, str | None] = {}
+        self._execution_locks: dict[tuple[str, str], RLock] = {}
 
     def execute(
+        self,
+        principal: Principal,
+        request: ExecutionRequest,
+        *,
+        trace_id: str | None = None,
+    ) -> ExecutionResult:
+        key = (request.tenant_id, request.idempotency_key)
+        with self._lock:
+            execution_lock = self._execution_locks.setdefault(key, RLock())
+        with execution_lock:
+            return self._execute_once(principal, request, trace_id=trace_id)
+
+    def _execute_once(
         self,
         principal: Principal,
         request: ExecutionRequest,
@@ -414,6 +428,14 @@ class GovernedExecutionService:
             if existing.result is not None:
                 return existing.result
             execution_id = existing.execution_id
+            if self._states.get(execution_id) is not ExecutionState.WAITING_APPROVAL:
+                return ExecutionResult(
+                    execution_id,
+                    self._states.get(execution_id, ExecutionState.REQUESTED),
+                    None,
+                    (),
+                    (),
+                )
             record = existing
         else:
             execution_id = uuid4()
@@ -421,7 +443,21 @@ class GovernedExecutionService:
                 request.tenant_id, request.idempotency_key, request.fingerprint, execution_id
             )
             if not self.idempotency.claim(record):
-                return self.execute(principal, request, trace_id=trace_id)
+                winner = self.idempotency.get(request.tenant_id, request.idempotency_key)
+                if winner is None or winner.fingerprint != request.fingerprint:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.IDEMPOTENCY_CONFLICT,
+                        "idempotency claim could not be established",
+                    )
+                if winner.result is not None:
+                    return winner.result
+                return ExecutionResult(
+                    winner.execution_id,
+                    self._states.get(winner.execution_id, ExecutionState.REQUESTED),
+                    None,
+                    (),
+                    (),
+                )
 
         identity = ExecutionIdentity(
             execution_id,
@@ -807,6 +843,7 @@ class GovernedExecutionService:
         if (
             registration.capability != request.capability_id
             or registration.version != request.tool_version
+            or registration.capability_version != request.capability_version
         ):
             raise ExecutionFailure(
                 ExecutionErrorCode.CAPABILITY_NOT_FOUND,

@@ -80,6 +80,8 @@ class ApprovalService:
         *,
         intent_fingerprint: str | None = None,
     ) -> ApprovalRequest:
+        if approver_subject_id is None or not approver_subject_id.strip():
+            raise PermissionError("authenticated approver identity is required")
         with self._lock:
             current = self._current(approval_id)
             if current.tenant_id != tenant_id:
@@ -88,11 +90,7 @@ class ApprovalService:
                 raise ValueError("approval is no longer pending")
             if intent_fingerprint is not None and current.intent_fingerprint != intent_fingerprint:
                 raise PermissionError("approval intent does not match")
-            if (
-                approved
-                and approver_subject_id is not None
-                and approver_subject_id == current.requested_by
-            ):
+            if approved and approver_subject_id == current.requested_by:
                 raise PermissionError("requester cannot approve the same consequential request")
             status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
             updated = ApprovalRequest(

@@ -65,7 +65,7 @@ def test_approval_must_be_explicit_and_tenant_bound() -> None:
     approval = service.request("t-a", uuid4(), "delete", "db:item", "destructive", "agent")
     with pytest.raises(PermissionError):
         service.require_approved(approval.approval_id)
-    approved = service.decide(approval.approval_id, True, "t-a")
+    approved = service.decide(approval.approval_id, True, "t-a", "approver-1")
     assert approved.status is ApprovalStatus.APPROVED
     service.require_approved(approval.approval_id)
 

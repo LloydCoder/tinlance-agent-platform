@@ -164,7 +164,7 @@ def test_high_risk_path_requires_exact_human_approval() -> None:
     with pytest.raises(PermissionError):
         service.execute(context, task, run, "provider", model_request, capability, call)
 
-    approvals.decide(approval.approval_id, True, tenant)
+    approvals.decide(approval.approval_id, True, tenant, "approver-1")
     result = service.execute(
         context,
         task,
