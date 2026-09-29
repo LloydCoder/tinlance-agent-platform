@@ -24,7 +24,10 @@ TOKEN = "token-a"
 
 
 def _request(
-    url: str, body: dict[str, object], token: str = TOKEN
+    url: str,
+    body: dict[str, object],
+    token: str = TOKEN,
+    request_id: str | None = None,
 ) -> tuple[int, dict[str, object]]:
     raw = json.dumps(body).encode()
     request = urllib.request.Request(
@@ -34,7 +37,7 @@ def _request(
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
             "X-Tinlance-API-Version": "1.1",
-            "X-Request-ID": str(uuid4()),
+            "X-Request-ID": request_id or str(uuid4()),
         },
         method="POST",
     )
@@ -288,6 +291,101 @@ def test_http_rejects_invalid_traceparent() -> None:
         with pytest.raises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(request, timeout=2)
         assert error.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_http_idempotency_replays_same_consequential_request() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
+        agent_status, agent_response = _request(
+            base,
+            {
+                "tenant_id": TENANT,
+                "subject_id": SUBJECT,
+                "operation": "agents.list",
+                "payload": {},
+            },
+        )
+        assert agent_status == 200
+        agent_id = agent_response["payload"]["agents"][0]["agent_id"]
+        request_id = str(uuid4())
+        body = {
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "runs.create",
+            "payload": {
+                "task_id": str(uuid4()),
+                "agent_id": agent_id,
+                "intent": "inspect repository",
+            },
+        }
+        first_status, first = _request(base, body, request_id=request_id)
+        second_status, second = _request(base, body, request_id=request_id)
+        assert first_status == second_status == 200
+        assert first["payload"]["run_id"] == second["payload"]["run_id"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_http_rejects_idempotency_key_reuse_with_different_request() -> None:
+    api, _gateway_instance = _gateway()
+    resolver = StaticPrincipalResolver(
+        {TOKEN: Principal(SUBJECT, "user", TENANT, scopes=frozenset({"platform"}))}
+    )
+    server = serve(api, resolver)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
+        request_id = str(uuid4())
+        first_body = {
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "health",
+            "payload": {},
+        }
+        # Establish the request ID on a guarded operation.
+        agents_status, agents_response = _request(
+            base,
+            {
+                "tenant_id": TENANT,
+                "subject_id": SUBJECT,
+                "operation": "agents.list",
+                "payload": {},
+            },
+        )
+        assert agents_status == 200
+        agent_id = agents_response["payload"]["agents"][0]["agent_id"]
+        first_body = {
+            "tenant_id": TENANT,
+            "subject_id": SUBJECT,
+            "operation": "runs.create",
+            "payload": {
+                "task_id": str(uuid4()),
+                "agent_id": agent_id,
+                "intent": "first",
+            },
+        }
+        second_body = {
+            **first_body,
+            "payload": {**first_body["payload"], "intent": "different"},
+        }
+        assert _request(base, first_body, request_id=request_id)[0] == 200
+        status, response = _request(base, second_body, request_id=request_id)
+        assert status == 409
+        assert response == {"error": "idempotency_conflict"}
     finally:
         server.shutdown()
         server.server_close()
