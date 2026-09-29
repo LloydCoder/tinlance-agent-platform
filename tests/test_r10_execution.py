@@ -8,9 +8,7 @@ from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
-    DataClass,
     Principal,
-    Reversibility,
     RiskTier,
 )
 from tinlance_agent_platform_events import InMemoryEventStore
@@ -115,10 +113,17 @@ def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) ->
         service.execute(principal, high)
     assert exc.value.code is ExecutionErrorCode.APPROVAL_REQUIRED
     approval = service.approvals.request(
-        principal.tenant_id, high.run_id, high.action, high.resource, "high-risk", principal.subject_id
+        principal.tenant_id,
+        high.run_id,
+        high.action,
+        high.resource,
+        "high-risk",
+        principal.subject_id,
     )
     with pytest.raises(PermissionError):
-        service.approvals.decide(approval.approval_id, True, principal.tenant_id, principal.subject_id)
+        service.approvals.decide(
+            approval.approval_id, True, principal.tenant_id, principal.subject_id
+        )
     service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
     completed = service.execute(principal, high, trace_id="trace-r10")
     assert completed.state is ExecutionState.COMPLETED
@@ -135,7 +140,9 @@ def test_unknown_prior_idempotent_execution_never_replays(harness: object) -> No
     key = str(uuid4())
     record = request(principal, agent, idempotency_key=key)
     from tinlance_agent_platform_execution import IdempotencyRecord
-    service.idempotency.claim(IdempotencyRecord(principal.tenant_id, key, record.fingerprint, uuid4()))
+    service.idempotency.claim(
+        IdempotencyRecord(principal.tenant_id, key, record.fingerprint, uuid4())
+    )
     with pytest.raises(ExecutionFailure) as exc:
         service.execute(principal, record)
     assert exc.value.code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
