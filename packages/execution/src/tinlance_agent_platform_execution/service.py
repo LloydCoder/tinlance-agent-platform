@@ -283,9 +283,7 @@ class SQLiteIdempotencyRepository:
                 payload.get("output"),
                 tuple(UUID(item) for item in payload.get("evidence_ids", [])),
                 tuple(UUID(item) for item in payload.get("audit_event_ids", [])),
-                ExecutionErrorCode(payload["error_code"])
-                if payload.get("error_code")
-                else None,
+                ExecutionErrorCode(payload["error_code"]) if payload.get("error_code") else None,
                 bool(payload.get("retryable", False)),
             )
         return IdempotencyRecord(
