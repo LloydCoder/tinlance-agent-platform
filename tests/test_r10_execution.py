@@ -7,8 +7,10 @@ import pytest
 
 from tinlance_agent_platform_agents import AgentRegistry
 from tinlance_agent_platform_approvals import ApprovalService
+from tinlance_agent_platform_budgets import BudgetService
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
+    Budget,
     Principal,
     RiskTier,
 )
@@ -322,3 +324,24 @@ def test_authoritative_tool_timeout_returns_terminal_timeout(harness: object) ->
     result = service.execute(principal, request(principal, agent))
     assert result.state is ExecutionState.TIMED_OUT
     assert result.error_code is ExecutionErrorCode.TIMEOUT
+
+
+def test_platform_budget_reservation_is_enforced_and_consumed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    budget = BudgetService(Budget(uuid4(), principal.tenant_id, uuid4(), 10, 30.0, 1))
+    service.budget = budget
+    item = request(principal, agent, run_id=budget.budget.run_id)
+    result = service.execute(principal, item)
+    assert result.state is ExecutionState.COMPLETED
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds >= 0
+
+
+def test_platform_budget_exhaustion_fails_closed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    budget = BudgetService(Budget(uuid4(), principal.tenant_id, uuid4(), 10, 30.0, 0))
+    service.budget = budget
+    item = request(principal, agent, run_id=budget.budget.run_id)
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, item)
+    assert exc.value.code is ExecutionErrorCode.BUDGET_EXCEEDED
