@@ -44,7 +44,7 @@ def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, obj
     tools.register(
         ToolRegistration(
             "reference.echo", "repository.read", "reference tool", version="1",
-            risk=RiskTier.LOW, timeout_seconds=10, max_tool_calls=1,
+            risk=RiskTier.HIGH, timeout_seconds=10, max_tool_calls=1,
         ),
         Echo(),
     )
