@@ -6,7 +6,6 @@ from tinlance_agent_platform_sdk import AgentPlatform
 from tinlance_reference_agents.base import (
     DomainFinding,
     EvidenceBackedConclusion,
-    ReferenceAgent,
     reject_untrusted_instructions,
 )
 
