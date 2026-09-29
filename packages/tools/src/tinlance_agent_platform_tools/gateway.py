@@ -38,6 +38,10 @@ class ToolExecutor(Protocol):
     def execute(self, call: ToolCall) -> str: ...
 
 
+class TimedToolExecutor(Protocol):
+    def execute_with_timeout(self, call: ToolCall, timeout_seconds: float) -> str: ...
+
+
 class ApprovalVerifier(Protocol):
     def require_approved_for(
         self,
@@ -59,6 +63,10 @@ class ToolGateway:
         if registration.name in self._tools:
             raise ValueError("tool registration is immutable")
         self._tools[registration.name] = (registration, executor)
+
+    def supports_hard_timeout(self, name: str) -> bool:
+        item = self._tools.get(name)
+        return item is not None and hasattr(item[1], "execute_with_timeout")
 
     def registration(self, name: str) -> ToolRegistration:
         item = self._tools.get(name)
@@ -108,6 +116,7 @@ class ToolGateway:
         approval_verifier: ApprovalVerifier | None = None,
         *,
         intent_fingerprint: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> str:
         if decision.decision is Decision.DENY:
             raise PermissionError("tool execution denied")
@@ -125,4 +134,7 @@ class ToolGateway:
         registration = self._tools.get(call.tool_name)
         if registration is None or registration[0].capability != call.capability:
             raise PermissionError("tool is not registered for requested capability")
-        return registration[1].execute(call)
+        executor = registration[1]
+        if timeout_seconds is not None and hasattr(executor, "execute_with_timeout"):
+            return executor.execute_with_timeout(call, timeout_seconds)  # type: ignore[attr-defined]
+        return executor.execute(call)
