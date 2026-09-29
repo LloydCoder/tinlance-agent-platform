@@ -32,8 +32,8 @@ from tinlance_agent_platform_execution import (
     ExecutionFailure,
     ExecutionRequest,
     ExecutionResult,
-    IdempotencyRecord,
     ExecutionState,
+    IdempotencyRecord,
     GovernedExecutionService,
     SQLiteIdempotencyRepository,
 )
