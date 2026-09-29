@@ -1,5 +1,7 @@
 """End-to-end reference-agent coverage against the authoritative R10 HTTP contract."""
 
+# ruff: isort: skip_file
+
 from __future__ import annotations
 
 from threading import Thread
