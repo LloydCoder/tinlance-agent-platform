@@ -186,7 +186,9 @@ class ReferencePlatformGateway(APIHandler):
             self._runs[run.run_id] = self._state.transition(run, RunStatus.RUNNING)
         self.events.append(
             new_event(
-                request.tenant_id, run.run_id, "run.created",
+                request.tenant_id,
+                run.run_id,
+                "run.created",
                 {"task_id": task_id, "agent_id": agent_id, "request_id": request.request_id},
             )
         )
@@ -285,7 +287,9 @@ class ReferencePlatformGateway(APIHandler):
             self._runs[parsed] = self._state.transition(run, RunStatus.WAITING_APPROVAL)
         self.events.append(
             new_event(
-                request.tenant_id, parsed, "approval.requested",
+                request.tenant_id,
+                parsed,
+                "approval.requested",
                 {"approval_id": str(approval.approval_id), "request_id": request.request_id},
             )
         )
@@ -309,7 +313,9 @@ class ReferencePlatformGateway(APIHandler):
         )
         self.events.append(
             new_event(
-                request.tenant_id, item.run_id, "approval.decided",
+                request.tenant_id,
+                item.run_id,
+                "approval.decided",
                 {
                     "approval_id": str(item.approval_id),
                     "request_id": request.request_id,
