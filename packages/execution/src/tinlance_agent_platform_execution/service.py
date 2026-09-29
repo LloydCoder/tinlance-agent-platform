@@ -300,11 +300,19 @@ class GovernedExecutionService:
                     ExecutionErrorCode.BUDGET_EXCEEDED,
                     "requested tool-call budget exceeds the registered tool limit",
                 )
-            if registration.risk is not None and registration.risk is not request.risk:
-                raise ExecutionFailure(
-                    ExecutionErrorCode.AUTHORIZATION_DENIED,
-                    "requested risk does not match registered tool risk",
-                )
+            if registration.risk is not None:
+                risk_order = {
+                    RiskTier.LOW: 0,
+                    RiskTier.MEDIUM: 1,
+                    RiskTier.HIGH: 2,
+                    RiskTier.CRITICAL: 3,
+                    RiskTier.PROHIBITED: 4,
+                }
+                if risk_order[request.risk] > risk_order[registration.risk]:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.AUTHORIZATION_DENIED,
+                        "requested risk exceeds the registered tool risk ceiling",
+                    )
             policy = evaluate(CapabilityRequest(
                 request.action, request.resource, frozenset({request.capability_id}),
                 request.risk, request.reversibility, request.data_class,
