@@ -97,12 +97,16 @@ def serve(
                     raise ValueError("operation is required")
                 if not isinstance(payload, dict):
                     raise ValueError("payload must be an object")
+                request_id = self.headers.get("X-Request-ID", "")
+                idempotency_key = self.headers.get("Idempotency-Key")
+                if idempotency_key is not None and idempotency_key != request_id:
+                    raise ValueError("Idempotency-Key must match X-Request-ID")
                 request = APIRequest(
                     principal.tenant_id,
                     principal.subject_id,
                     operation,
                     payload,
-                    self.headers.get("X-Request-ID", ""),
+                    request_id,
                     _traceparent(self.headers.get("traceparent")),
                 )
                 if not request.request_id or request.request_id != request.request_id.strip():
