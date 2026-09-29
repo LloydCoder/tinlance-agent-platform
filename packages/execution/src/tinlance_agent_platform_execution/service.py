@@ -306,6 +306,7 @@ class GovernedExecutionService:
         audit_ids: list[UUID] = []
         try:
             self._event(request, execution_id, "execution.requested", audit_ids)
+            self._event(request, execution_id, "execution.authenticated", audit_ids)
             agent = self._agent(request)
             self._bind_agent(principal, request, agent)
             registration = self._tool(request)
