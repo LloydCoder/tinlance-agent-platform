@@ -33,16 +33,27 @@ def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, obj
     tenant = "tenant-r10"
     principal = Principal("user-r10", "user", tenant, scopes=frozenset({"repository.read"}))
     agent = AgentDefinition(
-        uuid4(), tenant, "r10-agent", "1.0.0", principal.subject_id,
-        "default", frozenset({"repository.read"}), "sha256:instructions",
+        uuid4(),
+        tenant,
+        "r10-agent",
+        "1.0.0",
+        principal.subject_id,
+        "default",
+        frozenset({"repository.read"}),
+        "sha256:instructions",
     )
     agents = AgentRegistry()
     agents.register(agent)
     tools = ToolGateway()
     tools.register(
         ToolRegistration(
-            "reference.echo", "repository.read", "reference tool", version="1",
-            risk=RiskTier.HIGH, timeout_seconds=10, max_tool_calls=1,
+            "reference.echo",
+            "repository.read",
+            "reference tool",
+            version="1",
+            risk=RiskTier.HIGH,
+            timeout_seconds=10,
+            max_tool_calls=1,
         ),
         Echo(),
     )
@@ -128,9 +139,7 @@ def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) ->
     service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
     completed = service.execute(principal, high, trace_id="trace-r10")
     assert completed.state is ExecutionState.COMPLETED
-    replay = request(
-        principal, agent, risk=RiskTier.HIGH, approval_id=approval.approval_id
-    )
+    replay = request(principal, agent, risk=RiskTier.HIGH, approval_id=approval.approval_id)
     with pytest.raises(ExecutionFailure) as replay_error:
         service.execute(principal, replay)
     assert replay_error.value.code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
