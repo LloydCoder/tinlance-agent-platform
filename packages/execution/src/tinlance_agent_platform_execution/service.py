@@ -110,6 +110,7 @@ class ExecutionRequest:
     approval_id: UUID | None = None
     sandbox_required: bool = False
     evidence_required: bool = True
+    contract_version: str = CONTRACT_VERSION
 
     def __post_init__(self) -> None:
         text_fields = (
@@ -117,6 +118,8 @@ class ExecutionRequest:
             self.capability_id, self.capability_version, self.tool_name, self.tool_version,
             self.action, self.resource, self.blast_radius,
         )
+        if self.contract_version != CONTRACT_VERSION:
+            raise ValueError("unsupported governed execution contract version")
         if any(not value or value != value.strip() for value in text_fields):
             raise ValueError("execution identity and scope fields must be normalized")
         if self.requested_timeout_seconds <= 0 or self.requested_tool_calls < 1:
