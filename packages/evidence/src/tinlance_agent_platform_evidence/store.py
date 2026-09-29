@@ -19,7 +19,9 @@ class Evidence:
 
 
 class EvidenceStore(Protocol):
-    def append(self, tenant_id: str, run_id: UUID, content: str, execution_id: UUID | None = None) -> Evidence: ...
+    def append(
+        self, tenant_id: str, run_id: UUID, content: str, execution_id: UUID | None = None
+    ) -> Evidence: ...
 
     def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Evidence, ...]: ...
 
@@ -31,7 +33,9 @@ class InMemoryEvidenceStore:
         self._items: list[Evidence] = []
         self._lock = RLock()
 
-    def append(self, tenant_id: str, run_id: UUID, content: str, execution_id: UUID | None = None) -> Evidence:
+    def append(
+        self, tenant_id: str, run_id: UUID, content: str, execution_id: UUID | None = None
+    ) -> Evidence:
         if (
             not tenant_id
             or tenant_id != tenant_id.strip()
