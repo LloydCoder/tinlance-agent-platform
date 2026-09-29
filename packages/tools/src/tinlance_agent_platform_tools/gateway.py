@@ -114,7 +114,12 @@ class ToolGateway:
             if approval_id is None or approval_verifier is None:
                 raise PermissionError("approved human review is required")
             approval_verifier.require_approved_for(
-                approval_id, call.tenant_id, call.run_id, call.action, call.resource
+                approval_id,
+                call.tenant_id,
+                call.run_id,
+                call.action,
+                call.resource,
+                intent_fingerprint=intent_fingerprint,
             )
         registration = self._tools.get(call.tool_name)
         if registration is None or registration[0].capability != call.capability:
