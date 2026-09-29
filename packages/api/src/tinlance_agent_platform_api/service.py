@@ -39,7 +39,6 @@ class PrincipalResolver(Protocol):
     def resolve(self, bearer_token: str) -> AuthenticatedPrincipal: ...
 
 
-
 class AgentPlatformAPI:
     def __init__(self, handler: APIHandler) -> None:
         self._handler = handler
