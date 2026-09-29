@@ -72,7 +72,7 @@ class ApprovalService:
                 raise ValueError("approval is no longer pending")
             if (
                 intent_fingerprint is not None
-                and current.intent_fingerprint not in {None, intent_fingerprint}
+                and current.intent_fingerprint != intent_fingerprint
             ):
                 raise PermissionError("approval intent does not match")
             if (
