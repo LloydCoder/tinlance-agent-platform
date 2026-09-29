@@ -19,7 +19,16 @@ from tinlance_agent_platform_api.service import (
     AuthenticationError,
 )
 from tinlance_agent_platform_approvals import ApprovalService
-from tinlance_agent_platform_contracts import AgentDefinition, Principal, Run, RunStatus
+from tinlance_agent_platform_contracts import (
+    AgentDefinition,
+    DataClass,
+    Principal,
+    Reversibility,
+    RiskTier,
+    Run,
+    RunStatus,
+    ToolCall,
+)
 from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_execution import (
@@ -30,7 +39,7 @@ from tinlance_agent_platform_execution import (
     GovernedExecutionService,
 )
 from tinlance_agent_platform_runtime import RunStateMachine
-from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
+from tinlance_agent_platform_tools import ToolGateway, ToolRegistration
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,9 +265,9 @@ class ReferencePlatformGateway(APIHandler):
                     input=payload.get("input") if isinstance(payload.get("input"), dict) else {},
                     requested_timeout_seconds=float(payload.get("requested_timeout_seconds", 30.0)),
                     requested_tool_calls=int(payload.get("requested_tool_calls", 1)),
-                    risk=__import__("tinlance_agent_platform_contracts").RiskTier(risk),
-                    reversibility=__import__("tinlance_agent_platform_contracts").Reversibility(reversibility),
-                    data_class=__import__("tinlance_agent_platform_contracts").DataClass(data_class),
+                    risk=RiskTier(risk),
+                    reversibility=Reversibility(reversibility),
+                    data_class=DataClass(data_class),
                     blast_radius=str(payload.get("blast_radius", "single")),
                     approval_id=UUID(approval_id) if isinstance(approval_id, str) else None,
                     sandbox_required=bool(payload.get("sandbox_required", False)),
