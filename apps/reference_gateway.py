@@ -26,7 +26,7 @@ from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_runtime import RunStateMachine
 
-from packages.api.src.tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse
+from tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse, AuthenticationError, PrincipalResolver
 
 
 @dataclass(frozen=True, slots=True)
