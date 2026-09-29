@@ -161,3 +161,47 @@ def test_budget_limit_is_enforced(harness: object) -> None:
     with pytest.raises(ExecutionFailure) as exc:
         service.execute(principal, request(principal, agent, requested_tool_calls=2))
     assert exc.value.code is ExecutionErrorCode.BUDGET_EXCEEDED
+
+
+def test_approval_fingerprint_mismatch_fails_closed(harness: object) -> None:
+    service, principal, agent, _ = harness
+    high = request(principal, agent, risk=RiskTier.HIGH)
+    approval = service.approvals.request(
+        principal.tenant_id,
+        high.run_id,
+        high.action,
+        high.resource,
+        "high-risk",
+        principal.subject_id,
+        intent_fingerprint="wrong-fingerprint",
+    )
+    service.approvals.decide(approval.approval_id, True, principal.tenant_id, "approver")
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, high, trace_id="trace-r10")
+    assert exc.value.code is ExecutionErrorCode.APPROVAL_BINDING_MISMATCH
+
+
+def test_tenant_scoped_approval_cannot_be_read_or_consumed_cross_tenant(harness: object) -> None:
+    service, principal, agent, _ = harness
+    approval = service.approvals.request(
+        principal.tenant_id,
+        uuid4(),
+        "read",
+        "repo:example",
+        "test",
+        principal.subject_id,
+    )
+    with pytest.raises(PermissionError):
+        service.approvals.get(approval.approval_id, "tenant-other")
+    foreign = Principal("foreign", "user", "tenant-other")
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(
+            foreign,
+            request(
+                principal,
+                agent,
+                tenant_id="tenant-other",
+                principal_id="foreign",
+            ),
+        )
+    assert exc.value.code is ExecutionErrorCode.IDENTITY_BINDING_FAILED
