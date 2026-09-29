@@ -9,6 +9,7 @@ from .service import (
     GovernedExecutionService,
     IdempotencyRecord,
     InMemoryIdempotencyRepository,
+    SQLiteIdempotencyRepository,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "GovernedExecutionService",
     "IdempotencyRecord",
     "InMemoryIdempotencyRepository",
+    "SQLiteIdempotencyRepository",
 ]
