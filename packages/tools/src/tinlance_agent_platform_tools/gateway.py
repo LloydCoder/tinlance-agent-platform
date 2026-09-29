@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Callable, Protocol, cast
 from uuid import UUID
 
 from tinlance_agent_platform_contracts import (
@@ -135,6 +135,10 @@ class ToolGateway:
         if registration is None or registration[0].capability != call.capability:
             raise PermissionError("tool is not registered for requested capability")
         executor = registration[1]
-        if timeout_seconds is not None and hasattr(executor, "execute_with_timeout"):
-            return executor.execute_with_timeout(call, timeout_seconds)  # type: ignore[attr-defined]
+        timed = getattr(executor, "execute_with_timeout", None)
+        if timeout_seconds is not None and callable(timed):
+            run_with_timeout = cast(
+                Callable[[ToolCall, float], str], timed
+            )
+            return run_with_timeout(call, timeout_seconds)
         return executor.execute(call)
