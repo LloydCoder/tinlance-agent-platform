@@ -372,7 +372,13 @@ class GovernedExecutionService:
                 uuid4(), request.tenant_id, request.run_id, request.tool_name,
                 request.capability_id, request.action, request.resource,
             )
-            output = self.tools.execute(call, policy, request.approval_id, self.approvals)
+            output = self.tools.execute(
+                call,
+                policy,
+                request.approval_id,
+                self.approvals,
+                intent_fingerprint=request.fingerprint,
+            )
             if request.approval_id is not None:
                 self._event(request, execution_id, "approval.consumed", audit_ids)
             if monotonic() - started > effective_timeout:
