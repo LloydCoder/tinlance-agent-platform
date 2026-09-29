@@ -2,4 +2,4 @@
 
 from .gateway import ToolCall, ToolGateway, ToolRegistration
 
-__all__ = ["ToolGateway", "ToolRegistration"]
+__all__ = ["ToolCall", "ToolGateway", "ToolRegistration"]
