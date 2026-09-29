@@ -156,13 +156,7 @@ def test_reference_agents_complete_r10_approval_and_execution(
         arguments=arguments,
         reason="reference-agent mutation requires explicit human approval",
     )
-    decision = approver_client.approvals.decide(
-        approval_id,
-        True,
-        intent_fingerprint=agent._execution_intent(run, plan, arguments)["fingerprint"]
-        if "fingerprint" in agent._execution_intent(run, plan, arguments)
-        else None,
-    )
+    decision = approver_client.approvals.decide(approval_id, True)
     assert decision.state == "approved"
 
     completed = agent.execute_tool(
