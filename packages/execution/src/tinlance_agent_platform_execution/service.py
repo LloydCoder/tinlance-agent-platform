@@ -83,10 +83,18 @@ class ExecutionErrorCode(StrEnum):
 
 
 class ExecutionFailure(RuntimeError):
-    def __init__(self, code: ExecutionErrorCode, message: str, *, retryable: bool = False) -> None:
+    def __init__(
+        self,
+        code: ExecutionErrorCode,
+        message: str,
+        *,
+        retryable: bool = False,
+        execution_id: UUID | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.retryable = retryable
+        self.execution_id = execution_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -513,7 +521,9 @@ class GovernedExecutionService:
                     self._states[execution_id] = ExecutionState.WAITING_APPROVAL
                     self._event(request, execution_id, "execution.approval_required", audit_ids)
                     raise ExecutionFailure(
-                        ExecutionErrorCode.APPROVAL_REQUIRED, "approval is required"
+                        ExecutionErrorCode.APPROVAL_REQUIRED,
+                        "approval is required",
+                        execution_id=execution_id,
                     )
             elif request.approval_id is not None:
                 self.approvals.require_approved(request.approval_id)
