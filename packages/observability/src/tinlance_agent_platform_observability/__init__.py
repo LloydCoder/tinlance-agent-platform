@@ -1,4 +1,4 @@
-from .reliability import CorrelationContext, SLO, SLOMeasurement
+from .reliability import SLO, CorrelationContext, SLOMeasurement
 from .service import (
     InMemoryObservabilitySink,
     MetricPoint,
