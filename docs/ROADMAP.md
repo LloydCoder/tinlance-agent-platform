@@ -80,3 +80,79 @@ Any change to milestone meaning requires updating the roadmap, affected architec
 ## Non-goals
 
 The platform does not become an application or domain product. It does not grant authority from model confidence, prompt content, retrieved intelligence, tool registration, evaluation output or external data alone.
+
+# Post-M14 Enterprise Evolution
+
+M14 closes the canonical Agent Platform roadmap. The following phases are the **post-M14 production-maturity sequence** and must not be confused with missing canonical M0–M14 milestones.
+
+## M15 — Production Infrastructure & Recovery
+
+**Objective:** convert reference durability/execution boundaries into production-ready contracts for durable state, recovery and high availability.
+
+Required outcomes:
+- transactional outbox and durable publication contract;
+- durable run/execution state with crash recovery;
+- durable approval and idempotency adapters;
+- lease/ownership semantics for distributed workers;
+- cancellation and retry semantics that preserve execution identity;
+- PostgreSQL production adapter contracts with tenant-safe transactions;
+- backup/restore and disaster-recovery acceptance tests;
+- readiness checks that distinguish dependency health from application liveness.
+
+## M16 — Enterprise Identity, Secrets & Trust
+
+**Objective:** integrate production identity and secret infrastructure without moving authority into providers.
+
+Required outcomes:
+- OIDC/OAuth/workload-identity adapters;
+- agent/service identity lifecycle and revocation;
+- key/token rotation contracts;
+- external secret-manager adapter contracts;
+- KMS/HSM integration boundaries where required;
+- sender-constrained credential support where applicable;
+- authorization and identity conformance tests against provider adapters.
+
+## M17 — Agent Interoperability
+
+**Objective:** make remote-agent and protocol interoperability safe without allowing interoperability to grant authority.
+
+Required outcomes:
+- MCP production conformance;
+- A2A/remote-agent integration boundary;
+- agent discovery and capability advertisement;
+- authenticated delegation and authority attenuation;
+- protocol/version negotiation;
+- cross-agent provenance and audit causality;
+- hostile-peer and confused-deputy tests.
+
+## M18 — Reliability, Observability & Continuous Evaluation
+
+**Objective:** make production behavior measurable, testable and continuously defensible.
+
+Required outcomes:
+- OpenTelemetry-native traces/metrics/log correlation;
+- security-event and consequential-action correlation;
+- SLOs, error budgets and capacity measurements;
+- load, stress, chaos and failover tests;
+- continuous adversarial evaluation;
+- cost/latency/tool-call budgets as operational signals;
+- production diagnostic and incident-evidence workflows.
+
+## M19 — Enterprise Certification & Production GA
+
+**Objective:** establish the final release gate for production operation.
+
+Required outcomes:
+- full conformance and compatibility matrix;
+- tenant-isolation certification;
+- authorization/approval/sandbox certification;
+- supply-chain provenance and signed release verification;
+- disaster-recovery and rollback certification;
+- penetration/red-team validation;
+- upgrade compatibility and migration certification;
+- incident-response exercises;
+- documented production acceptance and operational ownership.
+
+### Serial completion rule
+
+M15 through M19 are strictly serial. A phase is complete only when its implementation, tests, security invariants, documentation and CI/release gates are green. The next phase must not begin while the preceding phase has a failing gate or unresolved blocker.
