@@ -1,4 +1,5 @@
 """Reliability and correlation contracts for production observability."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
