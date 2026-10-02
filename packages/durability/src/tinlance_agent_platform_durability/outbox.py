@@ -4,6 +4,7 @@ The Platform never treats publication to an external broker as part of the
 security authority decision. Durable adapters must atomically persist the
 business state and outbox record, then publish using the outbox lease.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -59,7 +60,10 @@ class TransactionalOutbox:
                 if record.published_at is not None or record.lease_id is not None:
                     continue
                 leased = OutboxRecord(
-                    record.event_id, record.tenant_id, record.aggregate_id, record.event_type,
+                    record.event_id,
+                    record.tenant_id,
+                    record.aggregate_id,
+                    record.event_type,
                     record.payload,
                     record.created_at,
                     record.attempts + 1,
@@ -78,7 +82,10 @@ class TransactionalOutbox:
             if record is None or record.lease_id != lease_id or record.published_at is not None:
                 raise PermissionError("outbox acknowledgement does not match an active lease")
             self._items[event_id] = OutboxRecord(
-                record.event_id, record.tenant_id, record.aggregate_id, record.event_type,
+                record.event_id,
+                record.tenant_id,
+                record.aggregate_id,
+                record.event_type,
                 record.payload,
                 record.created_at,
                 record.attempts,
@@ -92,7 +99,10 @@ class TransactionalOutbox:
             for event_id, record in tuple(self._items.items()):
                 if record.lease_id == lease_id and record.published_at is None:
                     self._items[event_id] = OutboxRecord(
-                        record.event_id, record.tenant_id, record.aggregate_id, record.event_type,
+                        record.event_id,
+                        record.tenant_id,
+                        record.aggregate_id,
+                        record.event_type,
                         record.payload,
                         record.created_at,
                         record.attempts,
