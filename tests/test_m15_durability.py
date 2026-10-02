@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from tinlance_agent_platform_durability.leases import WorkLeaseStore
+from tinlance_agent_platform_durability.leases import WorkLease, WorkLeaseStore
 from tinlance_agent_platform_durability.outbox import TransactionalOutbox
 
 
@@ -43,7 +43,6 @@ def test_worker_lease_prevents_double_claim_and_requires_owner_for_renewal() -> 
     first = store.claim(work_id, "worker-a")
     assert first is not None
     assert store.claim(work_id, "worker-b") is None
-    from tinlance_agent_platform_durability.leases import WorkLease
     with pytest.raises(PermissionError):
         store.renew(
             WorkLease(first.lease_id, first.work_id, "worker-b", first.expires_at),
