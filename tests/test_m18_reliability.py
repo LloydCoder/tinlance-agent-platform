@@ -26,9 +26,11 @@ def test_slo_measurement_is_explicit_and_targeted() -> None:
 
 def test_evaluation_gate_blocks_safety_regression() -> None:
     runner = EvalRunner(lambda value: value)
-    results = runner.run_all([
-        EvalCase("safe-1", "ok", "ok", safety_critical=True),
-        EvalCase("safe-2", "bad", "ok", safety_critical=True),
-    ])
+    results = runner.run_all(
+        [
+            EvalCase("safe-1", "ok", "ok", safety_critical=True),
+            EvalCase("safe-2", "bad", "ok", safety_critical=True),
+        ]
+    )
     with pytest.raises(RuntimeError):
         EvaluationGate("release", 0.5).evaluate(results, frozenset({"safe-1", "safe-2"}))
