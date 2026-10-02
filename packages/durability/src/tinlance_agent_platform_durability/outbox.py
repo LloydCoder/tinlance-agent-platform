@@ -7,7 +7,7 @@ business state and outbox record, then publish using the outbox lease.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import RLock
 from uuid import UUID, uuid4
 
@@ -40,7 +40,12 @@ class TransactionalOutbox:
         event_id = uuid4()
         with self._lock:
             self._items[event_id] = OutboxRecord(
-                event_id, tenant_id, aggregate_id, event_type, bytes(payload), datetime.now(timezone.utc)
+                event_id,
+                tenant_id,
+                aggregate_id,
+                event_type,
+                bytes(payload),
+                datetime.now(UTC),
             )
         return event_id
 
@@ -55,7 +60,11 @@ class TransactionalOutbox:
                     continue
                 leased = OutboxRecord(
                     record.event_id, record.tenant_id, record.aggregate_id, record.event_type,
-                    record.payload, record.created_at, record.attempts + 1, record.published_at, lease_id,
+                    record.payload,
+                    record.created_at,
+                    record.attempts + 1,
+                    record.published_at,
+                    lease_id,
                 )
                 self._items[record.event_id] = leased
                 selected.append(leased)
@@ -70,7 +79,11 @@ class TransactionalOutbox:
                 raise PermissionError("outbox acknowledgement does not match an active lease")
             self._items[event_id] = OutboxRecord(
                 record.event_id, record.tenant_id, record.aggregate_id, record.event_type,
-                record.payload, record.created_at, record.attempts, datetime.now(timezone.utc), None,
+                record.payload,
+                record.created_at,
+                record.attempts,
+                datetime.now(UTC),
+                None,
             )
 
     def release(self, lease_id: UUID) -> int:
@@ -80,7 +93,11 @@ class TransactionalOutbox:
                 if record.lease_id == lease_id and record.published_at is None:
                     self._items[event_id] = OutboxRecord(
                         record.event_id, record.tenant_id, record.aggregate_id, record.event_type,
-                        record.payload, record.created_at, record.attempts, record.published_at, None,
+                        record.payload,
+                        record.created_at,
+                        record.attempts,
+                        record.published_at,
+                        None,
                     )
                     released += 1
         return released
