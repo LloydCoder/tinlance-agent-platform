@@ -1,3 +1,4 @@
+from .reliability import SLO, CorrelationContext, SLOMeasurement
 from .service import (
     InMemoryObservabilitySink,
     MetricPoint,
@@ -14,4 +15,7 @@ __all__ = [
     "SecurityEvent",
     "TraceSpan",
     "new_security_event",
+    "CorrelationContext",
+    "SLO",
+    "SLOMeasurement",
 ]
