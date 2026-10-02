@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import RLock
 from uuid import UUID, uuid4
 
@@ -25,7 +25,7 @@ class WorkLeaseStore:
     def claim(self, work_id: UUID, owner: str, *, ttl_seconds: float = 30.0) -> WorkLease | None:
         if not owner or owner != owner.strip() or ttl_seconds <= 0:
             raise ValueError("owner and positive lease TTL are required")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
             current = self._items.get(work_id)
             if current is not None and current.expires_at > now:
@@ -37,12 +37,17 @@ class WorkLeaseStore:
     def renew(self, lease: WorkLease, *, ttl_seconds: float = 30.0) -> WorkLease:
         if ttl_seconds <= 0:
             raise ValueError("lease TTL must be positive")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
             current = self._items.get(lease.work_id)
             if current != lease or current.expires_at <= now:
                 raise PermissionError("lease is not active")
-            renewed = WorkLease(lease.lease_id, lease.work_id, lease.owner, now + timedelta(seconds=ttl_seconds))
+            renewed = WorkLease(
+                lease.lease_id,
+                lease.work_id,
+                lease.owner,
+                now + timedelta(seconds=ttl_seconds),
+            )
             self._items[lease.work_id] = renewed
             return renewed
 
