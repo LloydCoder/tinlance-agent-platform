@@ -1,4 +1,5 @@
 """Distributed worker lease contract with a reference implementation."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
