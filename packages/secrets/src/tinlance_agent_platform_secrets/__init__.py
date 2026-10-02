@@ -1,3 +1,10 @@
 from .broker import SecretBroker, SecretHandle
+from .scoped import ScopedSecretBroker, ScopedSecretHandle, ScopedSecretProvider
 
-__all__ = ["SecretBroker", "SecretHandle"]
+__all__ = [
+    "ScopedSecretBroker",
+    "ScopedSecretHandle",
+    "ScopedSecretProvider",
+    "SecretBroker",
+    "SecretHandle",
+]
