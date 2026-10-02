@@ -22,7 +22,10 @@ class AgentSkill:
             raise ValueError("skill_id must be normalized")
         if not self.description.strip():
             raise ValueError("skill description is required")
-        if any(not capability or capability != capability.strip() for capability in self.capabilities):
+        if any(
+            not capability or capability != capability.strip()
+            for capability in self.capabilities
+        ):
             raise ValueError("skill capabilities must be normalized")
 
 
@@ -40,13 +43,19 @@ class AgentCard:
 
     def validate(self, *, require_https: bool = True) -> None:
         parsed = urlparse(self.endpoint)
-        if parsed.scheme not in ({"https"} if require_https else {"http", "https"}) or not parsed.netloc:
+        allowed_schemes = {"https"} if require_https else {"http", "https"}
+        if parsed.scheme not in allowed_schemes or not parsed.netloc:
             raise ValueError("agent endpoint must use a valid secure URL")
-        if not all((self.protocol_version.strip(), self.name.strip(), self.card_version.strip())):
+        if not all(
+            (self.protocol_version.strip(), self.name.strip(), self.card_version.strip())
+        ):
             raise ValueError("agent card identity fields are required")
         if any(not scheme or scheme != scheme.strip() for scheme in self.authentication_schemes):
             raise ValueError("authentication schemes must be normalized")
-        if any("secret" in scheme.lower() or "api_key=" in scheme.lower() for scheme in self.authentication_schemes):
+        if any(
+            "secret" in scheme.lower() or "api_key=" in scheme.lower()
+            for scheme in self.authentication_schemes
+        ):
             raise ValueError("agent cards must not contain credential material")
         if self.signature is not None and not self.signature.strip():
             raise ValueError("signature cannot be empty")
@@ -72,7 +81,7 @@ class RemoteDelegation:
         parent_capabilities: frozenset[str],
         requested_capabilities: frozenset[str],
         resource_scope: str,
-    ) -> "RemoteDelegation":
+    ) -> RemoteDelegation:
         if not requested_capabilities <= parent_capabilities:
             raise PermissionError("remote delegation cannot widen parent authority")
         if not tenant_id or tenant_id != tenant_id.strip() or not resource_scope.strip():
