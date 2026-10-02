@@ -1,9 +1,10 @@
 # Release Readiness
 
-The platform milestone sequence is complete only when the repository's CI is green, the package coverage gate passes, boundary threat models have executable coverage, and no open pull requests/issues remain. Tagged release artifacts are built and Sigstore-signed by the release workflow. Production adoption additionally requires a real durable repository, secret manager, transactional outbox publisher, approved model/tool providers, isolated execution runtime, telemetry backend, backup/restore procedure and incident response controls.
+The canonical M0-M14 platform roadmap and the post-M14 M15-M19 enterprise evolution sequence are complete only when the repository's CI and security gates are green. The current repository enforces package quality, PostgreSQL migration/RLS/integrity tests, R10 certification, Reference Agents certification, CodeQL and secret scanning. Tagged release artifacts are built and Sigstore-signed by the release workflow.
 
-The platform deliberately keeps those infrastructure adapters behind contracts so provider choices do not become authority logic.
+M19 adds an explicit production acceptance contract requiring evidence for identity, authorization, governed execution, durability/recovery, secrets, isolation, observability, evaluation, supply chain, interoperability and operational ownership.
 
+Production adoption additionally requires a real durable repository, secret manager, transactional outbox publisher, approved model/tool providers, isolated execution runtime, telemetry backend, backup/restore procedure and incident-response controls. Repository CI proves repository behavior; it does not prove those external controls have been deployed.
 
 ## Agent certification gate
 
