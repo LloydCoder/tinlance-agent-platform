@@ -4,6 +4,7 @@ A secret reference is intentionally useless outside the exact execution scope
 for which it was issued. The external provider remains responsible for actual
 secret storage, cryptographic protection and rotation.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
