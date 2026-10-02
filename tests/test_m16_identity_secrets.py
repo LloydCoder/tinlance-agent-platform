@@ -23,16 +23,26 @@ def _identity() -> VerifiedAgentIdentity:
 
 def test_verified_identity_requires_exact_issuer_and_audience() -> None:
     identity = _identity()
-    identity.validate(expected_issuer="https://issuer.example", expected_audience="tinlance-platform")
+    identity.validate(
+        expected_issuer="https://issuer.example",
+        expected_audience="tinlance-platform",
+    )
     with pytest.raises(PermissionError):
-        identity.validate(expected_issuer="https://attacker.example", expected_audience="tinlance-platform")
+        identity.validate(
+            expected_issuer="https://attacker.example",
+            expected_audience="tinlance-platform",
+        )
 
 
 def test_expired_identity_is_rejected() -> None:
     identity = _identity()
     now = identity.expires_at + timedelta(seconds=1)
     with pytest.raises(PermissionError):
-        identity.validate(expected_issuer=identity.issuer, expected_audience=identity.audience, now=now)
+        identity.validate(
+            expected_issuer=identity.issuer,
+            expected_audience=identity.audience,
+            now=now,
+        )
 
 
 def test_secret_handle_is_execution_scoped() -> None:
