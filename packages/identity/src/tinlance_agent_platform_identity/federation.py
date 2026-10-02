@@ -22,7 +22,13 @@ class VerifiedAgentIdentity:
     expires_at: datetime
     token_id: str
 
-    def validate(self, *, expected_issuer: str, expected_audience: str, now: datetime | None = None) -> None:
+    def validate(
+        self,
+        *,
+        expected_issuer: str,
+        expected_audience: str,
+        now: datetime | None = None,
+    ) -> None:
         current = now or datetime.now(UTC)
         if self.issuer != expected_issuer or self.audience != expected_audience:
             raise PermissionError("identity issuer or audience is not trusted")
