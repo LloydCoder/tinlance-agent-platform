@@ -50,6 +50,21 @@ class ScopedSecretBroker:
     def __init__(self, provider: ScopedSecretProvider) -> None:
         self._provider = provider
 
-    def resolve_for_execution(self, handle: ScopedSecretHandle, **scope: object) -> str:
-        handle.validate_scope(**scope)  # type: ignore[arg-type]
+    def resolve_for_execution(
+        self,
+        handle: ScopedSecretHandle,
+        *,
+        tenant_id: str,
+        principal_id: str,
+        agent_id: UUID,
+        execution_id: UUID,
+        capability_id: str,
+    ) -> str:
+        handle.validate_scope(
+            tenant_id=tenant_id,
+            principal_id=principal_id,
+            agent_id=agent_id,
+            execution_id=execution_id,
+            capability_id=capability_id,
+        )
         return self._provider.resolve(handle)
