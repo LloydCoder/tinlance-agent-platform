@@ -1,4 +1,5 @@
 """Enterprise production acceptance and GA certification contract."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -27,9 +28,7 @@ class EnterpriseAcceptance:
         if not self.release.strip() or not self.items:
             raise ValueError("enterprise acceptance requires a release and controls")
         missing = [
-            item.control_id
-            for item in self.items
-            if item.status is not AcceptanceStatus.VERIFIED
+            item.control_id for item in self.items if item.status is not AcceptanceStatus.VERIFIED
         ]
         if missing:
             raise RuntimeError("enterprise acceptance is incomplete: " + ", ".join(missing))
