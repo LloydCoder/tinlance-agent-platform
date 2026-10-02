@@ -4,6 +4,7 @@ Cryptographic token verification belongs to the configured identity provider
 adapter. This module validates the normalized claims that the authority kernel
 is allowed to consume after verification.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
