@@ -4,7 +4,11 @@ import pytest
 
 from tinlance_agent_platform_evaluation import EvalCase, EvalRunner
 from tinlance_agent_platform_evaluation.gates import EvaluationGate
-from tinlance_agent_platform_observability.reliability import CorrelationContext, SLO, SLOMeasurement
+from tinlance_agent_platform_observability.reliability import (
+    SLO,
+    CorrelationContext,
+    SLOMeasurement,
+)
 
 
 def test_correlation_context_cannot_have_blank_trace_metadata() -> None:
