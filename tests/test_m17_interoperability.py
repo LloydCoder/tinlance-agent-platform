@@ -2,7 +2,11 @@ from uuid import uuid4
 
 import pytest
 
-from tinlance_agent_platform_multi_agent.interoperability import AgentCard, AgentSkill, RemoteDelegation
+from tinlance_agent_platform_multi_agent.interoperability import (
+    AgentCard,
+    AgentSkill,
+    RemoteDelegation,
+)
 
 
 def test_agent_card_requires_https_and_rejects_credential_material() -> None:
