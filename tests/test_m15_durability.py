@@ -43,10 +43,9 @@ def test_worker_lease_prevents_double_claim_and_requires_owner_for_renewal() -> 
     first = store.claim(work_id, "worker-a")
     assert first is not None
     assert store.claim(work_id, "worker-b") is None
+    from tinlance_agent_platform_durability.leases import WorkLease
     with pytest.raises(PermissionError):
-        store.renew(first, ttl_seconds=30) if first.owner == "worker-b" else store.renew(
-            type(first)(first.lease_id, first.work_id, "worker-b", first.expires_at), ttl_seconds=30
-        )
+        store.renew(WorkLease(first.lease_id, first.work_id, "worker-b", first.expires_at), ttl_seconds=30)
     renewed = store.renew(first)
     assert renewed.lease_id == first.lease_id
     store.release(renewed)
