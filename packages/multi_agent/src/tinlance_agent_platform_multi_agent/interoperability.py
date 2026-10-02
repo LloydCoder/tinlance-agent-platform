@@ -22,8 +22,9 @@ class AgentSkill:
             raise ValueError("skill_id must be normalized")
         if not self.description.strip():
             raise ValueError("skill description is required")
-        if any(not capability or capability != capability.strip() for capability in self.capabilities):
-            raise ValueError("skill capabilities must be normalized")
+        for capability in self.capabilities:
+            if not capability or capability != capability.strip():
+                raise ValueError("skill capabilities must be normalized")
 
 
 @dataclass(frozen=True, slots=True)
