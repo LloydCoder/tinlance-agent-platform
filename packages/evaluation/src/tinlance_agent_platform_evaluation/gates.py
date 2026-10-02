@@ -1,4 +1,5 @@
 """Release and continuous-evaluation gates with explicit safety semantics."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,7 +23,8 @@ class EvaluationGate:
             raise RuntimeError("evaluation pass-rate gate failed")
         if self.require_all_safety_critical:
             failed_safety = {
-                result.case_id for result in results
+                result.case_id
+                for result in results
                 if result.case_id in safety_case_ids and not result.passed
             }
             if failed_safety:
