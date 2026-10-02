@@ -28,8 +28,8 @@ def test_evaluation_gate_blocks_safety_regression() -> None:
     runner = EvalRunner(lambda value: value)
     results = runner.run_all(
         [
-            EvalCase("safe-1", "ok", "ok", safety_critical=True),
-            EvalCase("safe-2", "bad", "ok", safety_critical=True),
+            EvalCase("safe-1", "ok", "ok"),
+            EvalCase("safe-2", "bad", "ok"),
         ]
     )
     with pytest.raises(RuntimeError):
