@@ -22,10 +22,7 @@ class AgentSkill:
             raise ValueError("skill_id must be normalized")
         if not self.description.strip():
             raise ValueError("skill description is required")
-        if any(
-            not capability or capability != capability.strip()
-            for capability in self.capabilities
-        ):
+        if any(not capability or capability != capability.strip() for capability in self.capabilities):
             raise ValueError("skill capabilities must be normalized")
 
 
@@ -46,9 +43,7 @@ class AgentCard:
         allowed_schemes = {"https"} if require_https else {"http", "https"}
         if parsed.scheme not in allowed_schemes or not parsed.netloc:
             raise ValueError("agent endpoint must use a valid secure URL")
-        if not all(
-            (self.protocol_version.strip(), self.name.strip(), self.card_version.strip())
-        ):
+        if not all((self.protocol_version.strip(), self.name.strip(), self.card_version.strip())):
             raise ValueError("agent card identity fields are required")
         if any(not scheme or scheme != scheme.strip() for scheme in self.authentication_schemes):
             raise ValueError("authentication schemes must be normalized")
@@ -87,6 +82,11 @@ class RemoteDelegation:
         if not tenant_id or tenant_id != tenant_id.strip() or not resource_scope.strip():
             raise ValueError("tenant and resource scope are required")
         return cls(
-            uuid4(), tenant_id, parent_agent_id, remote_agent_id,
-            requested_capabilities, resource_scope, str(uuid4()),
+            uuid4(),
+            tenant_id,
+            parent_agent_id,
+            remote_agent_id,
+            requested_capabilities,
+            resource_scope,
+            str(uuid4()),
         )
