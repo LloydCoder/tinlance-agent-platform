@@ -39,7 +39,9 @@ class EnterpriseAcceptance:
             if not item.evidence_ref or not item.evidence_ref.strip()
         ]
         if without_evidence:
-            raise RuntimeError("enterprise acceptance lacks evidence: " + ", ".join(without_evidence))
+            raise RuntimeError(
+                "enterprise acceptance lacks evidence: " + ", ".join(without_evidence)
+            )
 
 
 def production_acceptance_items() -> tuple[AcceptanceItem, ...]:
@@ -54,6 +56,9 @@ def production_acceptance_items() -> tuple[AcceptanceItem, ...]:
         AcceptanceItem("evaluation", "Continuous adversarial and safety evaluation"),
         AcceptanceItem("supply_chain", "SBOM, vulnerability checks and signed release artifacts"),
         AcceptanceItem("recovery", "Backup restore drill, rollback and incident-response exercise"),
-        AcceptanceItem("interoperability", "MCP/A2A/provider compatibility and security conformance"),
+        AcceptanceItem(
+            "interoperability",
+            "MCP/A2A/provider compatibility and security conformance",
+        ),
         AcceptanceItem("ownership", "Security and operational ownership assigned"),
     )
