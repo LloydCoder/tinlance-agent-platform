@@ -65,10 +65,9 @@ def test_key_lifecycle_requires_one_active_version() -> None:
 
 def test_revocation_and_attestation_expiry_are_fail_closed() -> None:
     now = datetime.now(UTC)
-    record = RevocationRecord("att-1", "compromised issuer", now)
+    record = RevocationRecord("att-1", "revoked", now)
     assert record.attestation_id == "att-1"
-    trust = AttestationTrust("att-1", now + timedelta(minutes=5))
-    assert trust.usable(now=now)
+    assert AttestationTrust("att-1", now + timedelta(minutes=5)).usable(now=now)
     assert not AttestationTrust("att-1", now + timedelta(minutes=5), True).usable(now=now)
     assert not AttestationTrust("att-1", now - timedelta(seconds=1)).usable(now=now)
     with pytest.raises(ValueError):
