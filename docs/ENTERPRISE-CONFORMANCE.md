@@ -6,7 +6,7 @@ The platform's enterprise claim is based on executable controls rather than mile
 
 M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14
 
-M14 closes the canonical roadmap. M15-M28 are complete repository-level enterprise evolution phases. M29 is the final independent-assurance phase.
+M14 closes the canonical roadmap. M15-M29 are complete repository-level enterprise evolution phases.
 
 ## Post-M14 conformance
 
