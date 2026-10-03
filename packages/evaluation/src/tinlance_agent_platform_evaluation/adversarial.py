@@ -42,10 +42,6 @@ class AdversarialGate:
     def evaluate(self) -> None:
         if not self.name.strip() or not self.cases:
             raise ValueError("adversarial gate requires a name and cases")
-        failures = [
-            case.case_id
-            for case in self.cases
-            if not case.observed_blocked
-        ]
+        failures = [case.case_id for case in self.cases if not case.observed_blocked]
         if failures:
             raise RuntimeError("adversarial security gate failed: " + ", ".join(failures))
