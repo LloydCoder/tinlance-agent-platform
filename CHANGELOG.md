@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Control Expansion M20
+
+- Added provider-neutral risk classification contracts for consequential action severity and approval thresholds.
+- Added runtime control-hook contracts that fail closed without creating a second authority path.
+- Added tenant-bound resource registry contracts for governed agents, tools, MCP servers, models, policies, runtimes and remote agents.
+- Added time-bounded agent/workload/artifact/runtime attestation contracts.
+- Added cryptographic key-reference and signature-envelope contracts without storing key material.
+- Added control-to-test-to-evidence compliance mappings.
+- Reconciled architecture, enterprise conformance and release-readiness documentation.
+
 ## 2026-10-02 — Enterprise Evolution M15-M19
 
 - M15: added production durability primitives for transactional outbox publication and distributed worker lease semantics.
