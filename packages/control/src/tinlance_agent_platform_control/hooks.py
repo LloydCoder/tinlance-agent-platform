@@ -22,7 +22,8 @@ class ControlEvent:
     attributes: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
-        if any(not value.strip() for value in (self.event_type, self.tenant_id, self.execution_id, self.action)):
+        values = (self.event_type, self.tenant_id, self.execution_id, self.action)
+        if any(not value.strip() for value in values):
             raise ValueError("control event identity fields are required")
 
 
