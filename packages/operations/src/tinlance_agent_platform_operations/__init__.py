@@ -6,6 +6,7 @@ from .certification import (
 )
 from .production import DependencyKind, ProductionDependency, ProductionReadiness
 from .service import Config, HealthStatus, OperationsService
+from .sre import AlertRule, ErrorBudget, IncidentEvidence, Severity
 
 __all__ = [
     "AcceptanceItem",
@@ -18,4 +19,8 @@ __all__ = [
     "Config",
     "HealthStatus",
     "OperationsService",
+    "AlertRule",
+    "ErrorBudget",
+    "IncidentEvidence",
+    "Severity",
 ]
