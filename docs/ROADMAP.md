@@ -156,3 +156,42 @@ Required outcomes:
 ### Serial completion rule
 
 M15 through M19 are strictly serial. A phase is complete only when its implementation, tests, security invariants, documentation and CI/release gates are green. The next phase must not begin while the preceding phase has a failing gate or unresolved blocker.
+
+
+## M20–M29 Final Enterprise Assurance Track
+
+The following sequence is the final finite enterprise-assurance program. It extends the M15–M19 production-maturity work without reopening completed canonical milestones.
+
+### M20 — Enterprise Control Expansion
+Add provider-neutral risk classification, runtime control hooks, governed resource registry, agent/workload/artifact/runtime attestation, cryptographic metadata and control-to-evidence compliance mappings.
+
+### M21 — Production Infrastructure
+Exercise the platform against durable PostgreSQL, outbox/queue infrastructure, external secret management, isolated runtime/sandbox supervision, telemetry backends, health/readiness and deployment boundaries.
+
+### M22 — Identity, Cryptography & Attestation
+Harden OIDC/OAuth/workload identity, credential/key rotation, token protection, sender-constrained credentials where applicable, runtime/artifact attestation and revocation.
+
+### M23 — Registry & Ecosystem Governance
+Establish lifecycle, compatibility, provenance, versioning and revocation controls for agents, tools, MCP servers, models, policies, runtimes and remote agents.
+
+### M24 — Adversarial Agent Security
+Continuously test prompt/goal hijacking, tool misuse, privilege abuse, memory/context poisoning, malicious MCP/remote agents, confused-deputy behavior, data exfiltration, sandbox escape and cascading failures against the governed boundary.
+
+### M25 — Distributed Reliability & Disaster Recovery
+Validate worker crash recovery, database/queue failure, partitions, retries, duplicate delivery, failover, backup/restore, RTO/RPO and chaos scenarios.
+
+### M26 — Performance & Economic Governance
+Measure throughput, concurrency, p95/p99 latency, queue/database saturation, admission control, quotas, backpressure, token/tool/cost budgets and noisy-neighbor isolation.
+
+### M27 — Enterprise SRE & Compliance
+Operationalize OpenTelemetry, SLOs, error budgets, alerts, incident evidence, ownership, control mappings and enterprise evidence packages.
+
+### M28 — Supply Chain & Release Assurance
+Harden SBOM, provenance, signatures, dependency security, compatibility, migrations, rollback, upgrade safety and release attestations.
+
+### M29 — Independent Enterprise Assurance
+Run independent penetration/red-team testing, destructive recovery exercises, production acceptance, evidence review and final enterprise certification.
+
+### Finalization rule
+
+M20–M29 are strictly serial. A phase is complete only when implementation, security invariants, executable tests, documentation and every applicable CI/workflow gate are green. After M29, the finite roadmap ends and the Platform enters continuous enterprise assurance.
