@@ -6,7 +6,7 @@ The platform's enterprise claim is based on executable controls rather than mile
 
 M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14
 
-M14 closes the canonical roadmap. M15-M23 are complete repository-level enterprise evolution phases. M24 is the active adversarial security phase.
+M14 closes the canonical roadmap. M15-M24 are complete repository-level enterprise evolution phases. M25 is the active reliability and disaster-recovery phase.
 
 ## Post-M14 conformance
 
@@ -20,6 +20,7 @@ M14 closes the canonical roadmap. M15-M23 are complete repository-level enterpri
 - **M22:** token validation, sender-constraint metadata, key lifecycle and attestation revocation contracts.
 - **M23:** registry lifecycle, compatibility, provenance, digest and revocation controls.
 - **M24:** executable adversarial security regression corpus and fail-closed release gate.
+- **M25:** recovery objectives, failure-mode drills and RTO/RPO release gate.
 
 ## Invariants
 
@@ -34,6 +35,7 @@ M14 closes the canonical roadmap. M15-M23 are complete repository-level enterpri
 - Sender-constraint metadata does not replace authorization.
 - Key lifecycle state is explicit and private key material remains external.
 - Adversarial evaluation never grants authority and a failed blocking case prevents release.
+- Recovery evidence measures resilience and cannot be replaced by a green unit test alone.
 - High-risk or irreversible actions remain approval-gated.
 - Tool and MCP calls are completely mediated against capability, action and resource.
 - Model providers can be tenant/agent allowlisted and cannot exceed requested output budgets.
@@ -50,6 +52,6 @@ M14 closes the canonical roadmap. M15-M23 are complete repository-level enterpri
 
 The repository provides a governed, provider-neutral core and reference adapters. Customer production deployment still requires real durable stores, secret management, approved model/tool providers, isolated execution infrastructure, telemetry backends, backup/restore, incident response, key management and operational SLOs.
 
-M19-M24 make the evidence, readiness, trust, ecosystem-governance and adversarial-security requirements explicit; they do not substitute test doubles for deployed infrastructure.
+M19-M25 make the evidence, readiness, trust, ecosystem-governance, adversarial-security and recovery requirements explicit; they do not substitute test doubles for deployed infrastructure.
 
 Conformance is enforced by CI on every pull request.

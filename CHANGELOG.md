@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M25
+
+- Added recovery objectives and failure-mode drill contracts for worker crash, database/queue outage, network partition, duplicate delivery, provider timeout and regional failure.
+- Added RTO/RPO evidence requirements and a fail-closed recovery gate.
+- Reconciled disaster-recovery documentation to distinguish measured readiness from deployed infrastructure.
+
 ## 2026-10-03 — Enterprise Evolution M24
 
 - Added executable adversarial-agent security regression cases.
