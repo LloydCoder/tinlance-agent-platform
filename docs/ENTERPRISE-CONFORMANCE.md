@@ -6,7 +6,7 @@ The platform's enterprise claim is based on executable controls rather than mile
 
 M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7 -> M8 -> M9 -> M10 -> M11 -> M12 -> M13 -> M14
 
-M14 closes the canonical roadmap. M15-M19 complete the first post-M14 production-maturity sequence. M20 begins the final enterprise-control expansion track.
+M14 closes the canonical roadmap. M15-M20 are complete repository-level enterprise evolution phases. M21 is the active production-readiness phase.
 
 ## Post-M14 conformance
 
@@ -16,6 +16,7 @@ M14 closes the canonical roadmap. M15-M19 complete the first post-M14 production
 - **M18:** tenant/run/execution/trace correlation, SLO measurement and safety-aware evaluation gates.
 - **M19:** evidence-backed production acceptance and GA certification contract.
 - **M20:** risk classification, runtime control hooks, tenant-bound resource registry, attestation claims, cryptographic metadata and compliance traceability.
+- **M21:** evidence-backed readiness contract for the external production dependency boundary.
 
 ## Invariants
 
@@ -41,6 +42,6 @@ M14 closes the canonical roadmap. M15-M19 complete the first post-M14 production
 
 The repository provides a governed, provider-neutral core and reference adapters. Customer production deployment still requires real durable stores, secret management, approved model/tool providers, isolated execution infrastructure, telemetry backends, backup/restore, incident response, key management and operational SLOs.
 
-M19 and M20 make the evidence and control requirements explicit; they do not substitute test doubles for deployed infrastructure.
+M19-M21 make the evidence and readiness requirements explicit; they do not substitute test doubles for deployed infrastructure.
 
 Conformance is enforced by CI on every pull request.
