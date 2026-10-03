@@ -31,5 +31,6 @@ def test_alert_rule_and_incident_evidence() -> None:
 
 
 def test_error_budget_requires_observations() -> None:
+    budget = ErrorBudget(0.99, 0, 0)
     with pytest.raises(ValueError):
-        ErrorBudget(0.99, 0, 0).observed_failure_ratio
+        budget.observed_failure_ratio
