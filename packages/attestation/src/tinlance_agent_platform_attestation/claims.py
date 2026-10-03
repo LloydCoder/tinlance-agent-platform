@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from enum import StrEnum
-from datetime import UTC, datetime
 
 
 class AttestationType(StrEnum):
@@ -26,7 +26,8 @@ class Attestation:
 
     def validate(self, *, now: datetime | None = None) -> None:
         current = now or datetime.now(UTC)
-        if not all(value.strip() for value in (self.subject, self.issuer, self.artifact_digest, self.nonce)):
+        values = (self.subject, self.issuer, self.artifact_digest, self.nonce)
+        if any(not value.strip() for value in values):
             raise ValueError("attestation identity fields are required")
         if self.expires_at <= current or self.issued_at > current:
             raise PermissionError("attestation is outside its validity window")
