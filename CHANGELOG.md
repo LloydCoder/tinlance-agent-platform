@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Final M29 forensic reconciliation
+
+- Reconciled README, architecture, enterprise baseline, conformance and release-readiness documentation after the M15-M29 sequence.
+- Confirmed the final finite roadmap ends at M29 and transitions to continuous enterprise assurance.
+- Preserved the distinction between repository-level certification contracts and externally deployed production infrastructure/independent assurance.
+
 ## 2026-10-03 — Enterprise Evolution M29
 
 - Added independent-assurance report and finding contracts.
@@ -70,7 +76,7 @@
 - M15: added production durability primitives for transactional outbox publication and distributed worker lease semantics.
 - M16: added provider-neutral federated identity validation and execution-scoped secret handles.
 - M17: added secure remote-agent discovery metadata and authority-attenuating delegation contracts.
-- M18: added correlation context, SLO measurement and safety-aware evaluation gates.
+- M18: added correlation context, SLO measurement and safety-aware evaluation release gates.
 - M19: added evidence-backed enterprise production acceptance and GA certification contract.
 - Reconciled enterprise documentation to distinguish repository controls from external production infrastructure.
 
