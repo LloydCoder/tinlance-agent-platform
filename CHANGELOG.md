@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M28
+
+- Added release manifest provenance, artifact digest, SBOM, signature and rollback contracts.
+- Added tag-qualified release and migration-evidence gates.
+- Reconciled supply-chain and release-readiness documentation with the existing signed-release workflow.
+
 ## 2026-10-03 — Enterprise Evolution M27
 
 - Added provider-neutral error-budget, alert-threshold and incident-evidence contracts.
@@ -58,7 +64,7 @@
 - M15: added production durability primitives for transactional outbox publication and distributed worker lease semantics.
 - M16: added provider-neutral federated identity validation and execution-scoped secret handles.
 - M17: added secure remote-agent discovery metadata and authority-attenuating delegation contracts.
-- M18: added correlation context, SLO measurement and safety-aware evaluation release gates.
+- M18: added correlation context, SLO measurement and safety-aware evaluation gates.
 - M19: added evidence-backed enterprise production acceptance and GA certification contract.
 - Reconciled enterprise documentation to distinguish repository controls from external production infrastructure.
 
