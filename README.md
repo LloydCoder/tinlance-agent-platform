@@ -13,13 +13,14 @@ The canonical M0-M14 roadmap is complete. The serial post-M14 enterprise track i
 | M17 | Secure remote-agent interoperability and authority attenuation | Complete |
 | M18 | Reliability correlation, SLOs and continuous evaluation gates | Complete |
 | M19 | Enterprise production acceptance and GA certification contract | Complete |
-| M20 | Risk, runtime control hooks, registry, attestation, cryptographic metadata and compliance traceability | In progress |
+| M20 | Risk, runtime control hooks, registry, attestation, cryptographic metadata and compliance traceability | Complete |
+| M21 | Production dependency readiness and evidence boundary | In progress |
 
-M20 adds provider-neutral contracts only. Risk never grants authority; control hooks cannot bypass authorization; registry metadata does not authorize resources; attestation is a trust input that must be verified; cryptographic key material remains external; compliance mappings point to evidence rather than asserting compliance.
+M20 and M21 add provider-neutral controls and certification surfaces. They do not move application/domain concerns into the Platform or provision external infrastructure from the core repository.
 
 Production acceptance still requires operator verification of external infrastructure and evidence; repository CI does not prove that an external production environment is deployed.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), and [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md), and [docs/M21-PRODUCTION-INFRASTRUCTURE.md](docs/M21-PRODUCTION-INFRASTRUCTURE.md).
 
 ## Architectural boundary
 
