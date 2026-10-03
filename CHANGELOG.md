@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M23
+
+- Added registry lifecycle, compatibility and provenance contracts.
+- Added algorithm-qualified resource digests and fail-closed protocol compatibility checks.
+- Added explicit registry revocation behavior without creating an authorization bypass.
+
 ## 2026-10-03 — Enterprise Evolution M22
 
 - Added token validation and sender-constraint metadata contracts.
