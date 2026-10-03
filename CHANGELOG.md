@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M21
+
+- Added explicit production dependency readiness contracts covering database, outbox, secret manager, sandbox, telemetry, backup, incident response and operational ownership.
+- Added evidence requirements for every verified production dependency.
+- Reconciled the deployment contract to distinguish readiness certification from infrastructure provisioning.
+
 ## 2026-10-03 — Enterprise Control Expansion M20
 
 - Added provider-neutral risk classification contracts for consequential action severity and approval thresholds.
