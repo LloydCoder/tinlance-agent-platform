@@ -4,7 +4,7 @@ Tinlance Agent Platform is the governed execution substrate beneath Tinlance Age
 
 ## Enterprise evolution
 
-The canonical M0-M14 roadmap is complete. The serial post-M14 enterprise track is now:
+The canonical M0-M14 roadmap and the post-M14 M15-M29 enterprise engineering sequence are complete at the repository level:
 
 | Phase | Focus | State |
 |---|---|---|
@@ -22,13 +22,13 @@ The canonical M0-M14 roadmap is complete. The serial post-M14 enterprise track i
 | M26 | Performance, capacity and economic governance | Complete |
 | M27 | Enterprise SRE and compliance evidence | Complete |
 | M28 | Supply-chain, release provenance and rollback assurance | Complete |
-| M29 | Independent enterprise assurance and final certification gate | In progress |
+| M29 | Independent enterprise assurance and final certification gate | Complete |
 
 M20-M29 add provider-neutral controls and certification surfaces. They do not move application/domain concerns into the Platform or provision external infrastructure from the core repository.
 
 Production acceptance still requires operator verification of external infrastructure and evidence; repository CI does not prove that an external production environment is deployed.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md), [docs/M21-PRODUCTION-INFRASTRUCTURE.md](docs/M21-PRODUCTION-INFRASTRUCTURE.md), [docs/M22-IDENTITY-CRYPTO-ATTESTATION.md](docs/M22-IDENTITY-CRYPTO-ATTESTATION.md), [docs/M23-REGISTRY-GOVERNANCE.md](docs/M23-REGISTRY-GOVERNANCE.md), [docs/M24-ADVERSARIAL-AGENT-SECURITY.md](docs/M24-ADVERSARIAL-AGENT-SECURITY.md), [docs/M25-RELIABILITY-DR.md](docs/M25-RELIABILITY-DR.md), [docs/M26-PERFORMANCE-ECONOMICS.md](docs/M26-PERFORMANCE-ECONOMICS.md), [docs/M27-SRE-COMPLIANCE.md](docs/M27-SRE-COMPLIANCE.md), [docs/M28-SUPPLY-CHAIN-RELEASE.md](docs/M28-SUPPLY-CHAIN-RELEASE.md), and [docs/M29-INDEPENDENT-ASSURANCE.md](docs/M29-INDEPENDENT-ASSURANCE.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), and the M20-M29 phase specifications.
 
 ## Architectural boundary
 
@@ -36,4 +36,4 @@ The platform remains independent from FAS/FAS-Bench, FDSE, TADS/ReconOS, ThreatF
 
 ## Finalization
 
-M29 is the final finite engineering-assurance phase. After it, the Platform moves to continuous enterprise assurance.
+M29 is the final finite engineering-assurance phase. The Platform now enters continuous enterprise assurance: new threats, standards, incidents and production findings become new evidence/tests rather than arbitrary new roadmap phases.
