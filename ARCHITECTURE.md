@@ -4,17 +4,21 @@ Agent Platform is the generic governed execution substrate. It is separate from 
 
 ## Planes
 
-Control plane: identity, tenancy, authorization, policy, approvals, budgets, registries and domain registration.
+Authority plane: identity, tenancy, authorization, policy, risk, approvals, budgets and governance.
 
-Execution plane: runtime, orchestration, model gateway, tool/MCP gateway, secrets and sandbox adapters.
+Execution plane: agents, runtime, orchestration, model gateway, tool/MCP gateway, secrets, sandbox and multi-agent mediation.
 
-Evidence plane: events, evidence, trajectory, audit, observability and evaluation.
+Control plane: runtime control hooks, governed resource registry, attestation metadata, API and SDK surfaces.
+
+Evidence plane: events, evidence, trajectory, observability, evaluation and compliance traceability.
+
+Operations plane: durability and operational certification. Cryptographic metadata is provider-neutral; key material remains in external KMS/HSM or equivalent infrastructure.
 
 ## Authority chain
 
-identity -> tenancy -> authorization -> policy -> approval -> execution boundary -> evidence
+identity -> tenancy -> authorization -> policy -> risk -> approval -> execution boundary -> evidence
 
-Model output, external content, tool output and peer-agent messages are untrusted. No provider adapter can grant authority. A tool registration describes capability; it does not authorize a principal.
+Risk classification and control hooks can constrain an action but can never grant authority. Registry metadata, model output, external content, tool output, attestation claims and peer-agent messages are untrusted inputs until verified by the authoritative execution boundary. A tool registration describes capability; it does not authorize a principal.
 
 ## Dependency DAG
 
@@ -38,4 +42,4 @@ TADS/ReconOS/world-intelligence data can be represented as evidence or domain co
 
 ## Production boundary
 
-Reference in-memory implementations are deterministic and testable. Production adapters must provide durable storage, secret management, telemetry, sandbox supervision, backups and recovery without moving those responsibilities into contracts or kernel code.
+Reference implementations are deterministic and provider-neutral. Production adapters must provide durable storage, secret management, telemetry, sandbox supervision, backups, recovery, key management and operational ownership without moving those responsibilities into contracts or kernel code.
