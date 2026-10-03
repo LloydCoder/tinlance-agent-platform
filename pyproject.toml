@@ -45,6 +45,12 @@ packages = [
   "packages/multi_agent/src/tinlance_agent_platform_multi_agent",
   "packages/operations/src/tinlance_agent_platform_operations",
   "packages/execution/src/tinlance_agent_platform_execution",
+  "packages/risk/src/tinlance_agent_platform_risk",
+  "packages/control/src/tinlance_agent_platform_control",
+  "packages/registry/src/tinlance_agent_platform_registry",
+  "packages/attestation/src/tinlance_agent_platform_attestation",
+  "packages/crypto/src/tinlance_agent_platform_crypto",
+  "packages/compliance/src/tinlance_agent_platform_compliance",
 ]
 
 [tool.pytest.ini_options]
@@ -90,6 +96,12 @@ known-first-party = [
   "tinlance_agent_platform_multi_agent",
   "tinlance_agent_platform_operations",
   "tinlance_agent_platform_execution",
+  "tinlance_agent_platform_risk",
+  "tinlance_agent_platform_control",
+  "tinlance_agent_platform_registry",
+  "tinlance_agent_platform_attestation",
+  "tinlance_agent_platform_crypto",
+  "tinlance_agent_platform_compliance",
 ]
 
 [tool.mypy]
