@@ -2,10 +2,10 @@
 
 The canonical M0-M14 platform roadmap and post-M14 enterprise phases are complete only when the repository's CI and security gates are green. The repository enforces package quality, PostgreSQL migration/RLS/integrity tests, R10 certification, Reference Agents certification, CodeQL and secret scanning. Tagged release artifacts are built and Sigstore-signed by the release workflow.
 
-M19-M25 established production acceptance, control expansion, identity/trust, registry governance, adversarial security and recovery gates. M26 adds measurable capacity envelopes and tenant economic quotas.
+M19-M26 established production acceptance, control expansion, identity/trust, registry governance, adversarial security, recovery and capacity gates. M27 adds error budgets, alert thresholds and incident evidence.
 
-## M26 gate
+## M27 gate
 
-Capacity acceptance requires evidence-backed throughput, p95/p99 latency and concurrency measurements against an explicit envelope. Tenant quotas constrain admission across concurrency, tool calls, token units and cost units.
+SRE acceptance requires explicit error-budget measurements, threshold rules and evidence-backed incident records. These contracts do not replace external telemetry, paging or compliance-audit infrastructure.
 
-Production performance remains infrastructure- and provider-dependent; repository CI does not claim a fixed production capacity.
+Production adoption still requires real durable infrastructure, telemetry, incident response, backup/restore, key management and operational ownership.

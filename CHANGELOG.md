@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M27
+
+- Added provider-neutral error-budget, alert-threshold and incident-evidence contracts.
+- Added normalized incident evidence requirements for operational review.
+- Reconciled SRE/compliance documentation to distinguish control surfaces from external telemetry and audit services.
+
 ## 2026-10-03 — Enterprise Evolution M26
 
 - Added measurable capacity envelopes for throughput, p95/p99 latency and concurrency.
