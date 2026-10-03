@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M29
+
+- Added independent-assurance report and finding contracts.
+- Added a fail-closed final certification gate for unresolved assurance findings.
+- Defined M29 as the final finite engineering-assurance phase, followed by continuous enterprise assurance.
+
 ## 2026-10-03 — Enterprise Evolution M28
 
 - Added release manifest provenance, artifact digest, SBOM, signature and rollback contracts.

@@ -1,3 +1,4 @@
+from .assurance import AssuranceFinding, AssuranceReport, FindingState
 from .certification import (
     AcceptanceItem,
     AcceptanceStatus,
@@ -10,6 +11,9 @@ from .service import Config, HealthStatus, OperationsService
 from .sre import AlertRule, ErrorBudget, IncidentEvidence, Severity
 
 __all__ = [
+    "AssuranceFinding",
+    "AssuranceReport",
+    "FindingState",
     "AcceptanceItem",
     "AcceptanceStatus",
     "EnterpriseAcceptance",

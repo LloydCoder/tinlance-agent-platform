@@ -2,10 +2,12 @@
 
 The canonical M0-M14 platform roadmap and post-M14 enterprise phases are complete only when the repository's CI and security gates are green. The repository enforces package quality, PostgreSQL migration/RLS/integrity tests, R10 certification, Reference Agents certification, CodeQL and secret scanning. Tagged release artifacts are built and Sigstore-signed by the release workflow.
 
-M19-M27 established production acceptance, control expansion, identity/trust, registry governance, adversarial security, recovery, capacity and SRE gates. M28 adds explicit release provenance and rollback evidence contracts.
+M19-M28 established production acceptance, control expansion, identity/trust, registry governance, adversarial security, recovery, capacity, SRE and release assurance. M29 adds the final independent-assurance evidence contract.
 
-## M28 gate
+## M29 gate
 
-A release must carry source revision, algorithm-qualified artifact digest, SBOM, provenance and signature evidence. Upgrade plans must identify a migration and rollback reference. The tagged release workflow is responsible for building/signing artifacts; the Platform contract only models the evidence boundary.
+The final assurance report must identify the assessor, scope, findings and evidence. Certification is blocked while any finding remains open.
 
-Production release still requires deployment-specific change management, rollback execution and operational ownership.
+M29 does not claim that an independent assessor has performed the engagement. That evidence must come from the external assurance activity.
+
+After M29, the finite roadmap ends and the Platform enters continuous enterprise assurance.
