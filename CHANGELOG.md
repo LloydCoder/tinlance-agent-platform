@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M24
+
+- Added executable adversarial-agent security regression cases.
+- Added attack-class coverage for goal hijacking, tool misuse, identity/privilege abuse, memory poisoning, inter-agent attacks, cascading failures, trust exploitation, data exfiltration, sandbox escape and resource exhaustion.
+- Added a fail-closed release gate requiring evidence for every blocking regression case.
+
 ## 2026-10-03 — Enterprise Evolution M23
 
 - Added registry lifecycle, compatibility and provenance contracts.
