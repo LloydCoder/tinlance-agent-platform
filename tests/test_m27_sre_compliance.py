@@ -10,7 +10,7 @@ from tinlance_agent_platform_operations import (
 
 def test_error_budget_tracks_exhaustion() -> None:
     budget = ErrorBudget(0.99, 990, 1000)
-    assert budget.allowed_failure_ratio == 0.01
+    assert budget.allowed_failure_ratio == pytest.approx(0.01)
     assert not budget.exhausted
     exhausted = ErrorBudget(0.99, 980, 1000)
     assert exhausted.exhausted
