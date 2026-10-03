@@ -50,9 +50,7 @@ class ProductionReadiness:
             names = ", ".join(sorted(kind.value for kind in missing))
             raise RuntimeError("production readiness is missing dependencies: " + names)
         unverified = [
-            dependency.kind.value
-            for dependency in self.dependencies
-            if not dependency.verified
+            dependency.kind.value for dependency in self.dependencies if not dependency.verified
         ]
         if unverified:
             raise RuntimeError(
