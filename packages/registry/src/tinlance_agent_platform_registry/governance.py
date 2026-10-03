@@ -21,11 +21,9 @@ class Compatibility:
     def supports(self, version: str) -> bool:
         if not version.strip():
             raise ValueError("version is required")
-        if version < self.minimum_version:
-            return False
-        if self.maximum_version is not None and version > self.maximum_version:
-            return False
-        return True
+        return version >= self.minimum_version and (
+            self.maximum_version is None or version <= self.maximum_version
+        )
 
 
 @dataclass(frozen=True, slots=True)
