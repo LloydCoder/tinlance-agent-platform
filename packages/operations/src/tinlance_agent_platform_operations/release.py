@@ -46,5 +46,7 @@ class ReleaseGate:
     upgrade: UpgradePlan
 
     def evaluate(self) -> None:
-        if not self.upgrade.backward_compatible and not self.upgrade.rollback_ref.strip():
-            raise RuntimeError("non-compatible releases require rollback evidence")
+        if not self.manifest.version.startswith("v"):
+            raise RuntimeError("release version must be tag-qualified")
+        if not self.upgrade.migration_id.strip():
+            raise RuntimeError("release migration evidence is required")
