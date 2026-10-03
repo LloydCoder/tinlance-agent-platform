@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M26
+
+- Added measurable capacity envelopes for throughput, p95/p99 latency and concurrency.
+- Added tenant quotas for concurrency, tool calls, token units and cost units.
+- Added capacity evidence and fail-closed performance acceptance.
+
 ## 2026-10-03 — Enterprise Evolution M25
 
 - Added recovery objectives and failure-mode drill contracts for worker crash, database/queue outage, network partition, duplicate delivery, provider timeout and regional failure.
