@@ -16,13 +16,14 @@ The canonical M0-M14 roadmap is complete. The serial post-M14 enterprise track i
 | M20 | Risk, runtime control hooks, registry, attestation, cryptographic metadata and compliance traceability | Complete |
 | M21 | Production dependency readiness and evidence boundary | Complete |
 | M22 | Token security, key lifecycle and attestation revocation | Complete |
-| M23 | Registry lifecycle, compatibility and provenance governance | In progress |
+| M23 | Registry lifecycle, compatibility and provenance governance | Complete |
+| M24 | Adversarial agent security regression and release gate | In progress |
 
-M20-M23 add provider-neutral controls and certification surfaces. They do not move application/domain concerns into the Platform or provision external infrastructure from the core repository.
+M20-M24 add provider-neutral controls and certification surfaces. They do not move application/domain concerns into the Platform or provision external infrastructure from the core repository.
 
 Production acceptance still requires operator verification of external infrastructure and evidence; repository CI does not prove that an external production environment is deployed.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md), [docs/M21-PRODUCTION-INFRASTRUCTURE.md](docs/M21-PRODUCTION-INFRASTRUCTURE.md), [docs/M22-IDENTITY-CRYPTO-ATTESTATION.md](docs/M22-IDENTITY-CRYPTO-ATTESTATION.md), and [docs/M23-REGISTRY-GOVERNANCE.md](docs/M23-REGISTRY-GOVERNANCE.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md), [docs/M21-PRODUCTION-INFRASTRUCTURE.md](docs/M21-PRODUCTION-INFRASTRUCTURE.md), [docs/M22-IDENTITY-CRYPTO-ATTESTATION.md](docs/M22-IDENTITY-CRYPTO-ATTESTATION.md), [docs/M23-REGISTRY-GOVERNANCE.md](docs/M23-REGISTRY-GOVERNANCE.md), and [docs/M24-ADVERSARIAL-AGENT-SECURITY.md](docs/M24-ADVERSARIAL-AGENT-SECURITY.md).
 
 ## Architectural boundary
 
