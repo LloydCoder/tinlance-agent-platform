@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-03 — Enterprise Evolution M22
+
+- Added token validation and sender-constraint metadata contracts.
+- Added explicit cryptographic key lifecycle states and one-active-version validation.
+- Added attestation trust expiry and revocation contracts.
+- Reconciled enterprise identity and trust documentation with current token protection guidance.
+
 ## 2026-10-03 — Enterprise Evolution M21
 
 - Added explicit production dependency readiness contracts covering database, outbox, secret manager, sandbox, telemetry, backup, incident response and operational ownership.

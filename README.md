@@ -14,13 +14,14 @@ The canonical M0-M14 roadmap is complete. The serial post-M14 enterprise track i
 | M18 | Reliability correlation, SLOs and continuous evaluation gates | Complete |
 | M19 | Enterprise production acceptance and GA certification contract | Complete |
 | M20 | Risk, runtime control hooks, registry, attestation, cryptographic metadata and compliance traceability | Complete |
-| M21 | Production dependency readiness and evidence boundary | In progress |
+| M21 | Production dependency readiness and evidence boundary | Complete |
+| M22 | Token security, key lifecycle and attestation revocation | In progress |
 
-M20 and M21 add provider-neutral controls and certification surfaces. They do not move application/domain concerns into the Platform or provision external infrastructure from the core repository.
+M20-M22 add provider-neutral controls and certification surfaces. They do not move application/domain concerns into the Platform or provision external infrastructure from the core repository.
 
 Production acceptance still requires operator verification of external infrastructure and evidence; repository CI does not prove that an external production environment is deployed.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md), and [docs/M21-PRODUCTION-INFRASTRUCTURE.md](docs/M21-PRODUCTION-INFRASTRUCTURE.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ENTERPRISE-CONFORMANCE.md](docs/ENTERPRISE-CONFORMANCE.md), [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md), [docs/M20-CONTROL-EXPANSION.md](docs/M20-CONTROL-EXPANSION.md), [docs/M21-PRODUCTION-INFRASTRUCTURE.md](docs/M21-PRODUCTION-INFRASTRUCTURE.md), and [docs/M22-IDENTITY-CRYPTO-ATTESTATION.md](docs/M22-IDENTITY-CRYPTO-ATTESTATION.md).
 
 ## Architectural boundary
 
