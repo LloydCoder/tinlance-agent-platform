@@ -4,60 +4,46 @@
 
 Tinlance Agent Platform is the governed execution and authority substrate beneath Tinlance Agentic OS.
 
-It is **domain-neutral** and must not import or become dependent on FAS, FAS-Bench, FDSE, TADS, ReconOS, ThreatFade, Hezqara or FusionOps.
+It is domain-neutral and must not import or become dependent on FAS, FAS-Bench, FDSE, TADS, ReconOS, ThreatFade, Hezqara or FusionOps.
 
 The platform establishes authority outside model reasoning and re-checks authorization at the final consequential side-effect boundary.
 
 ## Planes
 
-### Control plane
-Identity, tenancy, authorization, policy, approvals, agents and budgets.
+### Authority plane
+Identity, tenancy, authorization, policy, risk classification, approvals, budgets and governance.
 
 ### Execution plane
-Runtime, model gateway, tool/MCP gateway, sandbox, secrets and orchestration.
+Agents, runtime, model gateway, tool/MCP gateway, sandbox, secrets, orchestration and multi-agent mediation.
+
+### Control plane
+Runtime control hooks, governed resource registry, attestation metadata, API and SDK surfaces.
 
 ### Evidence plane
-Context/memory, events, evidence, trajectory, observability and evaluation.
+Events, evidence, trajectory, observability, evaluation and compliance traceability.
+
+### Operations plane
+Durability, production readiness, SRE/error budgets, release assurance and independent certification evidence. Cryptographic metadata is provider-neutral; private key material remains external.
 
 ## Authority chain
 
-`principal → tenant → capability → policy → approval → execution boundary → evidence`
+principal -> tenant -> capability -> policy -> risk -> approval -> execution boundary -> evidence
 
-This chain is the central platform invariant.
-
-Model output, tool output, retrieved content, external intelligence and peer-agent messages are **untrusted data**. They may inform a decision but cannot create authority.
+Risk classification and control hooks can constrain an action but can never grant authority. Registry state, model output, tool output, attestation claims, external content and peer-agent messages are untrusted inputs until verified by the authoritative execution boundary.
 
 ## Dependency direction
 
-`contracts → kernel → services → adapters → apps`
+contracts -> kernel -> services -> adapters -> apps
 
 Contracts and kernel remain provider/framework neutral. Provider-specific adapters sit at the edge. Domain consumers use public contracts/SDK surfaces.
 
 ## Canonical milestones
 
-| Milestone | Required boundary | Primary evidence |
-|---|---|---|
-| M0 | Foundation, package DAG, RLS, threat model | Architecture + SQL + boundary tests |
-| M1 | Identity | Principal/agent/tenant contracts |
-| M2 | Authorization | Deny-by-default + complete mediation |
-| M3 | Approval | Exact action binding + expiry |
-| M4 | Runtime | Terminal-state + budget invariants |
-| M5 | Model gateway | Provider-neutral validated usage |
-| M6 | Tool/MCP | Scoped registration + tenant/capability binding |
-| M7 | Sandbox | Fail-closed isolation and policy |
-| M8 | Orchestration | Tenant-safe runner/delegation |
-| M9 | Memory | Trust/classification/redaction |
-| M10 | Evidence/event | Append-oriented evidence + trajectory integrity |
-| M11 | Observability | Correlated trace/metric/security signals |
-| M12 | Evaluation | Deterministic safety regression gates |
-| M13 | Domain SDK | Stable consumer surface |
-| M14 | Enterprise | Integrity, release, supply-chain and operational gates |
-
-The canonical definitions live in [docs/ROADMAP.md](docs/ROADMAP.md).
+M0-M14 are the canonical platform milestones. M15-M29 are the completed post-M14 enterprise-assurance sequence. The current definitions live in [docs/ROADMAP.md](ROADMAP.md).
 
 ## Platform vs Agentic OS
 
-**Agent Platform owns:** identity, tenancy, authorization, policy, approval authority, budgets, governed execution, sandbox/security boundaries, evidence and security events.
+**Agent Platform owns:** identity, tenancy, authorization, policy, risk, approval authority, budgets, governed execution, sandbox/security boundaries, evidence and security events.
 
 **Agentic OS owns:** users, sessions, tasks, workflows, agent applications, presentation, system integration and higher-level lifecycle.
 
@@ -65,7 +51,7 @@ The OS composes intent and lifecycle. The Platform establishes authority and exe
 
 ## Production boundary
 
-The repository provides contracts and reference implementations. A production deployment additionally requires durable PostgreSQL repositories, external secret management, approved model/tool providers, isolated execution infrastructure, telemetry collection, backup/restore, incident response and operational controls.
+The repository provides contracts and reference implementations. A production deployment additionally requires durable PostgreSQL repositories, external secret management, approved model/tool providers, isolated execution infrastructure, telemetry collection, backup/restore, incident response, key management and operational controls.
 
 Those deployment responsibilities must not be mistaken for authority logic embedded in the platform.
 
@@ -73,51 +59,31 @@ Those deployment responsibilities must not be mistaken for authority logic embed
 
 1. Tenant identifiers are immutable across a governed request.
 2. Capability possession cannot bypass policy.
-3. Prohibited and secret-data actions cannot be approved into execution.
-4. Every consequential tool call is re-authorized immediately before execution.
-5. Approval binds tenant, run, action and resource and expires.
-6. Child agents cannot widen parent authority or change tenant.
-7. Untrusted content is not silently promoted to trusted context.
-8. Secrets are execution-only handles.
-9. Evidence is attributable and integrity-protected.
-10. Evaluation results never grant authority.
-11. Required isolation failures fail closed.
-12. Security telemetry does not require sensitive payload capture.
+3. Risk never grants authority.
+4. Control hooks cannot bypass the authoritative execution boundary.
+5. Registry state cannot authorize a resource.
+6. Attestation is time-bounded and revocable.
+7. Prohibited and secret-data actions cannot be approved into execution.
+8. Every consequential tool call is re-authorized immediately before execution.
+9. Approval binds tenant, run, action and resource and expires.
+10. Child agents cannot widen parent authority or change tenant.
+11. Untrusted content is not silently promoted to trusted context.
+12. Secrets are execution-only handles.
+13. Evidence is attributable and integrity-protected.
+14. Evaluation and adversarial results never grant authority.
+15. Recovery, capacity, release and assurance evidence gates can block release but cannot grant execution authority.
+16. Security telemetry does not require sensitive payload capture.
 
 ## Design references
 
-The architecture is consistent with current external guidance on agent identity/authorization, least privilege, high-impact approvals, isolation, observability and evaluation. External guidance informs the design; repository tests and contracts remain the implementation authority.
+The architecture is consistent with current external guidance on agent identity/authorization, least privilege, high-impact approvals, isolation, adversarial evaluation, token protection, software supply-chain provenance and observability. External guidance informs the design; repository tests and contracts remain the implementation authority.
 
 ## Agent OS integration boundary
 
-Agent OS is the higher-level lifecycle and experience layer. It sends intent to Platform through the versioned API contract in packages/api and receives authoritative run, approval-reference, event and evidence-reference results.
-
-The reference boundary is:
-
-    Agent OS
-      |
-      | HTTPS JSON API v1.1
-      | bearer authentication
-      | X-Request-ID / W3C traceparent
-      v
-    Platform API
-      |
-      v
-    authenticated principal
-      |
-      v
-    governed Platform services
-      +--> run lifecycle
-      +--> capabilities
-      +--> approvals
-      +--> events/evidence
-
-The Platform HTTP boundary verifies the authenticated principal before dispatch and rejects request-body tenant/subject values that do not match that principal. The HTTP server does not implement a second authorization engine; it hands the authenticated context to the Platform handler.
+Agent OS is the higher-level lifecycle and experience layer. It sends intent to Platform through the versioned API contract and receives authoritative run, approval-reference, event and evidence-reference results.
 
 The reference HTTP server is for contract/integration testing. Production deployments must place a hardened TLS/reverse-proxy boundary in front of it and inject a standards-based token verifier with issuer, audience, signature, expiry and lifecycle controls.
 
-See [docs/architecture/agent-platform-agent-os-integration.md](architecture/agent-platform-agent-os-integration.md) for the canonical API v1.1 wire, identity, approval, reliability and production-boundary contract.
-
 ## Integration verification
 
-The Agent OS boundary is covered by the v1.1 gateway golden-path and identity-binding tests in tests/api/test_agent_os_gateway.py. The companion Agent OS repository validates the adapter against the same request/response envelope and exercises the local OS lifecycle delegation. Authentication and tenant context are resolved server-side; request-body identity is never treated as authority.
+The Agent OS boundary is covered by the API gateway and identity-binding tests. Authentication and tenant context are resolved server-side; request-body identity is never treated as authority.
