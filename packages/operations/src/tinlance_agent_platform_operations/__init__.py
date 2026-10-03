@@ -4,6 +4,7 @@ from .certification import (
     EnterpriseAcceptance,
     production_acceptance_items,
 )
+from .production import DependencyKind, ProductionDependency, ProductionReadiness
 from .service import Config, HealthStatus, OperationsService
 
 __all__ = [
@@ -11,6 +12,9 @@ __all__ = [
     "AcceptanceStatus",
     "EnterpriseAcceptance",
     "production_acceptance_items",
+    "DependencyKind",
+    "ProductionDependency",
+    "ProductionReadiness",
     "Config",
     "HealthStatus",
     "OperationsService",
