@@ -15,6 +15,7 @@ TENANT = "tenant-authz"
 RUN_ID = UUID("00000000-0000-0000-0000-000000000401")
 AGENT_ID = UUID("00000000-0000-0000-0000-000000000402")
 
+
 class ApprovalStub:
     def __init__(self, *, error: bool = False) -> None:
         self.error = error
