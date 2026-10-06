@@ -43,7 +43,7 @@ def test_high_risk_tool_requires_bound_approval() -> None:
     decision = gateway.authorize(context, call, _request())
     assert decision.decision is Decision.REQUIRE_APPROVAL
     with pytest.raises(PermissionError):
-        gateway.execute(call, decision)
+        gateway.execute(call, gateway.issue_permit(call, decision))
     approvals = ApprovalService()
     approval = approvals.request("t1", run_id, "delete", "db:item", "destructive", "agent")
     approvals.decide(approval.approval_id, True, "t1", "approver-1")
