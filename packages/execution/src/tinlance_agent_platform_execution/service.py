@@ -29,6 +29,7 @@ from tinlance_agent_platform_contracts import (
     DataClass,
     Decision,
     Principal,
+    RequestContext,
     Reversibility,
     RiskTier,
 )
@@ -696,9 +697,34 @@ class GovernedExecutionService:
                 side_effect_started=True,
             )
             try:
+                permit = self.tools.issue_permit(
+                    RequestContext(
+                        request.request_id,
+                        request.tenant_id,
+                        principal,
+                        "governed-execution",
+                        trace_id,
+                    ),
+                    call,
+                    CapabilityRequest(
+                        request.action,
+                        request.resource,
+                        frozenset({request.capability_id}),
+                        request.risk,
+                        request.reversibility,
+                        request.data_class,
+                        request.blast_radius,
+                        request.input,
+                    ),
+                )
+                if permit.decision != policy:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.AUTHORIZATION_DENIED,
+                        "tool authority decision diverged from Platform policy",
+                    )
                 output = self.tools.execute(
                     call,
-                    policy,
+                    permit,
                     request.approval_id,
                     self.approvals,
                     intent_fingerprint=request.fingerprint,
