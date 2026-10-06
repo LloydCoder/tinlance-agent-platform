@@ -4,12 +4,13 @@ Tinlance Agent Platform is the authoritative execution/authority plane beneath t
 
 ```mermaid
 flowchart LR
-    D[Tinlance Agent Developer] --> O[Tinlance Agent OS]
+    D[Tinlance Agent Developer / TADL] --> O[Tinlance Agent OS]
     O --> S[Tinlance Agent Platform SDK]
     S --> P[Tinlance Agent Platform]
-    P --> A[Identity / tenancy / policy / approvals]
-    P --> X[Governed execution / sandbox / tools]
-    P --> V[Authoritative evidence / audit]
+    P --> A[Identity / tenancy]
+    P --> Z[Authorization / policy / approvals]
+    P --> X[Budgets / sandbox / tools / MCP]
+    P --> V[Evidence / audit / observability]
     C[Ecosystem Conformance] -. gates .-> D
     C -. gates .-> O
     C -. gates .-> S
@@ -24,7 +25,11 @@ The integration boundary binds tenant and subject to the authenticated principal
 
 The repository's HTTP server is a reference contract boundary. Production deployments must add the hardened TLS, token verification, durable persistence, secrets, isolated runtime, telemetry, and operational controls described by the production documentation.
 
-The four-repository integration gate is maintained from the TADL repository and uses pinned commit SHAs so compatibility is reproducible rather than dependent on moving branches.
+The four-repository integration gate is maintained from the Agent Developer repository and uses pinned commit SHAs so compatibility is reproducible rather than dependent on moving branches.
+
+## Milestone vocabulary
+
+M0–M14 remain the canonical Agent Platform roadmap. The supplemental M13.1–M13.3 production-runtime hardening labels are retained for implementation traceability and do **not** redefine the canonical M13 Domain SDK or M14 Enterprise milestones. Post-M14 production maturity is governed by M15–M29.
 
 ## Conformance
 
