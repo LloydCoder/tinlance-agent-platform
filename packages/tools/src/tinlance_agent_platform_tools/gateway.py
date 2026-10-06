@@ -3,7 +3,7 @@ from hashlib import sha256
 import json
 from dataclasses import dataclass
 from typing import Protocol, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
