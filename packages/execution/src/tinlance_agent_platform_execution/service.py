@@ -896,7 +896,7 @@ class GovernedExecutionService:
                 "approval is required",
             )
         try:
-            self.approvals.validate_approved_for(
+            status = self.approvals.validate_approved_for(
                 request.approval_id,
                 request.tenant_id,
                 request.run_id,
@@ -909,6 +909,26 @@ class GovernedExecutionService:
                 ExecutionErrorCode.APPROVAL_BINDING_MISMATCH,
                 "approval is not valid for this execution intent",
             ) from exc
+        if status == ApprovalStatus.CONSUMED:
+            raise ExecutionFailure(
+                ExecutionErrorCode.APPROVAL_REPLAY,
+                "approval has already been consumed",
+            )
+        if status == ApprovalStatus.REJECTED:
+            raise ExecutionFailure(
+                ExecutionErrorCode.APPROVAL_REJECTED,
+                "approval was rejected",
+            )
+        if status == ApprovalStatus.EXPIRED:
+            raise ExecutionFailure(
+                ExecutionErrorCode.APPROVAL_EXPIRED,
+                "approval has expired",
+            )
+        if status is not None and status is not ApprovalStatus.APPROVED:
+            raise ExecutionFailure(
+                ExecutionErrorCode.APPROVAL_REQUIRED,
+                "approved human review is required",
+            )
 
     def _journal_state(
         self,
