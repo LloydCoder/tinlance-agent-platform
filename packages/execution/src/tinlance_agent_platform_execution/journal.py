@@ -12,8 +12,11 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from .service import ExecutionResult
 
 
 class JournalState(StrEnum):
@@ -296,7 +299,7 @@ class SQLiteExecutionJournal:
         return tuple(record for row in rows if (record := self._decode(row)) is not None)
 
 
-def encode_result(result: object) -> str:
+def encode_result(result: ExecutionResult) -> str:
     """Serialize an ExecutionResult without coupling the journal to execution package imports."""
     payload = {
         "execution_id": str(result.execution_id),
