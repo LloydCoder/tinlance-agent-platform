@@ -22,9 +22,18 @@ def test_evidence_hash_chain_is_tamper_evident() -> None:
     assert store.verify("tenant-a", run_id)
 
     store._items[0] = first.__class__(
-        first.evidence_id, first.tenant_id, first.run_id, first.content_hash,
-        "tampered", first.sequence, first.execution_id, first.actor_id,
-        first.provenance, first.occurred_at, first.previous_hash, first.record_hash,
+        first.evidence_id,
+        first.tenant_id,
+        first.run_id,
+        first.content_hash,
+        "tampered",
+        first.sequence,
+        first.execution_id,
+        first.actor_id,
+        first.provenance,
+        first.occurred_at,
+        first.previous_hash,
+        first.record_hash,
     )
     assert not store.verify("tenant-a", run_id)
 
