@@ -18,7 +18,8 @@ flowchart LR
 
 - Capability authorization occurs before policy approval and before side effects.
 - Policy denial cannot be overridden by model output or client assertions.
-- A required approval must be approved for the exact tenant, run, action, resource and intent fingerprint.
+- A required approval is first validated against the exact tenant, run, action, resource and intent fingerprint without consuming it.
+- The one-shot approval is consumed only at the governed side-effect boundary.
 - Supplying an unrelated approval ID cannot satisfy an approval gate.
 - The durable execution journal records the policy decision identity at authorization.
 - Budgets, sandbox and secret gates remain downstream constraints; none can grant authority.
