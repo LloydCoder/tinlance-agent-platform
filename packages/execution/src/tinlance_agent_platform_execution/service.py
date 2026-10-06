@@ -7,14 +7,14 @@ No caller can turn a client assertion into authority.
 
 from __future__ import annotations
 
+import json
+import sqlite3
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
-import json
-import sqlite3
 from threading import RLock
 from time import monotonic
 from typing import Any, Protocol, cast
