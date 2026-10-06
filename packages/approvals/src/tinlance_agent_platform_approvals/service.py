@@ -129,9 +129,12 @@ class ApprovalService:
         """Validate approval binding without consuming the one-shot approval."""
         with self._lock:
             current = self._current(approval_id)
+            if current.tenant_id != tenant_id:
+                raise PermissionError("approval is owned by another tenant")
+            if current.status is not ApprovalStatus.APPROVED:
+                return current.status
             if (
-                current.tenant_id != tenant_id
-                or current.run_id != run_id
+                current.run_id != run_id
                 or current.action != action
                 or current.resource != resource
                 or (
