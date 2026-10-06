@@ -95,7 +95,18 @@ class InMemoryAuditStore:
                 previous,
                 "",
             )
-            record = AuditRecord(*record.__match_args__[:-1], self._hash(record))
+            record = AuditRecord(
+                record.audit_id,
+                record.tenant_id,
+                record.run_id,
+                record.actor_id,
+                record.action,
+                record.resource,
+                record.decision,
+                record.occurred_at,
+                record.previous_hash,
+                self._hash(record),
+            )
             self._records.append(record)
             return record
 
