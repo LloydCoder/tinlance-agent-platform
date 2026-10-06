@@ -75,7 +75,7 @@ class BudgetService:
                 raise TimeoutError("budget exhausted")
             rid = reservation_id or uuid4()
             existing = self._reservations.get(rid)
-            candidate = BudgetReservation(rid, scope.tenant_id, scope.run_id, tool_calls, seconds, scope)
+            candidate = BudgetReservation(\n                rid, scope.tenant_id, scope.run_id, tool_calls, seconds, scope\n            )
             if existing is not None:
                 if existing != candidate:
                     raise ValueError("budget reservation ID conflicts with a different scope")
