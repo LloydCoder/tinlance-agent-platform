@@ -92,16 +92,21 @@ def test_nonce_mismatch_is_rejected(verifier: tuple[JWKSIdentityVerifier, Any]) 
 
 
 def test_wrong_algorithm_is_rejected(verifier: tuple[JWKSIdentityVerifier, Any]) -> None:
-    service, private_key = verifier
+    service, _ = verifier
     token = jwt.encode(
         {"iss": ISSUER, "sub": "user-123", "aud": AUDIENCE},
-        private_key,
-        algorithm="RS256",
-        headers={"typ": "JWT"},
+        "not-a-public-key",
+        algorithm="HS256",
+        headers={"typ": "at+jwt"},
     )
-    with pytest.raises(PermissionError, match="type"):
+    with pytest.raises(PermissionError, match="algorithm"):
         service.verify(token)
 
+
+def test_missing_tenant_claim_is_rejected(verifier: tuple[JWKSIdentityVerifier, Any]) -> None:
+    service, private_key = verifier
+    with pytest.raises(PermissionError, match="tenant"):
+        service.verify(make_token(private_key, tenant_id=None))
 
 def test_https_configuration_is_mandatory() -> None:
     with pytest.raises(ValueError):
