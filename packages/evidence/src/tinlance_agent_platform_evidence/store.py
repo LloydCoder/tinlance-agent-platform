@@ -120,7 +120,20 @@ class InMemoryEvidenceStore:
                 observed,
                 previous,
             )
-            item = Evidence(*item.__match_args__[:-1], record_hash=self._record_hash(item))
+            item = Evidence(
+                item.evidence_id,
+                item.tenant_id,
+                item.run_id,
+                item.content_hash,
+                item.content,
+                item.sequence,
+                item.execution_id,
+                item.actor_id,
+                item.provenance,
+                item.occurred_at,
+                item.previous_hash,
+                self._record_hash(item),
+            )
             self._items.append(item)
             return item
 
