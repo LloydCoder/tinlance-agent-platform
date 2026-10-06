@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import UTC, datetime
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_approvals import ApprovalService
+from .journal import ExecutionJournal, JournalRecord, JournalState, encode_result
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
     ApprovalStatus,
@@ -375,6 +377,7 @@ class GovernedExecutionService:
         events: EventStore,
         evidence: EvidenceStore,
         idempotency: IdempotencyRepository | None = None,
+        journal: ExecutionJournal | None = None,
         sandbox: SandboxGate | None = None,
         secrets: SecretGate | None = None,
         budget: BudgetGate | None = None,
@@ -386,6 +389,7 @@ class GovernedExecutionService:
         self.events = events
         self.evidence = evidence
         self.idempotency = idempotency or InMemoryIdempotencyRepository()
+        self.journal = journal
         self.sandbox = sandbox
         self.secrets = secrets
         self.budget = budget
