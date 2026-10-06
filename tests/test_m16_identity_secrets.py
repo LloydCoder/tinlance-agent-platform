@@ -49,8 +49,15 @@ def test_secret_handle_is_execution_scoped() -> None:
     agent_id = uuid4()
     execution_id = uuid4()
     handle = ScopedSecretHandle(
-        "provider-key", "7", "tenant-a", "principal-a", agent_id, execution_id,
-        "docs:write", "https://api.example", datetime.now(UTC) - timedelta(seconds=1),
+        "provider-key",
+        "7",
+        "tenant-a",
+        "principal-a",
+        agent_id,
+        execution_id,
+        "docs:write",
+        "https://api.example",
+        datetime.now(UTC) - timedelta(seconds=1),
         datetime.now(UTC) + timedelta(minutes=5),
     )
     handle.validate_scope(
