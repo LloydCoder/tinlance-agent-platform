@@ -120,7 +120,8 @@ def test_hello_governed_agent_executes_only_after_complete_mediation() -> None:
     )
     decision = gateway.authorize(context, call, request)
     assert decision.decision is Decision.REQUIRE_APPROVAL
-    assert gateway.execute(call, decision, approval.approval_id, approvals) == "ok"
+    permit = gateway.issue_permit(call, decision)
+    assert gateway.execute(call, permit, approval.approval_id, approvals) == "ok"
     assert executed == [call]
 
     events = InMemoryEventStore()
