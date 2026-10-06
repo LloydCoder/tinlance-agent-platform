@@ -85,8 +85,15 @@ def test_secret_handle_rejects_expiry_and_scope_confusion() -> None:
     agent_id, execution_id = uuid4(), uuid4()
     now = datetime.now(UTC)
     handle = ScopedSecretHandle(
-        "key", "1", "tenant-a", "principal-a", agent_id, execution_id,
-        "docs:write", "https://api.example", now - timedelta(minutes=2),
+        "key",
+        "1",
+        "tenant-a",
+        "principal-a",
+        agent_id,
+        execution_id,
+        "docs:write",
+        "https://api.example",
+        now - timedelta(minutes=2),
         now - timedelta(minutes=1),
     )
     with pytest.raises(PermissionError):
