@@ -105,6 +105,15 @@ def new_security_event(
     ):
         raise ValueError("invalid security event")
     return SecurityEvent(
-        uuid4(), tenant_id, event_type, severity, datetime.now(UTC), actor_id, trace_id,
-        run_id, execution_id, outcome, incident_id,
+        uuid4(),
+        tenant_id,
+        event_type,
+        severity,
+        datetime.now(UTC),
+        actor_id,
+        trace_id,
+        run_id,
+        execution_id,
+        outcome,
+        incident_id,
     )
