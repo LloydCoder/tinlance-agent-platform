@@ -29,3 +29,7 @@ The four-repository integration gate is maintained from the TADL repository and 
 ## Conformance
 
 The TADL-hosted conformance suite is the executable compatibility gate for the four repositories. It validates API 1.1 interoperability, authenticated principal binding, idempotency, trace propagation, transport security, and authority dependency direction against pinned revisions. Production infrastructure certification remains separate.
+
+## Production identity
+
+The Platform now includes a JWKS-backed JWT verification adapter for production identity boundaries. Verified issuer, audience, subject, tenant and validity claims feed the Platform authorization boundary; identity verification never grants execution authority. See `docs/production-runtime/M13-2-REAL-IDENTITY.md`.
