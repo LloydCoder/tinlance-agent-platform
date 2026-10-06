@@ -1,7 +1,9 @@
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Protocol, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
@@ -13,6 +15,17 @@ from tinlance_agent_platform_contracts import (
 )
 from tinlance_agent_platform_kernel import assert_authority_boundary
 from tinlance_agent_platform_policy import evaluate
+
+
+@dataclass(frozen=True, slots=True)
+class ToolExecutionPermit:
+    _seal: object
+    permit_id: UUID
+    tool_name: str
+    tenant_id: str
+    run_id: UUID
+    call_fingerprint: str
+    decision: PolicyDecision
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +78,8 @@ class ApprovalVerifier(Protocol):
 class ToolGateway:
     def __init__(self) -> None:
         self._tools: dict[str, tuple[ToolRegistration, ToolExecutor]] = {}
+        self._permit_seal = object()
+        self._used_permits: set[str] = set()
 
     def register(self, registration: ToolRegistration, executor: ToolExecutor) -> None:
         if registration.name in self._tools:
@@ -115,19 +130,66 @@ class ToolGateway:
             )
         return evaluate(capability_request)
 
-    def execute(
+    @staticmethod
+    def _call_fingerprint(call: ToolCall) -> str:
+        payload = json.dumps(
+            {
+                "tenant_id": call.tenant_id,
+                "run_id": str(call.run_id),
+                "tool_name": call.tool_name,
+                "capability": call.capability,
+                "action": call.action,
+                "resource": call.resource,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return sha256(payload.encode()).hexdigest()
+
+    def issue_permit(
         self,
         call: ToolCall,
         decision: PolicyDecision,
+    ) -> ToolExecutionPermit:
+        if decision.decision is Decision.DENY or (
+            decision.decision is Decision.REQUIRE_AUTHORIZATION and not decision.requires_approval
+        ):
+            raise PermissionError("tool execution denied")
+        return ToolExecutionPermit(
+            self._permit_seal,
+            uuid4(),
+            call.tool_name,
+            call.tenant_id,
+            call.run_id,
+            self._call_fingerprint(call),
+            decision,
+        )
+
+    def execute(
+        self,
+        call: ToolCall,
+        permit: ToolExecutionPermit,
         approval_id: UUID | None = None,
         approval_verifier: ApprovalVerifier | None = None,
         *,
         intent_fingerprint: str | None = None,
         timeout_seconds: float | None = None,
     ) -> str:
-        if decision.decision is Decision.DENY:
+        if permit._seal is not self._permit_seal:
+            raise PermissionError("tool execution permit is not platform-issued")
+        if permit.tool_name != call.tool_name or permit.tenant_id != call.tenant_id:
+            raise PermissionError("tool execution permit scope mismatch")
+        if permit.run_id != call.run_id or permit.call_fingerprint != self._call_fingerprint(call):
+            raise PermissionError("tool execution permit intent mismatch")
+        permit_key = str(permit.permit_id)
+        if permit_key in self._used_permits:
+            raise PermissionError("tool execution permit has already been consumed")
+        if permit.decision.decision is Decision.DENY or (
+            permit.decision.decision is Decision.REQUIRE_AUTHORIZATION
+            and not permit.decision.requires_approval
+        ):
             raise PermissionError("tool execution denied")
-        if decision.requires_approval:
+        if permit.decision.requires_approval:
             if approval_id is None or approval_verifier is None:
                 raise PermissionError("approved human review is required")
             approval_verifier.require_approved_for(
@@ -143,7 +205,10 @@ class ToolGateway:
             raise PermissionError("tool is not registered for requested capability")
         executor = registration[1]
         timed = getattr(executor, "execute_with_timeout", None)
-        if timeout_seconds is not None and callable(timed):
-            run_with_timeout = cast(Callable[[ToolCall, float], str], timed)
-            return run_with_timeout(call, timeout_seconds)
-        return executor.execute(call)
+        try:
+            if timeout_seconds is not None and callable(timed):
+                run_with_timeout = cast(Callable[[ToolCall, float], str], timed)
+                return run_with_timeout(call, timeout_seconds)
+            return executor.execute(call)
+        finally:
+            self._used_permits.add(permit_key)

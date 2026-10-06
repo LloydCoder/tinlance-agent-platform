@@ -96,6 +96,8 @@ class ApprovalVerifier(Protocol):
         run_id: UUID,
         action: str,
         resource: str,
+        *,
+        intent_fingerprint: str | None = None,
     ) -> None: ...
 
 
@@ -164,6 +166,7 @@ class MCPToolGateway:
         *,
         approval_id: UUID | None = None,
         approval_verifier: ApprovalVerifier | None = None,
+        intent_fingerprint: str | None = None,
     ) -> dict[str, object]:
         decision = self.authorize(context, scope, tool_name, capability_request)
         if decision.decision is Decision.DENY:
@@ -177,6 +180,7 @@ class MCPToolGateway:
                 run_id,
                 capability_request.action,
                 capability_request.resource,
+                intent_fingerprint=intent_fingerprint,
             )
         _validate_value(arguments)
         return self._transport.call(

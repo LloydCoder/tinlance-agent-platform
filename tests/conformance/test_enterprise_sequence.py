@@ -54,7 +54,8 @@ def test_canonical_governed_agent_path_is_fail_closed() -> None:
     tools.register(ToolRegistration("reader", "doc:read", "read documents"), Executor())
     decision = tools.authorize(context, call, request)
     assert decision.decision is Decision.ALLOW
-    assert tools.execute(call, decision) == "read:doc-1"
+    permit = tools.issue_permit(call, decision)
+    assert tools.execute(call, permit) == "read:doc-1"
 
 
 def test_tenant_boundary_cannot_be_crossed() -> None:

@@ -87,6 +87,11 @@ def test_sandbox_fails_closed() -> None:
     denied = SandboxRequest(uuid4(), "t-a", uuid4(), "ws", ("sh",), 10, False, ("/workspace",))
     with pytest.raises(PermissionError):
         validate_request(denied, SandboxPolicy(frozenset({"python"})))
+    outside_root = SandboxRequest(
+        uuid4(), "t-a", uuid4(), "ws", ("python",), 10, False, ("/tmp/workspace",)
+    )
+    with pytest.raises(PermissionError):
+        validate_request(outside_root, SandboxPolicy(frozenset({"python"})))
 
 
 def test_tool_gateway_requires_authorization() -> None:
@@ -110,7 +115,8 @@ def test_tool_gateway_requires_authorization() -> None:
     )
     decision = gateway.authorize(context, call, request)
     assert decision.decision is Decision.ALLOW
-    assert gateway.execute(call, decision) == "executed"
+    permit = gateway.issue_permit(call, decision)
+    assert gateway.execute(call, permit) == "executed"
 
 
 def test_tool_gateway_denies_mismatched_action() -> None:
