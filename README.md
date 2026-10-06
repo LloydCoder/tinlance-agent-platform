@@ -190,6 +190,7 @@ The canonical architectural precedence is:
 - [Release readiness](docs/RELEASE-READINESS.md)
 - [Release security](docs/RELEASE-SECURITY.md)
 - [Security threat models](security/README.md)
+- [Production runtime hardening](docs/production-runtime/README.md)
 - [Changelog](CHANGELOG.md)
 - [LLM-oriented index](llms.txt)
 
@@ -235,3 +236,5 @@ See [deployment/README.md](deployment/README.md) and [docs/ENTERPRISE-BASELINE.m
 M13.1 establishes durable execution state and fail-closed recovery. M13.2 adds cryptographic JWT/JWKS identity verification while keeping authorization authoritative and separate. See the production-runtime documentation for the acceptance gates.
 
 M13.3 closes the authorization seam: a verified identity is insufficient without capability authorization, policy allowance, and any required approval bound to the exact execution intent.
+
+M13.4–M13.8 harden the remaining consequential boundary: scoped budgets; sealed tool/MCP permits and sandbox roots; execution-scoped secrets; integrity-protected evidence/audit with cryptographic attestation; and tenant-bound observability/incident correlation. See [Production runtime hardening](docs/production-runtime/README.md).
