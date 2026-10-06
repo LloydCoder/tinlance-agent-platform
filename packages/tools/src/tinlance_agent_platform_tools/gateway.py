@@ -153,7 +153,10 @@ class ToolGateway:
         capability_request: CapabilityRequest,
     ) -> ToolExecutionPermit:
         decision = self.authorize(context, call, capability_request)
-        if decision.decision is Decision.DENY:
+        if decision.decision is Decision.DENY or (
+            decision.decision is Decision.REQUIRE_AUTHORIZATION
+            and not decision.requires_approval
+        ):
             raise PermissionError("tool execution denied")
         return ToolExecutionPermit(
             self._permit_seal,
@@ -184,7 +187,10 @@ class ToolGateway:
         permit_key = str(permit.permit_id)
         if permit_key in self._used_permits:
             raise PermissionError("tool execution permit has already been consumed")
-        if permit.decision.decision is Decision.DENY:
+        if permit.decision.decision is Decision.DENY or (
+            permit.decision.decision is Decision.REQUIRE_AUTHORIZATION
+            and not permit.decision.requires_approval
+        ):
             raise PermissionError("tool execution denied")
         if permit.decision.requires_approval:
             if approval_id is None or approval_verifier is None:
