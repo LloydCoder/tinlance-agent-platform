@@ -244,9 +244,7 @@ class SQLiteExecutionJournal:
                 if policy_decision_id is None
                 else policy_decision_id
             )
-            next_result = (
-                current_record.result_json if result_json is None else result_json
-            )
+            next_result = current_record.result_json if result_json is None else result_json
             updated_at = datetime.now(UTC)
             connection.execute(
                 """
