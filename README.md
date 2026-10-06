@@ -17,7 +17,7 @@ flowchart LR
     D[Tinlance Agent Developer] --> OS[Tinlance Agent OS]
     OS --> SDK[Tinlance Agent Platform SDK]
     SDK --> P[Tinlance Agent Platform]
-    P --> ID[Identity + Tenancy]
+    P --> ID[Identity + Tenancy / JWT-JWKS verification]
     P --> AUTH[Authorization + Policy]
     P --> APP[Approval]
     P --> RUN[Governed Runtime]
@@ -229,3 +229,7 @@ Production deployments require external evidence for durable persistence, secret
 See [deployment/README.md](deployment/README.md) and [docs/ENTERPRISE-BASELINE.md](docs/ENTERPRISE-BASELINE.md).
 
 </details>
+
+## Production runtime sequence
+
+M13.1 establishes durable execution state and fail-closed recovery. M13.2 adds cryptographic JWT/JWKS identity verification while keeping authorization authoritative and separate. See the production-runtime documentation for the acceptance gates.
