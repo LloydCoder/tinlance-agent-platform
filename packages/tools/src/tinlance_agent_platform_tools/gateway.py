@@ -1,7 +1,7 @@
-from collections.abc import Callable
-from hashlib import sha256
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Protocol, cast
 from uuid import UUID, uuid4
 
