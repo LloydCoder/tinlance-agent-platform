@@ -39,7 +39,6 @@ def record(*, execution_id: UUID = EXECUTION_ID, key: str = "idem-1") -> Journal
     )
 
 
-
 def test_journal_survives_reopen_and_recovers_inflight_work() -> None:
     with TemporaryDirectory() as directory:
         path = f"{directory}/journal.sqlite"
