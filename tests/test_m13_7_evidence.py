@@ -44,9 +44,7 @@ def test_evidence_attestation_verifies_external_signature() -> None:
     evidence = store.append("tenant-a", uuid4(), "decision", actor_id="agent-a")
     receipt = attest(evidence.evidence_id, evidence.record_hash, "kms-key-1", Signer())
     assert receipt.verify(Signer())
-    tampered = receipt.__class__(
-        uuid4(), receipt.record_hash, receipt.signer_id, receipt.signature
-    )
+    tampered = receipt.__class__(uuid4(), receipt.record_hash, receipt.signer_id, receipt.signature)
     assert not tampered.verify(Signer())
 
 
