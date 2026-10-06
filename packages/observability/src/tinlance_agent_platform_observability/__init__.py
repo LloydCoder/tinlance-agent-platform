@@ -1,3 +1,4 @@
+from .incidents import IncidentCorrelation, IncidentCorrelator
 from .reliability import SLO, CorrelationContext, SLOMeasurement
 from .service import (
     InMemoryObservabilitySink,
@@ -9,6 +10,8 @@ from .service import (
 )
 
 __all__ = [
+    "IncidentCorrelation",
+    "IncidentCorrelator",
     "InMemoryObservabilitySink",
     "MetricPoint",
     "ObservabilitySink",
