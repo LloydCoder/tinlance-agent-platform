@@ -8,6 +8,8 @@ from typing import Protocol
 class SandboxLimits:
     timeout_seconds: int = 30
     max_output_bytes: int = 1_000_000
+    max_memory_bytes: int = 1_073_741_824
+    max_processes: int = 128
 
 
 class SandboxProvider(Protocol):
@@ -26,7 +28,13 @@ class BubblewrapProvider:
     def command(
         self, argv: list[str], limits: SandboxLimits, workspace_paths: tuple[str, ...] = ()
     ) -> list[str]:
-        if not argv or limits.timeout_seconds < 1 or limits.max_output_bytes < 1:
+        if (
+            not argv
+            or limits.timeout_seconds < 1
+            or limits.max_output_bytes < 1
+            or limits.max_memory_bytes < 1
+            or limits.max_processes < 1
+        ):
             raise ValueError("invalid sandbox request")
         if not self.available():
             raise RuntimeError("bubblewrap sandbox provider is unavailable")
@@ -39,6 +47,8 @@ class BubblewrapProvider:
             "--die-with-parent",
             "--new-session",
             "--unshare-all",
+            "--cap-drop",
+            "ALL",
             "--ro-bind",
             "/usr",
             "/usr",
