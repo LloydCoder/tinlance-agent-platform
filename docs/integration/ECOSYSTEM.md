@@ -10,6 +10,10 @@ flowchart LR
     P --> A[Identity / tenancy / policy / approvals]
     P --> X[Governed execution / sandbox / tools]
     P --> V[Authoritative evidence / audit]
+    C[Ecosystem Conformance] -. gates .-> D
+    C -. gates .-> O
+    C -. gates .-> S
+    C -. gates .-> P
 ```
 
 The Platform does not depend on TADL, Agent OS, or the SDK for authority. They are consumers of the Platform's versioned contracts. The Platform SDK is a developer transport surface; Agent OS is a higher-level lifecycle/control plane; TADL is a developer artifact plane.
@@ -21,3 +25,7 @@ The integration boundary binds tenant and subject to the authenticated principal
 The repository's HTTP server is a reference contract boundary. Production deployments must add the hardened TLS, token verification, durable persistence, secrets, isolated runtime, telemetry, and operational controls described by the production documentation.
 
 The four-repository integration gate is maintained from the TADL repository and uses pinned commit SHAs so compatibility is reproducible rather than dependent on moving branches.
+
+## Conformance
+
+The TADL-hosted conformance suite is the executable compatibility gate for the four repositories. It validates API 1.1 interoperability, authenticated principal binding, idempotency, trace propagation, transport security, and authority dependency direction against pinned revisions. Production infrastructure certification remains separate.
