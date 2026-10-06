@@ -216,3 +216,13 @@ All post-M14 enterprise phases M15-M29 have completed their repository implement
 | M29 | Complete |
 
 This status is a repository-level statement. External production infrastructure, independent penetration testing, disaster-recovery exercises and customer compliance evidence remain deployment/assurance activities and are not implied by repository CI.
+
+## Supplemental production-runtime hardening
+
+The following labels are implementation traceability only and do not redefine the canonical M0-M14 vocabulary or reopen the completed M15-M29 enterprise track.
+
+### M13.4 — Budget and Resource Governance
+
+The consequential execution boundary now requires exact tenant/agent/run/action/resource budget scope, idempotent reservation identity, atomic tenant quota admission, and fail-closed settlement/release semantics. This hardens the M4 hard-budget invariant and M26 economic-governance contracts.
+
+Acceptance requires adversarial coverage for cross-tenant scope, reservation replay, parallel quota admission, exhaustion, settlement and release. See [M13-4-BUDGET-RESOURCE-GOVERNANCE.md](production-runtime/M13-4-BUDGET-RESOURCE-GOVERNANCE.md).

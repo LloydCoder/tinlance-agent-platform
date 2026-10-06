@@ -21,6 +21,7 @@ from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_approvals import ApprovalService
+from tinlance_agent_platform_budgets import BudgetScope
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
     ApprovalStatus,
@@ -262,7 +263,13 @@ class SecretGate(Protocol):
 
 
 class BudgetGate(Protocol):
-    def reserve(self, tenant_id: str, run_id: UUID, *, tool_calls: int, seconds: float) -> Any: ...
+    def reserve_scoped(
+        self,
+        scope: BudgetScope,
+        *,
+        tool_calls: int,
+        seconds: float,
+    ) -> Any: ...
 
     def consume(self, reservation: Any, elapsed_seconds: float) -> None: ...
 
@@ -624,9 +631,14 @@ class GovernedExecutionService:
                 raise ExecutionFailure(ExecutionErrorCode.TIMEOUT, "effective timeout is invalid")
             if self.budget is not None:
                 try:
-                    budget_reservation = self.budget.reserve(
-                        request.tenant_id,
-                        request.run_id,
+                    budget_reservation = self.budget.reserve_scoped(
+                        BudgetScope(
+                            request.tenant_id,
+                            request.agent_id,
+                            request.run_id,
+                            request.action,
+                            request.resource,
+                        ),
                         tool_calls=request.requested_tool_calls,
                         seconds=effective_timeout,
                     )
