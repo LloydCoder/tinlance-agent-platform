@@ -43,9 +43,12 @@ class IncidentCorrelator:
             self._incidents[incident.incident_id] = incident
         return incident
 
-    def add_security_event(self, incident_id: UUID, event_id: UUID) -> None:
+    def add_security_event(self, incident_id: UUID, event_id: UUID, *, tenant_id: str) -> None:
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("incident tenant is required")
         with self._lock:
             incident = self._require(incident_id)
+            self._require_tenant(incident, tenant_id)
             self._incidents[incident_id] = IncidentCorrelation(
                 incident.incident_id,
                 incident.tenant_id,
@@ -57,9 +60,12 @@ class IncidentCorrelator:
                 incident.evidence_ids,
             )
 
-    def add_audit(self, incident_id: UUID, audit_id: UUID) -> None:
+    def add_audit(self, incident_id: UUID, audit_id: UUID, *, tenant_id: str) -> None:
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("incident tenant is required")
         with self._lock:
             incident = self._require(incident_id)
+            self._require_tenant(incident, tenant_id)
             self._incidents[incident_id] = IncidentCorrelation(
                 incident.incident_id,
                 incident.tenant_id,
@@ -71,9 +77,31 @@ class IncidentCorrelator:
                 incident.evidence_ids,
             )
 
+    def add_evidence(self, incident_id: UUID, evidence_id: UUID, *, tenant_id: str) -> None:
+        if not tenant_id or tenant_id != tenant_id.strip():
+            raise ValueError("incident tenant is required")
+        with self._lock:
+            incident = self._require(incident_id)
+            self._require_tenant(incident, tenant_id)
+            self._incidents[incident_id] = IncidentCorrelation(
+                incident.incident_id,
+                incident.tenant_id,
+                incident.run_id,
+                incident.execution_id,
+                incident.trace_ids,
+                incident.security_event_ids,
+                incident.audit_ids,
+                incident.evidence_ids + (evidence_id,),
+            )
+
     def get(self, incident_id: UUID) -> IncidentCorrelation:
         with self._lock:
             return self._require(incident_id)
+
+    @staticmethod
+    def _require_tenant(incident: IncidentCorrelation, tenant_id: str) -> None:
+        if incident.tenant_id != tenant_id:
+            raise PermissionError("incident tenant does not match correlation tenant")
 
     def _require(self, incident_id: UUID) -> IncidentCorrelation:
         try:
