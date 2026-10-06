@@ -35,12 +35,7 @@ class TenantQuotaService:
         max_token_units: int,
         max_cost_units: float,
     ) -> None:
-        if (
-            max_concurrency < 1
-            or max_tool_calls < 0
-            or max_token_units < 0
-            or max_cost_units < 0
-        ):
+        if max_concurrency < 1 or max_tool_calls < 0 or max_token_units < 0 or max_cost_units < 0:
             raise ValueError("tenant quota values are invalid")
         self._limits = (
             max_concurrency,
@@ -69,12 +64,7 @@ class TenantQuotaService:
         values = (reservation_id, tenant_id, agent_id, run_id, action, resource)
         if any(not value or value != value.strip() for value in values):
             raise ValueError("quota reservation scope is required and normalized")
-        if (
-            concurrency < 1
-            or tool_calls < 0
-            or token_units < 0
-            or cost_units < 0
-        ):
+        if concurrency < 1 or tool_calls < 0 or token_units < 0 or cost_units < 0:
             raise ValueError("quota reservation dimensions are invalid")
         candidate = TenantReservation(
             reservation_id,
