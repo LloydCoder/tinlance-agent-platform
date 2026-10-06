@@ -10,6 +10,7 @@ __all__ = [
     "ScopedSecretBroker",
     "ScopedSecretHandle",
     "ScopedSecretProvider",
+    "SecretResolutionError",
     "SecretBroker",
     "SecretHandle",
 ]
