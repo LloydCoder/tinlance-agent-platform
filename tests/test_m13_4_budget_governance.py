@@ -87,16 +87,19 @@ def test_quota_replay_cannot_change_scope() -> None:
         concurrency=1,
         tool_calls=1,
     )
-    assert quota.reserve(
-        reservation_id="reservation-1",
-        tenant_id="tenant-a",
-        agent_id="agent-a",
-        run_id="run-a",
-        action="write",
-        resource="resource-a",
-        concurrency=1,
-        tool_calls=1,
-    ) == reservation
+    assert (
+        quota.reserve(
+            reservation_id="reservation-1",
+            tenant_id="tenant-a",
+            agent_id="agent-a",
+            run_id="run-a",
+            action="write",
+            resource="resource-a",
+            concurrency=1,
+            tool_calls=1,
+        )
+        == reservation
+    )
     with pytest.raises(ValueError):
         quota.reserve(
             reservation_id="reservation-1",
