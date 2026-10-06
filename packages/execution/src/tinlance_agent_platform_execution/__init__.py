@@ -1,3 +1,10 @@
+from .journal import (
+    ExecutionJournal,
+    JournalRecord,
+    JournalState,
+    SQLiteExecutionJournal,
+    encode_result,
+)
 from .service import (
     CONTRACT_VERSION,
     ExecutionErrorCode,
@@ -24,4 +31,9 @@ __all__ = [
     "IdempotencyRecord",
     "InMemoryIdempotencyRepository",
     "SQLiteIdempotencyRepository",
+    "ExecutionJournal",
+    "JournalRecord",
+    "JournalState",
+    "SQLiteExecutionJournal",
+    "encode_result",
 ]

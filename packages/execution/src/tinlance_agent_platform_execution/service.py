@@ -12,6 +12,7 @@ import sqlite3
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
 from threading import RLock
@@ -34,6 +35,8 @@ from tinlance_agent_platform_events import EventStore, new_event
 from tinlance_agent_platform_evidence import EvidenceStore
 from tinlance_agent_platform_policy import evaluate
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
+
+from .journal import ExecutionJournal, JournalRecord, JournalState, encode_result
 
 CONTRACT_VERSION = "governed-execution.v1"
 MAX_INPUT_BYTES = 1 * 1024 * 1024
@@ -375,6 +378,7 @@ class GovernedExecutionService:
         events: EventStore,
         evidence: EvidenceStore,
         idempotency: IdempotencyRepository | None = None,
+        journal: ExecutionJournal | None = None,
         sandbox: SandboxGate | None = None,
         secrets: SecretGate | None = None,
         budget: BudgetGate | None = None,
@@ -386,6 +390,7 @@ class GovernedExecutionService:
         self.events = events
         self.evidence = evidence
         self.idempotency = idempotency or InMemoryIdempotencyRepository()
+        self.journal = journal
         self.sandbox = sandbox
         self.secrets = secrets
         self.budget = budget
@@ -418,6 +423,32 @@ class GovernedExecutionService:
         trace_id: str | None = None,
     ) -> ExecutionResult:
         self._bind_principal(principal, request)
+        journal_record = (
+            self.journal.get_by_idempotency(request.tenant_id, request.idempotency_key)
+            if self.journal is not None
+            else None
+        )
+        if journal_record is not None:
+            if journal_record.fingerprint != request.fingerprint:
+                raise ExecutionFailure(
+                    ExecutionErrorCode.IDEMPOTENCY_CONFLICT,
+                    "idempotency key conflicts with a different execution",
+                )
+            if journal_record.state is JournalState.COMPLETED and journal_record.result_json:
+                return self._decode_result(journal_record.result_json)
+            if (
+                journal_record.side_effect_started
+                or journal_record.state is JournalState.OUTCOME_UNKNOWN
+            ):
+                return ExecutionResult(
+                    journal_record.execution_id,
+                    ExecutionState.OUTCOME_UNKNOWN,
+                    None,
+                    (),
+                    (),
+                    ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                    False,
+                )
         existing = self.idempotency.get(request.tenant_id, request.idempotency_key)
         if existing is not None:
             if existing.fingerprint != request.fingerprint:
@@ -438,7 +469,7 @@ class GovernedExecutionService:
                 )
             record = existing
         else:
-            execution_id = uuid4()
+            execution_id = journal_record.execution_id if journal_record is not None else uuid4()
             record = IdempotencyRecord(
                 request.tenant_id, request.idempotency_key, request.fingerprint, execution_id
             )
@@ -474,6 +505,26 @@ class GovernedExecutionService:
         )
         self._states[execution_id] = ExecutionState.REQUESTED
         self._trace_ids[execution_id] = trace_id
+        if self.journal is not None:
+            self.journal.create(
+                JournalRecord(
+                    execution_id,
+                    request.tenant_id,
+                    request.principal_id,
+                    request.agent_id,
+                    request.run_id,
+                    request.request_id,
+                    request.idempotency_key,
+                    request.fingerprint,
+                    JournalState.REQUESTED,
+                    False,
+                    "",
+                    request.approval_id,
+                    trace_id,
+                    None,
+                    datetime.now(UTC),
+                )
+            )
         audit_ids: list[UUID] = []
         budget_reservation: Any | None = None
         try:
@@ -554,7 +605,7 @@ class GovernedExecutionService:
             self._event(request, execution_id, "execution.policy_evaluated", audit_ids)
             if policy.requires_approval:
                 if request.approval_id is None:
-                    self._states[execution_id] = ExecutionState.WAITING_APPROVAL
+                    self._journal_state(request, execution_id, ExecutionState.WAITING_APPROVAL)
                     self._event(request, execution_id, "execution.approval_required", audit_ids)
                     raise ExecutionFailure(
                         ExecutionErrorCode.APPROVAL_REQUIRED,
@@ -608,7 +659,7 @@ class GovernedExecutionService:
                 self.secrets.authorize(request)
             elif self.secrets is not None:
                 self.secrets.authorize(request)
-            self._states[execution_id] = ExecutionState.AUTHORIZED
+            self._journal_state(request, execution_id, ExecutionState.AUTHORIZED)
             self._event(request, execution_id, "execution.started", audit_ids)
             started = monotonic()
             call = ToolCall(
@@ -620,6 +671,12 @@ class GovernedExecutionService:
                 request.action,
                 request.resource,
             )
+            self._journal_state(
+                request,
+                execution_id,
+                ExecutionState.RUNNING,
+                side_effect_started=True,
+            )
             try:
                 output = self.tools.execute(
                     call,
@@ -630,7 +687,7 @@ class GovernedExecutionService:
                     timeout_seconds=effective_timeout,
                 )
             except TimeoutError:
-                self._states[execution_id] = ExecutionState.TIMED_OUT
+                self._journal_state(request, execution_id, ExecutionState.TIMED_OUT)
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
                     execution_id,
@@ -645,6 +702,14 @@ class GovernedExecutionService:
                     self.budget.release(budget_reservation)
                     budget_reservation = None
                 self.idempotency.complete(record, result)
+                if self.journal is not None:
+                    self._journal_state(
+                        request,
+                        execution_id,
+                        result.state,
+                        side_effect_started=True,
+                        result=result,
+                    )
                 self._results[execution_id] = result
                 return result
             except PermissionError as exc:
@@ -670,7 +735,7 @@ class GovernedExecutionService:
                 self._event(request, execution_id, "approval.consumed", audit_ids)
             elapsed = monotonic() - started
             if elapsed > effective_timeout:
-                self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
+                self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
                     execution_id,
@@ -685,6 +750,14 @@ class GovernedExecutionService:
                     self.budget.release(budget_reservation)
                     budget_reservation = None
                 self.idempotency.complete(record, result)
+                if self.journal is not None:
+                    self._journal_state(
+                        request,
+                        execution_id,
+                        result.state,
+                        side_effect_started=True,
+                        result=result,
+                    )
                 self._results[execution_id] = result
                 return result
             if self.secrets is not None:
@@ -724,13 +797,13 @@ class GovernedExecutionService:
                         {"evidence_id": str(item.evidence_id)},
                     )
                 except Exception as exc:
-                    self._states[execution_id] = ExecutionState.FAILED
+                    self._journal_state(request, execution_id, ExecutionState.FAILED)
                     self._event(request, execution_id, "execution.failed", audit_ids)
                     raise ExecutionFailure(
                         ExecutionErrorCode.EVIDENCE_FAILURE,
                         "mandatory evidence could not be committed",
                     ) from exc
-            self._states[execution_id] = ExecutionState.COMPLETED
+            self._journal_state(request, execution_id, ExecutionState.COMPLETED)
             self._event(request, execution_id, "execution.completed", audit_ids)
             self._event(request, execution_id, "execution.finalized", audit_ids)
             result = ExecutionResult(
@@ -763,6 +836,14 @@ class GovernedExecutionService:
                     execution_id, state, None, (), tuple(audit_ids), exc.code, exc.retryable
                 )
                 self.idempotency.complete(record, result)
+                if self.journal is not None:
+                    self._journal_state(
+                        request,
+                        execution_id,
+                        result.state,
+                        side_effect_started=True,
+                        result=result,
+                    )
                 self._results[execution_id] = result
             raise
         except Exception as exc:
@@ -770,7 +851,7 @@ class GovernedExecutionService:
                 with suppress(Exception):
                     self.budget.release(budget_reservation)
                 budget_reservation = None
-            self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
+            self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
             with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
             result = ExecutionResult(
@@ -789,11 +870,48 @@ class GovernedExecutionService:
                 "execution outcome could not be established",
             ) from exc
 
+    @staticmethod
+    def _decode_result(payload: str) -> ExecutionResult:
+        value = json.loads(payload)
+        return ExecutionResult(
+            UUID(value["execution_id"]),
+            ExecutionState(value["state"]),
+            value.get("output"),
+            tuple(UUID(item) for item in value.get("evidence_ids", [])),
+            tuple(UUID(item) for item in value.get("audit_event_ids", [])),
+            ExecutionErrorCode(value["error_code"]) if value.get("error_code") else None,
+            bool(value.get("retryable", False)),
+        )
+
+    def _journal_state(
+        self,
+        request: ExecutionRequest,
+        execution_id: UUID,
+        state: ExecutionState,
+        *,
+        side_effect_started: bool | None = None,
+        result: ExecutionResult | None = None,
+    ) -> None:
+        self._states[execution_id] = state
+        if self.journal is not None:
+            self.journal.transition(
+                request.tenant_id,
+                execution_id,
+                JournalState(state.value),
+                side_effect_started=side_effect_started,
+                result_json=encode_result(result) if result is not None else None,
+            )
+
     def status(self, tenant_id: str, execution_id: UUID) -> ExecutionResult:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("tenant identifier must be normalized")
         result = self._results.get(execution_id)
         identity = self._identities.get(execution_id)
+        journal_record = (
+            self.journal.get(tenant_id, execution_id) if self.journal is not None else None
+        )  # noqa: E501
+        if result is None and journal_record is not None and journal_record.result_json:
+            return self._decode_result(journal_record.result_json)
         if identity is None or identity.tenant_id != tenant_id:
             raise PermissionError("execution is not owned by tenant")
         if result is not None:
@@ -881,7 +999,7 @@ class GovernedExecutionService:
         code: ExecutionErrorCode,
         audit_ids: list[UUID],
     ) -> None:
-        self._states[execution_id] = ExecutionState.DENIED
+        self._journal_state(request, execution_id, ExecutionState.DENIED)
         self._event(request, execution_id, "authorization.denied", audit_ids)
         raise ExecutionFailure(code, "execution denied")
 

@@ -21,9 +21,11 @@ flowchart LR
     P --> AUTH[Authorization + Policy]
     P --> APP[Approval]
     P --> RUN[Governed Runtime]
+    RUN --> J[Durable execution journal]
     P --> TOOL[Model / Tool / MCP Mediation]
     P --> SB[Sandbox + Secrets]
     P --> EV[Evidence + Audit]
+    J --> EV
     C[Ecosystem Conformance] -. verifies .-> D
     C -. verifies .-> OS
     C -. verifies .-> SDK
@@ -40,7 +42,7 @@ Agent frameworks can produce an action; a governed execution substrate determine
 | Identity | Normalized principals, agent identity, version binding, tenant binding |
 | Authorization | Deny-by-default capabilities and complete mediation |
 | Human control | Exact, expiring, resource-bound approvals |
-| Runtime | Fail-closed lifecycle, budgets, cancellation, retry and terminal-state integrity |
+| Runtime | Fail-closed lifecycle, durable state, budgets, cancellation, retry and terminal-state integrity |
 | Models and tools | Provider-neutral mediation with policy and risk controls |
 | MCP / remote agents | Scoped registration, protocol boundaries and authority attenuation |
 | Sandbox | Isolated execution with command, path, network and resource controls |
