@@ -148,11 +148,9 @@ class ToolGateway:
 
     def issue_permit(
         self,
-        context: RequestContext,
         call: ToolCall,
-        capability_request: CapabilityRequest,
+        decision: PolicyDecision,
     ) -> ToolExecutionPermit:
-        decision = self.authorize(context, call, capability_request)
         if decision.decision is Decision.DENY or (
             decision.decision is Decision.REQUIRE_AUTHORIZATION
             and not decision.requires_approval
