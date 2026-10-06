@@ -130,7 +130,8 @@ class GovernedExecutionService:
         )
 
         self._budget.consume_tool_call()
-        permit = self._tools.issue_permit(context, tool_call, capability_request)
+        tool_decision = self._tools.authorize(context, tool_call, capability_request)
+        permit = self._tools.issue_permit(tool_call, tool_decision)
         tool_output = self._tools.execute(
             tool_call,
             permit,
