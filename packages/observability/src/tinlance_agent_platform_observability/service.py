@@ -14,6 +14,7 @@ class TraceSpan:
     started_at: datetime
     ended_at: datetime | None = None
     trace_id: str | None = None
+    parent_span_id: str | None = None
     status: str = "unset"
 
 
@@ -35,7 +36,10 @@ class SecurityEvent:
     occurred_at: datetime
     actor_id: str | None = None
     trace_id: str | None = None
+    run_id: UUID | None = None
+    execution_id: UUID | None = None
     outcome: str = "unknown"
+    incident_id: UUID | None = None
 
 
 class ObservabilitySink(Protocol):
@@ -86,7 +90,10 @@ def new_security_event(
     *,
     actor_id: str | None = None,
     trace_id: str | None = None,
+    run_id: UUID | None = None,
+    execution_id: UUID | None = None,
     outcome: str = "unknown",
+    incident_id: UUID | None = None,
 ) -> SecurityEvent:
     if (
         not tenant_id
@@ -98,5 +105,6 @@ def new_security_event(
     ):
         raise ValueError("invalid security event")
     return SecurityEvent(
-        uuid4(), tenant_id, event_type, severity, datetime.now(UTC), actor_id, trace_id, outcome
+        uuid4(), tenant_id, event_type, severity, datetime.now(UTC), actor_id, trace_id,
+        run_id, execution_id, outcome, incident_id,
     )
