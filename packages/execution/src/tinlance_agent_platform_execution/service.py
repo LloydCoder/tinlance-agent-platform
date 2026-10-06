@@ -896,7 +896,7 @@ class GovernedExecutionService:
                 "approval is required",
             )
         try:
-            self.approvals.require_approved_for(
+            self.approvals.validate_approved_for(
                 request.approval_id,
                 request.tenant_id,
                 request.run_id,
