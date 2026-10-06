@@ -98,13 +98,23 @@ def test_secret_handle_rejects_expiry_and_scope_confusion() -> None:
     )
     with pytest.raises(PermissionError):
         handle.validate_scope(
-            tenant_id="tenant-a", principal_id="principal-a", agent_id=agent_id,
-            execution_id=execution_id, capability_id="docs:write",
-            purpose="docs:write", audience="https://api.example", now=now,
+            tenant_id="tenant-a",
+            principal_id="principal-a",
+            agent_id=agent_id,
+            execution_id=execution_id,
+            capability_id="docs:write",
+            purpose="docs:write",
+            audience="https://api.example",
+            now=now,
         )
     with pytest.raises(PermissionError):
         handle.validate_scope(
-            tenant_id="tenant-a", principal_id="principal-a", agent_id=agent_id,
-            execution_id=execution_id, capability_id="docs:write",
-            purpose="wrong-purpose", audience="https://api.example", now=now,
+            tenant_id="tenant-a",
+            principal_id="principal-a",
+            agent_id=agent_id,
+            execution_id=execution_id,
+            capability_id="docs:write",
+            purpose="wrong-purpose",
+            audience="https://api.example",
+            now=now,
         )
