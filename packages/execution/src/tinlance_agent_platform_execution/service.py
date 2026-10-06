@@ -7,14 +7,14 @@ No caller can turn a client assertion into authority.
 
 from __future__ import annotations
 
-import json
-import sqlite3
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
+import json
+import sqlite3
 from threading import RLock
 from time import monotonic
 from typing import Any, Protocol, cast
@@ -436,7 +436,10 @@ class GovernedExecutionService:
                 )
             if journal_record.state is JournalState.COMPLETED and journal_record.result_json:
                 return self._decode_result(journal_record.result_json)
-            if journal_record.side_effect_started or journal_record.state is JournalState.OUTCOME_UNKNOWN:
+            if (
+                journal_record.side_effect_started
+                or journal_record.state is JournalState.OUTCOME_UNKNOWN
+            ):
                 return ExecutionResult(
                     journal_record.execution_id,
                     ExecutionState.OUTCOME_UNKNOWN,
