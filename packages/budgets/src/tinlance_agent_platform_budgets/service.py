@@ -84,15 +84,15 @@ class BudgetService:
                 return existing
             if self._tenant_quota is not None:
                 self._tenant_quota.reserve(
-                        reservation_id=str(rid),
-                        tenant_id=scope.tenant_id,
-                        agent_id=str(scope.agent_id),
-                        run_id=str(scope.run_id),
-                        action=scope.action,
-                        resource=scope.resource,
-                        concurrency=1,
-                        tool_calls=tool_calls,
-                    )
+                    reservation_id=str(rid),
+                    tenant_id=scope.tenant_id,
+                    agent_id=str(scope.agent_id),
+                    run_id=str(scope.run_id),
+                    action=scope.action,
+                    resource=scope.resource,
+                    concurrency=1,
+                    tool_calls=tool_calls,
+                )
             self._reservations[rid] = candidate
             return candidate
 
