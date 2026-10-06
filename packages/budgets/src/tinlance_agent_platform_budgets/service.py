@@ -64,15 +64,6 @@ class BudgetService:
         if tool_calls < 0 or seconds < 0:
             raise ValueError("reservation dimensions cannot be negative")
         with self._lock:
-            reserved_calls = sum(item.tool_calls for item in self._reservations.values())
-            reserved_seconds = sum(item.seconds for item in self._reservations.values())
-            if (
-                self._budget.consumed_tool_calls + reserved_calls + tool_calls
-                > self._budget.max_tool_calls
-                or self._budget.elapsed_seconds + reserved_seconds + seconds
-                > self._budget.max_seconds
-            ):
-                raise TimeoutError("budget exhausted")
             rid = reservation_id or uuid4()
             existing = self._reservations.get(rid)
             candidate = BudgetReservation(
@@ -82,6 +73,15 @@ class BudgetService:
                 if existing != candidate:
                     raise ValueError("budget reservation ID conflicts with a different scope")
                 return existing
+            reserved_calls = sum(item.tool_calls for item in self._reservations.values())
+            reserved_seconds = sum(item.seconds for item in self._reservations.values())
+            if (
+                self._budget.consumed_tool_calls + reserved_calls + tool_calls
+                > self._budget.max_tool_calls
+                or self._budget.elapsed_seconds + reserved_seconds + seconds
+                > self._budget.max_seconds
+            ):
+                raise TimeoutError("budget exhausted")
             if self._tenant_quota is not None:
                 self._tenant_quota.reserve(
                     reservation_id=str(rid),
