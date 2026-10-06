@@ -233,3 +233,5 @@ See [deployment/README.md](deployment/README.md) and [docs/ENTERPRISE-BASELINE.m
 ## Production runtime sequence
 
 M13.1 establishes durable execution state and fail-closed recovery. M13.2 adds cryptographic JWT/JWKS identity verification while keeping authorization authoritative and separate. See the production-runtime documentation for the acceptance gates.
+
+M13.3 closes the authorization seam: a verified identity is insufficient without capability authorization, policy allowance, and any required approval bound to the exact execution intent.
