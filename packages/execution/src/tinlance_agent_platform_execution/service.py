@@ -422,6 +422,29 @@ class GovernedExecutionService:
         trace_id: str | None = None,
     ) -> ExecutionResult:
         self._bind_principal(principal, request)
+        journal_record = (
+            self.journal.get_by_idempotency(request.tenant_id, request.idempotency_key)
+            if self.journal is not None
+            else None
+        )
+        if journal_record is not None:
+            if journal_record.fingerprint != request.fingerprint:
+                raise ExecutionFailure(
+                    ExecutionErrorCode.IDEMPOTENCY_CONFLICT,
+                    "idempotency key conflicts with a different execution",
+                )
+            if journal_record.state is JournalState.COMPLETED and journal_record.result_json:
+                return self._decode_result(journal_record.result_json)
+            if journal_record.side_effect_started or journal_record.state is JournalState.OUTCOME_UNKNOWN:
+                return ExecutionResult(
+                    journal_record.execution_id,
+                    ExecutionState.OUTCOME_UNKNOWN,
+                    None,
+                    (),
+                    (),
+                    ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                    False,
+                )
         existing = self.idempotency.get(request.tenant_id, request.idempotency_key)
         if existing is not None:
             if existing.fingerprint != request.fingerprint:
@@ -442,7 +465,7 @@ class GovernedExecutionService:
                 )
             record = existing
         else:
-            execution_id = uuid4()
+            execution_id = journal_record.execution_id if journal_record is not None else uuid4()
             record = IdempotencyRecord(
                 request.tenant_id, request.idempotency_key, request.fingerprint, execution_id
             )
@@ -478,6 +501,26 @@ class GovernedExecutionService:
         )
         self._states[execution_id] = ExecutionState.REQUESTED
         self._trace_ids[execution_id] = trace_id
+        if self.journal is not None:
+            self.journal.create(
+                JournalRecord(
+                    execution_id,
+                    request.tenant_id,
+                    request.principal_id,
+                    request.agent_id,
+                    request.run_id,
+                    request.request_id,
+                    request.idempotency_key,
+                    request.fingerprint,
+                    JournalState.REQUESTED,
+                    False,
+                    "",
+                    request.approval_id,
+                    trace_id,
+                    None,
+                    datetime.now(UTC),
+                )
+            )
         audit_ids: list[UUID] = []
         budget_reservation: Any | None = None
         try:
