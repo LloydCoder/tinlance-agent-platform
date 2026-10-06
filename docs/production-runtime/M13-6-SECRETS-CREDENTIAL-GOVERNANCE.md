@@ -29,3 +29,8 @@ flowchart LR
 RFC 9700 recommends least-privilege, audience-restricted credentials and sender-constrained access tokens where applicable. OWASP's MCP Top 10 identifies token/secret exposure and scope creep as primary MCP risks. These controls therefore treat audience, purpose, scope and lifetime as first-class authorization dimensions. 
 
 Repository CI proves the contract and adversarial tests; it does not claim that an external secret manager or KMS has been deployed.
+
+
+## Legacy API safety
+
+The legacy unscoped `SecretBroker` compatibility surface intentionally fails closed. Only `ScopedSecretBroker` may resolve a secret for execution. This prevents backward-compatible callers from bypassing tenant, principal, agent, execution, capability, purpose, audience and time validation.
