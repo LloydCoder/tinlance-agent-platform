@@ -1,5 +1,11 @@
+"""Legacy secret broker compatibility shim.
+
+Consequential secret resolution must use ScopedSecretBroker. This module
+intentionally refuses unscoped resolution so older integrations cannot silently
+bypass tenant, execution, capability, purpose, audience and time controls.
+"""
+
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -8,8 +14,11 @@ class SecretHandle:
     version: str
 
 
-class SecretProvider(Protocol):
-    def resolve(self, handle: SecretHandle) -> str: ...
+class SecretProvider:
+    """Compatibility protocol marker; use ScopedSecretProvider for execution."""
+
+    def resolve(self, handle: SecretHandle) -> str:
+        raise NotImplementedError
 
 
 class SecretBroker:
@@ -17,6 +26,4 @@ class SecretBroker:
         self._provider = provider
 
     def resolve_for_execution(self, handle: SecretHandle) -> str:
-        if not handle.name or not handle.version:
-            raise ValueError("secret handle must be versioned")
-        return self._provider.resolve(handle)
+        raise PermissionError("unscoped secret resolution is disabled; use ScopedSecretBroker")
