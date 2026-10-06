@@ -47,7 +47,8 @@ def test_high_risk_tool_requires_bound_approval() -> None:
     approvals = ApprovalService()
     approval = approvals.request("t1", run_id, "delete", "db:item", "destructive", "agent")
     approvals.decide(approval.approval_id, True, "t1", "approver-1")
-    assert gateway.execute(call, decision, approval.approval_id, approvals) == "executed"
+    permit = gateway.issue_permit(call, decision)
+    assert gateway.execute(call, permit, approval.approval_id, approvals) == "executed"
 
 
 def test_approval_cannot_cross_tenant_or_resource() -> None:
