@@ -125,12 +125,10 @@ class ApprovalService:
         resource: str,
         *,
         intent_fingerprint: str | None = None,
-    ) -> None:
+    ) -> ApprovalStatus:
         """Validate approval binding without consuming the one-shot approval."""
         with self._lock:
             current = self._current(approval_id)
-            if current.status is not ApprovalStatus.APPROVED:
-                raise PermissionError("approved human review is required")
             if (
                 current.tenant_id != tenant_id
                 or current.run_id != run_id
@@ -142,6 +140,7 @@ class ApprovalService:
                 )
             ):
                 raise PermissionError("approval does not bind to this action")
+            return current.status
 
     def require_approved_for(
         self,
