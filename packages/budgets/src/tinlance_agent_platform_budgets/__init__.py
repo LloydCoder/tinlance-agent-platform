@@ -1,13 +1,17 @@
 """Deterministic run budgets."""
 
-from .capacity import CapacityEnvelope, CapacityGate, CapacityObservation, TenantQuota\nfrom .quota import TenantQuotaService, TenantReservation
-from .service import BudgetReservation, BudgetService
+from .capacity import CapacityEnvelope, CapacityGate, CapacityObservation, TenantQuota
+from .quota import TenantQuotaService, TenantReservation
+from .service import BudgetReservation, BudgetScope, BudgetService
 
 __all__ = [
     "BudgetReservation",
+    "BudgetScope",
     "BudgetService",
     "CapacityEnvelope",
     "CapacityGate",
     "CapacityObservation",
-    "TenantQuota",\n    "TenantQuotaService",\n    "TenantReservation",
+    "TenantQuota",
+    "TenantQuotaService",
+    "TenantReservation",
 ]
