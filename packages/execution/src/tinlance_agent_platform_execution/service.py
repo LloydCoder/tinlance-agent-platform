@@ -601,7 +601,7 @@ class GovernedExecutionService:
             self._event(request, execution_id, "execution.policy_evaluated", audit_ids)
             if policy.requires_approval:
                 if request.approval_id is None:
-                    self._states[execution_id] = ExecutionState.WAITING_APPROVAL
+                    self._journal_state(request, execution_id, ExecutionState.WAITING_APPROVAL)
                     self._event(request, execution_id, "execution.approval_required", audit_ids)
                     raise ExecutionFailure(
                         ExecutionErrorCode.APPROVAL_REQUIRED,
@@ -655,7 +655,7 @@ class GovernedExecutionService:
                 self.secrets.authorize(request)
             elif self.secrets is not None:
                 self.secrets.authorize(request)
-            self._states[execution_id] = ExecutionState.AUTHORIZED
+            self._journal_state(request, execution_id, ExecutionState.AUTHORIZED)
             self._event(request, execution_id, "execution.started", audit_ids)
             started = monotonic()
             call = ToolCall(
@@ -667,6 +667,12 @@ class GovernedExecutionService:
                 request.action,
                 request.resource,
             )
+            self._journal_state(
+                request,
+                execution_id,
+                ExecutionState.RUNNING,
+                side_effect_started=True,
+            )
             try:
                 output = self.tools.execute(
                     call,
@@ -677,7 +683,7 @@ class GovernedExecutionService:
                     timeout_seconds=effective_timeout,
                 )
             except TimeoutError:
-                self._states[execution_id] = ExecutionState.TIMED_OUT
+                self._journal_state(request, execution_id, ExecutionState.TIMED_OUT)
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
                     execution_id,
@@ -717,7 +723,7 @@ class GovernedExecutionService:
                 self._event(request, execution_id, "approval.consumed", audit_ids)
             elapsed = monotonic() - started
             if elapsed > effective_timeout:
-                self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
+                self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
                 result = ExecutionResult(
                     execution_id,
@@ -771,13 +777,13 @@ class GovernedExecutionService:
                         {"evidence_id": str(item.evidence_id)},
                     )
                 except Exception as exc:
-                    self._states[execution_id] = ExecutionState.FAILED
+                    self._journal_state(request, execution_id, ExecutionState.FAILED)
                     self._event(request, execution_id, "execution.failed", audit_ids)
                     raise ExecutionFailure(
                         ExecutionErrorCode.EVIDENCE_FAILURE,
                         "mandatory evidence could not be committed",
                     ) from exc
-            self._states[execution_id] = ExecutionState.COMPLETED
+            self._journal_state(request, execution_id, ExecutionState.COMPLETED)
             self._event(request, execution_id, "execution.completed", audit_ids)
             self._event(request, execution_id, "execution.finalized", audit_ids)
             result = ExecutionResult(
@@ -817,7 +823,7 @@ class GovernedExecutionService:
                 with suppress(Exception):
                     self.budget.release(budget_reservation)
                 budget_reservation = None
-            self._states[execution_id] = ExecutionState.OUTCOME_UNKNOWN
+            self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
             with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
             result = ExecutionResult(
@@ -835,6 +841,38 @@ class GovernedExecutionService:
                 ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
                 "execution outcome could not be established",
             ) from exc
+
+    @staticmethod
+    def _decode_result(payload: str) -> ExecutionResult:
+        value = json.loads(payload)
+        return ExecutionResult(
+            UUID(value["execution_id"]),
+            ExecutionState(value["state"]),
+            value.get("output"),
+            tuple(UUID(item) for item in value.get("evidence_ids", [])),
+            tuple(UUID(item) for item in value.get("audit_event_ids", [])),
+            ExecutionErrorCode(value["error_code"]) if value.get("error_code") else None,
+            bool(value.get("retryable", False)),
+        )
+
+    def _journal_state(
+        self,
+        request: ExecutionRequest,
+        execution_id: UUID,
+        state: ExecutionState,
+        *,
+        side_effect_started: bool | None = None,
+        result: ExecutionResult | None = None,
+    ) -> None:
+        self._states[execution_id] = state
+        if self.journal is not None:
+            self.journal.transition(
+                request.tenant_id,
+                execution_id,
+                JournalState(state.value),
+                side_effect_started=side_effect_started,
+                result_json=encode_result(result) if result is not None else None,
+            )
 
     def status(self, tenant_id: str, execution_id: UUID) -> ExecutionResult:
         if not tenant_id or tenant_id != tenant_id.strip():
@@ -928,7 +966,7 @@ class GovernedExecutionService:
         code: ExecutionErrorCode,
         audit_ids: list[UUID],
     ) -> None:
-        self._states[execution_id] = ExecutionState.DENIED
+        self._journal_state(request, execution_id, ExecutionState.DENIED)
         self._event(request, execution_id, "authorization.denied", audit_ids)
         raise ExecutionFailure(code, "execution denied")
 
