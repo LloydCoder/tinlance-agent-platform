@@ -15,7 +15,7 @@ class ApprovalStub:
         self.error = error
         self.calls: list[tuple[object, ...]] = []
 
-    def require_approved_for(self, *args: object, **kwargs: object) -> None:
+    def validate_approved_for(self, *args: object, **kwargs: object) -> None:
         self.calls.append((*args, kwargs))
         if self.error:
             raise PermissionError("approval binding mismatch")
