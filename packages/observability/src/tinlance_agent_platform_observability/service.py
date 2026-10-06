@@ -14,7 +14,24 @@ class TraceSpan:
     started_at: datetime
     ended_at: datetime | None = None
     trace_id: str | None = None
+    parent_span_id: str | None = None
     status: str = "unset"
+
+    def __post_init__(self) -> None:
+        if not self.tenant_id or self.tenant_id != self.tenant_id.strip() or not self.name.strip():
+            raise ValueError("trace tenant and name are required")
+        if self.started_at.tzinfo is None or self.started_at.utcoffset() is None:
+            raise ValueError("trace start must be timezone-aware")
+        if self.ended_at is not None and (
+            self.ended_at.tzinfo is None or self.ended_at.utcoffset() is None
+        ):
+            raise ValueError("trace end must be timezone-aware")
+        if self.ended_at is not None and self.ended_at < self.started_at:
+            raise ValueError("trace end cannot precede start")
+        if self.trace_id is not None and not self.trace_id.strip():
+            raise ValueError("trace_id cannot be empty")
+        if self.parent_span_id is not None and not self.parent_span_id.strip():
+            raise ValueError("parent_span_id cannot be empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +41,14 @@ class MetricPoint:
     value: float
     unit: str
     trace_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.tenant_id or self.tenant_id != self.tenant_id.strip():
+            raise ValueError("metric tenant is required")
+        if not self.name or self.name != self.name.strip() or not self.unit.strip():
+            raise ValueError("metric identity is required")
+        if self.trace_id is not None and not self.trace_id.strip():
+            raise ValueError("trace_id cannot be empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +60,10 @@ class SecurityEvent:
     occurred_at: datetime
     actor_id: str | None = None
     trace_id: str | None = None
+    run_id: UUID | None = None
+    execution_id: UUID | None = None
     outcome: str = "unknown"
+    incident_id: UUID | None = None
 
 
 class ObservabilitySink(Protocol):
@@ -86,7 +114,10 @@ def new_security_event(
     *,
     actor_id: str | None = None,
     trace_id: str | None = None,
+    run_id: UUID | None = None,
+    execution_id: UUID | None = None,
     outcome: str = "unknown",
+    incident_id: UUID | None = None,
 ) -> SecurityEvent:
     if (
         not tenant_id
@@ -98,5 +129,15 @@ def new_security_event(
     ):
         raise ValueError("invalid security event")
     return SecurityEvent(
-        uuid4(), tenant_id, event_type, severity, datetime.now(UTC), actor_id, trace_id, outcome
+        uuid4(),
+        tenant_id,
+        event_type,
+        severity,
+        datetime.now(UTC),
+        actor_id,
+        trace_id,
+        run_id,
+        execution_id,
+        outcome,
+        incident_id,
     )
