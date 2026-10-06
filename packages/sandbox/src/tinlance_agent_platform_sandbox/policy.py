@@ -26,13 +26,18 @@ class SandboxPolicy:
         if not roots:
             raise PermissionError("sandbox workspace roots are not configured")
         for root in roots:
-            if not root.is_absolute() or ".." in root.parts or root in {
-                PurePosixPath("/"),
-                PurePosixPath("/etc"),
-                PurePosixPath("/proc"),
-                PurePosixPath("/sys"),
-                PurePosixPath("/dev"),
-            }:
+            if (
+                not root.is_absolute()
+                or ".." in root.parts
+                or root
+                in {
+                    PurePosixPath("/"),
+                    PurePosixPath("/etc"),
+                    PurePosixPath("/proc"),
+                    PurePosixPath("/sys"),
+                    PurePosixPath("/dev"),
+                }
+            ):
                 raise PermissionError("sandbox workspace roots are invalid")
         for raw_path in request.allowed_paths:
             path = PurePosixPath(raw_path)
