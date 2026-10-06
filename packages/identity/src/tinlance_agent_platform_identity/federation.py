@@ -22,6 +22,7 @@ class VerifiedAgentIdentity:
     issued_at: datetime
     expires_at: datetime
     token_id: str
+    nonce: str | None = None
 
     def validate(
         self,
@@ -29,6 +30,7 @@ class VerifiedAgentIdentity:
         expected_issuer: str,
         expected_audience: str,
         now: datetime | None = None,
+        expected_nonce: str | None = None,
     ) -> None:
         current = now or datetime.now(UTC)
         if self.issuer != expected_issuer or self.audience != expected_audience:
@@ -39,10 +41,12 @@ class VerifiedAgentIdentity:
             raise PermissionError("identity assertion is incomplete")
         if any(not scope or scope != scope.strip() for scope in self.scopes):
             raise PermissionError("identity scopes must be normalized")
+        if expected_nonce is not None and self.nonce != expected_nonce:
+            raise PermissionError("identity nonce does not match")
 
 
 class IdentityVerifier(Protocol):
-    def verify(self, assertion: str) -> VerifiedAgentIdentity: ...
+    def verify(self, assertion: str, *, expected_nonce: str | None = None) -> VerifiedAgentIdentity: ...
 
 
 def require_verified_identity(
@@ -51,6 +55,12 @@ def require_verified_identity(
     expected_issuer: str,
     expected_audience: str,
     now: datetime | None = None,
+    expected_nonce: str | None = None,
 ) -> VerifiedAgentIdentity:
-    identity.validate(expected_issuer=expected_issuer, expected_audience=expected_audience, now=now)
+    identity.validate(
+        expected_issuer=expected_issuer,
+        expected_audience=expected_audience,
+        now=now,
+        expected_nonce=expected_nonce,
+    )
     return identity
