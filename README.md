@@ -24,6 +24,10 @@ flowchart LR
     P --> TOOL[Model / Tool / MCP Mediation]
     P --> SB[Sandbox + Secrets]
     P --> EV[Evidence + Audit]
+    C[Ecosystem Conformance] -. verifies .-> D
+    C -. verifies .-> OS
+    C -. verifies .-> SDK
+    C -. verifies .-> P
     DOMAIN[Domain systems] --> SDK
 ~~~
 
@@ -175,6 +179,7 @@ The canonical architectural precedence is:
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Ecosystem conformance](docs/integration/CONFORMANCE.md)
 - [Architecture](ARCHITECTURE.md)
 - [Canonical roadmap](docs/ROADMAP.md)
 - [Enterprise baseline](docs/ENTERPRISE-BASELINE.md)
