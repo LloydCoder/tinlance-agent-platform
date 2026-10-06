@@ -24,7 +24,11 @@ The integration boundary binds tenant and subject to the authenticated principal
 
 The repository's HTTP server is a reference contract boundary. Production deployments must add the hardened TLS, token verification, durable persistence, secrets, isolated runtime, telemetry, and operational controls described by the production documentation.
 
-The four-repository integration gate is maintained from the TADL repository and uses pinned commit SHAs so compatibility is reproducible rather than dependent on moving branches.
+The four-repository integration gate is maintained from the Agent Developer repository and uses pinned commit SHAs so compatibility is reproducible rather than dependent on moving branches.
+
+## Milestone vocabulary
+
+M0–M14 remain the canonical Agent Platform roadmap. The supplemental M13.1–M13.3 production-runtime hardening labels are retained for implementation traceability and do **not** redefine the canonical M13 Domain SDK or M14 Enterprise milestones. Post-M14 production maturity is governed by M15–M29.
 
 ## Conformance
 
