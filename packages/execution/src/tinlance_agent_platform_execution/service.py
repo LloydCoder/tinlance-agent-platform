@@ -903,6 +903,13 @@ class GovernedExecutionService:
             raise ValueError("tenant identifier must be normalized")
         result = self._results.get(execution_id)
         identity = self._identities.get(execution_id)
+        journal_record = (
+            self.journal.get(tenant_id, execution_id)
+            if self.journal is not None
+            else None
+        )
+        if result is None and journal_record is not None and journal_record.result_json:
+            return self._decode_result(journal_record.result_json)
         if identity is None or identity.tenant_id != tenant_id:
             raise PermissionError("execution is not owned by tenant")
         if result is not None:
