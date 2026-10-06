@@ -96,6 +96,8 @@ class ApprovalVerifier(Protocol):
         run_id: UUID,
         action: str,
         resource: str,
+        *,
+        intent_fingerprint: str | None = None,
     ) -> None: ...
 
 
