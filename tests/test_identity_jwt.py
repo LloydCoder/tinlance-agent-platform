@@ -108,8 +108,15 @@ def test_missing_tenant_claim_is_rejected(verifier: tuple[JWKSIdentityVerifier, 
     with pytest.raises(PermissionError, match="tenant"):
         service.verify(make_token(private_key, tenant_id=None))
 
+
 def test_https_configuration_is_mandatory() -> None:
     with pytest.raises(ValueError):
-        JWKSIdentityVerifier(issuer="http://issuer.example.test", audience=AUDIENCE, jwks_url="https://issuer.example.test/keys")
+        JWKSIdentityVerifier(
+            issuer="http://issuer.example.test",
+            audience=AUDIENCE,
+            jwks_url="https://issuer.example.test/keys",
+        )
     with pytest.raises(ValueError):
-        JWKSIdentityVerifier(issuer=ISSUER, audience=AUDIENCE, jwks_url="http://issuer.example.test/keys")
+        JWKSIdentityVerifier(
+            issuer=ISSUER, audience=AUDIENCE, jwks_url="http://issuer.example.test/keys"
+        )
