@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/LloydCoder/tinlance-agent-platform/security/advisories/new
+    about: Report suspected vulnerabilities privately. Do not disclose security issues in public issues.
+  - name: Documentation
+    url: https://github.com/LloydCoder/tinlance-agent-platform/tree/main/docs
+    about: Read the documentation before opening a support or usage issue.
