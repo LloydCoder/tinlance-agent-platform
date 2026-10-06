@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible defect in the platform.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Tinlance Agent Platform. Do not include credentials, customer data, private keys, or other secrets.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "1.1.0 / 7751326..."
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.14.x"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, database/runtime dependencies, and relevant configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest copy-pasteable reproduction or test case.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact secrets and personal/customer data.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I can reproduce this on the current main branch or have stated the exact version tested.
+          required: true
+        - label: I removed secrets and sensitive data from this report.
+          required: true
