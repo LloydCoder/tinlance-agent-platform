@@ -25,10 +25,10 @@ def _limit_process(limits: SandboxLimits) -> None:
     """Apply hard POSIX resource ceilings before the sandbox process starts."""
     cpu = max(1, int(limits.timeout_seconds))
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
-    memory = 1024 * 1024 * 1024
+    memory = limits.max_memory_bytes
     resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
     resource.setrlimit(resource.RLIMIT_FSIZE, (limits.max_output_bytes, limits.max_output_bytes))
-    resource.setrlimit(resource.RLIMIT_NPROC, (128, 128))
+    resource.setrlimit(resource.RLIMIT_NPROC, (limits.max_processes, limits.max_processes))
 
 
 class SandboxExecutor:
@@ -43,7 +43,12 @@ class SandboxExecutor:
             raise RuntimeError("production sandbox execution requires POSIX isolation")
         if not argv or not Path(cwd).is_absolute():
             raise ValueError("sandbox command and absolute cwd are required")
-        if limits.timeout_seconds < 1 or limits.max_output_bytes < 1:
+        if (
+            limits.timeout_seconds < 1
+            or limits.max_output_bytes < 1
+            or limits.max_memory_bytes < 1
+            or limits.max_processes < 1
+        ):
             raise ValueError("invalid sandbox limits")
 
         with tempfile.TemporaryDirectory(prefix="tinlance-sandbox-") as tmp:
