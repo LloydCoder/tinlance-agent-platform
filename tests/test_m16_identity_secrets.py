@@ -49,7 +49,17 @@ def test_secret_handle_is_execution_scoped() -> None:
     agent_id = uuid4()
     execution_id = uuid4()
     handle = ScopedSecretHandle(
-        "provider-key", "7", "tenant-a", "principal-a", agent_id, execution_id, "docs:write"
+        "provider-key",
+        "7",
+        "tenant-a",
+        "principal-a",
+        agent_id,
+        execution_id,
+        "docs:write",
+        "docs:write",
+        "https://api.example",
+        datetime.now(UTC) - timedelta(seconds=1),
+        datetime.now(UTC) + timedelta(minutes=5),
     )
     handle.validate_scope(
         tenant_id="tenant-a",
@@ -57,6 +67,8 @@ def test_secret_handle_is_execution_scoped() -> None:
         agent_id=agent_id,
         execution_id=execution_id,
         capability_id="docs:write",
+        purpose="docs:write",
+        audience="https://api.example",
     )
     with pytest.raises(PermissionError):
         handle.validate_scope(
@@ -65,4 +77,46 @@ def test_secret_handle_is_execution_scoped() -> None:
             agent_id=agent_id,
             execution_id=execution_id,
             capability_id="docs:write",
+            purpose="docs:write",
+            audience="https://api.example",
+        )
+
+
+def test_secret_handle_rejects_expiry_and_scope_confusion() -> None:
+    agent_id, execution_id = uuid4(), uuid4()
+    now = datetime.now(UTC)
+    handle = ScopedSecretHandle(
+        "key",
+        "1",
+        "tenant-a",
+        "principal-a",
+        agent_id,
+        execution_id,
+        "docs:write",
+        "docs:write",
+        "https://api.example",
+        now - timedelta(minutes=2),
+        now - timedelta(minutes=1),
+    )
+    with pytest.raises(PermissionError):
+        handle.validate_scope(
+            tenant_id="tenant-a",
+            principal_id="principal-a",
+            agent_id=agent_id,
+            execution_id=execution_id,
+            capability_id="docs:write",
+            purpose="docs:write",
+            audience="https://api.example",
+            now=now,
+        )
+    with pytest.raises(PermissionError):
+        handle.validate_scope(
+            tenant_id="tenant-a",
+            principal_id="principal-a",
+            agent_id=agent_id,
+            execution_id=execution_id,
+            capability_id="docs:write",
+            purpose="wrong-purpose",
+            audience="https://api.example",
+            now=now,
         )
