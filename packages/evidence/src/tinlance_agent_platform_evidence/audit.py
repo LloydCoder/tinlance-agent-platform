@@ -18,6 +18,9 @@ class AuditRecord:
     occurred_at: datetime
     previous_hash: str
     record_hash: str
+    sequence: int = 0
+    execution_id: UUID | None = None
+    intent_fingerprint: str | None = None
 
 
 class AuditStore(Protocol):
@@ -30,6 +33,8 @@ class AuditStore(Protocol):
         resource: str,
         decision: str,
         occurred_at: datetime | None = None,
+        execution_id: UUID | None = None,
+        intent_fingerprint: str | None = None,
     ) -> AuditRecord: ...
 
     def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[AuditRecord, ...]: ...
@@ -54,6 +59,9 @@ class InMemoryAuditStore:
                 record.decision,
                 record.occurred_at.isoformat(),
                 record.previous_hash,
+                str(record.sequence),
+                str(record.execution_id or ""),
+                record.intent_fingerprint or "",
             )
         )
         return sha256(canonical.encode()).hexdigest()
@@ -67,22 +75,28 @@ class InMemoryAuditStore:
         resource: str,
         decision: str,
         occurred_at: datetime | None = None,
+        execution_id: UUID | None = None,
+        intent_fingerprint: str | None = None,
     ) -> AuditRecord:
         values = (tenant_id, actor_id, action, resource, decision)
         if any(not value or value != value.strip() for value in values):
             raise ValueError("audit identity fields must be normalized")
+        if intent_fingerprint is not None and not intent_fingerprint.strip():
+            raise ValueError("intent fingerprint must be normalized")
         observed = occurred_at or datetime.now(UTC)
         if observed.tzinfo is None or observed.utcoffset() is None:
             raise ValueError("audit timestamp must be timezone-aware")
         with self._lock:
-            previous = next(
+            previous_record = next(
                 (
-                    record.record_hash
+                    record
                     for record in reversed(self._records)
                     if record.tenant_id == tenant_id and record.run_id == run_id
                 ),
-                "",
+                None,
             )
+            previous = previous_record.record_hash if previous_record else ""
+            sequence = previous_record.sequence + 1 if previous_record else 1
             record = AuditRecord(
                 uuid4(),
                 tenant_id,
@@ -94,6 +108,9 @@ class InMemoryAuditStore:
                 observed,
                 previous,
                 "",
+                sequence,
+                execution_id,
+                intent_fingerprint,
             )
             record = AuditRecord(
                 record.audit_id,
@@ -120,8 +137,14 @@ class InMemoryAuditStore:
 
     def verify(self, tenant_id: str, run_id: UUID) -> bool:
         previous = ""
+        expected_sequence = 1
         for record in self.list_for_run(tenant_id, run_id):
-            if record.previous_hash != previous or record.record_hash != self._hash(record):
+            if (
+                record.sequence != expected_sequence
+                or record.previous_hash != previous
+                or record.record_hash != self._hash(record)
+            ):
                 return False
             previous = record.record_hash
+            expected_sequence += 1
         return True
