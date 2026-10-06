@@ -1,0 +1,35 @@
+# Tinlance Agent Platform
+
+> Governed execution substrate for secure autonomous AI agents, beneath Tinlance Agentic OS.
+
+## Canonical documentation
+
+- [README](README.md): product scope, quick start, installation, usage, configuration, features, and boundaries.
+- [Architecture](ARCHITECTURE.md): stable system boundary and security invariants.
+- [Documentation index](docs/README.md): documentation organized by purpose.
+- [Roadmap](docs/ROADMAP.md): canonical M0-M14 sequence and post-M14 enterprise assurance history.
+- [Enterprise baseline](docs/ENTERPRISE-BASELINE.md): production acceptance and external-dependency evidence requirements.
+- [Enterprise conformance](docs/ENTERPRISE-CONFORMANCE.md): conformance contracts and evidence expectations.
+- [Release readiness](docs/RELEASE-READINESS.md): repository release gates and their limits.
+- [Release security](docs/RELEASE-SECURITY.md): signed-release and SBOM verification guidance.
+- [Security policy](SECURITY.md): vulnerability reporting and security invariants.
+- [Contributing](CONTRIBUTING.md): contribution workflow and engineering constraints.
+- [Changelog](CHANGELOG.md): release and engineering history.
+
+## Product boundary
+
+Tinlance Agent Platform owns identity, tenancy, authorization, policy, approval, runtime, model/tool/MCP mediation, sandbox, secrets, budgets, evidence, audit, and governed execution.
+
+Tinlance Agentic OS and domain systems consume stable contracts and SDK surfaces. The Platform does not absorb application or domain responsibilities.
+
+## Security model
+
+Core properties are deny-by-default authorization, immutable tenant scope, complete mediation, exact and expiring approval binding, non-escalating child-agent authority, fail-closed isolation, execution-only secret handling, attributable integrity-protected evidence, and sensitive-data-safe observability.
+
+## Important limitation
+
+Repository CI demonstrates repository controls and executable tests. It does not by itself prove that external production infrastructure, independent penetration testing, disaster recovery exercises, or customer compliance evidence exists.
+
+## Machine-readable source
+
+The repository is Python-based, requires Python 3.12 through 3.14, and is built with Hatchling. Tests are configured through pyproject.toml.
