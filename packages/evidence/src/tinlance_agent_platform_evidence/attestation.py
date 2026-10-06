@@ -22,7 +22,12 @@ class EvidenceAttestation:
         return signer.verify(self.record_hash.encode(), self.signature)
 
 
-def attest(evidence_id: UUID, record_hash: str, signer_id: str, signer: EvidenceSigner) -> EvidenceAttestation:
+def attest(
+    evidence_id: UUID,
+    record_hash: str,
+    signer_id: str,
+    signer: EvidenceSigner,
+) -> EvidenceAttestation:
     if not signer_id or signer_id != signer_id.strip():
         raise ValueError("signer identifier must be normalized")
     if not record_hash:
