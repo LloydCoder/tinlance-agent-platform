@@ -56,7 +56,11 @@ class ScopedSecretHandle:
             raise ValueError("secret validation time must be timezone-aware")
         if self.issued_at.tzinfo is None or self.expires_at.tzinfo is None:
             raise ValueError("secret handle timestamps must be timezone-aware")
-        if self.expires_at <= self.issued_at or current < self.issued_at or current >= self.expires_at:
+        if (
+            self.expires_at <= self.issued_at
+            or current < self.issued_at
+            or current >= self.expires_at
+        ):
             raise PermissionError("secret handle is expired or not yet valid")
 
 
