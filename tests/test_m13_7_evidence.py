@@ -40,3 +40,14 @@ def test_evidence_rejects_unbounded_or_invalid_actor() -> None:
     store = InMemoryEvidenceStore()
     with pytest.raises(ValueError):
         store.append("tenant-a", uuid4(), "x", actor_id=" agent-a ")
+
+
+def test_audit_chain_detects_tampering() -> None:
+    from tinlance_agent_platform_evidence import InMemoryAuditStore
+
+    store = InMemoryAuditStore()
+    run_id = uuid4()
+    first = store.append("tenant-a", run_id, "agent-a", "write", "doc:1", "allow")
+    second = store.append("tenant-a", run_id, "agent-a", "write", "doc:2", "deny")
+    assert second.previous_hash == first.record_hash
+    assert store.verify("tenant-a", run_id)
