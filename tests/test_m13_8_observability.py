@@ -36,7 +36,9 @@ def test_trace_rejects_invalid_time_order() -> None:
 
 def test_incident_correlator_binds_security_and_audit() -> None:
     correlator = IncidentCorrelator()
-    incident = correlator.start("tenant-a", run_id=uuid4(), trace_id="0123456789abcdef0123456789abcdef")
+    incident = correlator.start(
+        "tenant-a", run_id=uuid4(), trace_id="0123456789abcdef0123456789abcdef"
+    )
     security_id, audit_id = uuid4(), uuid4()
     correlator.add_security_event(incident.incident_id, security_id, tenant_id="tenant-a")
     correlator.add_audit(incident.incident_id, audit_id, tenant_id="tenant-a")
