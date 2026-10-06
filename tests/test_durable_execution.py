@@ -11,12 +11,13 @@ from tinlance_agent_platform_execution import (
     JournalRecord,
     JournalState,
     SQLiteExecutionJournal,
- )
+)
 
 TENANT = "tenant-durable"
 EXECUTION_ID = UUID("00000000-0000-0000-0000-000000000301")
 AGENT_ID = UUID("00000000-0000-0000-0000-000000000302")
 RUN_ID = UUID("00000000-0000-0000-0000-000000000303")
+
 
 def record(*, execution_id: UUID = EXECUTION_ID, key: str = "idem-1") -> JournalRecord:
     return JournalRecord(
