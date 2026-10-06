@@ -34,7 +34,9 @@ class JWKSIdentityVerifier:
             raise ValueError("JWKS endpoint must use HTTPS")
         if not self.audience.strip():
             raise ValueError("identity audience is required")
-        if not self.algorithms or any(algorithm not in {"RS256", "PS256", "ES256", "EdDSA"} for algorithm in self.algorithms):
+        if not self.algorithms or any(
+            algorithm not in {"RS256", "PS256", "ES256", "EdDSA"} for algorithm in self.algorithms
+        ):
             raise ValueError("identity algorithms are not allowed")
 
     def _provider(self) -> SigningKeyProvider:
