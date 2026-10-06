@@ -50,7 +50,8 @@ def test_tool_gateway_rejects_permit_for_different_call() -> None:
     principal = Principal("user", "human", "tenant-a", scopes=frozenset({"doc:read"}))
     context = RequestContext("req", "tenant-a", principal, "test")
     call = ToolCall(uuid4(), "tenant-a", uuid4(), "reader", "doc:read", "read", "doc:1")
-    permit = gateway.issue_permit(context, call, request())
+    decision = gateway.authorize(context, call, request())
+    permit = gateway.issue_permit(call, decision)
     different = ToolCall(uuid4(), "tenant-a", call.run_id, "reader", "doc:read", "read", "doc:2")
     with pytest.raises(PermissionError):
         gateway.execute(different, permit)
