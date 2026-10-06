@@ -77,7 +77,9 @@ class ExecutionJournal(Protocol):
         result_json: str | None = None,
     ) -> JournalRecord: ...
 
-    def list_recovery_candidates(self, tenant_id: str | None = None) -> tuple[JournalRecord, ...]: ...
+    def list_recovery_candidates(
+        self, tenant_id: str | None = None
+    ) -> tuple[JournalRecord, ...]: ...
 
 
 class SQLiteExecutionJournal:
