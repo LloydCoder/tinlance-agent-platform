@@ -32,6 +32,10 @@ PostgreSQL is the reference durable control-plane boundary. Tenant RLS is defens
 
 Evidence, trajectory and audit records are append-only surfaces. Event/outbox publication remains a transactionally durable adapter responsibility.
 
+## Durable execution
+
+Consequential execution identity and lifecycle state are journaled before the side-effect boundary. Terminal results are replayable after restart. Once a side-effect may have started, recovery fails closed to an outcome-unknown state and requires reconciliation rather than blind replay. The reference SQLite journal uses WAL with synchronous=FULL; production deployments must provide the same journal contract over durable PostgreSQL.
+
 ## Agentic OS relationship
 
 Agent Platform is not the operating environment itself. Agentic OS is a higher-level layer that composes humans, agents, organizations, workflows, applications and domain products using this governed substrate.
