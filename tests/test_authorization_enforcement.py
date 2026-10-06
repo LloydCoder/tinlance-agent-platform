@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from tinlance_agent_platform_execution import ExecutionErrorCode, ExecutionRequest, GovernedExecutionService
+from tinlance_agent_platform_execution import ExecutionErrorCode, ExecutionFailure, ExecutionRequest, GovernedExecutionService
 
 TENANT = "tenant-authz"
 RUN_ID = UUID("00000000-0000-0000-0000-000000000401")
@@ -63,6 +63,6 @@ def test_bound_approval_is_checked_against_intent() -> None:
 def test_unbound_approval_fails_closed() -> None:
     approvals = ApprovalStub(error=True)
     service = service_with(approvals)
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(ExecutionFailure) as exc_info:
         service._require_bound_approval(request())
     assert getattr(exc_info.value, "code", None) is ExecutionErrorCode.APPROVAL_BINDING_MISMATCH
