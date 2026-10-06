@@ -4,7 +4,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from tinlance_agent_platform_execution import ExecutionErrorCode, ExecutionFailure, ExecutionRequest, GovernedExecutionService
+from tinlance_agent_platform_execution import (
+    ExecutionErrorCode,
+    ExecutionFailure,
+    ExecutionRequest,
+    GovernedExecutionService,
+)
 
 TENANT = "tenant-authz"
 RUN_ID = UUID("00000000-0000-0000-0000-000000000401")
