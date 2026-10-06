@@ -612,8 +612,9 @@ class GovernedExecutionService:
                         "approval is required",
                         execution_id=execution_id,
                     )
+                self._require_bound_approval(request)
             elif request.approval_id is not None:
-                self.approvals.require_approved(request.approval_id)
+                self._require_bound_approval(request)
             effective_timeout = min(
                 request.requested_timeout_seconds,
                 registration.timeout_seconds,
@@ -659,7 +660,12 @@ class GovernedExecutionService:
                 self.secrets.authorize(request)
             elif self.secrets is not None:
                 self.secrets.authorize(request)
-            self._journal_state(request, execution_id, ExecutionState.AUTHORIZED)
+            self._journal_state(
+                request,
+                execution_id,
+                ExecutionState.AUTHORIZED,
+                policy_decision_id=policy_id,
+            )
             self._event(request, execution_id, "execution.started", audit_ids)
             started = monotonic()
             call = ToolCall(
@@ -883,6 +889,27 @@ class GovernedExecutionService:
             bool(value.get("retryable", False)),
         )
 
+    def _require_bound_approval(self, request: ExecutionRequest) -> None:
+        if request.approval_id is None:
+            raise ExecutionFailure(
+                ExecutionErrorCode.APPROVAL_REQUIRED,
+                "approval is required",
+            )
+        try:
+            self.approvals.require_approved_for(
+                request.approval_id,
+                request.tenant_id,
+                request.run_id,
+                request.action,
+                request.resource,
+                intent_fingerprint=request.fingerprint,
+            )
+        except PermissionError as exc:
+            raise ExecutionFailure(
+                ExecutionErrorCode.APPROVAL_BINDING_MISMATCH,
+                "approval is not valid for this execution intent",
+            ) from exc
+
     def _journal_state(
         self,
         request: ExecutionRequest,
@@ -890,6 +917,7 @@ class GovernedExecutionService:
         state: ExecutionState,
         *,
         side_effect_started: bool | None = None,
+        policy_decision_id: str | None = None,
         result: ExecutionResult | None = None,
     ) -> None:
         self._states[execution_id] = state
@@ -899,6 +927,7 @@ class GovernedExecutionService:
                 execution_id,
                 JournalState(state.value),
                 side_effect_started=side_effect_started,
+                policy_decision_id=policy_decision_id,
                 result_json=encode_result(result) if result is not None else None,
             )
 
