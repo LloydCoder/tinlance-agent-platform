@@ -33,3 +33,7 @@ The TADL-hosted conformance suite is the executable compatibility gate for the f
 ## Production identity
 
 The Platform now includes a JWKS-backed JWT verification adapter for production identity boundaries. Verified issuer, audience, subject, tenant and validity claims feed the Platform authorization boundary; identity verification never grants execution authority. See `docs/production-runtime/M13-2-REAL-IDENTITY.md`.
+
+## Authorization enforcement
+
+M13.3 makes the authorization boundary explicit: authenticated identity, registered capability, policy decision, required bound approval and runtime controls must all permit the operation before the side-effect boundary. Approval binding includes tenant, run, action, resource and intent fingerprint.
