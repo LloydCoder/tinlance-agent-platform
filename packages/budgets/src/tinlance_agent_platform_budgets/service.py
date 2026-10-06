@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from tinlance_agent_platform_contracts import Budget
 
-from .capacity import TenantReservation, TenantQuotaService
+from .quota import TenantQuotaService, TenantReservation
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,8 +81,7 @@ class BudgetService:
                     raise ValueError("budget reservation ID conflicts with a different scope")
                 return existing
             if self._tenant_quota is not None:
-                try:
-                    self._tenant_quota.reserve(
+                self._tenant_quota.reserve(
                         reservation_id=str(rid),
                         tenant_id=scope.tenant_id,
                         agent_id=str(scope.agent_id),
@@ -92,8 +91,6 @@ class BudgetService:
                         concurrency=1,
                         tool_calls=tool_calls,
                     )
-                except Exception:
-                    raise
             self._reservations[rid] = candidate
             return candidate
 
