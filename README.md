@@ -14,8 +14,9 @@
 
 ~~~mermaid
 flowchart LR
-    OS[Tinlance Agentic OS] --> SDK[Stable SDK / Contracts]
-    SDK --> P[Agent Platform]
+    D[Tinlance Agent Developer] --> OS[Tinlance Agent OS]
+    OS --> SDK[Tinlance Agent Platform SDK]
+    SDK --> P[Tinlance Agent Platform]
     P --> ID[Identity + Tenancy]
     P --> AUTH[Authorization + Policy]
     P --> APP[Approval]
