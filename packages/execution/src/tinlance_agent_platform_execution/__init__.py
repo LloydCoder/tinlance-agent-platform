@@ -1,4 +1,10 @@
-from .journal import ExecutionJournal, JournalRecord, JournalState, SQLiteExecutionJournal, encode_result
+from .journal import (
+    ExecutionJournal,
+    JournalRecord,
+    JournalState,
+    SQLiteExecutionJournal,
+    encode_result,
+)
 from .service import (
     CONTRACT_VERSION,
     ExecutionErrorCode,
