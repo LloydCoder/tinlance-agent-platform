@@ -1,7 +1,7 @@
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import RLock
-import re
 from typing import Protocol
 from uuid import UUID, uuid4
 
