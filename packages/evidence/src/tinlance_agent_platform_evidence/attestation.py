@@ -19,7 +19,14 @@ class EvidenceAttestation:
     def verify(self, signer: EvidenceSigner) -> bool:
         if not self.signer_id or not self.record_hash or not self.signature:
             return False
-        return signer.verify(self.record_hash.encode(), self.signature)
+        return signer.verify(
+            _attestation_message(self.evidence_id, self.record_hash, self.signer_id),
+            self.signature,
+        )
+
+
+def _attestation_message(evidence_id: UUID, record_hash: str, signer_id: str) -> bytes:
+    return f"{evidence_id}|{record_hash}|{signer_id}".encode()
 
 
 def attest(
@@ -32,7 +39,7 @@ def attest(
         raise ValueError("signer identifier must be normalized")
     if not record_hash:
         raise ValueError("record hash is required")
-    signature = signer.sign(record_hash.encode())
+    signature = signer.sign(_attestation_message(evidence_id, record_hash, signer_id))
     if not signature:
         raise ValueError("signer returned an empty signature")
     return EvidenceAttestation(evidence_id, record_hash, signer_id, signature)
