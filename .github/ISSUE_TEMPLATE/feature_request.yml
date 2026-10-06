@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose a change that fits the governed execution boundary.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the problem and the platform boundary. Features that move domain-product responsibilities into the Platform will be redirected.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem should this change solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest coherent change and its consumer-facing effect.
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Architectural boundary
+      description: Which package, contract, or trust boundary owns this capability? What must remain outside the Platform?
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and governance impact
+      description: Explain authorization, tenancy, approval, sandbox, secrets, evidence, or supply-chain implications.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and documentation.
+          required: true
+        - label: This proposal does not rely on model output, prompt content, retrieved data, or evaluation results as authority.
+          required: true
