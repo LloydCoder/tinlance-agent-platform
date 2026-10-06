@@ -110,7 +110,8 @@ def test_tool_gateway_requires_authorization() -> None:
     )
     decision = gateway.authorize(context, call, request)
     assert decision.decision is Decision.ALLOW
-    assert gateway.execute(call, decision) == "executed"
+    permit = gateway.issue_permit(call, decision)
+    assert gateway.execute(call, permit) == "executed"
 
 
 def test_tool_gateway_denies_mismatched_action() -> None:
