@@ -20,9 +20,21 @@ RUN_ID = UUID("00000000-0000-0000-0000-000000000303")
 
 def record(*, execution_id: UUID = EXECUTION_ID, key: str = "idem-1") -> JournalRecord:
     return JournalRecord(
-        execution_id, TENANT, "subject-durable", AGENT_ID, RUN_ID,
-        "request-durable", key, "fingerprint-durable", JournalState.REQUESTED,
-        False, "", None, "trace-durable", None, datetime.now(UTC),
+        execution_id,
+        TENANT,
+        "subject-durable",
+        AGENT_ID,
+        RUN_ID,
+        "request-durable",
+        key,
+        "fingerprint-durable",
+        JournalState.REQUESTED,
+        False,
+        "",
+        None,
+        "trace-durable",
+        None,
+        datetime.now(UTC),
     )
 
 def test_journal_survives_reopen_and_recovers_inflight_work() -> None:
@@ -46,9 +58,13 @@ def test_terminal_result_is_durable_and_replayable() -> None:
         journal = SQLiteExecutionJournal(path)
         assert journal.create(record())
         result = {
-            "execution_id": str(EXECUTION_ID), "state": "completed", "output": "safe result",
-            "evidence_ids": [str(uuid4())], "audit_event_ids": [str(uuid4())],
-            "error_code": None, "retryable": False,
+            "execution_id": str(EXECUTION_ID),
+            "state": "completed",
+            "output": "safe result",
+            "evidence_ids": [str(uuid4())],
+            "audit_event_ids": [str(uuid4())],
+            "error_code": None,
+            "retryable": False,
         }
         journal.transition(
             TENANT,
