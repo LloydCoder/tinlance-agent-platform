@@ -46,7 +46,9 @@ class VerifiedAgentIdentity:
 
 
 class IdentityVerifier(Protocol):
-    def verify(self, assertion: str, *, expected_nonce: str | None = None) -> VerifiedAgentIdentity: ...
+    def verify(
+        self, assertion: str, *, expected_nonce: str | None = None
+    ) -> VerifiedAgentIdentity: ...
 
 
 def require_verified_identity(
