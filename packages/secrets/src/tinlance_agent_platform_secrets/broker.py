@@ -26,6 +26,4 @@ class SecretBroker:
         self._provider = provider
 
     def resolve_for_execution(self, handle: SecretHandle) -> str:
-        raise PermissionError(
-            "unscoped secret resolution is disabled; use ScopedSecretBroker"
-        )
+        raise PermissionError("unscoped secret resolution is disabled; use ScopedSecretBroker")
