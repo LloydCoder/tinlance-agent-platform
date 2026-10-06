@@ -39,6 +39,7 @@ def record(*, execution_id: UUID = EXECUTION_ID, key: str = "idem-1") -> Journal
     )
 
 
+
 def test_journal_survives_reopen_and_recovers_inflight_work() -> None:
     with TemporaryDirectory() as directory:
         path = f"{directory}/journal.sqlite"
@@ -53,6 +54,7 @@ def test_journal_survives_reopen_and_recovers_inflight_work() -> None:
         assert [item.execution_id for item in reopened.list_recovery_candidates(TENANT)] == [
             EXECUTION_ID
         ]
+
 
 def test_terminal_result_is_durable_and_replayable() -> None:
     with TemporaryDirectory() as directory:
@@ -82,6 +84,7 @@ def test_terminal_result_is_durable_and_replayable() -> None:
         assert json.loads(recovered.result_json or "{}") == result
         assert reopened.list_recovery_candidates(TENANT) == ()
 
+
 def test_side_effect_marker_is_monotonic() -> None:
     with TemporaryDirectory() as directory:
         journal = SQLiteExecutionJournal(f"{directory}/journal.sqlite")
@@ -95,12 +98,14 @@ def test_side_effect_marker_is_monotonic() -> None:
                 side_effect_started=False,
             )
 
+
 def test_idempotency_identity_is_unique_per_tenant() -> None:
     with TemporaryDirectory() as directory:
         journal = SQLiteExecutionJournal(f"{directory}/journal.sqlite")
         assert journal.create(record())
         assert journal.create(record(execution_id=uuid4())) is False
         assert journal.create(record(execution_id=uuid4(), key="idem-1-tenant-2")) is True
+
 
 def test_invalid_database_path_is_rejected() -> None:
     with pytest.raises(ValueError):
