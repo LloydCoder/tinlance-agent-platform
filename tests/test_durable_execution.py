@@ -36,7 +36,9 @@ def test_journal_survives_reopen_and_recovers_inflight_work() -> None:
         assert recovered is not None
         assert recovered.state is JournalState.RUNNING
         assert recovered.side_effect_started is True
-        assert [item.execution_id for item in reopened.list_recovery_candidates(TENANT)] == [EXECUTION_ID]
+        assert [item.execution_id for item in reopened.list_recovery_candidates(TENANT)] == [
+            EXECUTION_ID
+        ]
 
 def test_terminal_result_is_durable_and_replayable() -> None:
     with TemporaryDirectory() as directory:
@@ -48,7 +50,13 @@ def test_terminal_result_is_durable_and_replayable() -> None:
             "evidence_ids": [str(uuid4())], "audit_event_ids": [str(uuid4())],
             "error_code": None, "retryable": False,
         }
-        journal.transition(TENANT, EXECUTION_ID, JournalState.COMPLETED, side_effect_started=True, result_json=json.dumps(result, sort_keys=True))
+        journal.transition(
+            TENANT,
+            EXECUTION_ID,
+            JournalState.COMPLETED,
+            side_effect_started=True,
+            result_json=json.dumps(result, sort_keys=True),
+        )
         reopened = SQLiteExecutionJournal(path)
         recovered = reopened.get_by_idempotency(TENANT, "idem-1")
         assert recovered is not None
@@ -62,7 +70,12 @@ def test_side_effect_marker_is_monotonic() -> None:
         assert journal.create(record())
         journal.transition(TENANT, EXECUTION_ID, JournalState.RUNNING, side_effect_started=True)
         with pytest.raises(ValueError, match="cannot be cleared"):
-            journal.transition(TENANT, EXECUTION_ID, JournalState.AUTHORIZED, side_effect_started=False)
+            journal.transition(
+                TENANT,
+                EXECUTION_ID,
+                JournalState.AUTHORIZED,
+                side_effect_started=False,
+            )
 
 def test_idempotency_identity_is_unique_per_tenant() -> None:
     with TemporaryDirectory() as directory:
