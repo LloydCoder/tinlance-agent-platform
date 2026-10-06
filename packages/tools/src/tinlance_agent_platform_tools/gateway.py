@@ -152,8 +152,7 @@ class ToolGateway:
         decision: PolicyDecision,
     ) -> ToolExecutionPermit:
         if decision.decision is Decision.DENY or (
-            decision.decision is Decision.REQUIRE_AUTHORIZATION
-            and not decision.requires_approval
+            decision.decision is Decision.REQUIRE_AUTHORIZATION and not decision.requires_approval
         ):
             raise PermissionError("tool execution denied")
         return ToolExecutionPermit(
