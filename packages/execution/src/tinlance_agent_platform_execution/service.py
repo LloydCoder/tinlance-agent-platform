@@ -698,6 +698,14 @@ class GovernedExecutionService:
                     self.budget.release(budget_reservation)
                     budget_reservation = None
                 self.idempotency.complete(record, result)
+                if self.journal is not None:
+                    self._journal_state(
+                        request,
+                        execution_id,
+                        result.state,
+                        side_effect_started=True,
+                        result=result,
+                    )
                 self._results[execution_id] = result
                 return result
             except PermissionError as exc:
@@ -738,6 +746,14 @@ class GovernedExecutionService:
                     self.budget.release(budget_reservation)
                     budget_reservation = None
                 self.idempotency.complete(record, result)
+                if self.journal is not None:
+                    self._journal_state(
+                        request,
+                        execution_id,
+                        result.state,
+                        side_effect_started=True,
+                        result=result,
+                    )
                 self._results[execution_id] = result
                 return result
             if self.secrets is not None:
@@ -816,6 +832,14 @@ class GovernedExecutionService:
                     execution_id, state, None, (), tuple(audit_ids), exc.code, exc.retryable
                 )
                 self.idempotency.complete(record, result)
+                if self.journal is not None:
+                    self._journal_state(
+                        request,
+                        execution_id,
+                        result.state,
+                        side_effect_started=True,
+                        result=result,
+                    )
                 self._results[execution_id] = result
             raise
         except Exception as exc:
