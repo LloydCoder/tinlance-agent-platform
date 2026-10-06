@@ -107,18 +107,11 @@ class TenantQuotaService:
             current = self._reservations.get(reservation.reservation_id)
             if current != reservation:
                 raise KeyError("quota reservation does not exist")
-            self._consumed = tuple(
-                left + right
-                for left, right in zip(
-                    self._consumed,
-                    (
-                        reservation.concurrency,
-                        reservation.tool_calls,
-                        reservation.token_units,
-                        reservation.cost_units,
-                    ),
-                    strict=True,
-                )
+            self._consumed = (
+                self._consumed[0] + reservation.concurrency,
+                self._consumed[1] + reservation.tool_calls,
+                self._consumed[2] + reservation.token_units,
+                self._consumed[3] + reservation.cost_units,
             )
             del self._reservations[reservation.reservation_id]
 
