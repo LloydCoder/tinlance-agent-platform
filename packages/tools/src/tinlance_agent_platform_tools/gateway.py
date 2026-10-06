@@ -20,6 +20,7 @@ from tinlance_agent_platform_policy import evaluate
 @dataclass(frozen=True, slots=True)
 class ToolExecutionPermit:
     _seal: object
+    permit_id: UUID
     tool_name: str
     tenant_id: str
     run_id: UUID
@@ -156,6 +157,7 @@ class ToolGateway:
             raise PermissionError("tool execution denied")
         return ToolExecutionPermit(
             self._permit_seal,
+            uuid4(),
             call.tool_name,
             call.tenant_id,
             call.run_id,
@@ -179,7 +181,7 @@ class ToolGateway:
             raise PermissionError("tool execution permit scope mismatch")
         if permit.run_id != call.run_id or permit.call_fingerprint != self._call_fingerprint(call):
             raise PermissionError("tool execution permit intent mismatch")
-        permit_key = f"{permit.tenant_id}:{permit.run_id}:{permit.call_fingerprint}"
+        permit_key = str(permit.permit_id)
         if permit_key in self._used_permits:
             raise PermissionError("tool execution permit has already been consumed")
         if permit.decision.decision is Decision.DENY:
