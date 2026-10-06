@@ -123,6 +123,9 @@ class InMemoryAuditStore:
                 record.occurred_at,
                 record.previous_hash,
                 self._hash(record),
+                record.sequence,
+                record.execution_id,
+                record.intent_fingerprint,
             )
             self._records.append(record)
             return record
