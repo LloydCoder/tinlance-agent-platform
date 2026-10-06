@@ -22,7 +22,6 @@ from uuid import UUID, uuid4
 
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
-from tinlance_agent_platform_contracts import (
     AgentDefinition,
     ApprovalStatus,
     CapabilityRequest,
@@ -38,10 +37,6 @@ from tinlance_agent_platform_policy import evaluate
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 from .journal import ExecutionJournal, JournalRecord, JournalState, encode_result
-from tinlance_agent_platform_events import EventStore, new_event
-from tinlance_agent_platform_evidence import EvidenceStore
-from tinlance_agent_platform_policy import evaluate
-from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 CONTRACT_VERSION = "governed-execution.v1"
 MAX_INPUT_BYTES = 1 * 1024 * 1024
