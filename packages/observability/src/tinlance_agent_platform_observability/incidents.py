@@ -43,9 +43,7 @@ class IncidentCorrelator:
             self._incidents[incident.incident_id] = incident
         return incident
 
-    def add_security_event(
-        self, incident_id: UUID, event_id: UUID, *, tenant_id: str
-    ) -> None:
+    def add_security_event(self, incident_id: UUID, event_id: UUID, *, tenant_id: str) -> None:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("incident tenant is required")
         with self._lock:
@@ -62,9 +60,7 @@ class IncidentCorrelator:
                 incident.evidence_ids,
             )
 
-    def add_audit(
-        self, incident_id: UUID, audit_id: UUID, *, tenant_id: str
-    ) -> None:
+    def add_audit(self, incident_id: UUID, audit_id: UUID, *, tenant_id: str) -> None:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("incident tenant is required")
         with self._lock:
@@ -81,9 +77,7 @@ class IncidentCorrelator:
                 incident.evidence_ids,
             )
 
-    def add_evidence(
-        self, incident_id: UUID, evidence_id: UUID, *, tenant_id: str
-    ) -> None:
+    def add_evidence(self, incident_id: UUID, evidence_id: UUID, *, tenant_id: str) -> None:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("incident tenant is required")
         with self._lock:
