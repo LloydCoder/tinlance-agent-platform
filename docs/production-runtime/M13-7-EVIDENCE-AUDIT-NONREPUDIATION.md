@@ -25,6 +25,8 @@ flowchart LR
 - Each record commits to the previous record hash, making deletion/reordering/tampering detectable.
 - Audit records capture actor, action, resource and decision without storing secret material.
 - External signing is provider-neutral and can be backed by KMS/HSM.
+- Attestation signatures bind the evidence identifier, record hash and signer identifier; changing any of those fields invalidates verification.
+- Audit records carry an explicit per-run sequence plus optional execution and intent-fingerprint bindings, and verification fails on gaps or reordering.
 - Verification fails closed when a chain or attestation does not validate.
 - Repository implementations are reference adapters; durable append-only storage, WORM/retention controls and production key custody remain deployment responsibilities.
 

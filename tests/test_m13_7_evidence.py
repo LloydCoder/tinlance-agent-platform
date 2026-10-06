@@ -19,6 +19,7 @@ def test_evidence_hash_chain_is_tamper_evident() -> None:
     first = store.append("tenant-a", run_id, "first", actor_id="agent-a")
     second = store.append("tenant-a", run_id, "second", actor_id="agent-a")
     assert second.previous_hash == first.record_hash
+    assert second.sequence == first.sequence + 1
     assert store.verify("tenant-a", run_id)
 
     store._items[0] = first.__class__(
@@ -43,6 +44,8 @@ def test_evidence_attestation_verifies_external_signature() -> None:
     evidence = store.append("tenant-a", uuid4(), "decision", actor_id="agent-a")
     receipt = attest(evidence.evidence_id, evidence.record_hash, "kms-key-1", Signer())
     assert receipt.verify(Signer())
+    tampered = receipt.__class__(uuid4(), receipt.record_hash, receipt.signer_id, receipt.signature)
+    assert not tampered.verify(Signer())
 
 
 def test_evidence_rejects_unbounded_or_invalid_actor() -> None:
@@ -59,4 +62,5 @@ def test_audit_chain_detects_tampering() -> None:
     first = store.append("tenant-a", run_id, "agent-a", "write", "doc:1", "allow")
     second = store.append("tenant-a", run_id, "agent-a", "write", "doc:2", "deny")
     assert second.previous_hash == first.record_hash
+    assert second.sequence == first.sequence + 1
     assert store.verify("tenant-a", run_id)
