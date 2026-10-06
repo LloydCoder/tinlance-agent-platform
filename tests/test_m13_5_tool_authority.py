@@ -37,7 +37,8 @@ def test_tool_gateway_requires_platform_issued_single_use_permit() -> None:
     principal = Principal("user", "human", "tenant-a", scopes=frozenset({"doc:read"}))
     context = RequestContext("req", "tenant-a", principal, "test")
     call = ToolCall(uuid4(), "tenant-a", uuid4(), "reader", "doc:read", "read", "doc:1")
-    permit = gateway.issue_permit(context, call, request())
+    decision = gateway.authorize(context, call, request())
+    permit = gateway.issue_permit(call, decision)
     assert gateway.execute(call, permit) == "ok:doc:1"
     with pytest.raises(PermissionError):
         gateway.execute(call, permit)
