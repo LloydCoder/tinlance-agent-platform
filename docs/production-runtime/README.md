@@ -63,3 +63,6 @@ The final audit re-verified the consequential path and fixed the following class
 - Tool/MCP/sandbox/secret/evidence/observability boundaries remain Platform-authoritative; upstream repositories are declaration/orchestration surfaces only.
 
 The repository gates validate these contracts. External durable stores, KMS/HSM, isolated compute, telemetry backends, network controls and independent assurance remain deployment responsibilities.
+
+
+- [P6 Production Runtime Contract](P6-PRODUCTION-RUNTIME-CONTRACT.md)
