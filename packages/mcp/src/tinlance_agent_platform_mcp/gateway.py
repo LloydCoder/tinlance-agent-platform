@@ -40,8 +40,6 @@ class ToolScope:
             raise ValueError("tool scope fields must be normalized")
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class MCPExecutionPermit:
     _seal: object
@@ -311,4 +309,3 @@ class MCPToolGateway:
             approval_id=approval_id,
             approval_verifier=approval_verifier,
         )
-
