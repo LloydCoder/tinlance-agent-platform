@@ -80,7 +80,12 @@ def test_mcp_unresolved_authorization_fails_closed() -> None:
     gateway = MCPToolGateway(transport)
     gateway.register(MCPTool("reader", "read docs", "doc:read", "doc:1", "read"))
     decision = PolicyDecision(
-        Decision.REQUIRE_AUTHORIZATION, "test", "1", "approval", RiskTier.LOW, requires_approval=False
+        Decision.REQUIRE_AUTHORIZATION,
+        "test",
+        "1",
+        "approval",
+        RiskTier.LOW,
+        requires_approval=False
     )
     with pytest.raises(PermissionError):
         gateway.issue_permit(
