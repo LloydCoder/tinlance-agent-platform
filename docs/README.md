@@ -14,6 +14,7 @@ This directory contains the operational and engineering documentation for Tinlan
 | Prepare a release | [Release readiness](RELEASE-READINESS.md) |
 | Verify release security | [Release security](RELEASE-SECURITY.md) |
 | Understand governed execution | [R10 governed execution](R10-GOVERNED-EXECUTION.md) |
+| Review production-runtime hardening | [Production runtime index](production-runtime/README.md) |
 
 ## Documentation model
 

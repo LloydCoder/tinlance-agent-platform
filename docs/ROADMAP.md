@@ -222,6 +222,22 @@ This status is a repository-level statement. External production infrastructure,
 The following labels are implementation traceability only and do not redefine the canonical M0-M14 vocabulary or reopen the completed M15-M29 enterprise track.
 
 ### M13.4 — Budget and Resource Governance
+### M13.5 — Sandbox, Tool and MCP Authority
+
+Sealed, single-use Platform-issued tool permits mediate consequential tool execution. Sandbox workspaces are constrained to approved roots, resource ceilings are enforced, Linux capabilities are dropped where bubblewrap is available, and MCP calls remain policy-mediated.
+
+### M13.6 — Secrets and Credential Governance
+
+Execution secret handles are tenant, principal, agent, execution, capability, purpose, audience and validity-window bound. The legacy unscoped secret-resolution surface fails closed.
+
+### M13.7 — Evidence, Audit and Non-Repudiation
+
+Evidence and audit records are bounded, tenant/run scoped and hash-chain verifiable. Audit records carry sequence and optional execution/intent bindings. External attestations cryptographically bind evidence identity, record hash and signer identity.
+
+### M13.8 — Observability and Incident Correlation
+
+Observability uses normalized W3C trace/span identifiers. Incident correlation is tenant-bound and can link security events, audit records and evidence without turning telemetry into execution authority.
+
 
 The consequential execution boundary now requires exact tenant/agent/run/action/resource budget scope, idempotent reservation identity, atomic tenant quota admission, and fail-closed settlement/release semantics. This hardens the M4 hard-budget invariant and M26 economic-governance contracts.
 

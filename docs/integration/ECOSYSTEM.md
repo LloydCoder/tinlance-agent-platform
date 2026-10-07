@@ -42,3 +42,16 @@ The Platform now includes a JWKS-backed JWT verification adapter for production 
 ## Authorization enforcement
 
 M13.3 makes the authorization boundary explicit: authenticated identity, registered capability, policy decision, required bound approval and runtime controls must all permit the operation before the side-effect boundary. Approval binding includes tenant, run, action, resource and intent fingerprint.
+
+
+## Supplemental production-runtime reconciliation
+
+| Phase | Platform authority | Upstream boundary |
+|---|---|---|
+| M13.4 | Budget/resource reservation and settlement | SDK/OS/TADL carry declarations only |
+| M13.5 | Tool/MCP permits and sandbox enforcement | SDK/OS/TADL cannot grant tool or sandbox authority |
+| M13.6 | Scoped secret resolution | SDK/OS/TADL secret references are metadata only |
+| M13.7 | Evidence/audit integrity and attestation | SDK/OS/TADL provenance is non-authoritative |
+| M13.8 | Observability and incident correlation | SDK/OS/TADL telemetry is correlation metadata only |
+
+All consequential operations re-enter the Platform authority boundary before side effects. See [Production runtime hardening](../production-runtime/README.md).
