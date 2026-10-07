@@ -182,6 +182,7 @@ The canonical architectural precedence is:
 
 - [Documentation index](docs/README.md)
 - [Ecosystem conformance](docs/integration/CONFORMANCE.md)
+- [P10 — Replication & Agent System GA](docs/ecosystem/P10-REPLICATION-GA.md)
 - [Architecture](ARCHITECTURE.md)
 - [Canonical roadmap](docs/ROADMAP.md)
 - [Enterprise baseline](docs/ENTERPRISE-BASELINE.md)
