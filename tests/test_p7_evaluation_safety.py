@@ -2,7 +2,7 @@ from tinlance_agent_platform_evaluation import EvaluationGate, EvalResult
 
 
 def test_evaluation_gate_blocks_failed_safety_case() -> None:
-    gate = EvaluationGate("p7", minimum_pass_rate=1.0, require_all_safety_critical=True)
+    gate = EvaluationGate("p7", minimum_pass_rate=0.5, require_all_safety_critical=True)
     results = (
         EvalResult(case_id="safe", passed=True, output="ok", reason="pass"),
         EvalResult(case_id="critical", passed=False, output="", reason="failure"),
