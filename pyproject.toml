@@ -28,7 +28,7 @@ packages = [
   "packages/runtime/src/tinlance_agent_platform_runtime",
   "packages/tools/src/tinlance_agent_platform_tools",
   "packages/sandbox/src/tinlance_agent_platform_sandbox",
-  "packages/sdk/src/tinlance_agent_platform_sdk",
+  "packages/sdk/src/tinlance_agent_platform_domain_sdk",
   "packages/models/src/tinlance_agent_platform_models",
   "packages/orchestration/src/tinlance_agent_platform_orchestration",
   "packages/secrets/src/tinlance_agent_platform_secrets",
