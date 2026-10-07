@@ -13,7 +13,9 @@ def validate_trace_id(value: str | None) -> None:
     if value is not None and (
         not _TRACE_ID.fullmatch(value) or value == "0" * 32
     ):
-        raise ValueError("trace_id must be a non-zero 32-character lowercase hexadecimal W3C trace id")
+        raise ValueError(
+            "trace_id must be a non-zero 32-character lowercase hexadecimal W3C trace id"
+        )
 
 
 def validate_span_id(value: str | None) -> None:
@@ -65,7 +67,7 @@ class MetricPoint:
             raise ValueError("metric tenant is required")
         if not self.name or self.name != self.name.strip() or not self.unit.strip():
             raise ValueError("metric identity is required")
-        _validate_trace_id(self.trace_id)
+        validate_trace_id(self.trace_id)
 
 
 @dataclass(frozen=True, slots=True)
