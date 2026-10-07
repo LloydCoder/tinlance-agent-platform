@@ -42,9 +42,7 @@ class Transport:
 def test_mcp_permit_is_single_use_and_intent_bound() -> None:
     transport = Transport()
     gateway = MCPToolGateway(transport)
-    gateway.register(
-        MCPTool("reader", "read docs", "doc:read", "doc:1", "read")
-    )
+    gateway.register(MCPTool("reader", "read docs", "doc:read", "doc:1", "read"))
     principal = Principal("user", "human", "tenant-a", scopes=frozenset({"doc:read"}))
     context = RequestContext("req", "tenant-a", principal, "test")
     scope = ToolScope("tenant-a", "doc:read", "doc:1")
@@ -85,7 +83,7 @@ def test_mcp_unresolved_authorization_fails_closed() -> None:
         "1",
         "approval",
         RiskTier.LOW,
-        requires_approval=False
+        requires_approval=False,
     )
     with pytest.raises(PermissionError):
         gateway.issue_permit(
