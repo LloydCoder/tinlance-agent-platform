@@ -1,7 +1,8 @@
-from .service import _validate_trace_id
 from dataclasses import dataclass
 from threading import RLock
 from uuid import UUID, uuid4
+
+from .service import _validate_trace_id
 
 
 @dataclass(frozen=True, slots=True)
