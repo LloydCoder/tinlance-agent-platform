@@ -45,4 +45,21 @@ flowchart LR
 
 ## External alignment
 
-The controls are informed by NIST's 2026 software-agent identity/authorization work, OWASP agentic-security guidance, and OAuth 2.0 Security BCP (RFC 9700). These sources inform the design but do not substitute for executable tests or deployment evidence.
+The controls are informed by NIST's 2026 software-agent identity/authorization work, OWASP agentic-security guidance, OAuth 2.0 Security BCP (RFC 9700), and the MCP 2026-07-28 authorization model. Current MCP guidance emphasizes per-request authorization, issuer validation, credential isolation and enterprise-managed authorization; the platform therefore treats MCP transport authentication as necessary but never sufficient for consequential execution.
+
+A2A 1.0.1 similarly defines authenticated security schemes and signed Agent Cards; any future remote-agent adapter must preserve Platform authority rather than treating discovery or advertised capability as authorization.
+
+These sources inform the design but do not substitute for executable tests or deployment evidence.
+
+## Final forensic audit — M13.4–M13.8
+
+The final audit re-verified the consequential path and fixed the following classes of gaps:
+
+- MCP transport execution now consumes a sealed, single-use Platform permit and fails closed on unresolved authorization.
+- MCP permits carry exact execution-intent binding into approval verification.
+- Evidence and audit hashes commit record identity, eliminating identical-record hash ambiguity.
+- Evidence size enforcement uses UTF-8 byte length rather than character count.
+- Security events and incident correlation validate W3C trace identifiers and timezone-aware event timestamps.
+- Tool/MCP/sandbox/secret/evidence/observability boundaries remain Platform-authoritative; upstream repositories are declaration/orchestration surfaces only.
+
+The repository gates validate these contracts. External durable stores, KMS/HSM, isolated compute, telemetry backends, network controls and independent assurance remain deployment responsibilities.
