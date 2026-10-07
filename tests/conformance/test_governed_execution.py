@@ -56,7 +56,7 @@ def test_full_governed_execution_path() -> None:
     task_id = uuid4()
     run_id = uuid4()
     principal = Principal("user-1", "human", tenant, scopes=frozenset({"doc:read"}))
-    context = RequestContext("req-1", tenant, principal, "test", trace_id="trace-1")
+    context = RequestContext("req-1", tenant, principal, "test", trace_id="00000000000000000000000000000001")
     task = TaskSpec(task_id, tenant, agent_id, "1.0", "user-1", "read", max_turns=1)
     run = Run(run_id, task_id, tenant)
     capability = CapabilityRequest(
