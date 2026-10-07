@@ -237,4 +237,4 @@ M13.1 establishes durable execution state and fail-closed recovery. M13.2 adds c
 
 M13.3 closes the authorization seam: a verified identity is insufficient without capability authorization, policy allowance, and any required approval bound to the exact execution intent.
 
-M13.4–M13.8 harden the remaining consequential boundary: scoped budgets; sealed tool/MCP permits and sandbox roots; execution-scoped secrets; integrity-protected evidence/audit with cryptographic attestation; and tenant-bound observability/incident correlation. See [Production runtime hardening](docs/production-runtime/README.md).
+M13.4–M13.8 harden the remaining consequential boundary: scoped budgets; sealed tool/MCP permits and sandbox roots; execution-scoped secrets; integrity-protected evidence/audit with cryptographic attestation; and tenant-bound observability/incident correlation. The final forensic audit also closes MCP permit replay/authorization gaps, evidence/audit identity ambiguity, byte-limit ambiguity, and malformed W3C telemetry identifiers. See [Production runtime hardening](docs/production-runtime/README.md).
