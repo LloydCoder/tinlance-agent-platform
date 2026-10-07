@@ -1,3 +1,3 @@
-from .gateway import MCPTool, MCPToolGateway, ToolScope
+from .gateway import MCPExecutionPermit, MCPTool, MCPToolGateway, ToolScope
 
 __all__ = ["MCPTool", "MCPToolGateway", "ToolScope"]
