@@ -301,6 +301,7 @@ class MCPToolGateway:
             capability_request=capability_request,
             arguments=arguments,
             decision=decision,
+            intent_fingerprint=intent_fingerprint,
         )
         return self.execute(
             permit=permit,
