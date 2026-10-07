@@ -6,8 +6,8 @@ Execution authority still comes from Agent Platform policy and authorization.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Final
 
 
@@ -147,7 +147,9 @@ if len(_REFERENCE_WORKFORCE_BY_ID) != len(REFERENCE_WORKFORCE):
     raise RuntimeError("reference workforce role IDs must be unique")
 
 
-def get_reference_workforce(role_id: str | None = None) -> tuple[WorkforceRole, ...] | WorkforceRole:
+def get_reference_workforce(
+    role_id: str | None = None,
+) -> tuple[WorkforceRole, ...] | WorkforceRole:
     """Return the immutable catalog, or one role by its stable identifier."""
     if role_id is None:
         return REFERENCE_WORKFORCE
