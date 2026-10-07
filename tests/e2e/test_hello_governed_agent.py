@@ -42,7 +42,7 @@ def test_hello_governed_agent_executes_only_after_complete_mediation() -> None:
         tenant_id=tenant_id,
         principal=principal,
         environment="test",
-        trace_id="trace-1",
+        trace_id="00000000000000000000000000000001",
     )
     definition = AgentDefinition(
         agent_id=agent_id,
@@ -142,7 +142,7 @@ def test_hello_governed_agent_executes_only_after_complete_mediation() -> None:
             "tool.executed",
             "info",
             actor_id="user-1",
-            trace_id="trace-1",
+            trace_id="00000000000000000000000000000001",
             outcome="allow",
         )
     )
