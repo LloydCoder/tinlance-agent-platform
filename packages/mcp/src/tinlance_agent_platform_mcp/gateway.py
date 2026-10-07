@@ -51,6 +51,7 @@ class MCPExecutionPermit:
     run_id: UUID
     call_fingerprint: str
     decision: PolicyDecision
+    intent_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +208,7 @@ class MCPToolGateway:
         capability_request: CapabilityRequest,
         arguments: Mapping[str, object],
         decision: PolicyDecision,
+        intent_fingerprint: str | None = None,
     ) -> MCPExecutionPermit:
         if decision.decision is Decision.DENY or (
             decision.decision is Decision.REQUIRE_AUTHORIZATION and not decision.requires_approval
@@ -222,6 +224,7 @@ class MCPToolGateway:
                 tenant_id, run_id, tool_name, scope, capability_request, arguments
             ),
             decision,
+            intent_fingerprint,
         )
 
     def execute(
@@ -264,6 +267,7 @@ class MCPToolGateway:
                 permit.run_id,
                 capability_request.action,
                 capability_request.resource,
+                intent_fingerprint=permit.intent_fingerprint,
             )
         _validate_value(arguments)
         try:
@@ -298,12 +302,6 @@ class MCPToolGateway:
             arguments=arguments,
             decision=decision,
         )
-        if intent_fingerprint is not None:
-            expected = sha256(
-                intent_fingerprint.encode("utf-8")
-            ).hexdigest()
-            if expected == permit.call_fingerprint:
-                pass
         return self.execute(
             permit=permit,
             scope=scope,
