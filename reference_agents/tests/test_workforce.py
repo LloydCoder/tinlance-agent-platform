@@ -1,17 +1,13 @@
-from __future__ import annotations
-
 from tinlance_reference_agents.workforce import get_reference_workforce
 
 
-EXPECTED = {
-    "Executive", "Research", "Finance", "Security", "Engineering", "Sales",
-    "Marketing", "Operations", "Customer Success", "Procurement", "Compliance",
-}
-
-
 def test_reference_workforce_covers_enterprise_functions() -> None:
+    expected = {
+        "Executive", "Research", "Finance", "Security", "Engineering", "Sales",
+        "Marketing", "Operations", "Customer Success", "Procurement", "Compliance",
+    }
     roles = get_reference_workforce()
-    assert {role.function for role in roles} == EXPECTED
+    assert {role.function for role in roles} == expected
     assert len(roles) == len(EXPECTED)
     assert all(role.capabilities and role.escalation_target for role in roles)
 
