@@ -12,7 +12,7 @@ from tinlance_agent_platform_observability.reliability import (
 
 
 def test_correlation_context_cannot_have_blank_trace_metadata() -> None:
-    context = CorrelationContext("tenant-a", uuid4(), trace_id="trace-1")
+    context = CorrelationContext("tenant-a", uuid4(), trace_id="00000000000000000000000000000001")
     context.validate()
     with pytest.raises(ValueError):
         CorrelationContext("tenant-a", uuid4(), trace_id=" ").validate()
