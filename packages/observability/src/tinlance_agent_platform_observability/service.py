@@ -76,6 +76,24 @@ class SecurityEvent:
     outcome: str = "unknown"
     incident_id: UUID | None = None
 
+    def __post_init__(self) -> None:
+        if (
+            not self.tenant_id
+            or self.tenant_id != self.tenant_id.strip()
+            or not self.event_type
+            or self.event_type != self.event_type.strip()
+            or self.severity not in {"info", "warning", "critical"}
+            or self.outcome not in {"allow", "deny", "unknown", "error"}
+        ):
+            raise ValueError("invalid security event")
+        if self.actor_id is not None and (
+            not self.actor_id or self.actor_id != self.actor_id.strip()
+        ):
+            raise ValueError("security event actor must be normalized")
+        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+            raise ValueError("security event timestamp must be timezone-aware")
+        _validate_trace_id(self.trace_id)
+
 
 class ObservabilitySink(Protocol):
     def emit_span(self, span: TraceSpan) -> None: ...
