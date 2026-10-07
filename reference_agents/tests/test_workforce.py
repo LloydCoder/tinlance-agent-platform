@@ -3,8 +3,17 @@ from tinlance_reference_agents.workforce import get_reference_workforce
 
 def test_reference_workforce_covers_enterprise_functions() -> None:
     expected = {
-        "Executive", "Research", "Finance", "Security", "Engineering", "Sales",
-        "Marketing", "Operations", "Customer Success", "Procurement", "Compliance",
+        "Executive",
+        "Research",
+        "Finance",
+        "Security",
+        "Engineering",
+        "Sales",
+        "Marketing",
+        "Operations",
+        "Customer Success",
+        "Procurement",
+        "Compliance",
     }
     roles = get_reference_workforce()
     assert {role.function for role in roles} == expected
