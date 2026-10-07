@@ -17,13 +17,6 @@ from .lifecycle import (
     ToolCallStatus,
 )
 
-from .transformation import (
-    Transformation,
-    TransformationExecutionState,
-    TransformationOutcome,
-    TransformationOutcomeStatus,
-    TransformationReference,
-)
 from .models import (
     AgentIdentity,
     AuditRecord,
@@ -37,6 +30,14 @@ from .models import (
     RequestContext,
     Reversibility,
     RiskTier,
+)
+
+from .transformation import (
+    Transformation,
+    TransformationExecutionState,
+    TransformationOutcome,
+    TransformationOutcomeStatus,
+    TransformationReference,
 )
 
 __all__ = [
