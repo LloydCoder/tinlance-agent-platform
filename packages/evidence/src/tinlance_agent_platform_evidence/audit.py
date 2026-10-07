@@ -51,6 +51,7 @@ class InMemoryAuditStore:
     def _hash(record: AuditRecord) -> str:
         canonical = "|".join(
             (
+                str(record.audit_id),
                 record.tenant_id,
                 str(record.run_id),
                 record.actor_id,
@@ -81,6 +82,8 @@ class InMemoryAuditStore:
         values = (tenant_id, actor_id, action, resource, decision)
         if any(not value or value != value.strip() for value in values):
             raise ValueError("audit identity fields must be normalized")
+        if any(len(value) > 4096 for value in values):
+            raise ValueError("audit identity fields exceed safety limits")
         if intent_fingerprint is not None and not intent_fingerprint.strip():
             raise ValueError("intent fingerprint must be normalized")
         observed = occurred_at or datetime.now(UTC)
