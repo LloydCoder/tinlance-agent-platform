@@ -45,9 +45,9 @@ flowchart LR
 
 ## External alignment
 
-The controls are informed by NIST's 2026 software-agent identity/authorization work, OWASP agentic-security guidance, OAuth 2.0 Security BCP (RFC 9700), and the MCP 2026-07-28 authorization model. Current MCP guidance emphasizes per-request authorization, issuer validation, credential isolation and enterprise-managed authorization; the platform therefore treats MCP transport authentication as necessary but never sufficient for consequential execution. citeturn0search0turn1search1turn0search1
+The controls are informed by NIST's 2026 software-agent identity/authorization work, OWASP agentic-security guidance, OAuth 2.0 Security BCP (RFC 9700), and the MCP 2026-07-28 authorization model. Current MCP guidance emphasizes per-request authorization, issuer validation, credential isolation and enterprise-managed authorization; the platform therefore treats MCP transport authentication as necessary but never sufficient for consequential execution.
 
-A2A 1.0.1 similarly defines authenticated security schemes and signed Agent Cards; any future remote-agent adapter must preserve Platform authority rather than treating discovery or advertised capability as authorization. citeturn0search5
+A2A 1.0.1 similarly defines authenticated security schemes and signed Agent Cards; any future remote-agent adapter must preserve Platform authority rather than treating discovery or advertised capability as authorization.
 
 These sources inform the design but do not substitute for executable tests or deployment evidence.
 
