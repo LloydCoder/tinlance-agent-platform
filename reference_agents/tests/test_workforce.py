@@ -29,7 +29,19 @@ def test_reference_workforce_covers_enterprise_functions() -> None:
 
 def test_reference_workforce_has_stable_unique_ids_and_capabilities() -> None:
     roles = get_reference_workforce()
-    assert [role.role_id for role in roles] == sorted(role.role_id for role in roles)
+    assert [role.role_id for role in roles] == [
+        "executive",
+        "research",
+        "finance",
+        "security",
+        "engineering",
+        "sales",
+        "marketing",
+        "operations",
+        "customer-success",
+        "procurement",
+        "compliance",
+    ]
     assert len({role.role_id for role in roles}) == len(roles)
     assert all(len(role.capabilities) == len(set(role.capabilities)) for role in roles)
 
