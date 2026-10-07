@@ -6,12 +6,16 @@ Execution authority still comes from Agent Platform policy and authorization.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Final
 
 
-_ROLE_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+def _is_valid_role_id(role_id: str) -> bool:
+    """Validate the canonical lowercase hyphenated role identifier grammar."""
+    parts = role_id.split("-")
+    return bool(role_id) and role_id == role_id.lower() and all(
+        part.isalnum() for part in parts
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +35,7 @@ class WorkforceRole:
         escalation_target = self.escalation_target.strip()
         capabilities = tuple(capability.strip() for capability in self.capabilities)
 
-        if not _ROLE_ID.fullmatch(role_id):
+        if not _is_valid_role_id(role_id):
             raise ValueError("role_id must be a lowercase hyphenated stable identifier")
         if not function or not mission:
             raise ValueError("workforce role identity and mission are required")
