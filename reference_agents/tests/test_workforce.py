@@ -8,7 +8,7 @@ def test_reference_workforce_covers_enterprise_functions() -> None:
     }
     roles = get_reference_workforce()
     assert {role.function for role in roles} == expected
-    assert len(roles) == len(EXPECTED)
+    assert len(roles) == len(expected)
     assert all(role.capabilities and role.escalation_target for role in roles)
 
 
