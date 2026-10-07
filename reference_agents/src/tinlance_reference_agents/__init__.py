@@ -11,6 +11,7 @@ from .base import (
 from .engineering import EngineeringAgent
 from .intelligence import IntelligenceAgent
 from .security import SecurityResearchAgent
+from .workforce import REFERENCE_WORKFORCE, WorkforceRole, get_reference_workforce
 
 __all__ = [
     "AgentRun",
@@ -22,4 +23,7 @@ __all__ = [
     "SecurityResearchAgent",
     "ToolPlan",
     "WorkflowStep",
+    "REFERENCE_WORKFORCE",
+    "WorkforceRole",
+    "get_reference_workforce",
 ]
