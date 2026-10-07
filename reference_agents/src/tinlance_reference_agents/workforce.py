@@ -13,11 +13,7 @@ from typing import Final
 def _is_valid_role_id(role_id: str) -> bool:
     """Validate the canonical lowercase hyphenated role identifier grammar."""
     parts = role_id.split("-")
-    return (
-        bool(role_id)
-        and role_id == role_id.lower()
-        and all(part.isalnum() for part in parts)
-    )
+    return bool(role_id) and role_id == role_id.lower() and all(part.isalnum() for part in parts)
 
 
 @dataclass(frozen=True, slots=True)
