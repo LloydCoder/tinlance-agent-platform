@@ -30,6 +30,13 @@ from .models import (
     Reversibility,
     RiskTier,
 )
+from .transformation import (
+    Transformation,
+    TransformationExecutionState,
+    TransformationOutcome,
+    TransformationOutcomeStatus,
+    TransformationReference,
+)
 
 __all__ = [
     "API_VERSION",
@@ -58,4 +65,9 @@ __all__ = [
     "TaskStatus",
     "ToolCall",
     "ToolCallStatus",
+    "Transformation",
+    "TransformationExecutionState",
+    "TransformationOutcome",
+    "TransformationOutcomeStatus",
+    "TransformationReference",
 ]
