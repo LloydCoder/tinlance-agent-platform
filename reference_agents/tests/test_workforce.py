@@ -1,0 +1,18 @@
+from tinlance_reference_agents.workforce import get_reference_workforce
+
+
+EXPECTED = {
+    "Executive", "Research", "Finance", "Security", "Engineering", "Sales",
+    "Marketing", "Operations", "Customer Success", "Procurement", "Compliance",
+}
+
+
+def test_reference_workforce_covers_enterprise_functions() -> None:
+    roles = get_reference_workforce()
+    assert {role.function for role in roles} == EXPECTED
+    assert len(roles) == len(EXPECTED)
+    assert all(role.capabilities and role.escalation_target for role in roles)
+
+
+def test_reference_workforce_is_not_authority() -> None:
+    assert all(not hasattr(role, "authorize") for role in get_reference_workforce())
