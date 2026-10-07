@@ -7,11 +7,17 @@ Execution authority still comes from Agent Platform policy and authorization.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Final
+
+
+_ROLE_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 @dataclass(frozen=True, slots=True)
 class WorkforceRole:
+    """Immutable, deterministic description of a reference enterprise role."""
+
     role_id: str
     function: str
     mission: str
@@ -19,12 +25,38 @@ class WorkforceRole:
     escalation_target: str
 
     def __post_init__(self) -> None:
-        if not self.role_id or not self.function or not self.mission:
+        role_id = self.role_id.strip()
+        function = self.function.strip()
+        mission = self.mission.strip()
+        escalation_target = self.escalation_target.strip()
+        capabilities = tuple(capability.strip() for capability in self.capabilities)
+
+        if not _ROLE_ID.fullmatch(role_id):
+            raise ValueError("role_id must be a lowercase hyphenated stable identifier")
+        if not function or not mission:
             raise ValueError("workforce role identity and mission are required")
-        if not self.capabilities:
-            raise ValueError("workforce role requires capabilities")
-        if not self.escalation_target:
+        if not capabilities or any(not capability for capability in capabilities):
+            raise ValueError("workforce role requires non-empty capabilities")
+        if len(set(capabilities)) != len(capabilities):
+            raise ValueError("workforce role capabilities must be unique")
+        if not escalation_target:
             raise ValueError("workforce role requires an escalation target")
+
+        object.__setattr__(self, "role_id", role_id)
+        object.__setattr__(self, "function", function)
+        object.__setattr__(self, "mission", mission)
+        object.__setattr__(self, "capabilities", capabilities)
+        object.__setattr__(self, "escalation_target", escalation_target)
+
+    def as_dict(self) -> dict[str, object]:
+        """Return a deterministic, authority-free catalog representation."""
+        return {
+            "role_id": self.role_id,
+            "function": self.function,
+            "mission": self.mission,
+            "capabilities": list(self.capabilities),
+            "escalation_target": self.escalation_target,
+        }
 
 
 REFERENCE_WORKFORCE: Final[tuple[WorkforceRole, ...]] = (
@@ -107,6 +139,20 @@ REFERENCE_WORKFORCE: Final[tuple[WorkforceRole, ...]] = (
     ),
 )
 
+_REFERENCE_WORKFORCE_BY_ID: Final[dict[str, WorkforceRole]] = {
+    role.role_id: role for role in REFERENCE_WORKFORCE
+}
 
-def get_reference_workforce() -> tuple[WorkforceRole, ...]:
-    return REFERENCE_WORKFORCE
+if len(_REFERENCE_WORKFORCE_BY_ID) != len(REFERENCE_WORKFORCE):
+    raise RuntimeError("reference workforce role IDs must be unique")
+
+
+def get_reference_workforce(role_id: str | None = None) -> tuple[WorkforceRole, ...] | WorkforceRole:
+    """Return the immutable catalog, or one role by its stable identifier."""
+    if role_id is None:
+        return REFERENCE_WORKFORCE
+    normalized = role_id.strip()
+    try:
+        return _REFERENCE_WORKFORCE_BY_ID[normalized]
+    except KeyError as exc:
+        raise KeyError(f"unknown reference workforce role: {normalized!r}") from exc
