@@ -10,18 +10,14 @@ _SPAN_ID = re.compile(r"^[0-9a-f]{16}$")
 
 
 def validate_trace_id(value: str | None) -> None:
-    if value is not None and (
-        not _TRACE_ID.fullmatch(value) or value == "0" * 32
-    ):
+    if value is not None and (not _TRACE_ID.fullmatch(value) or value == "0" * 32):
         raise ValueError(
             "trace_id must be a non-zero 32-character lowercase hexadecimal W3C trace id"
         )
 
 
 def validate_span_id(value: str | None) -> None:
-    if value is not None and (
-        not _SPAN_ID.fullmatch(value) or value == "0" * 16
-    ):
+    if value is not None and (not _SPAN_ID.fullmatch(value) or value == "0" * 16):
         raise ValueError(
             "parent_span_id must be a non-zero 16-character lowercase hexadecimal W3C span id"
         )
