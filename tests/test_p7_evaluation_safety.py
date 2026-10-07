@@ -1,4 +1,4 @@
-from tinlance_agent_platform_evaluation import EvaluationGate, EvalResult
+from tinlance_agent_platform_evaluation import EvalResult, EvaluationGate
 
 
 def test_evaluation_gate_blocks_failed_safety_case() -> None:
