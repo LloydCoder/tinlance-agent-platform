@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from threading import RLock
 from uuid import UUID, uuid4
 
-from .service import _validate_trace_id
+from .service import validate_trace_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +32,7 @@ class IncidentCorrelator:
     ) -> IncidentCorrelation:
         if not tenant_id or tenant_id != tenant_id.strip():
             raise ValueError("incident tenant is required")
-        _validate_trace_id(trace_id)
+        validate_trace_id(trace_id)
         incident = IncidentCorrelation(
             uuid4(),
             tenant_id,
