@@ -1,8 +1,10 @@
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from hashlib import sha256
 from types import MappingProxyType
 from typing import Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
@@ -36,6 +38,18 @@ class ToolScope:
             )
         ):
             raise ValueError("tool scope fields must be normalized")
+
+
+@dataclass(frozen=True, slots=True)
+class MCPExecutionPermit:
+    _seal: object
+    permit_id: UUID
+    tool_name: str
+    tenant_id: str
+    run_id: UUID
+    call_fingerprint: str
+    decision: PolicyDecision
+    intent_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +119,8 @@ class MCPToolGateway:
     def __init__(self, transport: MCPTransport) -> None:
         self._transport = transport
         self._tools: dict[str, MCPTool] = {}
+        self._permit_seal = object()
+        self._used_permits: set[UUID] = set()
 
     def register(self, tool: MCPTool) -> None:
         if tool.name in self._tools:
@@ -155,6 +171,112 @@ class MCPToolGateway:
             )
         return evaluate(capability_request)
 
+    @staticmethod
+    def _call_fingerprint(
+        tenant_id: str,
+        run_id: UUID,
+        tool_name: str,
+        scope: ToolScope,
+        capability_request: CapabilityRequest,
+        arguments: Mapping[str, object],
+    ) -> str:
+        payload = json.dumps(
+            {
+                "tenant_id": tenant_id,
+                "run_id": str(run_id),
+                "tool_name": tool_name,
+                "capability": scope.capability,
+                "resource": scope.resource,
+                "action": capability_request.action,
+                "request_resource": capability_request.resource,
+                "arguments": arguments,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return sha256(payload.encode("utf-8")).hexdigest()
+
+    def issue_permit(
+        self,
+        *,
+        tenant_id: str,
+        run_id: UUID,
+        tool_name: str,
+        scope: ToolScope,
+        capability_request: CapabilityRequest,
+        arguments: Mapping[str, object],
+        decision: PolicyDecision,
+        intent_fingerprint: str | None = None,
+    ) -> MCPExecutionPermit:
+        if decision.decision is Decision.DENY or (
+            decision.decision is Decision.REQUIRE_AUTHORIZATION and not decision.requires_approval
+        ):
+            raise PermissionError("MCP tool execution denied")
+        return MCPExecutionPermit(
+            self._permit_seal,
+            uuid4(),
+            tool_name,
+            tenant_id,
+            run_id,
+            self._call_fingerprint(
+                tenant_id, run_id, tool_name, scope, capability_request, arguments
+            ),
+            decision,
+            intent_fingerprint,
+        )
+
+    def execute(
+        self,
+        *,
+        permit: MCPExecutionPermit,
+        scope: ToolScope,
+        capability_request: CapabilityRequest,
+        arguments: Mapping[str, object],
+        approval_id: UUID | None = None,
+        approval_verifier: ApprovalVerifier | None = None,
+    ) -> dict[str, object]:
+        if permit._seal is not self._permit_seal:
+            raise PermissionError("MCP execution permit is not platform-issued")
+        if permit.tenant_id != scope.tenant_id or permit.tool_name not in self._tools:
+            raise PermissionError("MCP execution permit scope mismatch")
+        fingerprint = self._call_fingerprint(
+            permit.tenant_id,
+            permit.run_id,
+            permit.tool_name,
+            scope,
+            capability_request,
+            arguments,
+        )
+        if permit.call_fingerprint != fingerprint:
+            raise PermissionError("MCP execution permit intent mismatch")
+        if permit.permit_id in self._used_permits:
+            raise PermissionError("MCP execution permit has already been consumed")
+        if permit.decision.decision is Decision.DENY or (
+            permit.decision.decision is Decision.REQUIRE_AUTHORIZATION
+            and not permit.decision.requires_approval
+        ):
+            raise PermissionError("MCP tool execution denied")
+        if permit.decision.requires_approval:
+            if approval_id is None or approval_verifier is None:
+                raise PermissionError("approved human review is required")
+            approval_verifier.require_approved_for(
+                approval_id,
+                permit.tenant_id,
+                permit.run_id,
+                capability_request.action,
+                capability_request.resource,
+                intent_fingerprint=permit.intent_fingerprint,
+            )
+        _validate_value(arguments)
+        try:
+            return self._transport.call(
+                permit.tool_name,
+                MappingProxyType(dict(arguments)),
+                scope,
+            )
+        finally:
+            self._used_permits.add(permit.permit_id)
+
     def call(
         self,
         context: RequestContext,
@@ -169,22 +291,21 @@ class MCPToolGateway:
         intent_fingerprint: str | None = None,
     ) -> dict[str, object]:
         decision = self.authorize(context, scope, tool_name, capability_request)
-        if decision.decision is Decision.DENY:
-            raise PermissionError("MCP tool execution denied")
-        if decision.requires_approval:
-            if approval_id is None or approval_verifier is None:
-                raise PermissionError("approved human review is required")
-            approval_verifier.require_approved_for(
-                approval_id,
-                context.tenant_id,
-                run_id,
-                capability_request.action,
-                capability_request.resource,
-                intent_fingerprint=intent_fingerprint,
-            )
-        _validate_value(arguments)
-        return self._transport.call(
-            tool_name,
-            MappingProxyType(dict(arguments)),
-            scope,
+        permit = self.issue_permit(
+            tenant_id=context.tenant_id,
+            run_id=run_id,
+            tool_name=tool_name,
+            scope=scope,
+            capability_request=capability_request,
+            arguments=arguments,
+            decision=decision,
+            intent_fingerprint=intent_fingerprint,
+        )
+        return self.execute(
+            permit=permit,
+            scope=scope,
+            capability_request=capability_request,
+            arguments=arguments,
+            approval_id=approval_id,
+            approval_verifier=approval_verifier,
         )

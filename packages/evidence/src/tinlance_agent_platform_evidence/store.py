@@ -51,6 +51,7 @@ class InMemoryEvidenceStore:
     def _record_hash(item: Evidence) -> str:
         canonical = "|".join(
             (
+                str(item.evidence_id),
                 item.tenant_id,
                 str(item.run_id),
                 str(item.sequence),
@@ -79,12 +80,14 @@ class InMemoryEvidenceStore:
             not tenant_id
             or tenant_id != tenant_id.strip()
             or not content
-            or len(content) > _MAX_CONTENT
+            or len(content.encode("utf-8")) > _MAX_CONTENT
         ):
             raise ValueError("tenant and bounded content are required")
         if actor_id is not None and (not actor_id or actor_id != actor_id.strip()):
             raise ValueError("actor identifier must be normalized")
-        if not provenance or provenance != provenance.strip():
+        if actor_id is not None and len(actor_id) > 4096:
+            raise ValueError("actor identifier exceeds safety limits")
+        if not provenance or provenance != provenance.strip() or len(provenance) > 4096:
             raise ValueError("evidence provenance is required")
         observed = occurred_at or datetime.now(UTC)
         if observed.tzinfo is None or observed.utcoffset() is None:
