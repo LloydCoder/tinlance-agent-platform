@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from tinlance_reference_agents.workforce import get_reference_workforce
 
 
