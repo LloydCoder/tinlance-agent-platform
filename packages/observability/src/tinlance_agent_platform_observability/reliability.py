@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from .service import validate_span_id, validate_trace_id
+
 
 @dataclass(frozen=True, slots=True)
 class CorrelationContext:
@@ -17,10 +19,8 @@ class CorrelationContext:
     def validate(self) -> None:
         if not self.tenant_id or self.tenant_id != self.tenant_id.strip():
             raise ValueError("tenant scope is required")
-        if self.trace_id is not None and not self.trace_id.strip():
-            raise ValueError("trace_id cannot be empty")
-        if self.parent_span_id is not None and not self.parent_span_id.strip():
-            raise ValueError("parent_span_id cannot be empty")
+        validate_trace_id(self.trace_id)
+        validate_span_id(self.parent_span_id)
 
 
 @dataclass(frozen=True, slots=True)

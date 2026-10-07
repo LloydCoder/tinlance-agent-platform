@@ -16,8 +16,11 @@ class BudgetScope:
     resource: str
 
     def __post_init__(self) -> None:
-        if not self.tenant_id.strip() or not self.action.strip() or not self.resource.strip():
-            raise ValueError("budget scope fields are required")
+        values = (self.tenant_id, self.action, self.resource)
+        if any(not value or value != value.strip() for value in values):
+            raise ValueError("budget scope fields are required and normalized")
+        if any(len(value) > 4096 for value in values):
+            raise ValueError("budget scope fields exceed safety limits")
         if not isinstance(self.agent_id, UUID) or not isinstance(self.run_id, UUID):
             raise TypeError("budget scope identifiers must be UUIDs")
 
@@ -146,7 +149,10 @@ class BudgetService:
 
     def release(self, reservation: BudgetReservation) -> None:
         with self._lock:
-            current = self._reservations.pop(reservation.reservation_id, None)
+            current = self._reservations.get(reservation.reservation_id)
+            if current is not None and current != reservation:
+                raise KeyError("budget reservation scope mismatch")
+            self._reservations.pop(reservation.reservation_id, None)
             if current is not None and self._tenant_quota is not None:
                 self._tenant_quota.release(
                     TenantReservation(

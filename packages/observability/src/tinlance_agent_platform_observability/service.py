@@ -9,14 +9,18 @@ _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 _SPAN_ID = re.compile(r"^[0-9a-f]{16}$")
 
 
-def _validate_trace_id(value: str | None) -> None:
-    if value is not None and not _TRACE_ID.fullmatch(value):
-        raise ValueError("trace_id must be a 32-character lowercase hexadecimal W3C trace id")
+def validate_trace_id(value: str | None) -> None:
+    if value is not None and (not _TRACE_ID.fullmatch(value) or value == "0" * 32):
+        raise ValueError(
+            "trace_id must be a non-zero 32-character lowercase hexadecimal W3C trace id"
+        )
 
 
-def _validate_span_id(value: str | None) -> None:
-    if value is not None and not _SPAN_ID.fullmatch(value):
-        raise ValueError("parent_span_id must be a 16-character lowercase hexadecimal span id")
+def validate_span_id(value: str | None) -> None:
+    if value is not None and (not _SPAN_ID.fullmatch(value) or value == "0" * 16):
+        raise ValueError(
+            "parent_span_id must be a non-zero 16-character lowercase hexadecimal W3C span id"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,8 +46,8 @@ class TraceSpan:
             raise ValueError("trace end must be timezone-aware")
         if self.ended_at is not None and self.ended_at < self.started_at:
             raise ValueError("trace end cannot precede start")
-        _validate_trace_id(self.trace_id)
-        _validate_span_id(self.parent_span_id)
+        validate_trace_id(self.trace_id)
+        validate_span_id(self.parent_span_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +63,7 @@ class MetricPoint:
             raise ValueError("metric tenant is required")
         if not self.name or self.name != self.name.strip() or not self.unit.strip():
             raise ValueError("metric identity is required")
-        _validate_trace_id(self.trace_id)
+        validate_trace_id(self.trace_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,7 +96,7 @@ class SecurityEvent:
             raise ValueError("security event actor must be normalized")
         if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
             raise ValueError("security event timestamp must be timezone-aware")
-        _validate_trace_id(self.trace_id)
+        validate_trace_id(self.trace_id)
 
 
 class ObservabilitySink(Protocol):
