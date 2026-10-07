@@ -100,7 +100,7 @@ class SecurityEvent:
             raise ValueError("security event actor must be normalized")
         if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
             raise ValueError("security event timestamp must be timezone-aware")
-        _validate_trace_id(self.trace_id)
+        validate_trace_id(self.trace_id)
 
 
 class ObservabilitySink(Protocol):
