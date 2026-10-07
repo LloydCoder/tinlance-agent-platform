@@ -3,6 +3,7 @@ from uuid import uuid4
 
 import pytest
 
+from tinlance_agent_platform_budgets import BudgetReservation, BudgetScope, BudgetService
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
     DataClass,
@@ -122,3 +123,36 @@ def test_security_event_rejects_malformed_trace_id() -> None:
 def test_incident_rejects_malformed_trace_id() -> None:
     with pytest.raises(ValueError):
         IncidentCorrelator().start("tenant-a", trace_id="not-w3c")
+
+
+def test_budget_release_rejects_reservation_scope_confusion() -> None:
+    from tinlance_agent_platform_contracts import Budget
+
+    tenant = "tenant-a"
+    run_id = uuid4()
+    service = BudgetService(Budget(uuid4(), tenant, run_id, 2, 30.0, 2))
+    scope = BudgetScope(tenant, uuid4(), run_id, "read", "doc:1")
+    reservation = service.reserve_scoped(scope, tool_calls=1, seconds=1.0)
+    forged = BudgetReservation(
+        reservation.reservation_id,
+        tenant,
+        run_id,
+        1,
+        1.0,
+        BudgetScope(tenant, uuid4(), run_id, "write", "doc:2"),
+    )
+    with pytest.raises(KeyError):
+        service.release(forged)
+    service.release(reservation)
+
+
+def test_reliability_context_rejects_zero_w3c_ids() -> None:
+    from tinlance_agent_platform_observability import CorrelationContext
+
+    context = CorrelationContext(
+        "tenant-a",
+        uuid4(),
+        trace_id="00000000000000000000000000000000",
+    )
+    with pytest.raises(ValueError):
+        context.validate()
