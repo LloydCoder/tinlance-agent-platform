@@ -87,8 +87,8 @@ def main() -> None:
         raise AssertionError("TSIC Agent Platform adapter invariant drift")
 
     print(
-        f"PASS TSIC Agent Platform conformance: "
-        f"revision={TSIC_REVISION} contracts={len(bindings)}"
+        "PASS TSIC Agent Platform conformance:",
+        f"revision={TSIC_REVISION} contracts={len(bindings)}",
     )
 
 
