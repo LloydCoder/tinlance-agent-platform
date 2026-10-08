@@ -7,7 +7,7 @@ import json
 from urllib.request import Request, urlopen
 
 TSIC_REPOSITORY = "LloydCoder/tinlance-system-integration"
-TSIC_REVISION = "b970805933ba80902417105389362222b3196208"
+TSIC_REVISION = "bdb5b7f9f2295562ad8681c591a8a927500b4d8c"
 RAW_ROOT = f"https://raw.githubusercontent.com/{TSIC_REPOSITORY}/{TSIC_REVISION}"
 
 REQUIRED_CONTRACTS = {
