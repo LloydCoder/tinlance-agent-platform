@@ -32,6 +32,17 @@ jobs:
       - run: python -m pip freeze | grep -vE '^(tinlance-agent-platform==|-e )' > /tmp/audit-requirements.txt
       - run: pip-audit --strict -r /tmp/audit-requirements.txt
       - run: cyclonedx-py environment --output-format JSON --output-file sbom.json
+  tsic-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Verify pinned TSIC ecosystem contract
+        run: python scripts/tsic_conformance.py
   sql:
     runs-on: ubuntu-latest
     services:

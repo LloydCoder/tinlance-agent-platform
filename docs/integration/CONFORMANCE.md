@@ -1,20 +1,6 @@
 # Tinlance Agent Ecosystem Conformance
 
-Agent Platform is the authoritative target of the cross-repository conformance gate.
-
-```mermaid
-flowchart LR
-    D[TADL] --> O[Agent OS]
-    O --> S[Platform SDK]
-    S --> P[Agent Platform]
-    C[Ecosystem Conformance] -. verifies .-> D
-    C -. verifies .-> O
-    C -. verifies .-> S
-    C -. verifies .-> P
-    P --> A[Identity / policy / approvals]
-    P --> X[Governed execution / sandbox / tools]
-    P --> V[Authoritative evidence / audit]
-```
+Agent Platform is the authoritative target of the cross-repository conformance gate, while TSIC is the canonical ecosystem certification authority.
 
 ## Platform obligations
 
@@ -27,12 +13,22 @@ The conformance gate verifies that the Platform:
 - preserves trace and request metadata at the boundary; and
 - remains the sole consequential authority plane.
 
-The TADL repository pins reviewed commits for all four repositories and runs the executable suite against the reference HTTP boundary. The suite complements Platform CI, CodeQL, Scorecard, secret scanning, enterprise conformance, and release assurance.
+## TSIC obligations
 
-## Production boundary
+The Platform CI gate consumes immutable TSIC reference adapter revision b970805933ba80902417105389362222b3196208 and verifies:
 
-The reference HTTP server is a contract test boundary. Passing conformance does not claim that production PostgreSQL, external secret management, hardened TLS/token verification, sandbox infrastructure, enterprise identity, telemetry, backups, or incident response are deployed.
+- canonical Agent Platform repository mapping;
+- execution-authority governance role;
+- TSIC contract registry membership;
+- identity, registration, event, delivery, trace, interoperability, and economic contract bindings;
+- adapter authority invariants.
+
+The check is fail-closed and uses an immutable Git revision.
 
 ## Authority invariant
 
 TADL declarations, Agent OS intent, SDK requests, model output, memory, retrieved content, tool output, and external responses never grant authority. The Platform decides whether a consequential operation may occur and produces authoritative evidence.
+
+## Production boundary
+
+Passing the TSIC conformance check does not claim that production PostgreSQL, external secret management, hardened TLS/token verification, sandbox infrastructure, enterprise identity, telemetry, backups, or incident response are deployed.
