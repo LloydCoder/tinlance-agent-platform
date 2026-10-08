@@ -16,7 +16,7 @@ TSIC does not enter the runtime authority path. The Platform does not depend on 
 
 ## TSIC cross-repository contract
 
-The Agent Platform CI gate consumes the immutable TSIC reference adapter at revision b970805933ba80902417105389362222b3196208. The gate validates the canonical repository mapping, governance role, contract binding set, and authority invariants.
+The Agent Platform CI gate consumes the immutable TSIC reference adapter at revision bdb5b7f9f2295562ad8681c591a8a927500b4d8c. The gate validates the canonical repository mapping, governance role, contract binding set, and authority invariants.
 
 Run locally:
 
@@ -26,7 +26,7 @@ The check is fail-closed. It reads only machine-readable TSIC contract surfaces 
 
 Canonical wire contract: API version 1.1, POST /v1/agent-platform, with governed-execution.v1 for consequential tool mediation.
 
-The integration boundary binds tenant and subject to the authenticated principal, re-checks authorization at the consequential side-effect boundary, enforces idempotency for guarded operations, and emits authoritative evidence/events.
+The integration boundary binds tenant and subject to the authenticated principal, re-checks authorization at the consequential side-effect boundary, enforces idempotency for guarded operations, preserves W3C trace context and request/correlation identity, and emits authoritative evidence/events with cost-attribution references.
 
 ## Conformance
 
