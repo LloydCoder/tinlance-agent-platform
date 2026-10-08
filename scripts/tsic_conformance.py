@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed verification of the Agent Platform ↔ TSIC integration contract.
-
-The TSIC revision is immutable. This check intentionally consumes only the
-machine-readable TSIC surfaces required for Agent Platform conformance and
-does not copy TSIC authority into the Platform repository.
-"""
+"""Fail-closed verification of the Agent Platform to TSIC integration contract."""
 
 from __future__ import annotations
 
@@ -13,9 +8,7 @@ from urllib.request import Request, urlopen
 
 TSIC_REPOSITORY = "LloydCoder/tinlance-system-integration"
 TSIC_REVISION = "b970805933ba80902417105389362222b3196208"
-RAW_ROOT = (
-    f"https://raw.githubusercontent.com/{TSIC_REPOSITORY}/{TSIC_REVISION}"
-)
+RAW_ROOT = f"https://raw.githubusercontent.com/{TSIC_REPOSITORY}/{TSIC_REVISION}"
 
 REQUIRED_CONTRACTS = {
     "identity-context",
@@ -27,19 +20,22 @@ REQUIRED_CONTRACTS = {
     "economic-attribution",
 }
 
-EXPECTED_SYSTEM_REPOSITORY = (
-    "LloydCoder/tinlance-agent-platform"
-)
+EXPECTED_SYSTEM_REPOSITORY = "LloydCoder/tinlance-agent-platform"
 
 
 def fetch_json(path: str) -> dict:
     request = Request(
         f"{RAW_ROOT}/{path}",
-        headers={"Accept": "application/json", "User-Agent": "tinlance-agent-platform-ci"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "tinlance-agent-platform-ci",
+        },
     )
     with urlopen(request, timeout=15) as response:
         if response.status != 200:
-            raise RuntimeError(f"TSIC contract fetch failed for {path}: HTTP {response.status}")
+            raise RuntimeError(
+                f"TSIC contract fetch failed for {path}: HTTP {response.status}"
+            )
         return json.load(response)
 
 
@@ -65,12 +61,15 @@ def main() -> None:
     bindings = {item["tsic_contract"] for item in adapter["contract_bindings"]}
     if bindings != REQUIRED_CONTRACTS:
         raise AssertionError(
-            f"TSIC contract binding drift: expected {sorted(REQUIRED_CONTRACTS)}, got {sorted(bindings)}"
+            "TSIC contract binding drift: "
+            f"expected {sorted(REQUIRED_CONTRACTS)}, got {sorted(bindings)}"
         )
 
     registered = {item["id"] for item in registry["contracts"]}
-    if not REQUIRED_CONTRACTS <= registered:
-        raise AssertionError("TSIC contract registry is missing a required Platform contract")
+    if not registered >= REQUIRED_CONTRACTS:
+        raise AssertionError(
+            "TSIC contract registry is missing a required Platform contract"
+        )
 
     authority = adapter["authority"]
     if authority["integration_contracts"] != "tsic":
