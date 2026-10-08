@@ -86,7 +86,10 @@ def main() -> None:
     if invariants != required_invariants:
         raise AssertionError("TSIC Agent Platform adapter invariant drift")
 
-    print(f"PASS TSIC Agent Platform conformance: revision={TSIC_REVISION} contracts={len(bindings)}")
+    print(
+        f"PASS TSIC Agent Platform conformance: "
+        f"revision={TSIC_REVISION} contracts={len(bindings)}"
+    )
 
 
 if __name__ == "__main__":
