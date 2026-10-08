@@ -33,9 +33,7 @@ def fetch_json(path: str) -> dict:
     )
     with urlopen(request, timeout=15) as response:
         if response.status != 200:
-            raise RuntimeError(
-                f"TSIC contract fetch failed for {path}: HTTP {response.status}"
-            )
+            raise RuntimeError(f"TSIC contract fetch failed for {path}: HTTP {response.status}")
         return json.load(response)
 
 
@@ -67,9 +65,7 @@ def main() -> None:
 
     registered = {item["id"] for item in registry["contracts"]}
     if not registered >= REQUIRED_CONTRACTS:
-        raise AssertionError(
-            "TSIC contract registry is missing a required Platform contract"
-        )
+        raise AssertionError("TSIC contract registry is missing a required Platform contract")
 
     authority = adapter["authority"]
     if authority["integration_contracts"] != "tsic":
@@ -90,10 +86,7 @@ def main() -> None:
     if invariants != required_invariants:
         raise AssertionError("TSIC Agent Platform adapter invariant drift")
 
-    print(
-        "PASS TSIC Agent Platform conformance: "
-        f"revision={TSIC_REVISION} contracts={len(bindings)}"
-    )
+    print(f"PASS TSIC Agent Platform conformance: revision={TSIC_REVISION} contracts={len(bindings)}")
 
 
 if __name__ == "__main__":
