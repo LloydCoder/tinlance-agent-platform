@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import sys
 import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -143,12 +141,7 @@ def serve(
                 )
             except PermissionError:
                 self._respond(HTTPStatus.FORBIDDEN, {"error": "forbidden"})
-            except (ValueError, KeyError) as exc:
-                if os.environ.get("TINLANCE_API_DEBUG_ERRORS") == "1":
-                    print(
-                        f"request validation failed: {type(exc).__name__}: {exc}",
-                        file=sys.stderr,
-                    )
+            except (ValueError, KeyError):
                 self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_request"})
             except Exception:
                 self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "platform_error"})
