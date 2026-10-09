@@ -490,9 +490,10 @@ class ReferencePlatformGateway(APIHandler):
             with self._lock:
                 run = self._runs.get(UUID(self._required_text(payload, "run_id")))
                 if run is not None and run.tenant_id == request.tenant_id:
-                    self._runs[run.run_id] = self._state.transition(
-                        run, RunStatus.SUCCEEDED
-                    )
+                    # Approval resumes the run before the successful terminal transition.
+                    if run.status is RunStatus.WAITING_APPROVAL:
+                        run = self._state.transition(run, RunStatus.RUNNING)
+                    self._runs[run.run_id] = self._state.transition(run, RunStatus.SUCCEEDED)
         return APIResponse(
             "accepted",
             {
