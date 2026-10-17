@@ -4,11 +4,11 @@ from uuid import uuid4
 
 import pytest
 
+from tests.support.reference_gateway import ReferencePlatformGateway
 from tinlance_agent_platform_api.service import APIRequest
 from tinlance_agent_platform_contracts import Run
 from tinlance_agent_platform_events import InMemoryEventStore
 from tinlance_agent_platform_evidence import InMemoryEvidenceStore
-from tests.support.reference_gateway import ReferencePlatformGateway
 
 
 def make_request(tenant_id: str, operation: str, run_id: str) -> APIRequest:
