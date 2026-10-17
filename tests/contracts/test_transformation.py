@@ -22,6 +22,7 @@ def test_transformation_payload_preserves_contract_and_authority_boundary() -> N
         agent_version="1.0.0",
         workspace_ref="workspace:finance",
         task_ref="task:001",
+        context_source_refs=("source:request-001", "source:ledger"),
         objective="Reconcile transactions",
         success_criteria=("Produce a reconciled report",),
         requested_capabilities=(
@@ -41,6 +42,7 @@ def test_transformation_payload_preserves_contract_and_authority_boundary() -> N
     )
     payload = item.as_payload()
     assert payload["schema_version"] == "transformation/v1"
+    assert payload["context"]["source_refs"] == ["source:request-001", "source:ledger"]
     assert payload["requested_capabilities"][0]["capability_ref"] == "capability:finance.reconcile"
     assert payload["governance"]["approval_refs"] == ["approval:001"]
     assert payload["outputs"][0]["ref"] == "artifact:report"
@@ -56,3 +58,44 @@ def test_achieved_outcome_must_be_consistent() -> None:
         TransformationOutcome(TransformationOutcomeStatus.ACHIEVED, False)
     with pytest.raises(ValueError):
         TransformationOutcome(TransformationOutcomeStatus.PARTIALLY_ACHIEVED, True)
+
+
+def test_context_source_refs_reject_empty_or_oversized_values() -> None:
+    with pytest.raises(ValueError):
+        Transformation(
+            transformation_id=uuid4(),
+            tenant_ref="tenant:example",
+            version=1,
+            principal_ref="principal:human",
+            agent_ref="agent:finance",
+            agent_version="1.0.0",
+            workspace_ref="workspace:finance",
+            task_ref="task:001",
+            objective="Reconcile transactions",
+            requested_capabilities=(
+                TransformationCapability("capability:finance.reconcile", "reconcile transactions"),
+            ),
+            policy_refs=("policy:finance",),
+            risk_class="low",
+            execution_state=TransformationExecutionState.PLANNED,
+            context_source_refs=("",),
+        )
+    with pytest.raises(ValueError):
+        Transformation(
+            transformation_id=uuid4(),
+            tenant_ref="tenant:example",
+            version=1,
+            principal_ref="principal:human",
+            agent_ref="agent:finance",
+            agent_version="1.0.0",
+            workspace_ref="workspace:finance",
+            task_ref="task:001",
+            objective="Reconcile transactions",
+            requested_capabilities=(
+                TransformationCapability("capability:finance.reconcile", "reconcile transactions"),
+            ),
+            policy_refs=("policy:finance",),
+            risk_class="low",
+            execution_state=TransformationExecutionState.PLANNED,
+            context_source_refs=tuple(f"source:{index}" for index in range(101)),
+        )
