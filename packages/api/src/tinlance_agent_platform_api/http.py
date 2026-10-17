@@ -30,7 +30,7 @@ def _bearer(value: str | None) -> str:
     return token
 
 
-def _traceparent(value: str | None) -> str | None:
+def _traceparent(value: str | None) -> tuple[str, str, str] | None:
     if value is None:
         return None
     if not _TRACEPARENT.fullmatch(value):
@@ -39,7 +39,7 @@ def _traceparent(value: str | None) -> str | None:
     span_id = value[36:52]
     if trace_id == "0" * 32 or span_id == "0" * 16:
         raise ValueError("traceparent identifiers must not be all zero")
-    return value
+    return trace_id, span_id, value
 
 
 def _request_id(value: str | None) -> str:
@@ -112,15 +112,18 @@ def serve(
                 idempotency_key = self.headers.get("Idempotency-Key")
                 if idempotency_key is not None:
                     idempotency_key = _request_id(idempotency_key)
+                trace_context = _traceparent(self.headers.get("traceparent"))
                 request = APIRequest(
                     principal.tenant_id,
                     principal.subject_id,
                     operation,
                     payload,
                     request_id,
-                    _traceparent(self.headers.get("traceparent")),
+                    trace_context[0] if trace_context else None,
                     idempotency_key,
                     principal,
+                    span_id=trace_context[1] if trace_context else None,
+                    traceparent=trace_context[2] if trace_context else None,
                 )
                 response = api.dispatch(request)
                 self._respond(
