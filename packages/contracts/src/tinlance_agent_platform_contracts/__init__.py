@@ -16,6 +16,7 @@ from .lifecycle import (
     ToolCall,
     ToolCallStatus,
 )
+from .errors import PlatformAuthenticationFailure
 from .models import (
     AgentIdentity,
     AuditRecord,
@@ -54,6 +55,7 @@ __all__ = [
     "EvidenceRef",
     "ExecutionResult",
     "PolicyDecision",
+    "PlatformAuthenticationFailure",
     "Principal",
     "RequestContext",
     "Reversibility",
