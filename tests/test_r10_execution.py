@@ -207,8 +207,8 @@ def test_budget_limit_is_enforced(harness: object) -> None:
     assert exc.value.code is ExecutionErrorCode.BUDGET_EXCEEDED
 
 
-def test_approval_fingerprint_mismatch_fails_closed(harness: object) -> None:
-    service, principal, agent, _ = harness
+def test_approval_fingerprint_mismatch_fails_closed() -> None:
+    service, principal, agent, _ = _build_harness(RiskTier.HIGH)
     high = request(principal, agent, risk=RiskTier.HIGH)
     approval = service.approvals.request(
         principal.tenant_id,
@@ -281,7 +281,7 @@ def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: ob
             "repository.read",
             "reference tool",
             version="1",
-            risk=RiskTier.HIGH,
+            risk=RiskTier.LOW,
             timeout_seconds=10,
             max_tool_calls=1,
         ),
@@ -320,7 +320,7 @@ def test_authoritative_tool_timeout_returns_terminal_timeout(harness: object) ->
             "repository.read",
             "reference tool",
             version="1",
-            risk=RiskTier.HIGH,
+            risk=RiskTier.LOW,
             timeout_seconds=10,
             max_tool_calls=1,
         ),
