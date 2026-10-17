@@ -4,7 +4,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,7 @@ from tinlance_agent_platform_identity import (
     JWKSIdentityVerifier,
     JWKSPrincipalResolver,
     SQLiteTokenRevocationStore,
+    TokenRevocationChecker,
 )
 
 ISSUER = "https://issuer.example.test/"
@@ -85,7 +86,7 @@ def make_token(private_key: Any, **overrides: Any) -> str:
 
 def resolver_for(
     public_key: Any,
-    revocations: object,
+    revocations: TokenRevocationChecker,
 ) -> JWKSPrincipalResolver:
     verifier = JWKSIdentityVerifier(
         issuer=ISSUER,
@@ -93,7 +94,7 @@ def resolver_for(
         jwks_url="https://issuer.example.test/.well-known/jwks.json",
         key_provider=StaticKeyProvider(public_key),
     )
-    return JWKSPrincipalResolver(verifier, revocations)  # type: ignore[arg-type]
+    return JWKSPrincipalResolver(verifier, revocations)
 
 
 def send_request(
