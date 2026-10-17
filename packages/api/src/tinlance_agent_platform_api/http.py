@@ -7,8 +7,6 @@ import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from tinlance_agent_platform_identity import IdentityAuthenticationError
-
 from .service import (
     API_VERSION,
     AgentPlatformAPI,
@@ -99,7 +97,10 @@ def serve(
                     self._respond(HTTPStatus.UPGRADE_REQUIRED, {"error": "api_version_required"})
                     return
                 token = _bearer(self.headers.get("Authorization"))
-                principal = resolver.resolve(token)
+                try:
+                    principal = resolver.resolve(token)
+                except PermissionError as exc:
+                    raise AuthenticationError("bearer identity could not be authenticated") from exc
                 tenant_id = body.get("tenant_id")
                 subject_id = body.get("subject_id")
                 operation = body.get("operation")
@@ -129,7 +130,7 @@ def serve(
                     HTTPStatus.OK,
                     {"status": response.status, "payload": response.payload},
                 )
-            except (AuthenticationError, IdentityAuthenticationError):
+            except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             except IdempotencyConflictError:
                 self._respond(
