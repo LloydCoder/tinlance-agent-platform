@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from tinlance_agent_platform_contracts import (
+from tinlance_agent_platform_contracts.transformation import (
     Transformation,
     TransformationCapability,
     TransformationExecutionState,
