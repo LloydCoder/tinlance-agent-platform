@@ -13,7 +13,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tinlance_agent_platform_api.http import serve
-from tinlance_agent_platform_api.service import APIResponse, AgentPlatformAPI
+from tinlance_agent_platform_api.service import APIRequest, APIResponse, AgentPlatformAPI
 from tinlance_agent_platform_identity import (
     IdentityAuthenticationError,
     JWKSIdentityVerifier,
@@ -36,9 +36,9 @@ class StaticKeyProvider:
 
 class EchoHandler:
     def __init__(self) -> None:
-        self.requests: list[object] = []
+        self.requests: list[APIRequest] = []
 
-    def handle(self, request: object) -> APIResponse:
+    def handle(self, request: APIRequest) -> APIResponse:
         self.requests.append(request)
         return APIResponse(
             "ok",
