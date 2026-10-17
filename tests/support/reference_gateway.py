@@ -537,6 +537,10 @@ class ReferencePlatformGateway(APIHandler):
         if not isinstance(run_id, str):
             raise ValueError("run_id is required")
         parsed = UUID(run_id)
+        with self._lock:
+            run = self._runs.get(parsed)
+            if run is None or run.tenant_id != request.tenant_id:
+                raise PermissionError("run is not owned by tenant")
         items = self.events.list_for_run(request.tenant_id, parsed)
         return APIResponse(
             "ok",
@@ -564,6 +568,10 @@ class ReferencePlatformGateway(APIHandler):
         if not isinstance(run_id, str):
             raise ValueError("run_id is required")
         parsed = UUID(run_id)
+        with self._lock:
+            run = self._runs.get(parsed)
+            if run is None or run.tenant_id != request.tenant_id:
+                raise PermissionError("run is not owned by tenant")
         items = self.evidence.list_for_run(request.tenant_id, parsed)
         return APIResponse(
             "ok", {"evidence": [{"evidence_id": str(item.evidence_id)} for item in items]}
