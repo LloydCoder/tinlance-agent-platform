@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from cryptography.hazmat.primitives.asymmetric import rsa
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tinlance_agent_platform_identity import JWKSIdentityVerifier
 
