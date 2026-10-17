@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tinlance_agent_platform_contracts import Principal
+from tinlance_agent_platform_contracts import PlatformAuthenticationFailure, Principal
 
 from .federation import IdentityVerifier
 from .revocation import TokenRevocationChecker
 from .service import validate_principal
 
 
-class IdentityAuthenticationError(PermissionError):
+class IdentityAuthenticationError(PlatformAuthenticationFailure):
     """Raised when identity verification or revocation checking cannot succeed."""
 
 
