@@ -36,6 +36,8 @@ class VerifiedAgentIdentity:
         expected_nonce: str | None = None,
     ) -> None:
         current = now or datetime.now(UTC)
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise PermissionError("identity validation clock must be timezone-aware")
         if self.issuer != expected_issuer or self.audience != expected_audience:
             raise PermissionError("identity issuer or audience is not trusted")
         if (
