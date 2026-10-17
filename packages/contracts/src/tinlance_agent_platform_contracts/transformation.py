@@ -3,6 +3,7 @@
 Transformation is attributable intent/execution/outcome data. It is never an
 authorization grant and does not replace Platform policy or execution controls.
 """
+
 from __future__ import annotations
 
 import hashlib
