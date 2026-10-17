@@ -193,6 +193,7 @@ class JWKSIdentityVerifier:
             expected_audience=self.audience,
             now=datetime.now(UTC),
             expected_nonce=expected_nonce,
+            leeway_seconds=self.leeway_seconds,
         )
         return identity
 
