@@ -121,6 +121,7 @@ RUN_ID = uuid4()
 def _service(
     tool: object,
     *,
+    registered_risk: RiskTier = RiskTier.LOW,
     budget: BudgetService | None = None,
     secrets: object | None = None,
     idempotency: object | None = None,
@@ -145,7 +146,7 @@ def _service(
             CAPABILITY,
             "untrusted metadata must never grant authority",
             version="1",
-            risk=RiskTier.CRITICAL,
+            risk=registered_risk,
             max_tool_calls=1,
             capability_version="1",
         ),
@@ -336,7 +337,7 @@ def test_secret_output_is_redacted_and_never_entered_as_authority_evidence() -> 
 
 
 def test_malicious_tool_metadata_cannot_raise_authority() -> None:
-    service = _service(CountingTool())
+    service = _service(CountingTool(), registered_risk=RiskTier.CRITICAL)
     principal = Principal(SUBJECT, "human", TENANT_A, scopes=frozenset({CAPABILITY}))
     request = _request(risk=RiskTier.CRITICAL)
 
