@@ -43,8 +43,8 @@ class EchoHandler:
         return APIResponse(
             "ok",
             {
-                "tenant_id": getattr(request, "tenant_id"),
-                "subject_id": getattr(request, "subject_id"),
+                "tenant_id": request.tenant_id,
+                "subject_id": request.subject_id,
             },
         )
 
