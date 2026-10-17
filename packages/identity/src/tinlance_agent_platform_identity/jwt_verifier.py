@@ -124,7 +124,10 @@ class JWKSIdentityVerifier:
             header = jwt.get_unverified_header(assertion)
             if self.expected_typ is not None:
                 actual_typ = header.get("typ")
-                if not isinstance(actual_typ, str) or actual_typ.lower() != self.expected_typ.lower():
+                if (
+                    not isinstance(actual_typ, str)
+                    or actual_typ.lower() != self.expected_typ.lower()
+                ):
                     raise PermissionError("identity token type is not trusted")
             if header.get("alg") not in self.algorithms:
                 raise PermissionError("identity token algorithm is not trusted")
@@ -229,7 +232,9 @@ class JWKSIdentityVerifier:
         try:
             return datetime.fromtimestamp(value, UTC)
         except (OverflowError, OSError, ValueError) as exc:
-            raise PermissionError(f"identity claim {name!r} is outside the supported range") from exc
+            raise PermissionError(
+                f"identity claim {name!r} is outside the supported range"
+            ) from exc
 
     @staticmethod
     def _scopes(claims: dict[str, Any]) -> tuple[str, ...]:
