@@ -4,7 +4,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tinlance_agent_platform_api.http import serve
-from tinlance_agent_platform_api.service import APIRequest, APIResponse, AgentPlatformAPI
+from tinlance_agent_platform_api.service import AgentPlatformAPI, APIRequest, APIResponse
 from tinlance_agent_platform_identity import (
     IdentityAuthenticationError,
     JWKSIdentityVerifier,
