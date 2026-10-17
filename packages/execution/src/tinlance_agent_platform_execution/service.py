@@ -559,6 +559,11 @@ class GovernedExecutionService:
                         ExecutionErrorCode.AUTHORIZATION_DENIED,
                         "requested risk exceeds the registered tool risk ceiling",
                     )
+                if risk_order[request.risk] < risk_order[registration.risk]:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.AUTHORIZATION_DENIED,
+                        "requested risk cannot downgrade the registered tool risk",
+                    )
             try:
                 policy = evaluate(
                     CapabilityRequest(
