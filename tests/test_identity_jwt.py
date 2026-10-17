@@ -51,7 +51,12 @@ def make_token(private_key: Any, **overrides: Any) -> str:
         "nonce": "nonce-123",
     }
     claims.update(overrides)
-    return jwt.encode(\n        claims, private_key, algorithm="RS256", headers={"typ": "at+jwt", "kid": "key-1"}\n    )
+    return jwt.encode(
+        claims,
+        private_key,
+        algorithm="RS256",
+        headers={"typ": "at+jwt", "kid": "key-1"},
+    )
 
 
 def test_valid_jwks_identity_is_verified(verifier: tuple[JWKSIdentityVerifier, Any]) -> None:
