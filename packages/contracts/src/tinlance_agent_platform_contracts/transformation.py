@@ -217,7 +217,9 @@ class Transformation:
     completed_at: str | None = None
     output_refs: tuple[TransformationReference, ...] = ()
     evidence_refs: tuple[TransformationReference, ...] = ()
-    outcome: TransformationOutcome = TransformationOutcome(TransformationOutcomeStatus.UNKNOWN, False)
+    outcome: TransformationOutcome = TransformationOutcome(
+        TransformationOutcomeStatus.UNKNOWN, False
+    )
     provenance: TransformationProvenance = field(
         default_factory=lambda: TransformationProvenance(
             "agent-platform",
@@ -318,5 +320,7 @@ class Transformation:
         payload = self.as_payload()
         payload["provenance"] = dict(payload["provenance"])
         payload["provenance"].pop("content_digest", None)
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        encoded = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
         return hashlib.sha256(encoded).hexdigest()
