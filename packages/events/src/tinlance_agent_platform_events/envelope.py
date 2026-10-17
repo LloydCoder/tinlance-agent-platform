@@ -133,7 +133,7 @@ class EventEnvelope:
             raise ValueError("event data must be finite JSON values") from exc
         if len(encoded) > MAX_EVENT_BYTES:
             raise ValueError("event envelope exceeds the 1 MiB limit")
-        object.__setattr__(self, "data", _freeze_json(json.loads(json.dumps(self.data, allow_nan=False))))
+        object.__setattr__(self, "data", _freeze_json(json.loads(json.dumps(_thaw_json(self.data), allow_nan=False))))
 
     def to_payload(self, *, include_frozen_data: bool = True) -> dict[str, object]:
         data = self.data if include_frozen_data else _thaw_json(self.data)
