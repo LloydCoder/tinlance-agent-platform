@@ -38,8 +38,9 @@ class Echo:
         return self.execute(call)
 
 
-@pytest.fixture
-def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, object]:
+def _build_harness(
+    registered_risk: RiskTier = RiskTier.LOW,
+) -> tuple[GovernedExecutionService, Principal, AgentDefinition, object]:
     tenant = "tenant-r10"
     principal = Principal("user-r10", "user", tenant, scopes=frozenset({"repository.read"}))
     agent = AgentDefinition(
@@ -61,7 +62,7 @@ def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, obj
             "repository.read",
             "reference tool",
             version="1",
-            risk=RiskTier.HIGH,
+            risk=registered_risk,
             timeout_seconds=10,
             max_tool_calls=1,
         ),
@@ -75,6 +76,11 @@ def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, obj
         evidence=InMemoryEvidenceStore(),
     )
     return service, principal, agent, tools
+
+
+@pytest.fixture
+def harness() -> tuple[GovernedExecutionService, Principal, AgentDefinition, object]:
+    return _build_harness()
 
 
 def request(principal: Principal, agent: AgentDefinition, **overrides: object) -> ExecutionRequest:
@@ -127,8 +133,8 @@ def test_idempotency_returns_same_result_and_conflicting_key_fails(harness: obje
     assert exc.value.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT
 
 
-def test_high_risk_requires_approval_and_cannot_self_approve(harness: object) -> None:
-    service, principal, agent, _ = harness
+def test_high_risk_requires_approval_and_cannot_self_approve() -> None:
+    service, principal, agent, _ = _build_harness(RiskTier.HIGH)
     high = request(principal, agent, risk=RiskTier.HIGH)
     with pytest.raises(ExecutionFailure) as exc:
         service.execute(principal, high)
