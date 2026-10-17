@@ -100,7 +100,9 @@ def serve(
                 try:
                     principal = resolver.resolve(token)
                 except PermissionError as exc:
-                    raise AuthenticationError("bearer identity could not be authenticated") from exc
+                    raise AuthenticationError(
+                        "bearer identity could not be authenticated"
+                    ) from exc
                 tenant_id = body.get("tenant_id")
                 subject_id = body.get("subject_id")
                 operation = body.get("operation")
