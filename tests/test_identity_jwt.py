@@ -158,9 +158,7 @@ def test_malformed_roles_and_conflicting_scope_claims_are_rejected(
     with pytest.raises(PermissionError, match="roles"):
         service.verify(make_token(private_key, roles=["operator", " operator"]))
     with pytest.raises(PermissionError, match="contradictory"):
-        service.verify(
-            make_token(private_key, scp=["admin:all"])
-        )
+        service.verify(make_token(private_key, scp=["admin:all"]))
 
 
 def test_future_not_before_and_extreme_numeric_dates_fail_closed(
