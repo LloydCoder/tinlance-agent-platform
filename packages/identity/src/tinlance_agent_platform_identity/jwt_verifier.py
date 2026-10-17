@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import math
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
@@ -75,8 +76,19 @@ class JWKSIdentityVerifier:
             or not 0 <= self.leeway_seconds <= 300
         ):
             raise ValueError("identity clock leeway must be an integer between 0 and 300 seconds")
-        if self.jwks_timeout_seconds <= 0:
-            raise ValueError("JWKS timeout must be positive")
+        if (
+            isinstance(self.jwks_timeout_seconds, bool)
+            or not isinstance(self.jwks_timeout_seconds, (int, float))
+            or not math.isfinite(self.jwks_timeout_seconds)
+            or self.jwks_timeout_seconds <= 0
+        ):
+            raise ValueError("JWKS timeout must be a finite positive number")
+        if self.expected_typ is not None and (
+            not self.expected_typ or self.expected_typ != self.expected_typ.strip()
+        ):
+            raise ValueError("expected token type must be normalized when configured")
+        if not isinstance(self.require_client_id, bool) or not isinstance(self.require_kid, bool):
+            raise ValueError("JWT strictness options must be boolean")
         if (
             not self.tenant_claims
             or len(set(self.tenant_claims)) != len(self.tenant_claims)
