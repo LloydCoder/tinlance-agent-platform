@@ -113,11 +113,11 @@ class JWKSIdentityVerifier:
             timeout=self.jwks_timeout_seconds,
         )
 
-    def verify(
-        self, assertion: str, *, expected_nonce: str | None = None
-    ) -> VerifiedAgentIdentity:
-        if not isinstance(assertion, str) or not assertion or any(
-            character.isspace() for character in assertion
+    def verify(self, assertion: str, *, expected_nonce: str | None = None) -> VerifiedAgentIdentity:
+        if (
+            not isinstance(assertion, str)
+            or not assertion
+            or any(character.isspace() for character in assertion)
         ):
             raise PermissionError("identity assertion is malformed")
         try:
