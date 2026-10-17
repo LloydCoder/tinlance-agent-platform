@@ -44,11 +44,14 @@ def make_token(private_key: Any, **overrides: Any) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
         "tenant_id": "tenant-123",
+        "client_id": "tinlance-test-client",
+        "principal_type": "user",
+        "roles": ["operator"],
         "scope": "agent:run evidence:read",
         "nonce": "nonce-123",
     }
     claims.update(overrides)
-    return jwt.encode(claims, private_key, algorithm="RS256", headers={"typ": "at+jwt"})
+    return jwt.encode(\n        claims, private_key, algorithm="RS256", headers={"typ": "at+jwt", "kid": "key-1"}\n    )
 
 
 def test_valid_jwks_identity_is_verified(verifier: tuple[JWKSIdentityVerifier, Any]) -> None:
@@ -57,6 +60,9 @@ def test_valid_jwks_identity_is_verified(verifier: tuple[JWKSIdentityVerifier, A
     assert identity.subject_id == "user-123"
     assert identity.tenant_id == "tenant-123"
     assert identity.token_id == "token-123"
+    assert identity.client_id == "tinlance-test-client"
+    assert identity.principal_type == "user"
+    assert identity.roles == frozenset({"operator"})
     assert identity.scopes == frozenset({"agent:run", "evidence:read"})
 
 
@@ -119,4 +125,56 @@ def test_https_configuration_is_mandatory() -> None:
     with pytest.raises(ValueError):
         JWKSIdentityVerifier(
             issuer=ISSUER, audience=AUDIENCE, jwks_url="http://issuer.example.test/keys"
+        )
+
+
+def test_conflicting_tenant_aliases_are_rejected(
+    verifier: tuple[JWKSIdentityVerifier, Any],
+) -> None:
+    service, private_key = verifier
+    with pytest.raises(PermissionError, match="contradictory"):
+        service.verify(make_token(private_key, tid="tenant-other"))
+
+
+def test_client_id_and_principal_type_are_required(
+    verifier: tuple[JWKSIdentityVerifier, Any],
+) -> None:
+    service, private_key = verifier
+    with pytest.raises(PermissionError):
+        service.verify(make_token(private_key, client_id=None))
+    with pytest.raises(PermissionError, match="principal type"):
+        service.verify(make_token(private_key, principal_type="superuser"))
+
+
+def test_malformed_roles_and_conflicting_scope_claims_are_rejected(
+    verifier: tuple[JWKSIdentityVerifier, Any],
+) -> None:
+    service, private_key = verifier
+    with pytest.raises(PermissionError, match="roles"):
+        service.verify(make_token(private_key, roles=["operator", " operator"]))
+    with pytest.raises(PermissionError, match="contradictory"):
+        service.verify(
+            make_token(private_key, scp=["admin:all"])
+        )
+
+
+def test_future_not_before_and_extreme_numeric_dates_fail_closed(
+    verifier: tuple[JWKSIdentityVerifier, Any],
+) -> None:
+    service, private_key = verifier
+    with pytest.raises(PermissionError):
+        service.verify(
+            make_token(private_key, nbf=int((datetime.now(UTC) + timedelta(minutes=10)).timestamp()))
+        )
+    with pytest.raises(PermissionError):
+        service.verify(make_token(private_key, iat=-1e100))
+
+
+def test_jwks_key_id_and_clock_leeway_are_validated() -> None:
+    with pytest.raises(ValueError, match="leeway"):
+        JWKSIdentityVerifier(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            jwks_url="https://issuer.example.test/.well-known/jwks.json",
+            leeway_seconds=-1,
         )
