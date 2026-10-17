@@ -211,3 +211,26 @@ def test_jwks_key_id_and_clock_leeway_are_validated(
             jwks_url="https://issuer.example.test/.well-known/jwks.json",
             jwks_timeout_seconds=float("inf"),
         )
+
+
+def test_clock_leeway_is_applied_consistently_to_expiry(
+    verifier: tuple[JWKSIdentityVerifier, Any],
+) -> None:
+    service, private_key = verifier
+    now = datetime.now(UTC)
+    issued_at = int((now - timedelta(minutes=3)).timestamp())
+    within_leeway = make_token(
+        private_key,
+        iat=issued_at,
+        exp=int((now - timedelta(seconds=30)).timestamp()),
+    )
+    identity = service.verify(within_leeway)
+    assert identity.token_id == "token-123"
+
+    outside_leeway = make_token(
+        private_key,
+        iat=issued_at,
+        exp=int((now - timedelta(seconds=90)).timestamp()),
+    )
+    with pytest.raises(PermissionError):
+        service.verify(outside_leeway)
