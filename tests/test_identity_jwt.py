@@ -169,7 +169,10 @@ def test_future_not_before_and_extreme_numeric_dates_fail_closed(
     service, private_key = verifier
     with pytest.raises(PermissionError):
         service.verify(
-            make_token(private_key, nbf=int((datetime.now(UTC) + timedelta(minutes=10)).timestamp()))
+            make_token(
+                private_key,
+                nbf=int((datetime.now(UTC) + timedelta(minutes=10)).timestamp()),
+            )
         )
     with pytest.raises(PermissionError):
         service.verify(make_token(private_key, iat=-1e100))
