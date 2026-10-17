@@ -40,3 +40,8 @@ flowchart LR
 - Workspace paths are absolute and traversal-free; production deployments must additionally bind them to an approved workspace authority/root.
 
 These controls are aligned with current MCP security guidance emphasizing per-request authorization, audience-scoped credentials, isolation gateways and auditability. OWASP's MCP Top 10 specifically calls out privilege scope creep, tool poisoning, command execution, insufficient authorization, shadow servers and context over-sharing as major classes.
+
+
+### Registered risk is authoritative (P2 hardening)
+
+When a tool registration declares a risk tier, that tier is the authoritative classification for the registered tool boundary. A request may not lower or raise the declared tier to influence policy. A mismatch fails closed before sandbox setup, budget reservation, or tool side effects. High/critical registrations must still pass policy evaluation and the exact required approval binding; a registered capability is not itself an approval or an authorization decision.
