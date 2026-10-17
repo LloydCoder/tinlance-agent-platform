@@ -54,10 +54,9 @@ class VerifiedAgentIdentity:
             or self.expires_at.utcoffset() is None
         ):
             raise PermissionError("identity timestamps must be timezone-aware")
-        if (
-            self.expires_at <= current - timedelta(seconds=leeway_seconds)
-            or self.issued_at > current + timedelta(seconds=leeway_seconds)
-        ):
+        if self.expires_at <= current - timedelta(
+            seconds=leeway_seconds
+        ) or self.issued_at > current + timedelta(seconds=leeway_seconds):
             raise PermissionError("identity assertion is outside its validity window")
         if self.expires_at <= self.issued_at:
             raise PermissionError("identity assertion has an invalid validity window")
