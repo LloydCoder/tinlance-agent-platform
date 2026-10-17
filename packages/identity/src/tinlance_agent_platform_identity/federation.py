@@ -38,6 +38,13 @@ class VerifiedAgentIdentity:
         current = now or datetime.now(UTC)
         if self.issuer != expected_issuer or self.audience != expected_audience:
             raise PermissionError("identity issuer or audience is not trusted")
+        if (
+            self.issued_at.tzinfo is None
+            or self.issued_at.utcoffset() is None
+            or self.expires_at.tzinfo is None
+            or self.expires_at.utcoffset() is None
+        ):
+            raise PermissionError("identity timestamps must be timezone-aware")
         if self.expires_at <= current or self.issued_at > current:
             raise PermissionError("identity assertion is outside its validity window")
         if self.expires_at <= self.issued_at:
