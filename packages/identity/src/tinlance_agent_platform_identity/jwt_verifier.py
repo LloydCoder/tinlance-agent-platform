@@ -230,8 +230,8 @@ class JWKSIdentityVerifier:
         except (OverflowError, OSError, ValueError) as exc:
             raise PermissionError(f"identity claim {name!r} is outside the supported range") from exc
 
-    @classmethod
-    def _scopes(cls, claims: dict[str, Any]) -> tuple[str, ...]:
+    @staticmethod
+    def _scopes(claims: dict[str, Any]) -> tuple[str, ...]:
         def parse(value: object, name: str) -> tuple[str, ...]:
             if isinstance(value, str):
                 items = tuple(value.split())
