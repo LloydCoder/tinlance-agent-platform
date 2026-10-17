@@ -1,5 +1,6 @@
 """Provider-neutral contracts for Tinlance Agent Platform."""
 
+from .errors import PlatformAuthenticationFailure
 from .lifecycle import (
     API_VERSION,
     AgentDefinition,
@@ -16,7 +17,6 @@ from .lifecycle import (
     ToolCall,
     ToolCallStatus,
 )
-from .errors import PlatformAuthenticationFailure
 from .models import (
     AgentIdentity,
     AuditRecord,
