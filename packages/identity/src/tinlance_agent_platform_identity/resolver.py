@@ -47,4 +47,6 @@ class JWKSPrincipalResolver:
             )
             return validate_principal(principal)
         except Exception as exc:
-            raise IdentityAuthenticationError("verified identity cannot form a valid principal") from exc
+            raise IdentityAuthenticationError(
+                "verified identity cannot form a valid principal"
+            ) from exc
