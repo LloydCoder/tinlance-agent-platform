@@ -248,7 +248,9 @@ class Transformation:
         if len(self.context_source_refs) > 100 or any(
             not ref.strip() for ref in self.context_source_refs
         ):
-            raise ValueError("context source references must be non-empty and contain at most 100 items")
+            raise ValueError(
+                "context source references must be non-empty and contain at most 100 items"
+            )
         if not self.requested_capabilities:
             raise ValueError("transformation requires requested capabilities")
         if not self.policy_refs or any(not ref.strip() for ref in self.policy_refs):
@@ -304,6 +306,12 @@ class Transformation:
         }
         if self.approval_refs:
             governance["approval_refs"] = list(self.approval_refs)
+        context: dict[str, Any] = {
+            "workspace_ref": self.workspace_ref,
+            "task_ref": self.task_ref,
+        }
+        if self.context_source_refs:
+            context["source_refs"] = list(self.context_source_refs)
         return {
             "schema_version": CONTRACT_VERSION,
             "transformation_id": str(self.transformation_id),
@@ -311,11 +319,7 @@ class Transformation:
             "tenant_ref": self.tenant_ref,
             "intent": intent,
             "actor": actor,
-            "context": {
-                "workspace_ref": self.workspace_ref,
-                "task_ref": self.task_ref,
-                **({"source_refs": list(self.context_source_refs)} if self.context_source_refs else {}),
-            },
+            "context": context,
             "requested_capabilities": [item.as_payload() for item in self.requested_capabilities],
             "constraints": self.constraints.as_payload(),
             "governance": governance,
