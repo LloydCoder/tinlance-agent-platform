@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from cryptography.hazmat.primitives.asymmetric import rsa
 import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_api.service import AgentPlatformAPI, APIRequest, APIResponse
