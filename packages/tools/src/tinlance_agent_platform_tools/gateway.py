@@ -34,7 +34,7 @@ class ToolRegistration:
     capability: str
     description: str
     version: str = "1"
-    # When configured, this is the authoritative registered risk tier; callers cannot raise or lower it.
+    # The registered tier is authoritative; callers cannot raise or lower it.
     risk: RiskTier | None = None
     sandbox_required: bool = False
     timeout_seconds: float = 300.0
