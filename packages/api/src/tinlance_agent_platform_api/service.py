@@ -130,6 +130,8 @@ class AgentPlatformAPI:
             request.trace_id,
             request.idempotency_key,
             principal,
+            span_id=request.span_id,
+            traceparent=request.traceparent,
         )
         return self.dispatch(authenticated_request)
 
