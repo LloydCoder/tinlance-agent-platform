@@ -1,5 +1,6 @@
 """Provider-neutral contracts for Tinlance Agent Platform."""
 
+from .errors import PlatformAuthenticationFailure
 from .lifecycle import (
     API_VERSION,
     AgentDefinition,
@@ -54,6 +55,7 @@ __all__ = [
     "EvidenceRef",
     "ExecutionResult",
     "PolicyDecision",
+    "PlatformAuthenticationFailure",
     "Principal",
     "RequestContext",
     "Reversibility",

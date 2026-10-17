@@ -1,14 +1,14 @@
 """Federated identity verification contracts for production adapters.
 
-Cryptographic token verification belongs to the configured identity provider
-adapter. This module validates the normalized claims that the authority kernel
-is allowed to consume after verification.
+Cryptographic token verification belongs to the configured identity-provider
+adapter. Only normalized, signature-verified claims may enter the authority
+kernel; caller-supplied tenant and subject identifiers are never credentials.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 
@@ -23,6 +23,9 @@ class VerifiedAgentIdentity:
     expires_at: datetime
     token_id: str
     nonce: str | None = None
+    client_id: str | None = None
+    principal_type: str = "federated"
+    roles: frozenset[str] = frozenset()
 
     def validate(
         self,
@@ -31,16 +34,48 @@ class VerifiedAgentIdentity:
         expected_audience: str,
         now: datetime | None = None,
         expected_nonce: str | None = None,
+        leeway_seconds: int = 0,
     ) -> None:
         current = now or datetime.now(UTC)
+        if (
+            isinstance(leeway_seconds, bool)
+            or not isinstance(leeway_seconds, int)
+            or not 0 <= leeway_seconds <= 300
+        ):
+            raise PermissionError("identity validation leeway is invalid")
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise PermissionError("identity validation clock must be timezone-aware")
         if self.issuer != expected_issuer or self.audience != expected_audience:
             raise PermissionError("identity issuer or audience is not trusted")
-        if self.expires_at <= current or self.issued_at > current:
+        if (
+            self.issued_at.tzinfo is None
+            or self.issued_at.utcoffset() is None
+            or self.expires_at.tzinfo is None
+            or self.expires_at.utcoffset() is None
+        ):
+            raise PermissionError("identity timestamps must be timezone-aware")
+        if self.expires_at <= current - timedelta(
+            seconds=leeway_seconds
+        ) or self.issued_at > current + timedelta(seconds=leeway_seconds):
             raise PermissionError("identity assertion is outside its validity window")
-        if not self.subject_id or not self.tenant_id or not self.token_id:
-            raise PermissionError("identity assertion is incomplete")
+        if self.expires_at <= self.issued_at:
+            raise PermissionError("identity assertion has an invalid validity window")
+        for value, name in (
+            (self.subject_id, "subject"),
+            (self.tenant_id, "tenant"),
+            (self.token_id, "token identifier"),
+            (self.principal_type, "principal type"),
+        ):
+            if not value or value != value.strip():
+                raise PermissionError(f"identity {name} is incomplete or not normalized")
+        if self.client_id is not None and (
+            not self.client_id or self.client_id != self.client_id.strip()
+        ):
+            raise PermissionError("identity client_id must be normalized when provided")
         if any(not scope or scope != scope.strip() for scope in self.scopes):
             raise PermissionError("identity scopes must be normalized")
+        if any(not role or role != role.strip() for role in self.roles):
+            raise PermissionError("identity roles must be normalized")
         if expected_nonce is not None and self.nonce != expected_nonce:
             raise PermissionError("identity nonce does not match")
 
@@ -58,11 +93,13 @@ def require_verified_identity(
     expected_audience: str,
     now: datetime | None = None,
     expected_nonce: str | None = None,
+    leeway_seconds: int = 0,
 ) -> VerifiedAgentIdentity:
     identity.validate(
         expected_issuer=expected_issuer,
         expected_audience=expected_audience,
         now=now,
         expected_nonce=expected_nonce,
+        leeway_seconds=leeway_seconds,
     )
     return identity
