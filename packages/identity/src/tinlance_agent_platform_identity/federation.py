@@ -50,8 +50,10 @@ class VerifiedAgentIdentity:
         ):
             if not value or value != value.strip():
                 raise PermissionError(f"identity {name} is incomplete or not normalized")
-        if not self.client_id or self.client_id != self.client_id.strip():
-            raise PermissionError("identity client_id is required and must be normalized")
+        if self.client_id is not None and (
+            not self.client_id or self.client_id != self.client_id.strip()
+        ):
+            raise PermissionError("identity client_id must be normalized when provided")
         if any(not scope or scope != scope.strip() for scope in self.scopes):
             raise PermissionError("identity scopes must be normalized")
         if any(not role or role != role.strip() for role in self.roles):
