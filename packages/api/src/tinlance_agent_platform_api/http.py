@@ -7,6 +7,8 @@ import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from tinlance_agent_platform_identity import IdentityAuthenticationError
+
 from .service import (
     API_VERSION,
     AgentPlatformAPI,
@@ -127,7 +129,7 @@ def serve(
                     HTTPStatus.OK,
                     {"status": response.status, "payload": response.payload},
                 )
-            except AuthenticationError:
+            except (AuthenticationError, IdentityAuthenticationError):
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             except IdempotencyConflictError:
                 self._respond(
