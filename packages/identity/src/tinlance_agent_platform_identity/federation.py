@@ -8,7 +8,7 @@ kernel; caller-supplied tenant and subject identifiers are never credentials.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 
@@ -34,8 +34,15 @@ class VerifiedAgentIdentity:
         expected_audience: str,
         now: datetime | None = None,
         expected_nonce: str | None = None,
+        leeway_seconds: int = 0,
     ) -> None:
         current = now or datetime.now(UTC)
+        if (
+            isinstance(leeway_seconds, bool)
+            or not isinstance(leeway_seconds, int)
+            or not 0 <= leeway_seconds <= 300
+        ):
+            raise PermissionError("identity validation leeway is invalid")
         if current.tzinfo is None or current.utcoffset() is None:
             raise PermissionError("identity validation clock must be timezone-aware")
         if self.issuer != expected_issuer or self.audience != expected_audience:
@@ -47,7 +54,10 @@ class VerifiedAgentIdentity:
             or self.expires_at.utcoffset() is None
         ):
             raise PermissionError("identity timestamps must be timezone-aware")
-        if self.expires_at <= current or self.issued_at > current:
+        if (
+            self.expires_at <= current - timedelta(seconds=leeway_seconds)
+            or self.issued_at > current + timedelta(seconds=leeway_seconds)
+        ):
             raise PermissionError("identity assertion is outside its validity window")
         if self.expires_at <= self.issued_at:
             raise PermissionError("identity assertion has an invalid validity window")
@@ -84,11 +94,13 @@ def require_verified_identity(
     expected_audience: str,
     now: datetime | None = None,
     expected_nonce: str | None = None,
+    leeway_seconds: int = 0,
 ) -> VerifiedAgentIdentity:
     identity.validate(
         expected_issuer=expected_issuer,
         expected_audience=expected_audience,
         now=now,
         expected_nonce=expected_nonce,
+        leeway_seconds=leeway_seconds,
     )
     return identity
