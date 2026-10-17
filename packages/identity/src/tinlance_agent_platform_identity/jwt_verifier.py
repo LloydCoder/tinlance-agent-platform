@@ -7,9 +7,9 @@ the Platform authorization and policy layers remain authoritative.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import math
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
