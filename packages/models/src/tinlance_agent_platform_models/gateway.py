@@ -109,6 +109,7 @@ class ModelRoute:
     route_id: str
     provider: str
     model: str
+    policy_version: str
     capabilities: frozenset[str]
     task_policies: frozenset[str]
     data_classifications: frozenset[str]
@@ -125,6 +126,7 @@ class ModelRoute:
             (self.route_id, "route_id"),
             (self.provider, "provider"),
             (self.model, "model"),
+            (self.policy_version, "policy_version"),
         ):
             if not value or value != value.strip():
                 raise ValueError(f"{name} must be normalized and non-empty")
@@ -170,7 +172,6 @@ class ModelRoutingRequest:
     risk_score: int
     budget_microusd: int
     provider_availability: frozenset[str]
-    policy_version: str
     trace_id: str | None = None
 
     def __post_init__(self) -> None:
@@ -179,7 +180,6 @@ class ModelRoutingRequest:
             (self.agent_id, "agent_id"),
             (self.task_policy, "task_policy"),
             (self.model_capability, "model_capability"),
-            (self.policy_version, "policy_version"),
         ):
             if not value or value != value.strip():
                 raise ValueError(f"{name} must be normalized and non-empty")
@@ -209,7 +209,7 @@ class ModelRoutingDecision:
     provider: str | None
     model_id: str | None
     task_policy: str
-    policy_version: str
+    policy_version: str | None
     reason_code: str
     trace_id: str | None
 
@@ -273,7 +273,7 @@ class ModelRouter:
             provider=selected.provider if selected else None,
             model_id=selected.model if selected else None,
             task_policy=request.task_policy,
-            policy_version=request.policy_version,
+            policy_version=selected.policy_version if selected else None,
             reason_code="eligible_route_selected" if selected else "no_eligible_route",
             trace_id=request.trace_id,
         )
