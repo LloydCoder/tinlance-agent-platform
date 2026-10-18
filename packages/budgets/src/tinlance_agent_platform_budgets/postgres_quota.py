@@ -414,7 +414,11 @@ class PostgresBudgetGate:
         self._active: dict[UUID, PostgresBudgetReservation] = {}
         self._lock = RLock()
 
-    def _transaction(self, tenant_id: UUID, operation: Callable[[PostgresQuotaLedger], Any]) -> Any:
+    def _transaction(
+        self,
+        tenant_id: UUID,
+        operation: Callable[[PostgresQuotaLedger], Any],
+    ) -> Any:
         connection = self._connection_factory()
         try:
             if getattr(connection, "autocommit", False):
@@ -556,7 +560,12 @@ class PostgresBudgetGate:
             # authority if a release fails and requires recovery.
             self._run_budget.release(reservation.local_reservation)
 
-    def renew(self, reservation: PostgresBudgetReservation, *, lease_seconds: int = 900) -> datetime:
+    def renew(
+        self,
+        reservation: PostgresBudgetReservation,
+        *,
+        lease_seconds: int = 900,
+    ) -> datetime:
         with self._lock:
             if self._active.get(reservation.reservation_id) != reservation:
                 raise KeyError("durable budget reservation is not active")
@@ -569,7 +578,12 @@ class PostgresBudgetGate:
             ),
         )
 
-    def request_expired_reconciliation(self, tenant_id: UUID, *, batch_limit: int = 100) -> int:
+    def request_expired_reconciliation(
+        self,
+        tenant_id: UUID,
+        *,
+        batch_limit: int = 100,
+    ) -> int:
         return self._transaction(
             tenant_id,
             lambda ledger: ledger.request_expired_reconciliation(
