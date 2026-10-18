@@ -19,6 +19,13 @@ from tinlance_agent_platform_policy import evaluate
 _MAX_ARGUMENTS = 64
 _MAX_STRING = 16_384
 _MAX_DEPTH = 8
+_RISK_ORDER = {
+    RiskTier.LOW: 0,
+    RiskTier.MEDIUM: 1,
+    RiskTier.HIGH: 2,
+    RiskTier.CRITICAL: 3,
+    RiskTier.PROHIBITED: 4,
+}
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
 
@@ -73,6 +80,9 @@ class MCPTool:
     capability: str
     resource_pattern: str
     action: str = "call"
+    risk: RiskTier | None = None
+    requires_approval: bool = False
+    idempotency_argument: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.name, self.capability, self.action, self.resource_pattern)):
@@ -82,6 +92,10 @@ class MCPTool:
             for value in (self.name, self.capability, self.action, self.resource_pattern)
         ):
             raise ValueError("MCP tool fields must be normalized")
+        if self.requires_approval and self.risk is None:
+            raise ValueError("approval-gated MCP tools must declare an authoritative risk tier")
+        if self.idempotency_argument is not None and not self.idempotency_argument.strip():
+            raise ValueError("MCP idempotency argument must be normalized")
 
 
 class MCPTransport(Protocol):
@@ -208,7 +222,26 @@ class MCPToolGateway:
                 str(exc),
                 capability_request.risk,
             )
-        return evaluate(capability_request)
+        if tool.risk is not None and _RISK_ORDER[capability_request.risk] < _RISK_ORDER[tool.risk]:
+            return PolicyDecision(
+                Decision.DENY,
+                "mcp-registered-risk-floor",
+                "1",
+                "capability request risk is below the registered tool risk",
+                capability_request.risk,
+            )
+        decision = evaluate(capability_request)
+        if tool.requires_approval and decision.decision is not Decision.DENY and not decision.requires_approval:
+            return PolicyDecision(
+                Decision.REQUIRE_APPROVAL,
+                decision.policy_id,
+                decision.policy_version,
+                "registered tool requires human approval",
+                capability_request.risk,
+                requires_approval=True,
+                trace_context=decision.trace_context,
+            )
+        return decision
 
     @staticmethod
     def _call_fingerprint(
@@ -310,6 +343,16 @@ class MCPToolGateway:
                 intent_fingerprint=permit.intent_fingerprint,
             )
         _validate_value(arguments)
+        tool = self._tools[permit.tool_name]
+        if tool.idempotency_argument is not None:
+            key = arguments.get(tool.idempotency_argument)
+            if (
+                not isinstance(key, str)
+                or not 16 <= len(key) <= 256
+                or not key.isascii()
+                or any(ord(character) < 33 or ord(character) > 126 for character in key)
+            ):
+                raise ValueError("MCP tool requires a normalized idempotency key")
         try:
             return self._transport.call(
                 permit.tool_name,
