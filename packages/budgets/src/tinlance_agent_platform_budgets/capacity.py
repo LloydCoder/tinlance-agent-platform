@@ -15,11 +15,16 @@ class CapacityEnvelope:
 
     def __post_init__(self) -> None:
         if (
-            not all(math.isfinite(value) for value in (
-                self.minimum_throughput_per_minute,
-                self.maximum_p95_ms,
-                self.maximum_p99_ms,
-            ))
+            not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                for value in (
+                    self.minimum_throughput_per_minute,
+                    self.maximum_p95_ms,
+                    self.maximum_p99_ms,
+                )
+            )
             or any(value < 0 for value in (
                 self.minimum_throughput_per_minute,
                 self.maximum_p95_ms,
@@ -43,9 +48,12 @@ class CapacityObservation:
 
     def __post_init__(self) -> None:
         if (
-            not all(math.isfinite(value) for value in (
-                self.throughput_per_minute, self.p95_ms, self.p99_ms
-            ))
+            not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms)
+            )
             or any(value < 0 for value in (
                 self.throughput_per_minute, self.p95_ms, self.p99_ms, self.concurrency
             ))
@@ -94,6 +102,8 @@ class TenantQuota:
             or not isinstance(self.max_tool_calls, int)
             or isinstance(self.max_token_units, bool)
             or not isinstance(self.max_token_units, int)
+            or isinstance(self.max_cost_units, bool)
+            or not isinstance(self.max_cost_units, (int, float))
             or not math.isfinite(self.max_cost_units)
             or self.max_concurrency < 1
             or self.max_tool_calls < 0
@@ -113,6 +123,8 @@ class TenantQuota:
         if (
             any(isinstance(value, bool) or not isinstance(value, int)
                 for value in (concurrency, tool_calls, token_units))
+            or isinstance(cost_units, bool)
+            or not isinstance(cost_units, (int, float))
             or not math.isfinite(cost_units)
             or concurrency < 0 or tool_calls < 0 or token_units < 0 or cost_units < 0
         ):
