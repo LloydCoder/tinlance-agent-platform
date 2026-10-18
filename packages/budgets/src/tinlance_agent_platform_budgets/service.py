@@ -24,6 +24,12 @@ class BudgetScope:
             raise ValueError("budget scope fields are required and normalized")
         if len(self.tenant_id) > 256 or len(self.action) > 256 or len(self.resource) > 256:
             raise ValueError("budget scope fields exceed safety limits")
+        if any(
+            ord(char) < 32 or ord(char) == 127
+            for value in values
+            for char in value
+        ):
+            raise ValueError("budget scope fields must not contain control characters")
         if not isinstance(self.agent_id, UUID) or not isinstance(self.run_id, UUID):
             raise TypeError("budget scope identifiers must be UUIDs")
 
