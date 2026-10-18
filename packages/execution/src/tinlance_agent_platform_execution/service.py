@@ -644,6 +644,7 @@ class GovernedExecutionService:
                             request.run_id,
                             request.action,
                             request.resource,
+                            idempotency_key=request.idempotency_key,
                         ),
                         tool_calls=request.requested_tool_calls,
                         seconds=effective_timeout,
