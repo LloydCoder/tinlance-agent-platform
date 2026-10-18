@@ -103,17 +103,17 @@ def serve(
                     raw = self.rfile.read(length)
                     if len(raw) != length:
                         raise ValueError("request body is truncated")
-                    response = mcp_service.handle(dict(self.headers.items()), raw)
-                    self.send_response(response.status_code)
+                    mcp_response = mcp_service.handle(dict(self.headers.items()), raw)
+                    self.send_response(mcp_response.status_code)
                     response_headers = {
-                        key.lower(): value for key, value in response.headers.items()
+                        key.lower(): value for key, value in mcp_response.headers.items()
                     }
-                    for key, value in response.headers.items():
+                    for key, value in mcp_response.headers.items():
                         self.send_header(key, value)
                     if "content-length" not in response_headers:
-                        self.send_header("Content-Length", str(len(response.body)))
+                        self.send_header("Content-Length", str(len(mcp_response.body)))
                     self.end_headers()
-                    self.wfile.write(response.body)
+                    self.wfile.write(mcp_response.body)
                 except Exception:
                     self._respond(
                         HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "mcp_transport_error"}
@@ -176,10 +176,10 @@ def serve(
                     idempotency_key,
                     principal,
                 )
-                response = api.dispatch(request)
+                api_response = api.dispatch(request)
                 self._respond(
                     HTTPStatus.OK,
-                    {"status": response.status, "payload": response.payload},
+                    {"status": api_response.status, "payload": api_response.payload},
                 )
             except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
