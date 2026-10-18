@@ -71,14 +71,15 @@ begin
         raise exception 'expected one expired reservation to require reconciliation';
     end if;
 
-    if (
-        select state from platform.quota_reservations
+    if not exists (
+        select 1 from platform.quota_reservations
         where tenant_id = '00000000-0000-0000-0000-000000000091'
           and quota_reservations.reservation_id = v_reservation_id
+          and state = 'reserved'
           and recovery_attempts = 1
           and recovery_requested_at is not null
-    ) <> 'reserved' then
-        raise exception 'expired reservation was silently refunded';
+    ) then
+        raise exception 'expired reservation was silently refunded or not marked';
     end if;
 
     if not exists (
