@@ -363,10 +363,23 @@ class EcosystemRegistrySnapshot:
             required_ids = tuple(contract_id for contract_id, _ in agent.required_contracts)
             self._validate_contract_set(agent.agent_id, required_ids, contracts)
             for contract_id, version in agent.required_contracts:
-                if contracts[contract_id].version != version:
+                contract = contracts[contract_id]
+                if contract.version != version:
                     raise ValueError(
                         f"{agent.agent_id}: incompatible {contract_id} version {version}"
                     )
+                if (
+                    self.schema_version == "registry-manifest/v2"
+                    and agent.lifecycle is not None
+                    and agent.lifecycle.state is LifecycleState.ACTIVE
+                ):
+                    contract_owner = self.repository_metadata[contract.owner_repository_id]
+                    if contract_owner.lifecycle.state is not LifecycleState.ACTIVE:
+                        raise ValueError(f"{agent.agent_id}: contract owner is not active")
+                    if contract_owner.publisher.identity_status is IdentityStatus.REVOKED:
+                        raise ValueError(f"{agent.agent_id}: contract owner publisher is revoked")
+                    if contract_owner.supply_chain.verification_status is SupplyChainStatus.REVOKED:
+                        raise ValueError(f"{agent.agent_id}: contract owner supply-chain attestation is revoked")
 
         rule_map = {(rule.consumer_id, rule.contract_id): rule for rule in self.compatibility_rules}
         required_pairs = {
