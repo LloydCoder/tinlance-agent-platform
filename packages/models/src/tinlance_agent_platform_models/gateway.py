@@ -191,13 +191,20 @@ class ModelRoutingRequest:
 class ModelRoutingDecision:
     decision_id: str
     allowed: bool
-    route_id: str | None
+    route: str | None
     provider: str | None
-    model: str | None
+    model_id: str | None
     policy_version: str
     reason_code: str
     trace_id: str | None
 
+    @property
+    def route_id(self) -> str | None:
+        return self.route
+
+    @property
+    def model(self) -> str | None:
+        return self.model_id
 
 class ModelRouter:
     """Deterministic, policy-constrained route selector with fail-closed audit."""
@@ -221,7 +228,7 @@ class ModelRouter:
             and request.model_capability in route.capabilities\n            and request.risk_class in route.risk_classes
             and request.data_classification in route.data_classifications
             and request.risk_score <= route.max_risk_score
-            and request.estimated_cost_microusd <= route.max_cost_microusd
+            and request.budget_microusd <= route.max_cost_microusd
             and (route.tenants is None or request.tenant_id in route.tenants)
             and (route.agents is None or request.agent_id in route.agents)
         ]
@@ -230,9 +237,9 @@ class ModelRouter:
         decision = ModelRoutingDecision(
             decision_id=str(uuid4()),
             allowed=selected is not None,
-            route_id=selected.route_id if selected else None,
+            route=selected.route_id if selected else None,
             provider=selected.provider if selected else None,
-            model=selected.model if selected else None,
+            model_id=selected.model if selected else None,
             policy_version=request.policy_version,
             reason_code="eligible_route_selected" if selected else "no_eligible_route",
             trace_id=request.trace_id,
