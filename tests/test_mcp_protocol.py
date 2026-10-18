@@ -289,8 +289,11 @@ def test_protocol_requires_valid_per_request_client_metadata() -> None:
     ).encode()
     assert service.handle(headers("tools/list"), missing).status_code == 400
     missing_header = service.handle(
-        {key: value for key, value in headers("tools/list").items()
-         if key != "mcp-protocol-version"},
+        {
+            key: value
+            for key, value in headers("tools/list").items()
+            if key != "mcp-protocol-version"
+        },
         body("tools/list"),
     )
     assert missing_header.status_code == 400
