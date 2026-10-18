@@ -14,7 +14,7 @@ from typing import Protocol
 from urllib.parse import urlparse
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from .interoperability import A2A_PROTOCOL_VERSION, AgentCard
+from .interoperability import A2A_PROTOCOL_VERSION, AgentCard, AgentCardSignatureVerifier
 
 MAX_REQUEST_BYTES = 1_048_576
 MAX_RESPONSE_BYTES = 1_048_576
@@ -217,12 +217,11 @@ class A2AProtocolService:
         resolver: A2APrincipalResolver,
         rate_limiter: A2ARateLimiter,
         agent_card: AgentCard,
+        card_verifier: AgentCardSignatureVerifier,
         *,
         allowed_origins: tuple[str, ...] = (),
     ) -> None:
-        agent_card.validate()
-        if not agent_card.signature or not agent_card.key_id or not agent_card.signature_algorithm:
-            raise ValueError("published A2A Agent Card must be signed")
+        agent_card.verify_signature(card_verifier)
         origins = frozenset(allowed_origins)
         for origin in origins:
             parsed = urlparse(origin)
