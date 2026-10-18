@@ -20,7 +20,7 @@ class BudgetScope:
         values = (self.tenant_id, self.action, self.resource)
         if any(not value or value != value.strip() for value in values):
             raise ValueError("budget scope fields are required and normalized")
-        if any(len(value) > 4096 for value in values):
+        if len(self.tenant_id) > 256 or len(self.action) > 256 or len(self.resource) > 256:
             raise ValueError("budget scope fields exceed safety limits")
         if not isinstance(self.agent_id, UUID) or not isinstance(self.run_id, UUID):
             raise TypeError("budget scope identifiers must be UUIDs")
@@ -184,8 +184,15 @@ class BudgetService:
             self._reservations.pop(reservation.reservation_id, None)
 
     def consume_turn(self, elapsed_seconds: float) -> None:
-        if not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
+        if (
+            isinstance(elapsed_seconds, bool)
+            or not isinstance(elapsed_seconds, (int, float))
+            or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0
+        ):
             raise ValueError("elapsed time must be finite and non-negative")
+        if self._tenant_quota is not None:
+            raise RuntimeError("scoped budget reservation is required when tenant quota is enabled")
         with self._lock:
             if self._budget.consumed_turns + 1 > self._budget.max_turns:
                 raise TimeoutError("maximum turns exceeded")
@@ -198,6 +205,8 @@ class BudgetService:
             )
 
     def consume_tool_call(self) -> None:
+        if self._tenant_quota is not None:
+            raise RuntimeError("scoped budget reservation is required when tenant quota is enabled")
         with self._lock:
             if self._budget.consumed_tool_calls + 1 > self._budget.max_tool_calls:
                 raise TimeoutError("maximum tool calls exceeded")
