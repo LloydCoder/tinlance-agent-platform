@@ -46,6 +46,8 @@ class Connection:
             return Cursor((self.reserve_result or params[0],))
         if "platform.settle_quota" in query:
             return Cursor((self.result if isinstance(self.result, str) else "settled",))
+        if "platform.request_expired_quota_reconciliation" in query:
+            return Cursor((self.result,))
         if "platform.renew_quota_reservation" in query:
             return Cursor((self.result,))
         return Cursor((self.result if isinstance(self.result, bool) else True,))
