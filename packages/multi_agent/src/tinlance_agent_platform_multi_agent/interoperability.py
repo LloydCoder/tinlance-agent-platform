@@ -288,6 +288,7 @@ class RemoteDelegation:
     tenant_id: str
     parent_agent_id: UUID
     remote_agent_id: UUID
+    audience: str
     capabilities: frozenset[str]
     resource_scope: str
     delegation_nonce: str
@@ -322,6 +323,7 @@ class RemoteDelegation:
             tenant_id=tenant_id,
             parent_agent_id=parent_agent_id,
             remote_agent_id=remote_agent_id,
+            audience=str(remote_agent_id),
             capabilities=frozenset(requested_capabilities),
             resource_scope=resource_scope,
             delegation_nonce=str(uuid4()),
@@ -349,6 +351,9 @@ class RemoteDelegation:
             raise PermissionError("remote delegation has expired")
         _required(self.tenant_id, "tenant")
         _required(self.resource_scope, "resource scope")
+        _required(self.audience, "delegation audience")
+        if self.audience != str(self.remote_agent_id):
+            raise PermissionError("delegation audience does not match the remote agent")
         if not self.delegation_nonce.strip():
             raise PermissionError("delegation nonce is missing")
 
