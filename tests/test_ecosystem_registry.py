@@ -133,16 +133,13 @@ def valid_snapshot(**overrides):
     if schema_version == "registry-manifest/v2":
         active_lifecycle = LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T00:00:00Z")
         services = tuple(
-            replace(item, lifecycle=item.lifecycle or active_lifecycle)
-            for item in services
+            replace(item, lifecycle=item.lifecycle or active_lifecycle) for item in services
         )
         agents = tuple(
-            replace(item, lifecycle=item.lifecycle or active_lifecycle)
-            for item in agents
+            replace(item, lifecycle=item.lifecycle or active_lifecycle) for item in agents
         )
         contracts = tuple(
-            replace(item, lifecycle=item.lifecycle or active_lifecycle)
-            for item in contracts
+            replace(item, lifecycle=item.lifecycle or active_lifecycle) for item in contracts
         )
     pairs = {
         (service.service_id, contract_id)
@@ -379,8 +376,7 @@ def test_deprecated_contract_requires_replacement_and_non_https_supply_chain_ref
         SupplyChainReferences(
             reviewed_sha=SHAS["platform"],
             provenance_uri=(
-                "https://github.com/LloydCoder/tinlance-agent-platform/commit/"
-                + SHAS["platform"]
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + SHAS["platform"]
             ),
             sbom_uri="http://example.test/sbom.json",
             signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
