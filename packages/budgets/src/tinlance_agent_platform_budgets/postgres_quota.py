@@ -518,24 +518,49 @@ class PostgresBudgetGate:
             current = self._active.get(reservation.reservation_id)
             if current != reservation:
                 raise KeyError("durable budget reservation is not active")
-        actual = self._measure_usage(reservation.scope, reservation.reservation_id, elapsed_seconds)
-        if not isinstance(actual, QuotaSettlement):
-            raise TypeError("Platform usage meter must return QuotaSettlement")
-        status = self._transaction(
-            reservation.tenant_id,
-            lambda ledger: ledger.settle(
-                tenant_id=reservation.tenant_id,
-                reservation_id=reservation.reservation_id,
-                actual=actual,
-            ),
-        )
+        try:
+            actual = self._measure_usage(
+                reservation.scope,
+                reservation.reservation_id,
+                elapsed_seconds,
+            )
+            if not isinstance(actual, QuotaSettlement):
+                raise TypeError("Platform usage meter must return QuotaSettlement")
+            status = self._transaction(
+                reservation.tenant_id,
+                lambda ledger: ledger.settle(
+                    tenant_id=reservation.tenant_id,
+                    reservation_id=reservation.reservation_id,
+                    actual=actual,
+                ),
+            )
+        except Exception:
+            # The external side effect has already run. Record local measured
+            # usage, but leave the durable reservation for reconciliation.
+            with suppress(Exception):
+                self._run_budget.consume_measured(
+                    reservation.local_reservation,
+                    elapsed_seconds,
+                )
+            raise
         with self._lock:
             self._active.pop(reservation.reservation_id, None)
         runtime_overrun = elapsed_seconds > reservation.local_reservation.seconds
-        if runtime_overrun:
-            self._run_budget.consume_overrun(reservation.local_reservation, elapsed_seconds)
-        else:
-            self._run_budget.consume(reservation.local_reservation, elapsed_seconds)
+        try:
+            if runtime_overrun:
+                self._run_budget.consume_measured(
+                    reservation.local_reservation,
+                    elapsed_seconds,
+                )
+            else:
+                self._run_budget.consume(reservation.local_reservation, elapsed_seconds)
+        except Exception:
+            with suppress(Exception):
+                self._run_budget.consume_measured(
+                    reservation.local_reservation,
+                    elapsed_seconds,
+                )
+            raise
         if runtime_overrun:
             raise TimeoutError("measured runtime exceeded the reserved runtime budget")
         if status == "overrun":
