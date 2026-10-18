@@ -60,9 +60,7 @@ def _prepare_event(event: Event) -> tuple[Event, CloudEventEnvelope]:
         for key, value in event.payload.items()
     ):
         raise ValueError("event payload keys and values must be strings")
-    sensitive_markers = (
-        "secret", "password", "token", "api_key", "private_key", "credential"
-    )
+    sensitive_markers = ("secret", "password", "token", "api_key", "private_key", "credential")
     if any(
         any(marker in key.lower() or marker in value.lower() for marker in sensitive_markers)
         for key, value in event.payload.items()
@@ -150,8 +148,7 @@ class PostgresEventStore:
             raise ValueError("PostgreSQL tenant_id must be a UUID") from exc
 
         run = self._connection.execute(
-            "SELECT run_id FROM platform.runs "
-            "WHERE tenant_id = %s AND run_id = %s FOR UPDATE",
+            "SELECT run_id FROM platform.runs WHERE tenant_id = %s AND run_id = %s FOR UPDATE",
             (tenant_uuid, stored.run_id),
         ).fetchone()
         if run is None:
