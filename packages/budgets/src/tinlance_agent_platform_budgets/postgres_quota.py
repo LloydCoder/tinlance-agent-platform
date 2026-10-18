@@ -123,7 +123,12 @@ class PostgresQuotaLedger:
             or actual.cost_units < 0
         ):
             raise ValueError("actual quota usage must be finite and non-negative")
-        evidence_json = json.dumps(actual.evidence, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        evidence_json = json.dumps(
+            actual.evidence,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
         row = self._connection.execute(
             "SELECT platform.settle_quota(%s, %s, %s, %s, %s, %s::jsonb)",
             (
