@@ -149,7 +149,7 @@ returns boolean
 language sql
 immutable
 set search_path = pg_catalog, platform
-as $
+as $$
     select jsonb_typeof(coalesce(p_evidence, '{}'::jsonb)) = 'object'
        and octet_length(coalesce(p_evidence, '{}'::jsonb)::text) <= 4096
        and not exists (
@@ -164,7 +164,7 @@ as $
                or jsonb_typeof(item.value) not in ('string', 'number', 'boolean')
                or (jsonb_typeof(item.value) = 'string' and length(item.value #>> '{}') > 512)
        )
-$;
+$$;
 
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
@@ -315,7 +315,7 @@ create or replace function platform.settle_quota(
 language plpgsql
 security invoker
 set search_path = pg_catalog, platform
-as $
+as $$
 declare
     reservation platform.quota_reservations%rowtype;
     tenant_limit platform.tenant_budget_limits%rowtype;
@@ -419,7 +419,7 @@ begin
     end if;
     return 'settled';
 end;
-$;
+$$;
 
 create or replace function platform.release_quota(
     p_tenant_id uuid,
