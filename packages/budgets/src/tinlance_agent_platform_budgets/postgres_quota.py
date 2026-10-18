@@ -610,7 +610,7 @@ class PostgresBudgetGate:
         with self._lock:
             if self._active.get(reservation.reservation_id) != reservation:
                 raise KeyError("durable budget reservation is not active")
-        return self._transaction(
+        renewed_until = self._transaction(
             reservation.tenant_id,
             lambda ledger: ledger.renew(
                 tenant_id=reservation.tenant_id,
@@ -618,6 +618,9 @@ class PostgresBudgetGate:
                 lease_seconds=lease_seconds,
             ),
         )
+        if not isinstance(renewed_until, datetime):
+            raise RuntimeError("quota lease renewal returned an unexpected result")
+        return renewed_until
 
     def request_expired_reconciliation(
         self,
@@ -625,10 +628,13 @@ class PostgresBudgetGate:
         *,
         batch_limit: int = 100,
     ) -> int:
-        return self._transaction(
+        requested = self._transaction(
             tenant_id,
             lambda ledger: ledger.request_expired_reconciliation(
                 tenant_id=tenant_id,
                 batch_limit=batch_limit,
             ),
         )
+        if isinstance(requested, bool) or not isinstance(requested, int) or requested < 0:
+            raise RuntimeError("quota reconciliation request returned an unexpected result")
+        return requested
