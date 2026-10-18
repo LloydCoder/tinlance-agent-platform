@@ -21,7 +21,7 @@ from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_approvals import ApprovalService
-from tinlance_agent_platform_budgets import BudgetScope
+from tinlance_agent_platform_budgets import BudgetScope, QuotaOverrunError
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
     ApprovalStatus,
@@ -269,6 +269,7 @@ class BudgetGate(Protocol):
         *,
         tool_calls: int,
         seconds: float,
+        idempotency_key: str | None = None,
     ) -> Any: ...
 
     def consume(self, reservation: Any, elapsed_seconds: float) -> None: ...
@@ -647,6 +648,7 @@ class GovernedExecutionService:
                         ),
                         tool_calls=request.requested_tool_calls,
                         seconds=effective_timeout,
+                        idempotency_key=request.idempotency_key,
                     )
                 except (PermissionError, TimeoutError, ValueError) as exc:
                     raise ExecutionFailure(
@@ -725,6 +727,14 @@ class GovernedExecutionService:
                 if budget_reservation is not None and self.budget is not None:
                     try:
                         self.budget.consume(budget_reservation, elapsed)
+                    except QuotaOverrunError:
+                        with suppress(Exception):
+                            self._event(
+                                request,
+                                execution_id,
+                                "execution.budget_overrun",
+                                audit_ids,
+                            )
                     except Exception:
                         with suppress(Exception):
                             self._event(
@@ -781,6 +791,20 @@ class GovernedExecutionService:
             if budget_reservation is not None and self.budget is not None:
                 try:
                     self.budget.consume(budget_reservation, elapsed)
+                except QuotaOverrunError as exc:
+                    # The ledger confirmed and recorded the overrun; this is not
+                    # an uncertain settlement and must not be mislabeled as one.
+                    budget_reservation = None
+                    self._event(
+                        request,
+                        execution_id,
+                        "execution.budget_overrun",
+                        audit_ids,
+                    )
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.BUDGET_EXCEEDED,
+                        "execution exceeded its reserved budget; measured overrun was recorded",
+                    ) from exc
                 except TimeoutError as exc:
                     # The tool has already executed; do not refund an overrun.
                     budget_reservation = None
