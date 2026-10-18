@@ -107,8 +107,8 @@ begin
            and q.lease_expires_at <= clock_timestamp()
            and q.recovery_requested_at is null
          order by q.lease_expires_at, q.reservation_id
-         for update skip locked
          limit p_limit
+         for update skip locked
     ), marked as (
         update platform.quota_reservations q
            set recovery_requested_at = clock_timestamp(),
