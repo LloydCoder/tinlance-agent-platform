@@ -61,17 +61,12 @@ class LifecycleMetadata:
             raise ValueError("lifecycle changed_at must be an RFC 3339 timestamp") from exc
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise ValueError("lifecycle changed_at must include a timezone")
-        if (
-            self.state in {
-                LifecycleState.QUARANTINED,
-                LifecycleState.REVOKED,
-                LifecycleState.DEPRECATED,
-            }
-            and (not self.reason or not self.reason.strip())
-        ):
-            raise ValueError(
-                "quarantined, revoked and deprecated resources require a reason"
-            )
+        if self.state in {
+            LifecycleState.QUARANTINED,
+            LifecycleState.REVOKED,
+            LifecycleState.DEPRECATED,
+        } and (not self.reason or not self.reason.strip()):
+            raise ValueError("quarantined, revoked and deprecated resources require a reason")
         if self.state is LifecycleState.DEPRECATED:
             if not self.replacement_id or not self.replacement_id.strip():
                 raise ValueError("deprecated resources require a replacement ID")
@@ -311,10 +306,7 @@ class EcosystemRegistrySnapshot:
                 raise ValueError(
                     f"{service.service_id}: non-active lifecycle state must fail closed"
                 )
-            if not service.enabled and (
-                service.lifecycle is None
-                or service.lifecycle.state is LifecycleState.ACTIVE
-            ):
+            if not service.enabled and (service.lifecycle is None or service.lifecycle.state is LifecycleState.ACTIVE):
                 raise ValueError(
                     f"{service.service_id}: required active service registration is disabled"
                 )
