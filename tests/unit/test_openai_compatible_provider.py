@@ -2,8 +2,8 @@ import json
 import threading
 import time
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from uuid import uuid4
 
 import pytest
 
