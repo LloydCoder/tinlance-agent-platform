@@ -107,9 +107,7 @@ class _UrllibTWIHTTPClient:
             response_body = response.read(self._max_response_bytes + 1)
             if len(response_body) > self._max_response_bytes:
                 raise TWITransportError(None) from None
-            response_headers = {
-                key.lower(): value for key, value in response.headers.items()
-            }
+            response_headers = {key.lower(): value for key, value in response.headers.items()}
             return TWIHTTPResponse(response.status, response_headers, response_body)
 
 
@@ -128,38 +126,78 @@ class _ToolSpec:
 
 _TOOL_SPECS: dict[str, _ToolSpec] = {
     "twi_search": _ToolSpec(
-        "web.search", "submit", "web://search/*", "twi:search", "POST", "/v1/jobs",
-        "idempotency_key", RiskTier.LOW,
+        capability="web.search",
+        action="submit",
+        resource_pattern="web://search/*",
+        required_scope="twi:search",
+        method="POST",
+        route="/v1/jobs",
+        idempotency_argument="idempotency_key",
+        risk=RiskTier.LOW,
     ),
     "twi_fetch": _ToolSpec(
-        "web.fetch", "submit", "web://fetch/*", "twi:fetch", "POST", "/v1/jobs",
-        "idempotency_key", RiskTier.MEDIUM,
+        capability="web.fetch",
+        action="submit",
+        resource_pattern="web://fetch/*",
+        required_scope="twi:fetch",
+        method="POST",
+        route="/v1/jobs",
+        idempotency_argument="idempotency_key",
+        risk=RiskTier.MEDIUM,
     ),
     "twi_browser_navigate": _ToolSpec(
-        "web.browser.navigate", "navigate", "web://browser/*", "twi:browser", "POST", "/v1/jobs",
-        "idempotency_key", RiskTier.MEDIUM,
+        capability="web.browser.navigate",
+        action="navigate",
+        resource_pattern="web://browser/*",
+        required_scope="twi:browser",
+        method="POST",
+        route="/v1/jobs",
+        idempotency_argument="idempotency_key",
+        risk=RiskTier.MEDIUM,
     ),
     "twi_job_read": _ToolSpec(
-        "web.job.read", "read", "twi://jobs/{job_id}", "twi:jobs:read", "GET", "/v1/jobs/{job_id}"
+        capability="web.job.read",
+        action="read",
+        resource_pattern="twi://jobs/{job_id}",
+        required_scope="twi:jobs:read",
+        method="GET",
+        route="/v1/jobs/{job_id}",
     ),
     "twi_job_cancel": _ToolSpec(
-        "web.job.cancel", "cancel", "twi://jobs/{job_id}", "twi:jobs:cancel", "POST",
-        "/v1/jobs/{job_id}/cancel", risk=RiskTier.LOW,
+        capability="web.job.cancel",
+        action="cancel",
+        resource_pattern="twi://jobs/{job_id}",
+        required_scope="twi:jobs:cancel",
+        method="POST",
+        route="/v1/jobs/{job_id}/cancel",
+        risk=RiskTier.LOW,
     ),
     "twi_research_verify": _ToolSpec(
-        "web.research.verify", "verify", "twi://research/verification/*",
-        "twi:research:verify", "POST", "/v1/research/verify",
+        capability="web.research.verify",
+        action="verify",
+        resource_pattern="twi://research/verification/*",
+        required_scope="twi:research:verify",
+        method="POST",
+        route="/v1/research/verify",
     ),
     "twi_world_intelligence_export": _ToolSpec(
-        "world-intelligence.source-evidence.export", "submit",
-        "world-intelligence://source-evidence/*", "twi:observations:export",
-        "POST", "/v1/integrations/world-intelligence/exports",
-        "idempotency_key", RiskTier.HIGH, True,
+        capability="world-intelligence.source-evidence.export",
+        action="submit",
+        resource_pattern="world-intelligence://source-evidence/*",
+        required_scope="twi:observations:export",
+        method="POST",
+        route="/v1/integrations/world-intelligence/exports",
+        idempotency_argument="idempotency_key",
+        risk=RiskTier.HIGH,
+        requires_approval=True,
     ),
     "twi_world_intelligence_export_status": _ToolSpec(
-        "world-intelligence.source-evidence.read", "read",
-        "twi://world-intelligence/exports/{event_id}", "twi:observations:export:read",
-        "GET", "/v1/integrations/world-intelligence/exports/{event_id}",
+        capability="world-intelligence.source-evidence.read",
+        action="read",
+        resource_pattern="twi://world-intelligence/exports/{event_id}",
+        required_scope="twi:observations:export:read",
+        method="GET",
+        route="/v1/integrations/world-intelligence/exports/{event_id}",
     ),
 }
 
