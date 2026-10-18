@@ -144,7 +144,10 @@ class ModelRoute:
         }:
             raise ValueError("route data classifications are invalid")
         if not self.risk_classes or not self.risk_classes <= {
-            "low", "moderate", "high", "critical"
+            "low",
+            "moderate",
+            "high",
+            "critical",
         }:
             raise ValueError("route risk classes are invalid")
         if not 0 <= self.max_risk_score <= 100 or self.max_cost_microusd < 0:
