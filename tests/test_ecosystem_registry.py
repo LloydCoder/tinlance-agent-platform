@@ -477,3 +477,32 @@ def test_deprecated_resource_replacement_must_resolve_to_an_active_resource():
             repository_metadata=v2_repository_metadata(),
             contracts=tuple(contracts),
         ).validate()
+
+
+def test_publisher_and_supply_chain_uris_must_match_the_reviewed_identity_and_revision():
+    with pytest.raises(ValueError, match="publisher identity URI must match"):
+        PublisherIdentity(
+            "LloydCoder",
+            "https://github.com/other-account",
+            IdentityStatus.UNVERIFIED,
+        )
+
+    with pytest.raises(ValueError, match="exact reviewed GitHub commit"):
+        SupplyChainReferences(
+            reviewed_sha=SHAS["platform"],
+            provenance_uri="https://github.com/LloydCoder/tinlance-agent-platform/commit/" + "f" * 40,
+            sbom_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            verification_status=SupplyChainStatus.PENDING,
+        )
+
+    with pytest.raises(ValueError, match="GitHub attestation index"):
+        SupplyChainReferences(
+            reviewed_sha=SHAS["platform"],
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + SHAS["platform"]
+            ),
+            sbom_uri="https://example.test/sbom.json",
+            signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            verification_status=SupplyChainStatus.PENDING,
+        )
