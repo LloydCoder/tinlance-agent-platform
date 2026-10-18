@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
@@ -18,6 +19,7 @@ from tinlance_agent_platform_mcp import (
     MCPToolGateway,
     TWIHTTPTransport,
     TWIHTTPResponse,
+    TWI_TOOL_REGISTRATIONS,
     TWITransportError,
     ToolScope,
     register_twi_tools,
@@ -81,7 +83,7 @@ class FakeHTTPClient:
         method: str,
         url: str,
         *,
-        headers: dict[str, str] | Any,
+        headers: Mapping[str, str],
         body: bytes | None,
         timeout_seconds: float,
     ) -> TWIHTTPResponse:
@@ -186,16 +188,13 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         gateway = MCPToolGateway(self.transport)
         register_twi_tools(gateway)
         export = next(
-            tool
-            for tool in __import__(
-                "tinlance_agent_platform_mcp.twi", fromlist=["TWI_TOOL_REGISTRATIONS"]
-            ).TWI_TOOL_REGISTRATIONS
+            tool for tool in TWI_TOOL_REGISTRATIONS
             if tool.name == "twi_world_intelligence_export"
         )
         self.assertTrue(export.requires_approval)
         self.assertEqual(export.risk, RiskTier.HIGH)
         self.assertEqual(export.idempotency_argument, "idempotency_key")
-        self.assertEqual(len(gateway._tools), 8)
+        self.assertEqual(len(TWI_TOOL_REGISTRATIONS), 8)
 
     def test_export_is_blocked_without_human_approval_before_network_call(self) -> None:
         gateway = MCPToolGateway(self.transport)
