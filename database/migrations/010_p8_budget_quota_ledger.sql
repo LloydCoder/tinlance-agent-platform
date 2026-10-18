@@ -287,11 +287,11 @@ create or replace function platform.settle_quota(
     p_actual_token_units bigint,
     p_actual_cost_units numeric,
     p_evidence jsonb default '{}'::jsonb
-) returns boolean
+) returns text
 language plpgsql
 security invoker
 set search_path = pg_catalog, platform
-as $$
+as $
 declare
     reservation platform.quota_reservations%rowtype;
     tenant_limit platform.tenant_budget_limits%rowtype;
@@ -321,7 +321,7 @@ begin
         if reservation.actual_tool_calls = p_actual_tool_calls
            and reservation.actual_token_units = p_actual_token_units
            and reservation.actual_cost_units = p_actual_cost_units then
-            return false;
+            return 'already_settled';
         end if;
         raise exception 'conflicting duplicate settlement' using errcode = '23505';
     end if;
@@ -389,9 +389,12 @@ begin
         event_kind, p_actual_tool_calls, p_actual_token_units, p_actual_cost_units,
         reservation.idempotency_key, coalesce(p_evidence, '{}'::jsonb)
     );
-    return event_kind <> 'overrun';
+    if event_kind = 'overrun' then
+        return 'overrun';
+    end if;
+    return 'settled';
 end;
-$$;
+$;
 
 create or replace function platform.release_quota(
     p_tenant_id uuid,
