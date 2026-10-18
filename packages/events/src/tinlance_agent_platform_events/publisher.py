@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -116,11 +116,9 @@ class PostgresOutboxPublisher:
                     if isinstance(exc, (ValueError, TypeError, json.JSONDecodeError))
                     else "provider_publish_failed"
                 )
-                try:
+                # Leave the lease to expire; never persist raw exception text.
+                with suppress(Exception):
                     self._release(outbox_id, lease_token, error_code)
-                except Exception:
-                    # Leave the lease to expire; never persist raw exception text.
-                    pass
                 failed += 1
                 continue
             try:
