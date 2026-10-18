@@ -579,3 +579,18 @@ def test_postgres_budget_gate_reconciles_settlement_without_double_accounting() 
     assert recovered_settlement.committed
     assert budget.budget.consumed_tool_calls == 1
     assert budget.budget.elapsed_seconds == 2.0
+
+
+def test_postgres_budget_gate_exposes_lease_renewal_and_reconciliation() -> None:
+    reserve_connection = Connection()
+    renew_until = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
+    renew_connection = Connection(result=renew_until)
+    reconciliation_connection = Connection(result=2)
+    gate, _, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, renew_connection, reconciliation_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    assert gate.renew(reservation, lease_seconds=600) == renew_until
+    assert gate.request_expired_reconciliation(TENANT_ID, batch_limit=10) == 2
+    assert renew_connection.committed and renew_connection.closed
+    assert reconciliation_connection.committed and reconciliation_connection.closed
