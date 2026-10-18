@@ -11,7 +11,7 @@ import json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, NoReturn, Protocol
 from urllib.parse import urlsplit
 
 from .gateway import ModelRequest, ModelResponse
@@ -54,7 +54,15 @@ class StaticModelCredential:
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> NoReturn:
         raise ModelProviderError("provider redirects are disabled")
 
 
