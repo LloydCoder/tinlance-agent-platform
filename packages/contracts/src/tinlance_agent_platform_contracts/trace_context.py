@@ -123,7 +123,10 @@ class TraceLineageContext:
             if key == "outcome" and attribute_value not in _OUTCOMES:
                 raise ValueError("unsupported trace outcome")
             if key == "attempt" and (
-                not isinstance(attribute_value, int) or isinstance(attribute_value, bool) or attribute_value < 0 or attribute_value > 1000
+                not isinstance(attribute_value, int)
+                or isinstance(attribute_value, bool)
+                or attribute_value < 0
+                or attribute_value > 1000
             ):
                 raise ValueError("trace attempt must be an integer between 0 and 1000")
             if isinstance(attribute_value, str):
