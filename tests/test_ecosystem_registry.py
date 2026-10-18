@@ -27,21 +27,51 @@ CONTRACTS = (
 )
 
 SERVICES = (
-    ServiceRegistration("agent-platform.api", "platform", SHAS["platform"], "1.1",
+    ServiceRegistration(
+        "agent-platform.api",
+        "platform",
+        SHAS["platform"],
+        "1.1",
         ("governed-execution.v1", "event-envelope.v1", "trace-context.v1"),
-        ("agent.execute", "tool.invoke"), AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION),
-    ServiceRegistration("agent-os.runtime", "os", SHAS["os"], "1.1",
+        ("agent.execute", "tool.invoke"),
+        AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION,
+    ),
+    ServiceRegistration(
+        "agent-os.runtime",
+        "os",
+        SHAS["os"],
+        "1.1",
         ("event-envelope.v1", "trace-context.v1"),
-        ("event.publish", "trace.propagate"), AuthorityMode.AUTHORITY_FREE),
-    ServiceRegistration("platform-sdk.client", "platform_sdk", SHAS["platform_sdk"], "1.1",
+        ("event.publish", "trace.propagate"),
+        AuthorityMode.AUTHORITY_FREE,
+    ),
+    ServiceRegistration(
+        "platform-sdk.client",
+        "platform_sdk",
+        SHAS["platform_sdk"],
+        "1.1",
         ("governed-execution.v1", "event-envelope.v1", "trace-context.v1"),
-        ("request.submit", "trace.propagate"), AuthorityMode.AUTHORITY_FREE),
-    ServiceRegistration("tadl.validator", "developer", SHAS["developer"], "1.1",
+        ("request.submit", "trace.propagate"),
+        AuthorityMode.AUTHORITY_FREE,
+    ),
+    ServiceRegistration(
+        "tadl.validator",
+        "developer",
+        SHAS["developer"],
+        "1.1",
         ("transformation.v1", "replication.v1", "trace-context.v1", "registry-manifest.v1"),
-        ("artifact.validate", "registry.validate"), AuthorityMode.AUTHORITY_FREE),
-    ServiceRegistration("tsic.conformance", "tsic", SHAS["tsic"], "1.1",
+        ("artifact.validate", "registry.validate"),
+        AuthorityMode.AUTHORITY_FREE,
+    ),
+    ServiceRegistration(
+        "tsic.conformance",
+        "tsic",
+        SHAS["tsic"],
+        "1.1",
         ("event-envelope.v1", "trace-context.v1", "registry-manifest.v1"),
-        ("contract.validate", "compatibility.validate"), AuthorityMode.CONFORMANCE_ONLY),
+        ("contract.validate", "compatibility.validate"),
+        AuthorityMode.CONFORMANCE_ONLY,
+    ),
 )
 
 AGENTS = (
