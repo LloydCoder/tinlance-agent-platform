@@ -3,6 +3,7 @@
 The envelope is transport metadata only. Event content is untrusted and cannot
 change identity, tenant scope, policy, approval, or execution authority.
 """
+
 from __future__ import annotations
 
 import json
