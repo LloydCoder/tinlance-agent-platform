@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 
@@ -14,9 +15,26 @@ class CapacityEnvelope:
 
     def __post_init__(self) -> None:
         if (
-            self.minimum_throughput_per_minute < 0
-            or self.maximum_p95_ms < 0
-            or self.maximum_p99_ms < 0
+            not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                for value in (
+                    self.minimum_throughput_per_minute,
+                    self.maximum_p95_ms,
+                    self.maximum_p99_ms,
+                )
+            )
+            or any(
+                value < 0
+                for value in (
+                    self.minimum_throughput_per_minute,
+                    self.maximum_p95_ms,
+                    self.maximum_p99_ms,
+                )
+            )
+            or isinstance(self.maximum_concurrency, bool)
+            or not isinstance(self.maximum_concurrency, int)
             or self.maximum_concurrency < 1
         ):
             raise ValueError("capacity envelope values are invalid")
@@ -33,17 +51,19 @@ class CapacityObservation:
 
     def __post_init__(self) -> None:
         if (
-            self.throughput_per_minute < 0
-            or self.p95_ms < 0
-            or self.p99_ms < 0
+            isinstance(self.concurrency, bool)
+            or not isinstance(self.concurrency, int)
             or self.concurrency < 0
+            or not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms)
+            )
+            or any(value < 0 for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms))
             or self.p95_ms > self.p99_ms
         ):
             raise ValueError("capacity observation values are invalid")
-
-    @property
-    def within(self) -> bool:
-        return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,18 +73,48 @@ class CapacityGate:
     evidence_ref: str
 
     def __post_init__(self) -> None:
-        if not self.evidence_ref.strip():
-            raise ValueError("capacity evidence is required")
+        if (
+            not isinstance(self.evidence_ref, str)
+            or not self.evidence_ref
+            or self.evidence_ref != self.evidence_ref.strip()
+            or len(self.evidence_ref) > 512
+            or any(ord(char) < 32 or ord(char) == 127 for char in self.evidence_ref)
+        ):
+            raise ValueError("capacity evidence must be a bounded normalized reference")
+
+    @property
+    def within(self) -> bool:
+        return (
+            self.observation.throughput_per_minute >= self.envelope.minimum_throughput_per_minute
+            and self.observation.p95_ms <= self.envelope.maximum_p95_ms
+            and self.observation.p99_ms <= self.envelope.maximum_p99_ms
+            and self.observation.concurrency <= self.envelope.maximum_concurrency
+        )
 
     def evaluate(self) -> None:
+        violations: list[str] = []
         if self.observation.throughput_per_minute < self.envelope.minimum_throughput_per_minute:
-            raise RuntimeError("capacity throughput target failed")
+            violations.append(
+                f"throughput {self.observation.throughput_per_minute:g}/min is below "
+                f"{self.envelope.minimum_throughput_per_minute:g}/min"
+            )
         if self.observation.p95_ms > self.envelope.maximum_p95_ms:
-            raise RuntimeError("capacity p95 target failed")
+            violations.append(
+                f"p95 latency {self.observation.p95_ms:g}ms exceeds "
+                f"{self.envelope.maximum_p95_ms:g}ms"
+            )
         if self.observation.p99_ms > self.envelope.maximum_p99_ms:
-            raise RuntimeError("capacity p99 target failed")
+            violations.append(
+                f"p99 latency {self.observation.p99_ms:g}ms exceeds "
+                f"{self.envelope.maximum_p99_ms:g}ms"
+            )
         if self.observation.concurrency > self.envelope.maximum_concurrency:
-            raise RuntimeError("capacity concurrency target failed")
+            violations.append(
+                f"concurrency {self.observation.concurrency} exceeds "
+                f"{self.envelope.maximum_concurrency}"
+            )
+        if violations:
+            raise RuntimeError("capacity envelope was exceeded: " + "; ".join(violations))
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +126,16 @@ class TenantQuota:
 
     def __post_init__(self) -> None:
         if (
-            self.max_concurrency < 1
+            isinstance(self.max_concurrency, bool)
+            or not isinstance(self.max_concurrency, int)
+            or isinstance(self.max_tool_calls, bool)
+            or not isinstance(self.max_tool_calls, int)
+            or isinstance(self.max_token_units, bool)
+            or not isinstance(self.max_token_units, int)
+            or isinstance(self.max_cost_units, bool)
+            or not isinstance(self.max_cost_units, (int, float))
+            or not math.isfinite(self.max_cost_units)
+            or self.max_concurrency < 1
             or self.max_tool_calls < 0
             or self.max_token_units < 0
             or self.max_cost_units < 0
@@ -91,7 +150,19 @@ class TenantQuota:
         token_units: int,
         cost_units: float,
     ) -> bool:
-        if concurrency < 0 or tool_calls < 0 or token_units < 0 or cost_units < 0:
+        if (
+            any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in (concurrency, tool_calls, token_units)
+            )
+            or isinstance(cost_units, bool)
+            or not isinstance(cost_units, (int, float))
+            or not math.isfinite(cost_units)
+            or concurrency < 0
+            or tool_calls < 0
+            or token_units < 0
+            or cost_units < 0
+        ):
             return False
         return (
             concurrency <= self.max_concurrency

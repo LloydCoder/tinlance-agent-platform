@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass, replace
 from threading import RLock
 from uuid import UUID, uuid4
@@ -17,10 +18,14 @@ class BudgetScope:
 
     def __post_init__(self) -> None:
         values = (self.tenant_id, self.action, self.resource)
+        if any(not isinstance(value, str) for value in values):
+            raise TypeError("budget scope text fields must be strings")
         if any(not value or value != value.strip() for value in values):
             raise ValueError("budget scope fields are required and normalized")
-        if any(len(value) > 4096 for value in values):
+        if len(self.tenant_id) > 256 or len(self.action) > 256 or len(self.resource) > 256:
             raise ValueError("budget scope fields exceed safety limits")
+        if any(ord(char) < 32 or ord(char) == 127 for value in values for char in value):
+            raise ValueError("budget scope fields must not contain control characters")
         if not isinstance(self.agent_id, UUID) or not isinstance(self.run_id, UUID):
             raise TypeError("budget scope identifiers must be UUIDs")
 
@@ -64,8 +69,16 @@ class BudgetService:
     ) -> BudgetReservation:
         if scope.tenant_id != self._budget.tenant_id or scope.run_id != self._budget.run_id:
             raise PermissionError("budget is owned by another tenant or run")
-        if tool_calls < 0 or seconds < 0:
-            raise ValueError("reservation dimensions cannot be negative")
+        if (
+            isinstance(tool_calls, bool)
+            or not isinstance(tool_calls, int)
+            or tool_calls < 0
+            or isinstance(seconds, bool)
+            or not isinstance(seconds, (int, float))
+            or not math.isfinite(seconds)
+            or seconds < 0
+        ):
+            raise ValueError("reservation dimensions must be finite and non-negative")
         with self._lock:
             rid = reservation_id or uuid4()
             existing = self._reservations.get(rid)
@@ -107,6 +120,8 @@ class BudgetService:
         tool_calls: int = 1,
         seconds: float = 0.0,
     ) -> BudgetReservation:
+        if self._tenant_quota is not None:
+            raise RuntimeError("reserve_scoped is required when tenant quota is enabled")
         scope = BudgetScope(
             tenant_id,
             UUID(int=0),
@@ -117,19 +132,19 @@ class BudgetService:
         return self.reserve_scoped(scope, tool_calls=tool_calls, seconds=seconds)
 
     def consume(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
-        if elapsed_seconds < 0:
-            raise ValueError("elapsed time cannot be negative")
+        if (
+            isinstance(elapsed_seconds, bool)
+            or not isinstance(elapsed_seconds, (int, float))
+            or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0
+        ):
+            raise ValueError("elapsed time must be finite and non-negative")
         with self._lock:
             current = self._reservations.get(reservation.reservation_id)
             if current != reservation:
                 raise KeyError("budget reservation does not exist")
             if elapsed_seconds > current.seconds:
                 raise TimeoutError("execution exceeded reserved runtime budget")
-            self._budget = replace(
-                self._budget,
-                consumed_tool_calls=self._budget.consumed_tool_calls + current.tool_calls,
-                elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
-            )
             if self._tenant_quota is not None:
                 self._tenant_quota.settle(
                     TenantReservation(
@@ -145,6 +160,11 @@ class BudgetService:
                         0.0,
                     )
                 )
+            self._budget = replace(
+                self._budget,
+                consumed_tool_calls=self._budget.consumed_tool_calls + current.tool_calls,
+                elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
+            )
             del self._reservations[reservation.reservation_id]
 
     def release(self, reservation: BudgetReservation) -> None:
@@ -152,7 +172,6 @@ class BudgetService:
             current = self._reservations.get(reservation.reservation_id)
             if current is not None and current != reservation:
                 raise KeyError("budget reservation scope mismatch")
-            self._reservations.pop(reservation.reservation_id, None)
             if current is not None and self._tenant_quota is not None:
                 self._tenant_quota.release(
                     TenantReservation(
@@ -168,10 +187,18 @@ class BudgetService:
                         0.0,
                     )
                 )
+            self._reservations.pop(reservation.reservation_id, None)
 
     def consume_turn(self, elapsed_seconds: float) -> None:
-        if elapsed_seconds < 0:
-            raise ValueError("elapsed time cannot be negative")
+        if (
+            isinstance(elapsed_seconds, bool)
+            or not isinstance(elapsed_seconds, (int, float))
+            or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0
+        ):
+            raise ValueError("elapsed time must be finite and non-negative")
+        if self._tenant_quota is not None:
+            raise RuntimeError("scoped budget reservation is required when tenant quota is enabled")
         with self._lock:
             if self._budget.consumed_turns + 1 > self._budget.max_turns:
                 raise TimeoutError("maximum turns exceeded")
@@ -184,6 +211,8 @@ class BudgetService:
             )
 
     def consume_tool_call(self) -> None:
+        if self._tenant_quota is not None:
+            raise RuntimeError("scoped budget reservation is required when tenant quota is enabled")
         with self._lock:
             if self._budget.consumed_tool_calls + 1 > self._budget.max_tool_calls:
                 raise TimeoutError("maximum tool calls exceeded")
