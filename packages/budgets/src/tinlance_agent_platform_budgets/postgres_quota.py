@@ -496,7 +496,10 @@ class PostgresBudgetGate:
                 reservation_id = ledger.reserve(request)
         except Exception as exc:
             sqlstate = getattr(exc, "sqlstate", getattr(exc, "pgcode", None))
-            if sqlstate == "23505" and "idempotency key conflicts with existing reservation" in str(exc).lower():
+            if (
+                sqlstate == "23505"
+                and "idempotency key conflicts with existing reservation" in str(exc).lower()
+            ):
                 raise QuotaReservationReplayError(
                     "idempotency key conflicts with a different quota reservation intent"
                 ) from exc
@@ -540,8 +543,15 @@ class PostgresBudgetGate:
         measured = self.measure_usage(reservation, float(elapsed_seconds))
         if not isinstance(measured, QuotaSettlement):
             raise TypeError("measure_usage must return QuotaSettlement")
+        measured_evidence = self._validate_measured_evidence(measured.evidence)
+        measured_price_book = measured_evidence.get("price_book_version")
+        if (
+            measured_price_book is not None
+            and measured_price_book != reservation.estimate.price_book_version
+        ):
+            raise ValueError("measured usage price book does not match the reserved estimate")
         evidence = reservation.estimate.as_evidence()
-        evidence.update(self._validate_measured_evidence(measured.evidence))
+        evidence.update(measured_evidence)
         actual = QuotaSettlement(
             measured.tool_calls,
             measured.token_units,
