@@ -10,7 +10,6 @@ from __future__ import annotations
 import hmac
 import re
 from datetime import UTC, datetime
-from hashlib import sha256
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse
@@ -26,10 +25,10 @@ from tinlance_agent_platform_contracts import (
 
 from .gateway import ApprovalVerifier, MCPToolGateway, ToolScope
 from .twi import (
+    TWITransportError,
     TWI_OPERATION_TO_TOOL,
     compute_twi_intent_fingerprint,
     twi_tool_spec,
-    TWITransportError,
 )
 
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
