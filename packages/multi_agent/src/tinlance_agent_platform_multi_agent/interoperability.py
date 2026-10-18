@@ -3,6 +3,7 @@
 Discovery metadata is descriptive, not authoritative. Remote communication must
 enter the normal Platform identity, authorization and execution boundaries.
 """
+
 from __future__ import annotations
 
 import base64
@@ -24,9 +25,7 @@ MAX_REMOTE_RESPONSE_BYTES = 1_048_576
 class AgentCardSignatureVerifier(Protocol):
     """Verifies a JWS signing input against a trusted key registry."""
 
-    def verify(
-        self, key_id: str, algorithm: str, signing_input: bytes, signature: str
-    ) -> bool: ...
+    def verify(self, key_id: str, algorithm: str, signing_input: bytes, signature: str) -> bool: ...
 
 
 class RemoteAgentTransport(Protocol):
@@ -85,9 +84,7 @@ def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
     except ValueError:
         address = None
     if address is not None and not address.is_global:
-        loopback_development = (
-            not require_https and parsed.scheme == "http" and address.is_loopback
-        )
+        loopback_development = not require_https and parsed.scheme == "http" and address.is_loopback
         if not loopback_development:
             raise ValueError("remote agent endpoint must not target a non-public IP address")
     return hostname, parsed.scheme
@@ -194,13 +191,9 @@ class AgentCard:
                     raise ValueError("each A2A security scheme must define exactly one scheme type")
                 security_schemes[scheme] = dict(configured)
             elif scheme.lower() in {"bearer", "http-bearer"}:
-                security_schemes[scheme] = {
-                    "httpAuthSecurityScheme": {"scheme": "Bearer"}
-                }
+                security_schemes[scheme] = {"httpAuthSecurityScheme": {"scheme": "Bearer"}}
             else:
-                raise ValueError(
-                    f"security scheme {scheme!r} requires explicit protocol details"
-                )
+                raise ValueError(f"security scheme {scheme!r} requires explicit protocol details")
             security_requirements.append({scheme: []})
         payload: dict[str, object] = {
             "name": self.name,
@@ -285,9 +278,7 @@ class AgentCard:
                     separators=(",", ":"),
                 ).encode("utf-8")
             )
-            payload["signatures"] = [
-                {"protected": protected, "signature": self.signature}
-            ]
+            payload["signatures"] = [{"protected": protected, "signature": self.signature}]
         return payload
 
 
