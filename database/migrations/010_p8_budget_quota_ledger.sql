@@ -460,7 +460,7 @@ begin
 
     update platform.quota_reservations
        set state = 'settled', actual_tool_calls = p_actual_tool_calls,
-           actual_token_units = p_actual_token_units, actual_cost_units = p_actual_cost_units,
+           actual_token_units = p_actual_token_units, actual_cost_units = normalized_actual_cost,
            settled_at = now()
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id;
 
@@ -469,7 +469,7 @@ begin
         tool_calls, token_units, cost_units, idempotency_key, evidence
     ) values (
         gen_random_uuid(), p_tenant_id, reservation.organization_id, p_reservation_id, reservation.run_id,
-        event_kind, p_actual_tool_calls, p_actual_token_units, p_actual_cost_units,
+        event_kind, p_actual_tool_calls, p_actual_token_units, normalized_actual_cost,
         reservation.idempotency_key, coalesce(p_evidence, '{}'::jsonb)
     );
     if event_kind = 'overrun' then
