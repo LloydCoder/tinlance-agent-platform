@@ -345,7 +345,6 @@ class PostgresQuotaLedger:
         return row[0]
 
 
-
 @dataclass(frozen=True, slots=True)
 class QuotaEstimate:
     """Platform-derived reservation estimate; never accepted as client authority."""
