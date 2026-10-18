@@ -424,3 +424,31 @@ def test_tool_behavior_annotations_must_be_explicit_and_consistent() -> None:
             {"type": "object", "properties": {}, "additionalProperties": False},
             destructive=True,
         )
+
+
+def test_http_rejects_duplicate_mcp_routing_headers_before_dispatch() -> None:
+    service, api, _ = make_service()
+    server = serve(api, Resolver(), host="127.0.0.1", port=0, mcp_service=service)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        connection = http.client.HTTPConnection(host, port, timeout=3)
+        payload = body("server/discover")
+        connection.putrequest("POST", "/mcp")
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Content-Length", str(len(payload)))
+        connection.putheader("Authorization", "Bearer valid-token")
+        connection.putheader("MCP-Protocol-Version", "2026-07-28")
+        connection.putheader("Mcp-Method", "server/discover")
+        connection.putheader("Mcp-Method", "tools/call")
+        connection.endheaders(payload)
+        response = connection.getresponse()
+        response.read()
+        assert response.status == 400
+        assert api.requests == []
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
