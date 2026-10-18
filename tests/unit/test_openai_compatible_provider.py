@@ -127,6 +127,11 @@ def test_openai_compatible_provider_rejects_non_https_remote_endpoint():
 def test_openai_compatible_provider_rejects_embedded_credentials():
     with pytest.raises(ValueError, match="credentials"):
         OpenAICompatibleProvider(
-            "https://" + "user:password@" + ".".join(("provider", "example")) + "/v1/chat/completions",
+            (
+                "https://"
+                + "user:password@"
+                + ".".join(("provider", "example"))
+                + "/v1/chat/completions"
+            ),
             StaticModelCredential("test-secret"),
         )
