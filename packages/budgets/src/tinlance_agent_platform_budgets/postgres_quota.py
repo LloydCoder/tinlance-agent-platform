@@ -17,7 +17,6 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID, uuid4
 
-
 _COST_QUANTUM = Decimal("0.000001")
 _MAX_COST_UNITS = Decimal("99999999999999.999999")
 
