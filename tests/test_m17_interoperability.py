@@ -263,3 +263,11 @@ def test_remote_delegation_is_attenuated_and_expires() -> None:
             resource_scope="tenant-a/documents",
             now=issued,
         )
+
+
+def test_remote_endpoint_rejects_query_parameters() -> None:
+    with pytest.raises(ValueError, match="query parameters"):
+        validate_remote_endpoint(
+            "https://" + "agent.example" + "/a2a?access_token=unsafe",
+            lambda _host: ("93.184.216.34",),
+        )
