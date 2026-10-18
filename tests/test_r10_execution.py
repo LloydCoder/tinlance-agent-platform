@@ -28,6 +28,20 @@ from tinlance_agent_platform_execution import (
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 
+class FailingSettlementBudget:
+    def __init__(self) -> None:
+        self.released = False
+
+    def reserve_scoped(self, scope, *, tool_calls: int, seconds: float):
+        return {"scope": scope, "tool_calls": tool_calls, "seconds": seconds}
+
+    def consume(self, reservation, elapsed_seconds: float) -> None:
+        raise RuntimeError("quota settlement unavailable")
+
+    def release(self, reservation) -> None:
+        self.released = True
+
+
 class Echo:
     def execute(self, call: ToolCall) -> str:
         return f"executed:{call.action}:{call.resource}"
@@ -351,3 +365,13 @@ def test_platform_budget_exhaustion_fails_closed(harness: object) -> None:
     with pytest.raises(ExecutionFailure) as exc:
         service.execute(principal, item)
     assert exc.value.code is ExecutionErrorCode.BUDGET_EXCEEDED
+
+
+def test_failed_post_execution_budget_settlement_is_not_refunded() -> None:
+    service, principal, agent, _ = _build_harness()
+    budget = FailingSettlementBudget()
+    service.budget = budget
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, request(principal, agent))
+    assert exc.value.code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
+    assert budget.released is False
