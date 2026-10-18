@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -136,6 +137,9 @@ def test_remote_delegation_is_attenuated_and_expires() -> None:
     )
     delegation.validate(now=issued + timedelta(seconds=59))
     assert delegation.capabilities == frozenset({"documents:read"})
+    assert delegation.audience == str(remote)
+    with pytest.raises(PermissionError, match="audience"):
+        replace(delegation, audience=str(parent)).validate(now=issued + timedelta(seconds=1))
     with pytest.raises(PermissionError, match="expired"):
         delegation.validate(now=issued + timedelta(seconds=60))
     with pytest.raises(ValueError, match="TTL"):
