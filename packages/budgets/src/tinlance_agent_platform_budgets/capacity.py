@@ -72,6 +72,7 @@ class CapacityObservation:
         ):
             raise ValueError("capacity observation values are invalid")
 
+
 @dataclass(frozen=True, slots=True)
 class CapacityGate:
     envelope: CapacityEnvelope
