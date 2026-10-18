@@ -5,6 +5,7 @@ Reservation, settlement, the append-only ledger fact, and domain state changes
 must commit or roll back together. This adapter never commits or closes a
 connection.
 """
+
 from __future__ import annotations
 
 import json
