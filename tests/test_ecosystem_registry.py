@@ -103,8 +103,13 @@ def test_registry_rejects_missing_service_and_stale_reviewed_revision():
         )
     stale = (
         ServiceRegistration(
-            SERVICES[0].service_id, "platform", "f" * 40, "1.1",
-            SERVICES[0].contract_ids, SERVICES[0].capabilities, SERVICES[0].authority_mode,
+            SERVICES[0].service_id,
+            "platform",
+            "f" * 40,
+            "1.1",
+            SERVICES[0].contract_ids,
+            SERVICES[0].capabilities,
+            SERVICES[0].authority_mode,
         ),
         *SERVICES[1:],
     )
@@ -128,9 +133,15 @@ def test_registry_rejects_missing_contracts_and_incompatible_versions():
 def test_registry_rejects_authority_drift_and_duplicate_ids():
     drift = (
         SERVICES[0],
-        ServiceRegistration("agent-os.runtime", "os", SHAS["os"], "1.1",
+        ServiceRegistration(
+            "agent-os.runtime",
+            "os",
+            SHAS["os"],
+            "1.1",
             ("event-envelope.v1", "trace-context.v1"),
-            ("event.publish",), AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION),
+            ("event.publish",),
+            AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION,
+        ),
         *SERVICES[2:],
     )
     with pytest.raises(ValueError, match="sole consequential execution authority"):
