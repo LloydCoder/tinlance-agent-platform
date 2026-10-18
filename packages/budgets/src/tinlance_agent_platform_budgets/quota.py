@@ -79,6 +79,10 @@ class TenantQuotaService:
         values = (reservation_id, tenant_id, agent_id, run_id, action, resource)
         if any(not value or value != value.strip() for value in values):
             raise ValueError("quota reservation scope is required and normalized")
+        if any(len(value) > 256 for value in values):
+            raise ValueError("quota reservation scope exceeds safety limits")
+        if any(ord(char) < 32 or ord(char) == 127 for value in values for char in value):
+            raise ValueError("quota reservation scope must not contain control characters")
         if (
             any(
                 isinstance(value, bool) or not isinstance(value, int)
