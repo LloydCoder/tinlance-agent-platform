@@ -116,7 +116,8 @@ def serve(
                     raw = self.rfile.read(length)
                     if len(raw) != length:
                         raise ValueError("request body is truncated")
-                    self._send_protocol_response(a2a_service.handle(dict(self.headers.items()), raw))
+                    protocol_response = a2a_service.handle(dict(self.headers.items()), raw)
+                    self._send_protocol_response(protocol_response)
                 except Exception:
                     self._respond(
                         HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "a2a_transport_error"}
