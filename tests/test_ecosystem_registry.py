@@ -322,7 +322,10 @@ def test_v2_registry_rejects_supply_chain_revision_drift_and_revoked_publisher()
         ),
     )
     with pytest.raises(ValueError, match="supply-chain revision differs"):
-        valid_snapshot(schema_version="registry-manifest/v2", repository_metadata=metadata).validate()
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
 
     metadata = v2_repository_metadata()
     platform = metadata["platform"]
@@ -372,7 +375,10 @@ def test_deprecated_contract_requires_replacement_and_non_https_supply_chain_ref
     with pytest.raises(ValueError, match="SBOM reference must be credential-free HTTPS"):
         SupplyChainReferences(
             reviewed_sha=SHAS["platform"],
-            provenance_uri="https://github.com/LloydCoder/tinlance-agent-platform/commit/" + SHAS["platform"],
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/"
+                + SHAS["platform"]
+            ),
             sbom_uri="http://example.test/sbom.json",
             signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
             verification_status=SupplyChainStatus.PENDING,
