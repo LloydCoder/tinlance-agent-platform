@@ -56,7 +56,7 @@ def test_model_response_cannot_exceed_requested_output_budget() -> None:
 
 
 def trusted_router(recorder):
-    return ModelRouter(recorder, lambda _route: True)
+    return ModelRouter(recorder, lambda _route: True, lambda _request: True)
 
 
 def routing_request(**overrides: object) -> ModelRoutingRequest:
@@ -199,14 +199,18 @@ def test_model_routing_request_rejects_invalid_risk_budget_and_context(
 
 
 def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
-    denied = ModelRouter(lambda _decision: None, lambda _route: False)
+    denied = ModelRouter(
+        lambda _decision: None, lambda _route: False, lambda _request: True
+    )
     with pytest.raises(PermissionError, match="not registered"):
         denied.register(route("unregistered", "provider-a"))
 
     def registry_outage(_route: ModelRoute) -> bool:
         raise OSError("registry unavailable")
 
-    unavailable = ModelRouter(lambda _decision: None, registry_outage)
+    unavailable = ModelRouter(
+        lambda _decision: None, registry_outage, lambda _request: True
+    )
     with pytest.raises(RuntimeError, match="failing closed"):
         unavailable.register(route("unverified", "provider-a"))
 
@@ -237,3 +241,32 @@ def test_model_router_denies_each_ineligible_route_dimension(
     assert decision.route is None
     assert decision.model_id is None
     assert decision.reason_code == "no_eligible_route"
+
+
+
+def test_model_router_denies_untrusted_routing_context_with_evidence() -> None:
+    recorded = []
+    router = ModelRouter(
+        recorded.append,
+        lambda _route: True,
+        lambda _request: False,
+    )
+    router.register(route("route-a", "provider-a"))
+    decision = router.route(routing_request())
+    assert not decision.allowed
+    assert decision.reason_code == "untrusted_routing_context"
+    assert decision.route is None
+    assert recorded == [decision]
+
+
+def test_model_router_fails_closed_if_context_verification_is_unavailable() -> None:
+    def unavailable_context(_request: ModelRoutingRequest) -> bool:
+        raise OSError("policy service unavailable")
+
+    router = ModelRouter(
+        lambda _decision: None,
+        lambda _route: True,
+        unavailable_context,
+    )
+    with pytest.raises(RuntimeError, match="context could not be verified"):
+        router.route(routing_request())
