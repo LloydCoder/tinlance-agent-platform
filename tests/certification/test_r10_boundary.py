@@ -301,13 +301,13 @@ def test_budget_reservations_cannot_oversubscribe_under_race() -> None:
     assert sum(results) == 4
 
 
-def test_timeout_is_terminal_and_non_retryable() -> None:
+def test_timeout_with_uncertain_side_effect_is_terminal_and_non_retryable() -> None:
     service = _service(TimeoutTool())
     principal = Principal(SUBJECT, "human", TENANT_A, scopes=frozenset({CAPABILITY}))
     result = service.execute(principal, _request())
 
-    assert result.state is ExecutionState.TIMED_OUT
-    assert result.error_code is ExecutionErrorCode.TIMEOUT
+    assert result.state is ExecutionState.OUTCOME_UNKNOWN
+    assert result.error_code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
     assert result.retryable is False
 
 
