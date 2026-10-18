@@ -48,7 +48,8 @@ class MCPToolDefinition:
         if self.consequential and not self.idempotency_argument:
             raise ValueError("consequential MCP tools require an idempotency argument")
         if self.idempotency_argument is not None and (
-            not self.idempotency_argument or self.idempotency_argument != self.idempotency_argument.strip()
+            not self.idempotency_argument
+            or self.idempotency_argument != self.idempotency_argument.strip()
         ):
             raise ValueError("idempotency argument name must be normalized")
         if self.input_schema.get("type") != "object":
