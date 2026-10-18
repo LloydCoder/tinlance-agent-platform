@@ -24,6 +24,16 @@ class Resolver:
         return Principal()
 
 
+class CardSignatureVerifier:
+    def verify(self, key_id: str, algorithm: str, signing_input: bytes, signature: str) -> bool:
+        return (
+            key_id == "trusted-key-1"
+            and algorithm == "EdDSA"
+            and bool(signing_input)
+            and signature == "dmFsaWQtc2lnbmF0dXJl"
+        )
+
+
 class RateLimiter:
     def __init__(self, allowed: bool = True) -> None:
         self.allowed = allowed
@@ -73,11 +83,11 @@ def make_service(*, allowed: bool = True):
         (AgentSkill("text.work", "Handle text tasks", frozenset({"text:work"})),),
         ("bearer",),
         "1.0.0",
-        "signed-card",
+        "dmFsaWQtc2lnbmF0dXJl",
         "trusted-key-1",
         "EdDSA",
     )
-    service = A2AProtocolService(api, resolver, limiter, card)
+    service = A2AProtocolService(api, resolver, limiter, card, CardSignatureVerifier())
     return service, api, resolver, limiter, card
 
 
@@ -196,7 +206,7 @@ def test_http_server_mounts_a2a_and_publishes_signed_agent_card() -> None:
         card_response = connection.getresponse()
         card_body = json.loads(card_response.read().decode())
         assert card_response.status == 200
-        assert card_body["signatures"][0]["signature"] == "signed-card"
+        assert card_body["signatures"][0]["signature"] == "dmFsaWQtc2lnbmF0dXJl"
         assert card_body["supportedInterfaces"][0]["url"] == card.endpoint
         connection.close()
 
