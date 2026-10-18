@@ -236,7 +236,7 @@ class EcosystemRegistrySnapshot:
                 raise ValueError(f"{consumer_id}: contract {contract_id} is not immutable")
 
 
-def _assert_unique(values, label: str) -> None:
+def _assert_unique(values: Iterable[object], label: str) -> None:
     values = list(values)
     if len(values) != len(set(values)):
         raise ValueError(f"duplicate {label} registration")
