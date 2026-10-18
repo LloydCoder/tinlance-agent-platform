@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+import math
 from threading import RLock
 from uuid import UUID, uuid4
 
@@ -64,8 +65,11 @@ class BudgetService:
     ) -> BudgetReservation:
         if scope.tenant_id != self._budget.tenant_id or scope.run_id != self._budget.run_id:
             raise PermissionError("budget is owned by another tenant or run")
-        if tool_calls < 0 or seconds < 0:
-            raise ValueError("reservation dimensions cannot be negative")
+        if (
+            isinstance(tool_calls, bool) or not isinstance(tool_calls, int)
+            or tool_calls < 0 or not math.isfinite(seconds) or seconds < 0
+        ):
+            raise ValueError("reservation dimensions must be finite and non-negative")
         with self._lock:
             rid = reservation_id or uuid4()
             existing = self._reservations.get(rid)
@@ -117,8 +121,8 @@ class BudgetService:
         return self.reserve_scoped(scope, tool_calls=tool_calls, seconds=seconds)
 
     def consume(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
-        if elapsed_seconds < 0:
-            raise ValueError("elapsed time cannot be negative")
+        if not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
+            raise ValueError("elapsed time must be finite and non-negative")
         with self._lock:
             current = self._reservations.get(reservation.reservation_id)
             if current != reservation:
@@ -170,8 +174,8 @@ class BudgetService:
                 )
 
     def consume_turn(self, elapsed_seconds: float) -> None:
-        if elapsed_seconds < 0:
-            raise ValueError("elapsed time cannot be negative")
+        if not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
+            raise ValueError("elapsed time must be finite and non-negative")
         with self._lock:
             if self._budget.consumed_turns + 1 > self._budget.max_turns:
                 raise TimeoutError("maximum turns exceeded")
