@@ -278,7 +278,7 @@ class EcosystemRegistrySnapshot:
                 raise ValueError(f"{service.service_id}: required active service registration is disabled")
             if self.schema_version == "registry-manifest/v2":
                 owner_metadata = self.repository_metadata[service.owner_repository_id]
-                if owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
+                if service.enabled and owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
                     raise ValueError(f"{service.service_id}: owner repository is not active")
             if service.owner_repository_id != "platform" and service.authority_mode not in {
                 AuthorityMode.AUTHORITY_FREE,
@@ -295,7 +295,7 @@ class EcosystemRegistrySnapshot:
             )
             if agent.lifecycle is not None and agent.lifecycle.state is not LifecycleState.ACTIVE and agent.agent_id in self.required_agent_ids:
                 raise ValueError(f"{agent.agent_id}: required agent is not active")
-            if self.schema_version == "registry-manifest/v2" and self.repository_metadata[agent.owner_repository_id].lifecycle.state is not LifecycleState.ACTIVE:
+            if self.schema_version == "registry-manifest/v2" and agent.agent_id in self.required_agent_ids and self.repository_metadata[agent.owner_repository_id].lifecycle.state is not LifecycleState.ACTIVE:
                 raise ValueError(f"{agent.agent_id}: owner repository is not active")
             if agent.authority_mode not in {
                 AuthorityMode.DELEGATED_ONLY,
