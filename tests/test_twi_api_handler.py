@@ -171,9 +171,9 @@ class TWIAPIHandlerTests(unittest.TestCase):
         self.assertEqual(
             self.http.calls[0]["headers"]["Idempotency-Key"], "search-idempotency-0001"
         )
-        self.assertTrue(self.issuer.calls[0]["traceparent"].startswith(
-            "00-0123456789abcdef0123456789abcdef-"
-        ))
+        self.assertTrue(
+            self.issuer.calls[0]["traceparent"].startswith("00-0123456789abcdef0123456789abcdef-")
+        )
 
     def test_export_requires_exact_intent_bound_human_approval(self) -> None:
         run_id = uuid4()
@@ -214,9 +214,7 @@ class TWIAPIHandlerTests(unittest.TestCase):
         self.assertEqual(self.approvals.calls[0]["run_id"], run_id)
         self.assertEqual(self.approvals.calls[0]["intent_fingerprint"], fingerprint)
         sent = json.loads(self.http.calls[0]["body"].decode())
-        self.assertEqual(
-            set(sent), {"claim_id", "statement", "job_id", "quote"}
-        )
+        self.assertEqual(set(sent), {"claim_id", "statement", "job_id", "quote"})
         self.assertEqual(
             self.http.calls[0]["headers"]["Idempotency-Key"],
             "source-evidence-export-0001",
