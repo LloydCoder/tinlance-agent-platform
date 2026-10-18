@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
@@ -11,6 +12,7 @@ from tinlance_agent_platform_contracts import (
     Decision,
     PolicyDecision,
     RequestContext,
+    RiskTier,
 )
 from tinlance_agent_platform_kernel import assert_authority_boundary
 from tinlance_agent_platform_policy import evaluate
@@ -18,6 +20,14 @@ from tinlance_agent_platform_policy import evaluate
 _MAX_ARGUMENTS = 64
 _MAX_STRING = 16_384
 _MAX_DEPTH = 8
+_RISK_ORDER = {
+    RiskTier.LOW: 0,
+    RiskTier.MEDIUM: 1,
+    RiskTier.HIGH: 2,
+    RiskTier.CRITICAL: 3,
+    RiskTier.PROHIBITED: 4,
+}
+_TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +35,9 @@ class ToolScope:
     tenant_id: str
     capability: str
     resource: str
+    subject_id: str | None = None
+    request_id: str | None = None
+    traceparent: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.capability, self.resource)):
@@ -38,6 +51,15 @@ class ToolScope:
             )
         ):
             raise ValueError("tool scope fields must be normalized")
+        for value in (self.subject_id, self.request_id):
+            if value is not None and (not value or value != value.strip()):
+                raise ValueError("optional tool scope identity fields must be normalized")
+        if self.traceparent is not None:
+            if not _TRACEPARENT.fullmatch(self.traceparent):
+                raise ValueError("tool scope traceparent is invalid")
+            version, trace_id, span_id, _flags = self.traceparent.split("-")
+            if version == "ff" or set(trace_id) == {"0"} or set(span_id) == {"0"}:
+                raise ValueError("tool scope traceparent identifiers are invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +81,9 @@ class MCPTool:
     capability: str
     resource_pattern: str
     action: str = "call"
+    risk: RiskTier | None = None
+    requires_approval: bool = False
+    idempotency_argument: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.name, self.capability, self.action, self.resource_pattern)):
@@ -68,6 +93,12 @@ class MCPTool:
             for value in (self.name, self.capability, self.action, self.resource_pattern)
         ):
             raise ValueError("MCP tool fields must be normalized")
+        if self.requires_approval and self.risk is None:
+            raise ValueError("approval-gated MCP tools must declare an authoritative risk tier")
+        if self.requires_approval and self.idempotency_argument is None:
+            raise ValueError("approval-gated MCP tools must declare an idempotency argument")
+        if self.idempotency_argument is not None and not self.idempotency_argument.strip():
+            raise ValueError("MCP idempotency argument must be normalized")
 
 
 class MCPTransport(Protocol):
@@ -145,6 +176,36 @@ class MCPToolGateway:
                 "MCP tenant mismatch",
                 capability_request.risk,
             )
+        if scope.subject_id is not None and scope.subject_id != context.principal.subject_id:
+            return PolicyDecision(
+                Decision.DENY,
+                "mcp-subject-boundary",
+                "1",
+                "MCP subject mismatch",
+                capability_request.risk,
+            )
+        if scope.request_id is not None and scope.request_id != context.request_id:
+            return PolicyDecision(
+                Decision.DENY,
+                "mcp-request-boundary",
+                "1",
+                "MCP request context mismatch",
+                capability_request.risk,
+            )
+        if scope.traceparent is not None:
+            parts = scope.traceparent.split("-")
+            if (
+                context.trace_context is None
+                or parts[1] != context.trace_context.trace_id
+                or parts[2] != context.trace_context.span_id
+            ):
+                return PolicyDecision(
+                    Decision.DENY,
+                    "mcp-trace-boundary",
+                    "1",
+                    "MCP trace context is not bound to the Platform request",
+                    capability_request.risk,
+                )
         if (
             scope.capability != tool.capability
             or scope.resource != tool.resource_pattern
@@ -169,7 +230,30 @@ class MCPToolGateway:
                 str(exc),
                 capability_request.risk,
             )
-        return evaluate(capability_request)
+        if tool.risk is not None and _RISK_ORDER[capability_request.risk] < _RISK_ORDER[tool.risk]:
+            return PolicyDecision(
+                Decision.DENY,
+                "mcp-registered-risk-floor",
+                "1",
+                "capability request risk is below the registered tool risk",
+                capability_request.risk,
+            )
+        decision = evaluate(capability_request)
+        if (
+            tool.requires_approval
+            and decision.decision is Decision.ALLOW
+            and not decision.requires_approval
+        ):
+            return PolicyDecision(
+                Decision.REQUIRE_APPROVAL,
+                decision.policy_id,
+                decision.policy_version,
+                "registered tool requires human approval",
+                capability_request.risk,
+                requires_approval=True,
+                trace_context=decision.trace_context,
+            )
+        return decision
 
     @staticmethod
     def _call_fingerprint(
@@ -183,6 +267,9 @@ class MCPToolGateway:
         payload = json.dumps(
             {
                 "tenant_id": tenant_id,
+                "subject_id": scope.subject_id,
+                "request_id": scope.request_id,
+                "traceparent": scope.traceparent,
                 "run_id": str(run_id),
                 "tool_name": tool_name,
                 "capability": scope.capability,
@@ -268,6 +355,16 @@ class MCPToolGateway:
                 intent_fingerprint=permit.intent_fingerprint,
             )
         _validate_value(arguments)
+        tool = self._tools[permit.tool_name]
+        if tool.idempotency_argument is not None:
+            key = arguments.get(tool.idempotency_argument)
+            if (
+                not isinstance(key, str)
+                or not 16 <= len(key) <= 256
+                or not key.isascii()
+                or any(ord(character) < 33 or ord(character) > 126 for character in key)
+            ):
+                raise ValueError("MCP tool requires a normalized idempotency key")
         try:
             return self._transport.call(
                 permit.tool_name,

@@ -12,6 +12,9 @@ from tinlance_agent_platform_mcp import MCPProtocolService, MCPToolDefinition
 class Principal:
     tenant_id: str = "tenant-a"
     subject_id: str = "subject-a"
+    scopes: frozenset[str] = frozenset({"web.search", "validation.check", "runs.create"})
+    roles: frozenset[str] = frozenset()
+    principal_type: str = "user"
 
 
 class Resolver:
@@ -454,3 +457,16 @@ def test_http_rejects_duplicate_mcp_routing_headers_before_dispatch() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)
+
+
+def test_valid_traceparent_dispatches_only_canonical_trace_id() -> None:
+    service, api, _ = make_service()
+    trace_id = "0123456789abcdef0123456789abcdef"
+    traceparent = f"00-{trace_id}-0123456789abcdef-01"
+    response = service.handle(
+        headers("tools/call", **{"mcp-name": "search", "traceparent": traceparent}),
+        body("tools/call", {"name": "search", "arguments": {"query": "trace test"}}),
+    )
+    assert response.status_code == 200
+    assert len(api.requests) == 1
+    assert api.requests[0].trace_id == trace_id
