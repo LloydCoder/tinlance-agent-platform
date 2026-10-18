@@ -72,7 +72,7 @@ begin
         '40000000-0000-0000-0000-000000000071',
         '10000000-0000-0000-0000-000000000071',
         '30000000-0000-0000-0000-000000000071',
-        'read', 'resource:one', 'p8-idempotency-key-0001', 1, 1, 10, 1.0
+        'read', 'resource:one', 'p8-idempotency-key-0001', 1, 1, 10, 1.0000005
     );
     if replay_id <> first_id then
         raise exception 'first reservation returned an unexpected ID';
@@ -84,7 +84,7 @@ begin
         '40000000-0000-0000-0000-000000000071',
         '10000000-0000-0000-0000-000000000071',
         '30000000-0000-0000-0000-000000000071',
-        'read', 'resource:one', 'p8-idempotency-key-0001', 1, 1, 10, 1.0
+        'read', 'resource:one', 'p8-idempotency-key-0001', 1, 1, 10, 1.0000005
     );
     if replay_id <> first_id then
         raise exception 'identical reservation retry was not idempotent';
@@ -112,7 +112,7 @@ begin
         '40000000-0000-0000-0000-000000000071',
         '10000000-0000-0000-0000-000000000071',
         '30000000-0000-0000-0000-000000000071',
-        'read', 'resource:one', 'p8-idempotency-key-0001', 1, 1, 10, 1.0
+        'read', 'resource:one', 'p8-idempotency-key-0001', 1, 1, 10, 1.0000005
     );
     if replay_id <> first_id then
         raise exception 'retry after settlement created a different reservation';
