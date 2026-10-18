@@ -350,7 +350,7 @@ begin
         tool_calls, token_units, cost_units, idempotency_key, evidence
     ) values (
         gen_random_uuid(), p_tenant_id, p_organization_id, p_reservation_id, p_run_id, 'reserved',
-        p_tool_calls, p_token_units, p_cost_units, p_idempotency_key, '{}'::jsonb
+        p_tool_calls, p_token_units, normalized_cost, p_idempotency_key, '{}'::jsonb
     );
     return p_reservation_id;
 end;
