@@ -408,7 +408,7 @@ class TWIHTTPTransport:
                 "payload": {key: arguments[key] for key in browser_fields if key in arguments},
             }
         if tool_name == "twi_job_read":
-            return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}", None
+            return f"/v1/jobs/{quote(str(arguments.get('job_id', '')), safe='')}", None
         if tool_name == "twi_job_cancel":
             return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}/cancel", None
         if tool_name == "twi_research_verify":
