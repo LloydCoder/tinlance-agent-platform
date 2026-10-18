@@ -877,6 +877,9 @@ class GovernedExecutionService:
             self._results[execution_id] = result
             return result
         except ExecutionFailure as exc:
+            unsettled_budget_after_side_effect = (
+                side_effect_started and budget_reservation is not None and self.budget is not None
+            )
             if budget_reservation is not None and self.budget is not None:
                 if side_effect_started:
                     # Once the tool gateway has been entered, an exception is not
@@ -894,7 +897,7 @@ class GovernedExecutionService:
                     with suppress(Exception):
                         self.budget.release(budget_reservation)
                     budget_reservation = None
-            if side_effect_started and exc.code not in {
+            if unsettled_budget_after_side_effect and exc.code not in {
                 ExecutionErrorCode.BUDGET_EXCEEDED,
                 ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
             }:
