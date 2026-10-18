@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -350,3 +351,25 @@ def test_postgres_ledger_rejects_invalid_reconciliation_batch(batch_limit) -> No
     ledger = PostgresQuotaLedger(Connection())
     with pytest.raises(ValueError, match="batch_limit"):
         ledger.request_expired_reconciliation(tenant_id=TENANT_ID, batch_limit=batch_limit)
+
+
+def test_postgres_adapter_normalizes_cost_to_numeric_scale() -> None:
+    connection = Connection()
+    ledger = PostgresQuotaLedger(connection)
+    ledger.reserve(request(cost_units=1.2345675))
+    assert connection.queries[0][1][-1] == Decimal("1.234568")
+
+    settlement_connection = Connection()
+    settlement_ledger = PostgresQuotaLedger(settlement_connection)
+    settlement_ledger.settle(
+        tenant_id=TENANT_ID,
+        reservation_id=uuid4(),
+        actual=QuotaSettlement(1, 10, 1.2345675, {}),
+    )
+    assert settlement_connection.queries[0][1][4] == Decimal("1.234568")
+
+
+def test_postgres_adapter_rejects_cost_outside_numeric_precision() -> None:
+    ledger = PostgresQuotaLedger(Connection())
+    with pytest.raises(ValueError, match="numeric\(20, 6\) range"):
+        ledger.reserve(request(cost_units=1e15))
