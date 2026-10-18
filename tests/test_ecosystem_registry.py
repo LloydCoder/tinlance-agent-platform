@@ -32,7 +32,23 @@ CONTRACTS = (
     ContractRegistration("trace-context.v1", "1.0", "tsic"),
     ContractRegistration("transformation.v1", "1.0", "developer"),
     ContractRegistration("replication.v1", "1.0", "developer"),
-    ContractRegistration("registry-manifest.v1", "1.0", "tsic"),
+    ContractRegistration(
+        "registry-manifest.v1",
+        "1.0",
+        "tsic",
+        lifecycle=LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T06:50:45Z",
+            reason="superseded by registry-manifest.v2",
+            replacement_id="registry-manifest.v2",
+        ),
+    ),
+    ContractRegistration(
+        "registry-manifest.v2",
+        "2.0",
+        "tsic",
+        lifecycle=LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T06:50:45Z"),
+    ),
 )
 
 SERVICES = (
@@ -68,7 +84,7 @@ SERVICES = (
         "developer",
         SHAS["developer"],
         "1.1",
-        ("transformation.v1", "replication.v1", "trace-context.v1", "registry-manifest.v1"),
+        ("transformation.v1", "replication.v1", "trace-context.v1", "registry-manifest.v2"),
         ("artifact.validate", "registry.validate"),
         AuthorityMode.AUTHORITY_FREE,
     ),
@@ -77,7 +93,7 @@ SERVICES = (
         "tsic",
         SHAS["tsic"],
         "1.1",
-        ("event-envelope.v1", "trace-context.v1", "registry-manifest.v1"),
+        ("event-envelope.v1", "trace-context.v1", "registry-manifest.v2"),
         ("contract.validate", "compatibility.validate"),
         AuthorityMode.CONFORMANCE_ONLY,
     ),
