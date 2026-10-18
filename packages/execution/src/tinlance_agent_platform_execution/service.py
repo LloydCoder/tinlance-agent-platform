@@ -926,7 +926,7 @@ class GovernedExecutionService:
                         result=result,
                     )
                 self._results[execution_id] = result
-            raise
+            raise exc
         except Exception as exc:
             if budget_reservation is not None and self.budget is not None:
                 if side_effect_started:
