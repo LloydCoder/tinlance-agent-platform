@@ -64,6 +64,15 @@ def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
     hostname = parsed.hostname.rstrip(".").lower()
     if hostname == "localhost" or hostname.endswith(".localhost"):
         raise ValueError("remote agent endpoint must not target localhost")
+    if parsed.scheme == "http":
+        try:
+            local_address = ipaddress.ip_address(hostname)
+        except ValueError:
+            local_address = None
+        if hostname != "localhost" and not (
+            local_address is not None and local_address.is_loopback
+        ):
+            raise ValueError("cleartext HTTP is allowed only for loopback development")
     try:
         address = ipaddress.ip_address(hostname)
     except ValueError:
@@ -272,14 +281,18 @@ class RemoteDelegation:
         )
 
     def validate(self, *, now: datetime | None = None) -> None:
-        current = (now or datetime.now(UTC)).astimezone(UTC)
-        if current.tzinfo is None:
+        current_value = now or datetime.now(UTC)
+        if current_value.tzinfo is None:
             raise ValueError("validation time must be timezone-aware")
+        current = current_value.astimezone(UTC)
         if self.issued_at.tzinfo is None or self.expires_at.tzinfo is None:
             raise ValueError("delegation timestamps must be timezone-aware")
         issued_at = self.issued_at.astimezone(UTC)
         expires_at = self.expires_at.astimezone(UTC)
-        if expires_at <= issued_at or (expires_at - issued_at).total_seconds() > MAX_DELEGATION_TTL_SECONDS:
+        if (
+            expires_at <= issued_at
+            or (expires_at - issued_at).total_seconds() > MAX_DELEGATION_TTL_SECONDS
+        ):
             raise PermissionError("delegation expiry is invalid")
         if issued_at > current + timedelta(seconds=30):
             raise PermissionError("delegation issue time is in the future")
@@ -331,6 +344,9 @@ class A2AClient:
             timeout_seconds=timeout_seconds,
             max_response_bytes=MAX_REMOTE_RESPONSE_BYTES,
         )
-        if len(json.dumps(response, separators=(",", ":"), ensure_ascii=False).encode("utf-8")) > MAX_REMOTE_RESPONSE_BYTES:
+        response_size = len(
+            json.dumps(response, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        )
+        if response_size > MAX_REMOTE_RESPONSE_BYTES:
             raise ValueError("A2A response exceeds maximum size")
         return response
