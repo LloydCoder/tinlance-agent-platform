@@ -91,7 +91,9 @@ def serve(
                     self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_content_length"})
                     return
                 if length < 0 or length > MAX_REQUEST_BYTES:
-                    self._respond(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"})
+                    self._respond(
+                        HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"}
+                    )
                     return
                 if "application/json" not in self.headers.get("Content-Type", "").lower():
                     self._respond(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_required"})
@@ -102,7 +104,9 @@ def serve(
                         raise ValueError("request body is truncated")
                     response = mcp_service.handle(dict(self.headers.items()), raw)
                     self.send_response(response.status_code)
-                    response_headers = {key.lower(): value for key, value in response.headers.items()}
+                    response_headers = {
+                        key.lower(): value for key, value in response.headers.items()
+                    }
                     for key, value in response.headers.items():
                         self.send_header(key, value)
                     if "content-length" not in response_headers:
@@ -110,7 +114,9 @@ def serve(
                     self.end_headers()
                     self.wfile.write(response.body)
                 except Exception:
-                    self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "mcp_transport_error"})
+                    self._respond(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "mcp_transport_error"}
+                    )
                 return
             if self.path != "/v1/agent-platform":
                 self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
