@@ -51,7 +51,10 @@ class CapacityObservation:
 
     def __post_init__(self) -> None:
         if (
-            not all(
+            isinstance(self.concurrency, bool)
+            or not isinstance(self.concurrency, int)
+            or self.concurrency < 0
+            or not all(
                 isinstance(value, (int, float))
                 and not isinstance(value, bool)
                 and math.isfinite(value)
@@ -59,15 +62,8 @@ class CapacityObservation:
             )
             or any(
                 value < 0
-                for value in (
-                    self.throughput_per_minute,
-                    self.p95_ms,
-                    self.p99_ms,
-                    self.concurrency,
-                )
+                for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms)
             )
-            or isinstance(self.concurrency, bool)
-            or not isinstance(self.concurrency, int)
             or self.p95_ms > self.p99_ms
         ):
             raise ValueError("capacity observation values are invalid")
@@ -80,8 +76,14 @@ class CapacityGate:
     evidence_ref: str
 
     def __post_init__(self) -> None:
-        if not self.evidence_ref.strip():
-            raise ValueError("capacity evidence is required")
+        if (
+            not isinstance(self.evidence_ref, str)
+            or not self.evidence_ref
+            or self.evidence_ref != self.evidence_ref.strip()
+            or len(self.evidence_ref) > 512
+            or any(ord(char) < 32 or ord(char) == 127 for char in self.evidence_ref)
+        ):
+            raise ValueError("capacity evidence must be a bounded normalized reference")
 
     @property
     def within(self) -> bool:
