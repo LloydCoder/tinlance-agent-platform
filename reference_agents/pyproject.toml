@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.15"
 license = "Apache-2.0"
 dependencies = [
-  "tinlance-agent-platform-sdk @ git+https://github.com/LloydCoder/tinlance-agent-platform-sdk.git@e9e5ab621b036ca602cd1df0fe73352413b01672",
+  "tinlance-agent-platform-sdk @ git+https://github.com/LloydCoder/tinlance-agent-platform-sdk.git@2f358d5dd1e562918613f138b7ef1e3a16f693cb",
 ]
 
 [project.optional-dependencies]
