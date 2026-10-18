@@ -48,7 +48,10 @@ class Connection:
             return Cursor((self.result if isinstance(self.result, str) else "settled",))
         if "platform.request_expired_quota_reconciliation" in query:
             return Cursor((self.result,))
-        if "platform.renew_quota_reservation" in query:
+        if (
+            "platform.renew_quota_reservation" in query
+            or "platform.request_expired_quota_reconciliation" in query
+        ):
             return Cursor((self.result,))
         return Cursor((self.result if isinstance(self.result, bool) else True,))
 
@@ -381,7 +384,7 @@ def test_postgres_adapter_normalizes_cost_to_numeric_scale() -> None:
 
 def test_postgres_adapter_rejects_cost_outside_numeric_precision() -> None:
     ledger = PostgresQuotaLedger(Connection())
-    with pytest.raises(ValueError, match="numeric\(20, 6\) range"):
+    with pytest.raises(ValueError, match=r"numeric\(20, 6\) range"):
         ledger.reserve(request(cost_units=1e15))
 
 
