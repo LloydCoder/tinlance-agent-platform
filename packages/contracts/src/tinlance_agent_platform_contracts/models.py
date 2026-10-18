@@ -196,3 +196,8 @@ class AuditRecord:
     decision: Decision
     result: str
     timestamp: str
+    trace_context: TraceLineageContext | None = None
+
+    def __post_init__(self) -> None:
+        if self.trace_context is not None and self.trace_context.tenant_id != self.tenant_id:
+            raise ValueError("audit record and trace context tenants must match")
