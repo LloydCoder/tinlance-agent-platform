@@ -114,7 +114,6 @@ class ModelRoute:
     task_policies: frozenset[str]
     data_classifications: frozenset[str]
     risk_classes: frozenset[str]
-    max_risk_score: int
     max_cost_microusd: int
     priority: int = 100
     tenants: frozenset[str] | None = None
@@ -152,8 +151,8 @@ class ModelRoute:
             "critical",
         }:
             raise ValueError("route risk classes are invalid")
-        if not 0 <= self.max_risk_score <= 100 or self.max_cost_microusd < 0:
-            raise ValueError("route risk and cost limits are invalid")
+        if self.max_cost_microusd < 0:
+            raise ValueError("route cost limit cannot be negative")
         for allowlist in (self.tenants, self.agents):
             if allowlist is not None and any(
                 not value or value != value.strip() for value in allowlist
@@ -169,10 +168,10 @@ class ModelRoutingRequest:
     model_capability: str
     risk_class: str
     data_classification: str
-    risk_score: int
-    budget_microusd: int
+    estimated_cost_microusd: int
+    available_budget_microusd: int
     provider_availability: frozenset[str]
-    trace_id: str | None = None
+    trace_id: str
 
     def __post_init__(self) -> None:
         for value, name in (
@@ -187,17 +186,15 @@ class ModelRoutingRequest:
             raise ValueError("unsupported risk class")
         if self.data_classification not in {"public", "internal", "confidential", "restricted"}:
             raise ValueError("unsupported data classification")
-        if not 0 <= self.risk_score <= 100 or self.budget_microusd < 0:
-            raise ValueError("routing risk and budget are invalid")
+        if self.estimated_cost_microusd < 0 or self.available_budget_microusd < 0:
+            raise ValueError("estimated cost and available budget cannot be negative")
         if not self.provider_availability:
             raise ValueError("provider availability must be explicitly supplied")
         if any(
             not provider or provider != provider.strip() for provider in self.provider_availability
         ):
             raise ValueError("available provider names must be normalized")
-        if self.trace_id is not None and (
-            not _TRACE_ID.fullmatch(self.trace_id) or set(self.trace_id) == {"0"}
-        ):
+        if not _TRACE_ID.fullmatch(self.trace_id) or set(self.trace_id) == {"0"}:
             raise ValueError("trace_id must be a valid non-zero W3C trace identifier")
 
 
@@ -211,7 +208,7 @@ class ModelRoutingDecision:
     task_policy: str
     policy_version: str | None
     reason_code: str
-    trace_id: str | None
+    trace_id: str
 
     @property
     def route_id(self) -> str | None:
@@ -229,14 +226,24 @@ class ModelRouter:
         self,
         record_decision: Callable[[ModelRoutingDecision], None],
         verify_registered_route: Callable[[ModelRoute], bool],
+        verify_routing_context: Callable[[ModelRoutingRequest], bool],
     ) -> None:
         if not callable(record_decision):
             raise TypeError("a durable routing-decision recorder is required")
         if not callable(verify_registered_route):
             raise TypeError("a trusted route-registry verifier is required")
+        if not callable(verify_routing_context):
+            raise TypeError("a trusted routing-context verifier is required")
         self._record_decision = record_decision
         self._verify_registered_route = verify_registered_route
+        self._verify_routing_context = verify_routing_context
         self._routes: dict[str, ModelRoute] = {}
+
+    def _record(self, decision: ModelRoutingDecision) -> None:
+        try:
+            self._record_decision(decision)
+        except Exception as exc:
+            raise RuntimeError("routing decision could not be recorded; failing closed") from exc
 
     def register(self, route: ModelRoute) -> None:
         if route.route_id in self._routes:
@@ -250,6 +257,36 @@ class ModelRouter:
         self._routes[route.route_id] = route
 
     def route(self, request: ModelRoutingRequest) -> ModelRoutingDecision:
+        try:
+            context_verified = self._verify_routing_context(request)
+        except Exception as exc:
+            unavailable = ModelRoutingDecision(
+                decision_id=str(uuid4()),
+                allowed=False,
+                route=None,
+                provider=None,
+                model_id=None,
+                task_policy=request.task_policy,
+                policy_version=None,
+                reason_code="routing_context_unavailable",
+                trace_id=request.trace_id,
+            )
+            self._record(unavailable)
+            raise RuntimeError("routing context could not be verified; failing closed") from exc
+        if context_verified is not True:
+            decision = ModelRoutingDecision(
+                decision_id=str(uuid4()),
+                allowed=False,
+                route=None,
+                provider=None,
+                model_id=None,
+                task_policy=request.task_policy,
+                policy_version=None,
+                reason_code="untrusted_routing_context",
+                trace_id=request.trace_id,
+            )
+            self._record(decision)
+            return decision
         candidates = [
             route
             for route in self._routes.values()
@@ -259,8 +296,8 @@ class ModelRouter:
             and request.model_capability in route.capabilities
             and request.risk_class in route.risk_classes
             and request.data_classification in route.data_classifications
-            and request.risk_score <= route.max_risk_score
-            and request.budget_microusd <= route.max_cost_microusd
+            and request.estimated_cost_microusd <= route.max_cost_microusd
+            and request.estimated_cost_microusd <= request.available_budget_microusd
             and (route.tenants is None or request.tenant_id in route.tenants)
             and (route.agents is None or request.agent_id in route.agents)
         ]
@@ -277,8 +314,5 @@ class ModelRouter:
             reason_code="eligible_route_selected" if selected else "no_eligible_route",
             trace_id=request.trace_id,
         )
-        try:
-            self._record_decision(decision)
-        except Exception as exc:
-            raise RuntimeError("routing decision could not be recorded; failing closed") from exc
+        self._record(decision)
         return decision

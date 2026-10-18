@@ -6,14 +6,17 @@
 
 The Agent Platform is the only authority for route eligibility and consequential tool execution. A model route is metadata and a routing decision is evidence; neither grants a capability, approval, secret scope, sandbox access, or permission to execute a tool. OS and SDK callers cannot bypass Platform policy by supplying a preferred provider or model.
 
-This phase hardens the provider-neutral model boundary with deterministic route selection based on registered route metadata, capability compatibility, tenant/agent allowlists, data classification, risk ceiling, cost estimate, provider availability, route enablement, and policy version. The existing ModelGateway remains the provider invocation boundary; ModelRouter selects a route but does not call providers or execute tools.
+This phase hardens the provider-neutral model boundary with deterministic route selection based on registered route metadata, task-policy and capability compatibility, tenant/agent allowlists, data classification, allowed risk classes, estimated call cost, available budget, provider availability, route enablement, and trusted policy version. The existing ModelGateway remains the provider invocation boundary; ModelRouter selects a route but does not call providers or execute tools.
 
 ## Decision semantics
 
 - Route registrations are immutable and route IDs are unique. Registration requires an injected trusted Platform-registry verifier; verifier denial or outage fails closed.
 - Eligibility is conjunctive: every required condition must pass; no matching route means deny/no route.
 - Candidate ordering is deterministic: ascending priority, then route ID.
-- Provider availability is explicit request context; unavailable providers cannot be selected.
+- Routing context is accepted only after an injected trusted Platform policy/context verifier returns exactly true; verifier denial is recorded as a deny, and verifier outage is recorded before the call fails closed.
+- Provider availability and budget are explicit trusted Platform runtime context; unavailable providers cannot be selected.
+- Estimated call cost must fit both the route's per-call cost ceiling and the available budget.
+- A valid, non-zero W3C trace identifier is mandatory for every routing request and decision.
 - Every allow or deny decision is passed to the configured evidence recorder before the caller receives it.
 - If decision recording fails, routing fails closed and no decision is returned to the caller.
 - The policy version is sourced from the verified route record, never from the caller. Decision evidence includes a unique decision ID, selected route/provider/model where allowed, trusted policy version, task policy, reason code, and trace ID.

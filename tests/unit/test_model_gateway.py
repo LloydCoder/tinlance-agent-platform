@@ -56,7 +56,7 @@ def test_model_response_cannot_exceed_requested_output_budget() -> None:
 
 
 def trusted_router(recorder):
-    return ModelRouter(recorder, lambda _route: True)
+    return ModelRouter(recorder, lambda _route: True, lambda _request: True)
 
 
 def routing_request(**overrides: object) -> ModelRoutingRequest:
@@ -67,8 +67,8 @@ def routing_request(**overrides: object) -> ModelRoutingRequest:
         "model_capability": "summarization",
         "risk_class": "moderate",
         "data_classification": "confidential",
-        "risk_score": 20,
-        "budget_microusd": 50,
+        "estimated_cost_microusd": 50,
+        "available_budget_microusd": 100,
         "provider_availability": frozenset({"provider-a", "provider-b"}),
         "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
     }
@@ -88,7 +88,6 @@ def route(
     classifications: frozenset[str] = frozenset({"public", "internal", "confidential"}),
     task_policies: frozenset[str] = frozenset({"summarization-policy-v1"}),
     risk_classes: frozenset[str] = frozenset({"low", "moderate"}),
-    max_risk_score: int = 50,
     max_cost_microusd: int = 100,
     enabled: bool = True,
 ) -> ModelRoute:
@@ -101,7 +100,6 @@ def route(
         task_policies=task_policies,
         data_classifications=classifications,
         risk_classes=risk_classes,
-        max_risk_score=max_risk_score,
         max_cost_microusd=max_cost_microusd,
         priority=priority,
         tenants=tenants,
@@ -138,7 +136,7 @@ def test_model_router_fails_closed_for_tenant_risk_data_budget_and_availability(
             "provider-a",
             tenants=frozenset({"tenant-other"}),
             classifications=frozenset({"public"}),
-            max_risk_score=5,
+            risk_classes=frozenset({"high"}),
             max_cost_microusd=10,
         )
     )
@@ -184,9 +182,9 @@ def test_model_router_fails_closed_if_audit_recording_fails() -> None:
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"risk_score": 101},
-        {"risk_score": -1},
-        {"budget_microusd": -1},
+        {"estimated_cost_microusd": -1},
+        {"available_budget_microusd": -1},
+        {"risk_class": "unclassified"},
         {"data_classification": "top-secret"},
         {"provider_availability": frozenset()},
         {"trace_id": "0" * 32},
@@ -201,14 +199,14 @@ def test_model_routing_request_rejects_invalid_risk_budget_and_context(
 
 
 def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
-    denied = ModelRouter(lambda _decision: None, lambda _route: False)
+    denied = ModelRouter(lambda _decision: None, lambda _route: False, lambda _request: True)
     with pytest.raises(PermissionError, match="not registered"):
         denied.register(route("unregistered", "provider-a"))
 
     def registry_outage(_route: ModelRoute) -> bool:
         raise OSError("registry unavailable")
 
-    unavailable = ModelRouter(lambda _decision: None, registry_outage)
+    unavailable = ModelRouter(lambda _decision: None, registry_outage, lambda _request: True)
     with pytest.raises(RuntimeError, match="failing closed"):
         unavailable.register(route("unverified", "provider-a"))
 
@@ -222,8 +220,8 @@ def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
         ({"capabilities": frozenset({"translation"})}, {}),
         ({"risk_classes": frozenset({"high"})}, {}),
         ({"classifications": frozenset({"public"})}, {}),
-        ({"max_risk_score": 10}, {}),
         ({"max_cost_microusd": 10}, {}),
+        ({}, {"available_budget_microusd": 10}),
         ({}, {"provider_availability": frozenset({"provider-b"})}),
         ({"enabled": False}, {}),
     ],
@@ -239,3 +237,34 @@ def test_model_router_denies_each_ineligible_route_dimension(
     assert decision.route is None
     assert decision.model_id is None
     assert decision.reason_code == "no_eligible_route"
+
+
+def test_model_router_denies_untrusted_routing_context_with_evidence() -> None:
+    recorded = []
+    router = ModelRouter(
+        recorded.append,
+        lambda _route: True,
+        lambda _request: False,
+    )
+    router.register(route("route-a", "provider-a"))
+    decision = router.route(routing_request())
+    assert not decision.allowed
+    assert decision.reason_code == "untrusted_routing_context"
+    assert decision.route is None
+    assert recorded == [decision]
+
+
+def test_model_router_fails_closed_if_context_verification_is_unavailable() -> None:
+    def unavailable_context(_request: ModelRoutingRequest) -> bool:
+        raise OSError("policy service unavailable")
+
+    recorded = []
+    router = ModelRouter(
+        recorded.append,
+        lambda _route: True,
+        unavailable_context,
+    )
+    with pytest.raises(RuntimeError, match="context could not be verified"):
+        router.route(routing_request())
+    assert len(recorded) == 1
+    assert recorded[0].reason_code == "routing_context_unavailable"
