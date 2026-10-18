@@ -49,6 +49,8 @@ class QuotaReservationRequest:
             or self.concurrency < 1
             or self.tool_calls < 0
             or self.token_units < 0
+            or isinstance(self.cost_units, bool)
+            or not isinstance(self.cost_units, (int, float))
             or not math.isfinite(self.cost_units)
             or self.cost_units < 0
         ):
@@ -115,6 +117,8 @@ class PostgresQuotaLedger:
             or not isinstance(actual.token_units, int)
             or actual.tool_calls < 0
             or actual.token_units < 0
+            or isinstance(actual.cost_units, bool)
+            or not isinstance(actual.cost_units, (int, float))
             or not math.isfinite(actual.cost_units)
             or actual.cost_units < 0
         ):
