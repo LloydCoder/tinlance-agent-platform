@@ -147,7 +147,7 @@ def test_stateless_discovery_and_tools_list_are_cache_safe() -> None:
     assert discovered["ttlMs"] > 0
     assert discovered["_meta"]["io.modelcontextprotocol/serverInfo"] == {
         "name": "tinlance-agent-platform",
-        "version": "1.0.0",
+        "version": "1.1.0",
     }
     assert "protocolVersion" not in discovered
     listing = service.handle(headers("tools/list"), body("tools/list"))
@@ -221,6 +221,14 @@ def test_protocol_rejects_invalid_versions_arguments_and_oversized_payloads() ->
         headers("tools/list", **{"mcp-protocol-version": "unknown"}), body("tools/list")
     )
     assert invalid_version.status_code == 400
+    unsupported_version = service.handle(
+        headers("tools/list", **{"mcp-protocol-version": "2025-11-25"}),
+        body("tools/list"),
+    )
+    assert unsupported_version.status_code == 400
+    unsupported_error = decode(unsupported_version)["error"]
+    assert unsupported_error["code"] == -32022
+    assert unsupported_error["data"]["supported"] == ["2026-07-28"]
     invalid_args = service.handle(
         headers("tools/call", **{"mcp-name": "search"}),
         body("tools/call", {"name": "search", "arguments": {"query": "ok", "extra": True}}),
