@@ -275,7 +275,8 @@ class EcosystemRegistrySnapshot:
                     raise ValueError(f"{repository_id}: v2 repository metadata has an invalid type")
                 if metadata.supply_chain.reviewed_sha != self.repository_revisions[repository_id]:
                     raise ValueError(
-                        f"{repository_id}: supply-chain revision differs from reviewed repository SHA"
+                        f"{repository_id}: supply-chain revision differs from "
+                        "reviewed repository SHA"
                     )
                 if metadata.publisher.identity_status is IdentityStatus.REVOKED:
                     raise ValueError(f"{repository_id}: revoked publisher identity fails closed")
