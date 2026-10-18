@@ -12,6 +12,7 @@ from .openai_compatible import (
     ModelCredentialProvider,
     ModelProviderError,
     OpenAICompatibleProvider,
+    ScopedModelCredentialProvider,
     StaticModelCredential,
 )
 
@@ -27,5 +28,6 @@ __all__ = [
     "ModelCredentialProvider",
     "ModelProviderError",
     "OpenAICompatibleProvider",
+    "ScopedModelCredentialProvider",
     "StaticModelCredential",
 ]
