@@ -14,7 +14,15 @@ alter table platform.quota_ledger
     drop constraint if exists quota_ledger_event_type_check;
 alter table platform.quota_ledger
     add constraint quota_ledger_event_type_check
-    check (event_type in ('reserved', 'settled', 'released', 'overrun', 'recovery_requested'));
+    check (event_type in (
+        'reserved', 'settled', 'released', 'overrun', 'recovery_requested', 'lease_renewed'
+    ));
+
+alter table platform.quota_ledger
+    drop constraint if exists quota_ledger_tenant_id_reservation_id_event_type_key;
+create unique index if not exists quota_ledger_single_transition_event
+    on platform.quota_ledger(tenant_id, reservation_id, event_type)
+    where event_type <> 'lease_renewed';
 
 create or replace function platform.renew_quota_reservation(
     p_tenant_id uuid,
@@ -53,6 +61,19 @@ begin
     update platform.quota_reservations
        set lease_expires_at = new_expiry
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id;
+    insert into platform.quota_ledger(
+        ledger_id, tenant_id, organization_id, reservation_id, run_id, event_type,
+        tool_calls, token_units, cost_units, idempotency_key, evidence
+    ) values (
+        gen_random_uuid(), reservation.tenant_id, reservation.organization_id,
+        reservation.reservation_id, reservation.run_id, 'lease_renewed',
+        0, 0, 0, reservation.idempotency_key,
+        jsonb_build_object(
+            'lease_expires_at',
+            to_char(new_expiry at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+            'source_event_id', reservation.idempotency_key
+        )
+    );
     return new_expiry;
 end;
 $$;
