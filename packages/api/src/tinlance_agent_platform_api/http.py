@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Protocol
 
 from .service import (
     API_VERSION,
@@ -16,6 +18,16 @@ from .service import (
     IdempotencyConflictError,
     PrincipalResolver,
 )
+
+class MCPHTTPResponse(Protocol):
+    status_code: int
+    headers: Mapping[str, str]
+    body: bytes
+
+
+class MCPHTTPService(Protocol):
+    def handle(self, headers: Mapping[str, str], raw_body: bytes) -> MCPHTTPResponse: ...
+
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
@@ -56,6 +68,7 @@ def serve(
     *,
     host: str = "127.0.0.1",
     port: int = 0,
+    mcp_service: MCPHTTPService | None = None,
 ) -> ThreadingHTTPServer:
     """Start a local/reference HTTP server.
 
@@ -68,6 +81,37 @@ def serve(
         sys_version = ""
 
         def do_POST(self) -> None:  # noqa: N802
+            if self.path == "/mcp":
+                if mcp_service is None:
+                    self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", ""))
+                except ValueError:
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_content_length"})
+                    return
+                if length < 0 or length > MAX_REQUEST_BYTES:
+                    self._respond(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"})
+                    return
+                if "application/json" not in self.headers.get("Content-Type", "").lower():
+                    self._respond(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_required"})
+                    return
+                try:
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("request body is truncated")
+                    response = mcp_service.handle(dict(self.headers.items()), raw)
+                    self.send_response(response.status_code)
+                    response_headers = {key.lower(): value for key, value in response.headers.items()}
+                    for key, value in response.headers.items():
+                        self.send_header(key, value)
+                    if "content-length" not in response_headers:
+                        self.send_header("Content-Length", str(len(response.body)))
+                    self.end_headers()
+                    self.wfile.write(response.body)
+                except Exception:
+                    self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "mcp_transport_error"})
+                return
             if self.path != "/v1/agent-platform":
                 self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
