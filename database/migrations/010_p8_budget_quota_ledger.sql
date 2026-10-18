@@ -68,6 +68,8 @@ create table if not exists platform.quota_reservations (
     unique (tenant_id, reservation_id),
     foreign key (tenant_id, organization_id)
         references platform.organizations(tenant_id, organization_id),
+    foreign key (tenant_id, organization_id)
+        references platform.organization_budget_limits(tenant_id, organization_id),
     foreign key (tenant_id, agent_id)
         references platform.agents(tenant_id, agent_id),
     foreign key (tenant_id, run_id)
@@ -247,10 +249,9 @@ begin
         raise exception 'tenant budget limits are not configured' using errcode = 'P0002';
     end if;
 
-    if not exists (
-        select 1 from platform.tenants
-         where tenant_id = p_tenant_id and status = 'active'
-    ) then
+    perform 1 from platform.tenants
+     where tenant_id = p_tenant_id and status = 'active' for share;
+    if not found then
         raise exception 'tenant is not active' using errcode = '42501';
     end if;
 
@@ -279,10 +280,10 @@ begin
         if not found then
             raise exception 'organization budget limits are not configured' using errcode = 'P0002';
         end if;
-        if not exists (
-            select 1 from platform.organizations
-             where tenant_id = p_tenant_id and organization_id = p_organization_id and status = 'active'
-        ) then
+        perform 1 from platform.organizations
+         where tenant_id = p_tenant_id and organization_id = p_organization_id
+           and status = 'active' for share;
+        if not found then
             raise exception 'organization is not active' using errcode = '42501';
         end if;
     end if;
@@ -392,6 +393,9 @@ begin
     if reservation.organization_id is not null then
         select * into org_limit from platform.organization_budget_limits
          where tenant_id = p_tenant_id and organization_id = reservation.organization_id for update;
+        if not found then
+            raise exception 'organization budget limits are not configured' using errcode = 'P0002';
+        end if;
     end if;
 
     select coalesce(sum(qr.reserved_tool_calls), 0), coalesce(sum(qr.reserved_token_units), 0),
