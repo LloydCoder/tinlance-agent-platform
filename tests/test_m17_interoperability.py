@@ -149,6 +149,7 @@ def test_a2a_client_requires_scoped_delegation_and_pinned_transport() -> None:
         ttl_seconds=60,
         now=issued,
     )
+    credentials.now = issued + timedelta(seconds=1)
     result = client.send(
         make_card(agent_id=remote),
         delegation,
