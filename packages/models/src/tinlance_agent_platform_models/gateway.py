@@ -214,15 +214,28 @@ class ModelRoutingDecision:
 class ModelRouter:
     """Deterministic, policy-constrained route selector with fail-closed audit."""
 
-    def __init__(self, record_decision: Callable[[ModelRoutingDecision], None]) -> None:
+    def __init__(
+        self,
+        record_decision: Callable[[ModelRoutingDecision], None],
+        verify_registered_route: Callable[[ModelRoute], bool],
+    ) -> None:
         if not callable(record_decision):
             raise TypeError("a durable routing-decision recorder is required")
+        if not callable(verify_registered_route):
+            raise TypeError("a trusted route-registry verifier is required")
         self._record_decision = record_decision
+        self._verify_registered_route = verify_registered_route
         self._routes: dict[str, ModelRoute] = {}
 
     def register(self, route: ModelRoute) -> None:
         if route.route_id in self._routes:
             raise ValueError("model route identifiers are immutable and unique")
+        try:
+            verified = self._verify_registered_route(route)
+        except Exception as exc:
+            raise RuntimeError("route registration could not be verified; failing closed") from exc
+        if verified is not True:
+            raise PermissionError("model route is not registered in the trusted Platform registry")
         self._routes[route.route_id] = route
 
     def route(self, request: ModelRoutingRequest) -> ModelRoutingDecision:
