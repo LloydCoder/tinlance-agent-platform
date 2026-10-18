@@ -11,10 +11,12 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 _COST_QUANTUM = Decimal("0.000001")
@@ -308,3 +310,290 @@ class PostgresQuotaLedger:
         if row is None or not isinstance(row[0], bool):
             raise RuntimeError("quota release procedure returned an unexpected result")
         return row[0]
+
+
+if TYPE_CHECKING:
+    from .service import BudgetScope
+
+
+class QuotaReservationReplayError(RuntimeError):
+    """An idempotency key was reused for a different reservation intent."""
+
+
+class QuotaOverrunError(TimeoutError):
+    """Measured usage exceeded the reserved quota and was durably recorded."""
+
+
+@dataclass(frozen=True, slots=True)
+class QuotaUsageEstimate:
+    """Fail-closed admission estimate derived from a versioned provider price book."""
+
+    tool_calls: int
+    token_units: int
+    cost_units: float
+    provider: str
+    model: str
+    price_book_version: str
+    billing_unit: str = "request"
+    metering_source: str = "provider-estimate"
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.tool_calls, bool)
+            or not isinstance(self.tool_calls, int)
+            or self.tool_calls < 0
+            or isinstance(self.token_units, bool)
+            or not isinstance(self.token_units, int)
+            or self.token_units < 0
+            or isinstance(self.cost_units, bool)
+            or not isinstance(self.cost_units, (int, float))
+            or not math.isfinite(self.cost_units)
+            or self.cost_units < 0
+        ):
+            raise ValueError("quota estimate dimensions must be finite and non-negative")
+        for value, name in (
+            (self.provider, "provider"),
+            (self.model, "model"),
+            (self.price_book_version, "price_book_version"),
+            (self.billing_unit, "billing_unit"),
+            (self.metering_source, "metering_source"),
+        ):
+            if not isinstance(value, str) or not PostgresQuotaLedger._IDENTIFIER.fullmatch(value):
+                raise ValueError(f"{name} must be a normalized metadata identifier")
+
+    def as_evidence(self) -> dict[str, str]:
+        return {
+            "provider": self.provider,
+            "model": self.model,
+            "price_book_version": self.price_book_version,
+            "billing_unit": self.billing_unit,
+            "metering_source": self.metering_source,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PostgresBudgetReservation:
+    """Execution-bound handle for a durable Platform quota reservation."""
+
+    reservation_id: UUID
+    tenant_id: UUID
+    organization_id: UUID | None
+    scope: Any
+    idempotency_key: str
+    estimate: QuotaUsageEstimate
+
+
+class PostgresBudgetGate:
+    """Durable execution budget gate backed by the Platform-owned quota ledger.
+
+    A connection factory must return a transaction context manager (for example,
+    a psycopg connection). Each reserve/settle/release operation commits in its
+    own short transaction. The caller must supply a trusted price-book estimator,
+    an authoritative usage meter, and a tenant-scoped organization resolver.
+    Missing callbacks or missing measured usage fail closed; no default estimate
+    or fabricated settlement is permitted.
+    """
+
+    def __init__(
+        self,
+        connection_factory: Callable[[], Any],
+        *,
+        estimate_usage: Callable[[Any, int, float], QuotaUsageEstimate],
+        measure_usage: Callable[[PostgresBudgetReservation, float], QuotaSettlement],
+        resolve_organization: Callable[[Any], UUID | None],
+        lease_seconds: int = 900,
+    ) -> None:
+        if not callable(connection_factory):
+            raise TypeError("connection_factory must be callable")
+        if not callable(estimate_usage) or not callable(measure_usage):
+            raise TypeError("estimate_usage and measure_usage callbacks are required")
+        if not callable(resolve_organization):
+            raise TypeError("resolve_organization callback is required")
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or not 60 <= lease_seconds <= 3600
+        ):
+            raise ValueError("lease_seconds must be between 60 and 3600")
+        self._connection_factory = connection_factory
+        self.estimate_usage = estimate_usage
+        self.measure_usage = measure_usage
+        self.resolve_organization = resolve_organization
+        self.lease_seconds = lease_seconds
+
+    @contextmanager
+    def _tenant_ledger(self, tenant_id: UUID) -> Iterator[PostgresQuotaLedger]:
+        # set_config(..., true) is transaction-local; never leak tenant context
+        # through a pooled connection after the transaction exits.
+        with self._connection_factory() as connection:
+            connection.execute(
+                "SELECT set_config('platform.tenant_id', %s, true)",
+                (str(tenant_id),),
+            )
+            yield PostgresQuotaLedger(connection)
+
+    @staticmethod
+    def _tenant_uuid(scope: Any) -> UUID:
+        try:
+            return UUID(scope.tenant_id)
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise ValueError("durable quota scope tenant_id must be a UUID") from exc
+
+    @staticmethod
+    def _validate_idempotency_key(value: str | None) -> str:
+        if (
+            not isinstance(value, str)
+            or not 16 <= len(value) <= 256
+            or value != value.strip()
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
+            raise ValueError("durable quota admission requires a normalized idempotency key")
+        return value
+
+    def reserve_new(
+        self,
+        scope: BudgetScope,
+        *,
+        tool_calls: int,
+        seconds: float,
+        idempotency_key: str,
+    ) -> PostgresBudgetReservation:
+        key = self._validate_idempotency_key(idempotency_key)
+        if (
+            isinstance(tool_calls, bool)
+            or not isinstance(tool_calls, int)
+            or tool_calls < 1
+            or isinstance(seconds, bool)
+            or not isinstance(seconds, (int, float))
+            or not math.isfinite(seconds)
+            or seconds <= 0
+        ):
+            raise ValueError("durable quota admission dimensions must be finite and positive")
+        tenant_id = self._tenant_uuid(scope)
+        estimate = self.estimate_usage(scope, tool_calls, float(seconds))
+        if not isinstance(estimate, QuotaUsageEstimate):
+            raise TypeError("estimate_usage must return QuotaUsageEstimate")
+        if estimate.tool_calls < tool_calls:
+            raise ValueError("quota estimate cannot reserve fewer tool calls than requested")
+        organization_id = self.resolve_organization(scope)
+        if organization_id is not None and not isinstance(organization_id, UUID):
+            raise TypeError("resolve_organization must return a UUID or None")
+        request = QuotaReservationRequest(
+            tenant_id=tenant_id,
+            agent_id=scope.agent_id,
+            run_id=scope.run_id,
+            action=scope.action,
+            resource=scope.resource,
+            idempotency_key=key,
+            concurrency=1,
+            tool_calls=estimate.tool_calls,
+            token_units=estimate.token_units,
+            cost_units=estimate.cost_units,
+            organization_id=organization_id,
+        )
+        try:
+            with self._tenant_ledger(tenant_id) as ledger:
+                reservation_id = ledger.reserve(request)
+        except Exception as exc:
+            sqlstate = getattr(exc, "sqlstate", getattr(exc, "pgcode", None))
+            if sqlstate == "23505" and "idempotency key conflicts with existing reservation" in str(exc).lower():
+                raise QuotaReservationReplayError(
+                    "idempotency key conflicts with a different quota reservation intent"
+                ) from exc
+            raise
+        return PostgresBudgetReservation(
+            reservation_id,
+            tenant_id,
+            organization_id,
+            scope,
+            key,
+            estimate,
+        )
+
+    def reserve_scoped(
+        self,
+        scope: BudgetScope,
+        *,
+        tool_calls: int,
+        seconds: float,
+        idempotency_key: str | None = None,
+    ) -> PostgresBudgetReservation:
+        if idempotency_key is None:
+            raise ValueError("durable quota admission requires an idempotency key")
+        return self.reserve_new(
+            scope,
+            tool_calls=tool_calls,
+            seconds=seconds,
+            idempotency_key=idempotency_key,
+        )
+
+    def consume(self, reservation: Any, elapsed_seconds: float) -> None:
+        if not isinstance(reservation, PostgresBudgetReservation):
+            raise TypeError("PostgresBudgetGate requires its own reservation handle")
+        if (
+            isinstance(elapsed_seconds, bool)
+            or not isinstance(elapsed_seconds, (int, float))
+            or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0
+        ):
+            raise ValueError("elapsed_seconds must be finite and non-negative")
+        measured = self.measure_usage(reservation, float(elapsed_seconds))
+        if not isinstance(measured, QuotaSettlement):
+            raise TypeError("measure_usage must return QuotaSettlement")
+        evidence = reservation.estimate.as_evidence()
+        evidence.update(self._validate_measured_evidence(measured.evidence))
+        actual = QuotaSettlement(
+            measured.tool_calls,
+            measured.token_units,
+            measured.cost_units,
+            evidence,
+        )
+        with self._tenant_ledger(reservation.tenant_id) as ledger:
+            result = ledger.settle(
+                tenant_id=reservation.tenant_id,
+                reservation_id=reservation.reservation_id,
+                actual=actual,
+            )
+        if result == "overrun":
+            raise QuotaOverrunError(
+                "measured usage exceeded the reserved quota; the overrun was recorded"
+            )
+
+    @staticmethod
+    def _validate_measured_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
+        safe = PostgresQuotaLedger._validate_evidence(evidence)
+        if "measurement_ref" not in safe:
+            raise ValueError("measured usage requires a measurement_ref")
+        return safe
+
+    def release(self, reservation: Any) -> None:
+        if not isinstance(reservation, PostgresBudgetReservation):
+            raise TypeError("PostgresBudgetGate requires its own reservation handle")
+        with self._tenant_ledger(reservation.tenant_id) as ledger:
+            ledger.release(
+                tenant_id=reservation.tenant_id,
+                reservation_id=reservation.reservation_id,
+                reason="cancelled-before-side-effect",
+                evidence={
+                    "correlation_id": str(reservation.scope.run_id),
+                    "metering_source": reservation.estimate.metering_source,
+                },
+            )
+
+    def renew(self, reservation: PostgresBudgetReservation) -> datetime:
+        if not isinstance(reservation, PostgresBudgetReservation):
+            raise TypeError("PostgresBudgetGate requires its own reservation handle")
+        with self._tenant_ledger(reservation.tenant_id) as ledger:
+            renewed_until = ledger.renew(
+                tenant_id=reservation.tenant_id,
+                reservation_id=reservation.reservation_id,
+                lease_seconds=self.lease_seconds,
+            )
+        return renewed_until
+
+    def request_expired_reconciliation(self, *, tenant_id: UUID, batch_limit: int = 100) -> int:
+        with self._tenant_ledger(tenant_id) as ledger:
+            return ledger.request_expired_reconciliation(
+                tenant_id=tenant_id,
+                batch_limit=batch_limit,
+            )
