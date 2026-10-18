@@ -23,6 +23,20 @@ class AcceptCardSignature:
         )
 
 
+class ScopedCredentialProvider:
+    def __init__(self) -> None:
+        self.issued = []
+
+    def issue(self, delegation: RemoteDelegation) -> str:
+        delegation.validate(
+            expected_tenant_id=delegation.tenant_id,
+            expected_issuer_id=delegation.parent_agent_id,
+            expected_audience=delegation.audience,
+        )
+        self.issued.append(delegation.delegation_id)
+        return "short-lived-scoped-token"
+
+
 class CaptureA2ATransport:
     def __init__(self) -> None:
         self.calls = []
@@ -54,12 +68,13 @@ class CaptureA2ATransport:
 
 def make_card(
     *,
+    agent_id=None,
     endpoint: str = "https://" + "agent.example" + "/a2a",
     signature: str = "dmFsaWQtc2lnbmF0dXJl",
 ) -> AgentCard:
     skill = AgentSkill("documents.read", "Read documents", frozenset({"documents:read"}))
     return AgentCard(
-        uuid4(),
+        agent_id or uuid4(),
         "1.0",
         "remote",
         "Remote agent",
@@ -109,24 +124,72 @@ def test_remote_endpoint_validation_blocks_private_dns_and_pins_public_addresses
         validate_remote_endpoint("https://localhost/a2a", lambda _host: ("127.0.0.1",))
 
 
-def test_a2a_client_verifies_card_and_passes_pinned_addresses_to_transport() -> None:
+def test_a2a_client_requires_scoped_delegation_and_pinned_transport() -> None:
     transport = CaptureA2ATransport()
+    credentials = ScopedCredentialProvider()
     client = A2AClient(
         resolver=lambda _host: ("93.184.216.34",),
         transport=transport,
         card_verifier=AcceptCardSignature(),
+        credential_provider=credentials,
     )
-    result = client.send(make_card(), "opaque-bearer-token", {"method": "message/send"})
+    parent = uuid4()
+    remote = uuid4()
+    issued = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
+    delegation = RemoteDelegation.issue(
+        tenant_id="tenant-a",
+        parent_agent_id=parent,
+        remote_agent_id=remote,
+        parent_capabilities=frozenset({"documents:read", "documents:write"}),
+        requested_capabilities=frozenset({"documents:read"}),
+        resource_scope="tenant-a/documents",
+        ttl_seconds=60,
+        now=issued,
+    )
+    result = client.send(
+        make_card(agent_id=remote),
+        delegation,
+        {"method": "message/send"},
+        expected_tenant_id="tenant-a",
+        expected_issuer_id=parent,
+        required_capabilities=frozenset({"documents:read"}),
+        resource_scope="tenant-a/documents",
+        now=issued + timedelta(seconds=1),
+    )
     assert result["task"]["id"] == "task-1"
+    assert credentials.issued == [delegation.delegation_id]
     assert transport.calls == [
         (
             "https://" + "agent.example" + "/a2a",
             ("93.184.216.34",),
-            "opaque-bearer-token",
+            "short-lived-scoped-token",
             10.0,
             "1.0",
+            "application/a2a+json",
         )
     ]
+    with pytest.raises(PermissionError, match="capabilities"):
+        client.send(
+            make_card(agent_id=remote),
+            delegation,
+            {"method": "message/send"},
+            expected_tenant_id="tenant-a",
+            expected_issuer_id=parent,
+            required_capabilities=frozenset({"documents:admin"}),
+            resource_scope="tenant-a/documents",
+            now=issued + timedelta(seconds=1),
+        )
+    with pytest.raises(PermissionError, match="resource scope"):
+        client.send(
+            make_card(agent_id=remote),
+            delegation,
+            {"method": "message/send"},
+            expected_tenant_id="tenant-a",
+            expected_issuer_id=parent,
+            required_capabilities=frozenset({"documents:read"}),
+            resource_scope="tenant-a/admin",
+            now=issued + timedelta(seconds=1),
+        )
 
 
 def test_remote_delegation_is_attenuated_and_expires() -> None:
