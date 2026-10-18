@@ -21,8 +21,14 @@ replace them or let a quota reservation satisfy an approval requirement.
 ## Repository implementation
 
 - `packages/budgets`: deterministic in-memory reference budgets and quotas.
-- `packages/budgets/.../postgres_quota.py`: transaction-bound adapter for
-  persistent reservation, settlement and release procedures.
+- `packages/budgets/.../postgres_quota.py`: transaction-bound ledger adapter
+  plus `PostgresBudgetGate`, which connects the durable ledger to the
+  execution `BudgetGate` contract using short tenant-scoped transactions.
+- `PostgresBudgetGate` requires injected Platform-side usage estimation,
+  measured-usage evidence and trusted organization resolution. It derives a
+  stable reservation ID from the authenticated execution idempotency key,
+  rejects an existing durable reservation before a new side effect, and never
+  holds a database transaction open while the tool executes.
 - `database/migrations/010_p8_budget_quota_ledger.sql`: tenant and
   organization limits, reservation state, append-only cost ledger, RLS and
   transactional SQL procedures.
@@ -55,9 +61,11 @@ replace them or let a quota reservation satisfy an approval requirement.
    returned explicitly so the caller stops further work.
 5. Release is permitted only for an un-settled reservation and requires a
    normalized reason. Cancellation after a consequential side effect must
-   settle observed usage rather than pretend it was refunded. Once recovery
-   has been requested for an expired lease, release is blocked; reconciliation
-   must settle measured usage (zero only with an explicit measurement reference).
+   settle observed usage rather than pretend it was refunded. Settlement failure
+   after side-effect start preserves the reservation for recovery; execution
+   reports an unknown outcome instead of refunding quota. Once recovery has been
+   requested for an expired lease, release is blocked; reconciliation must settle
+   measured usage (zero only with an explicit measurement reference).
 6. Partial settlement charges measured usage and releases the unused estimate.
    A release before side effects charges zero; a post-side-effect cancellation
    is not automatically refundable.
@@ -65,9 +73,11 @@ replace them or let a quota reservation satisfy an approval requirement.
    metadata. Trace identifiers are format-validated; prompts, arbitrary
    provider bodies, credentials and secrets are not ledger evidence. Lease
    renewals and recovery requests are separately recorded in the ledger.
-8. All database calls participate in the caller's tenant-scoped transaction.
-   Domain state, reservation transition and ledger entry must commit or roll
-   back together. The adapter does not commit or close caller-owned connections.
+8. The low-level ledger adapter participates in a caller-owned tenant-scoped
+   transaction and never commits or closes that connection. The higher-level
+   `PostgresBudgetGate` owns one short transaction per reserve/settle/release
+   operation, commits or rolls back it, and closes the connection. No transaction
+   spans an external tool side effect.
 9. RLS and composite tenant foreign keys prevent cross-tenant access and
    cross-tenant agent/run/organization binding.
 10. Capacity gates compare measured throughput, p95/p99 latency and concurrency
@@ -78,10 +88,15 @@ replace them or let a quota reservation satisfy an approval requirement.
 ## Production boundary
 
 The in-memory quota implementation is a reference/test implementation only.
-The PostgreSQL adapter requires migrations 010 and 011 to be applied and
-invoked inside a real tenant-scoped transaction. This repository change does **not** prove
-that a production database, migration pipeline, runtime database role, secret
-manager, multi-region failover, or production telemetry has been deployed.
+Production execution must inject `PostgresBudgetGate` into the governed execution
+service with a real connection factory, migrations 010 and 011 applied, least-
+privilege runtime role, trusted organization resolver, Platform-side cost
+estimator, and provider usage meter that emits immutable measurement references.
+A lease-renewal worker must call `renew` for long-running reservations and a
+reconciliation worker must review expired reservations; expiry is not permission
+to release quota automatically. This repository change does **not** prove that
+those external components, migration pipelines, secret managers, multi-region
+failover or production telemetry have been deployed.
 Those require environment-level evidence and load/failure testing.
 
 ## P8 exit gate
