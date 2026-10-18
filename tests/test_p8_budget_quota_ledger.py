@@ -158,7 +158,7 @@ def test_postgres_ledger_calls_transactional_procedures_without_owning_commit() 
         ledger.settle(
             tenant_id=TENANT_ID,
             reservation_id=reservation_id,
-            actual=QuotaSettlement(1, 80, 0.8, {"provider": "unit-test"}),
+            actual=QuotaSettlement(1, 80, 0.8, {"provider": "unit-test", "measurement_ref": "usage:unit-test"}),
         )
         == "settled"
     )
@@ -217,7 +217,7 @@ def test_postgres_ledger_distinguishes_overrun_from_idempotent_settlement() -> N
         replay.settle(
             tenant_id=TENANT_ID,
             reservation_id=uuid4(),
-            actual=QuotaSettlement(2, 200, 3.5, {}),
+            actual=QuotaSettlement(2, 200, 3.5, {"measurement_ref": "usage:overrun"}),
         )
         == "already_settled"
     )
@@ -368,7 +368,7 @@ def test_postgres_adapter_normalizes_cost_to_numeric_scale() -> None:
     settlement_ledger.settle(
         tenant_id=TENANT_ID,
         reservation_id=uuid4(),
-        actual=QuotaSettlement(1, 10, 1.2345675, {}),
+        actual=QuotaSettlement(1, 10, 1.2345675, {"measurement_ref": "usage:rounding-test"}),
     )
     assert settlement_connection.queries[0][1][4] == Decimal("1.234568")
 
