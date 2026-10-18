@@ -412,6 +412,7 @@ class PostgresBudgetGate:
         self._measure_usage = measure_usage
         self._resolve_organization = resolve_organization
         self._active: dict[UUID, PostgresBudgetReservation] = {}
+        self._pending: set[UUID] = set()
         self._lock = RLock()
 
     def _transaction(
@@ -455,13 +456,20 @@ class PostgresBudgetGate:
             NAMESPACE_URL,
             f"tinlance-quota:{tenant_id}:{scope.run_id}:{scope.idempotency_key}",
         )
-        local = self._run_budget.reserve_scoped(
-            scope,
-            tool_calls=tool_calls,
-            seconds=seconds,
-            reservation_id=reservation_id,
-        )
+        with self._lock:
+            if reservation_id in self._active or reservation_id in self._pending:
+                raise QuotaReservationReplayError(
+                    "quota reservation is already active for this idempotency key"
+                )
+            self._pending.add(reservation_id)
+        local: BudgetReservation | None = None
         try:
+            local = self._run_budget.reserve_scoped(
+                scope,
+                tool_calls=tool_calls,
+                seconds=seconds,
+                reservation_id=reservation_id,
+            )
             estimate = self._estimate_usage(scope, tool_calls, seconds)
             if not isinstance(estimate, QuotaEstimate):
                 raise TypeError("Platform usage estimator must return QuotaEstimate")
@@ -495,10 +503,14 @@ class PostgresBudgetGate:
             )
             with self._lock:
                 self._active[reservation_id] = reservation
+                self._pending.discard(reservation_id)
             return reservation
         except Exception:
-            with suppress(Exception):
-                self._run_budget.release(local)
+            with self._lock:
+                self._pending.discard(reservation_id)
+            if local is not None:
+                with suppress(Exception):
+                    self._run_budget.release(local)
             raise
 
     def consume(self, reservation: PostgresBudgetReservation, elapsed_seconds: float) -> None:
