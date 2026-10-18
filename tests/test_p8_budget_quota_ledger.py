@@ -377,3 +377,13 @@ def test_postgres_adapter_rejects_cost_outside_numeric_precision() -> None:
     ledger = PostgresQuotaLedger(Connection())
     with pytest.raises(ValueError, match="numeric\(20, 6\) range"):
         ledger.reserve(request(cost_units=1e15))
+
+
+def test_postgres_settlement_requires_a_measurement_reference() -> None:
+    ledger = PostgresQuotaLedger(Connection())
+    with pytest.raises(ValueError, match="measurement_ref"):
+        ledger.settle(
+            tenant_id=TENANT_ID,
+            reservation_id=uuid4(),
+            actual=QuotaSettlement(1, 10, 0.1, {}),
+        )
