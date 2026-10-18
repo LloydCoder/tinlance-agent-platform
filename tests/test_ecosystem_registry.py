@@ -73,10 +73,13 @@ def valid_snapshot(**overrides):
         (agent.agent_id, contract_id)
         for agent in agents for contract_id, _ in agent.required_contracts
     }
-    rules = overrides.pop("compatibility_rules", tuple(
-        CompatibilityRule(consumer, contract_id, ("1.0",))
-        for consumer, contract_id in sorted(pairs)
-    ))
+    rules = overrides.pop(
+        "compatibility_rules",
+        tuple(
+            CompatibilityRule(consumer, contract_id, ("1.0",))
+            for consumer, contract_id in sorted(pairs)
+        ),
+    )
     return EcosystemRegistrySnapshot(
         repository_revisions=overrides.pop("repository_revisions", SHAS),
         services=services,
@@ -98,8 +101,13 @@ def test_registry_rejects_missing_service_and_stale_reviewed_revision():
         valid_snapshot(services=SERVICES[1:]).validate()
     with pytest.raises(ValueError, match="full immutable commit SHA"):
         ServiceRegistration(
-            SERVICES[0].service_id, "platform", "main", "1.1",
-            SERVICES[0].contract_ids, SERVICES[0].capabilities, SERVICES[0].authority_mode,
+            SERVICES[0].service_id,
+            "platform",
+            "main",
+            "1.1",
+            SERVICES[0].contract_ids,
+            SERVICES[0].capabilities,
+            SERVICES[0].authority_mode,
         )
     stale = (
         ServiceRegistration(
