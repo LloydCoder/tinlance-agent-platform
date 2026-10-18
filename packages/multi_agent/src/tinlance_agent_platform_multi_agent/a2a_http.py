@@ -295,6 +295,8 @@ class A2AProtocolService:
                 return self._rpc_error(request_id, -32602, "params must be an object")
             if method == "message/send":
                 message = params.get("message")
+                if not isinstance(message, Mapping):
+                    return self._rpc_error(request_id, -32602, "message must be an object")
                 intent, context_id = _text_from_message(message)
                 fingerprint = _request_fingerprint(
                     principal.tenant_id, principal.subject_id, normalized_id
@@ -309,7 +311,7 @@ class A2AProtocolService:
                 ):
                     return self._rpc_error(request_id, -32602, "invalid idempotency key")
                 task_seed = supplied_key or normalized_id
-                task_id = uuid5(
+                deterministic_task_id = uuid5(
                     NAMESPACE_URL,
                     f"tinlance-a2a:{principal.tenant_id}:{principal.subject_id}:{task_seed}",
                 )
@@ -318,7 +320,7 @@ class A2AProtocolService:
                     principal.subject_id,
                     "runs.create",
                     {
-                        "task_id": str(task_id),
+                        "task_id": str(deterministic_task_id),
                         "agent_id": str(self._card.agent_id),
                         "intent": intent,
                     },
@@ -340,15 +342,15 @@ class A2AProtocolService:
                     return self._rpc_error(
                         request_id, -32603, "Platform returned an invalid run ID"
                     )
-                task: dict[str, object] = {
+                created_task: dict[str, object] = {
                     "kind": "task",
                     "id": run_id,
                     "status": {"state": _task_state(state)},
                     "history": [dict(message)],
                 }
                 if context_id is not None:
-                    task["contextId"] = context_id
-                result: dict[str, object] = {"task": task}
+                    created_task["contextId"] = context_id
+                result: dict[str, object] = {"task": created_task}
             elif method == "tasks/get":
                 history_length = params.get("historyLength", 0)
                 if (
@@ -363,7 +365,7 @@ class A2AProtocolService:
                 if not isinstance(task_id_value, str):
                     return self._rpc_error(request_id, -32602, "tasks/get requires a task id")
                 try:
-                    task_id = str(UUID(task_id_value))
+                    run_task_id = str(UUID(task_id_value))
                 except ValueError:
                     return self._rpc_error(
                         request_id, -32602, "task id must be a Platform run UUID"
@@ -376,7 +378,7 @@ class A2AProtocolService:
                         principal.tenant_id,
                         principal.subject_id,
                         "runs.events",
-                        {"run_id": task_id},
+                        {"run_id": run_task_id},
                         f"a2a-{request_fingerprint}",
                         _traceparent(normalized.get("traceparent")),
                         None,
@@ -388,22 +390,25 @@ class A2AProtocolService:
                         request_id, -32603, "Platform could not retrieve task events"
                     )
                 events = response.payload.get("events")
-                task: dict[str, object] = {
+                task_snapshot: dict[str, object] = {
                     "kind": "task",
-                    "id": task_id,
+                    "id": run_task_id,
                     "status": {"state": _status_from_events(events)},
                 }
                 if history_length > 0 and isinstance(events, list):
-                    history = [
-                        dict(event_payload["message"])
-                        for event in events
-                        if isinstance(event, Mapping)
-                        and isinstance(event_payload := event.get("payload"), Mapping)
-                        and isinstance(event_payload.get("message"), Mapping)
-                    ]
+                    history: list[dict[str, object]] = []
+                    for event in events:
+                        if not isinstance(event, Mapping):
+                            continue
+                        event_payload = event.get("payload")
+                        if not isinstance(event_payload, Mapping):
+                            continue
+                        message_payload = event_payload.get("message")
+                        if isinstance(message_payload, Mapping):
+                            history.append(dict(message_payload))
                     if history:
-                        task["history"] = history[-history_length:]
-                result = task
+                        task_snapshot["history"] = history[-history_length:]
+                result = task_snapshot
             else:
                 return self._rpc_error(request_id, -32601, "method not supported")
             return self._json_response(200, {"jsonrpc": "2.0", "id": request_id, "result": result})
