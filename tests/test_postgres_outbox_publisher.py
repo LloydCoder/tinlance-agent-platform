@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-import pytest
-
 from tinlance_agent_platform_events.publisher import PostgresOutboxPublisher
+
+import pytest
 
 
 TENANT_ID = UUID("00000000-0000-0000-0000-000000000061")
