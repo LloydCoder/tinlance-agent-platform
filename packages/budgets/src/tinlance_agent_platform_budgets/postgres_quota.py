@@ -12,6 +12,7 @@ import json
 import math
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -207,6 +208,56 @@ class PostgresQuotaLedger:
         ):
             raise RuntimeError("quota settlement procedure returned an unexpected result")
         return str(row[0])
+
+    def renew(
+        self,
+        *,
+        tenant_id: UUID,
+        reservation_id: UUID,
+        lease_seconds: int = 900,
+    ) -> datetime:
+        """Renew a live reservation lease without changing its quota dimensions."""
+        self._require_transaction()
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or not 60 <= lease_seconds <= 3600
+        ):
+            raise ValueError("lease_seconds must be between 60 and 3600")
+        row = self._connection.execute(
+            "SELECT platform.renew_quota_reservation(%s, %s, %s)",
+            (tenant_id, reservation_id, lease_seconds),
+        ).fetchone()
+        if row is None or not isinstance(row[0], datetime):
+            raise RuntimeError("quota lease renewal returned an unexpected result")
+        return row[0]
+
+    def request_expired_reconciliation(
+        self,
+        *,
+        tenant_id: UUID,
+        batch_limit: int = 100,
+    ) -> int:
+        """Mark expired reservations for review; this never releases quota automatically."""
+        self._require_transaction()
+        if (
+            isinstance(batch_limit, bool)
+            or not isinstance(batch_limit, int)
+            or not 1 <= batch_limit <= 1000
+        ):
+            raise ValueError("batch_limit must be between 1 and 1000")
+        row = self._connection.execute(
+            "SELECT platform.request_expired_quota_reconciliation(%s, %s)",
+            (tenant_id, batch_limit),
+        ).fetchone()
+        if (
+            row is None
+            or isinstance(row[0], bool)
+            or not isinstance(row[0], int)
+            or row[0] < 0
+        ):
+            raise RuntimeError("quota reconciliation request returned an unexpected result")
+        return row[0]
 
     def release(
         self,
