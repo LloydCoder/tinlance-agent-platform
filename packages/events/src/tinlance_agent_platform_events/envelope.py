@@ -11,12 +11,29 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 _SPAN_ID = re.compile(r"^[0-9a-f]{16}$")
 _CLASSIFICATIONS = {"public", "internal", "confidential", "restricted"}
+
+
+def _freeze_json(value: Any) -> Any:
+    if isinstance(value, dict):
+        return MappingProxyType({key: _freeze_json(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze_json(item) for item in value)
+    return value
+
+
+def _thaw_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
+    return value
 
 
 def _required(value: str, field: str, limit: int = 256) -> None:
@@ -108,7 +125,7 @@ class CloudEventEnvelope:
             encoded = json.dumps(
                 dict(self.data), sort_keys=True, separators=(",", ":"), allow_nan=False
             )
-            object.__setattr__(self, "data", json.loads(encoded))
+            object.__setattr__(self, "data", _freeze_json(json.loads(encoded)))
         except (TypeError, ValueError) as exc:
             raise ValueError("data must contain only finite JSON-compatible values") from exc
 
@@ -124,7 +141,7 @@ class CloudEventEnvelope:
             "executionid": self.executionid,
             "traceid": self.traceid,
             "correlationid": self.correlationid,
-            "data": dict(self.data),
+            "data": _thaw_json(self.data),
         }
         for field in (
             "subject",

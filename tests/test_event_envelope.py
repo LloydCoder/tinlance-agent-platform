@@ -49,3 +49,12 @@ def test_platform_envelope_serializes_canonical_cloud_events_names() -> None:
 def test_platform_envelope_rejects_invalid_values(overrides) -> None:
     with pytest.raises(ValueError):
         make_event(**overrides)
+
+
+def test_nested_event_payload_is_immutable() -> None:
+    data = {"nested": {"state": "succeeded"}}
+    event = make_event(data=data)
+    data["nested"]["state"] = "failed"
+    with pytest.raises(TypeError):
+        event.data["nested"]["state"] = "mutated"
+    assert event.as_payload()["data"]["nested"]["state"] == "succeeded"
