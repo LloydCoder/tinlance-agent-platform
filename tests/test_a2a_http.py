@@ -231,3 +231,19 @@ def test_a2a_task_id_must_be_a_uuid() -> None:
     )
     assert response.status_code == 200
     assert "error" in decode(response)
+
+
+def test_a2a_idempotency_key_stabilizes_task_identity_across_request_ids() -> None:
+    service, api, _, _, _ = make_service()
+    shared_key = "a2a-idempotency-key-0001"
+    first = service.handle(
+        headers("message/send", **{"idempotency-key": shared_key}),
+        request("message/send", {"message": message()}, "first-request"),
+    )
+    second = service.handle(
+        headers("message/send", **{"idempotency-key": shared_key}),
+        request("message/send", {"message": message()}, "retry-request"),
+    )
+    assert first.status_code == second.status_code == 200
+    assert api.requests[0].payload["task_id"] == api.requests[1].payload["task_id"]
+    assert api.requests[0].idempotency_key == api.requests[1].idempotency_key == shared_key
