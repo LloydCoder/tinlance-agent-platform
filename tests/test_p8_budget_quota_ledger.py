@@ -11,7 +11,10 @@ from tinlance_agent_platform_budgets import (
     CapacityEnvelope,
     CapacityGate,
     CapacityObservation,
+    PostgresBudgetGate,
     PostgresQuotaLedger,
+    QuotaEstimate,
+    QuotaReservationReplayError,
     QuotaReservationRequest,
     QuotaSettlement,
     TenantQuotaService,
@@ -32,16 +35,31 @@ class Cursor:
 
 
 class Connection:
-    def __init__(self, *, autocommit=False, result=True, reserve_result=None):
+    def __init__(
+        self,
+        *,
+        autocommit=False,
+        result=True,
+        reserve_result=None,
+        existing_reservation=False,
+    ):
         self.autocommit = autocommit
         self.result = result
         self.reserve_result = reserve_result
+        self.existing_reservation = existing_reservation
         self.queries = []
         self.committed = False
+        self.rolled_back = False
         self.closed = False
 
     def execute(self, query, params=()):
         self.queries.append((query, params))
+        if "set_config('platform.tenant_id'" in query:
+            return Cursor((params[0],))
+        if "FROM platform.tenant_budget_limits" in query:
+            return Cursor((params[0],))
+        if "FROM platform.quota_reservations" in query:
+            return Cursor((uuid4(),)) if self.existing_reservation else Cursor(None)
         if "platform.reserve_quota" in query:
             return Cursor((self.reserve_result or params[0],))
         if "platform.settle_quota" in query:
@@ -57,6 +75,9 @@ class Connection:
 
     def commit(self):
         self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
 
     def close(self):
         self.closed = True
