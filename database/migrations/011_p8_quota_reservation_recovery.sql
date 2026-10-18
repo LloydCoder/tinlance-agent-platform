@@ -78,6 +78,28 @@ begin
 end;
 $$;
 
+-- Once recovery is requested, a reservation cannot be released/refunded.
+-- Reconciliation must settle observed usage (including zero only with evidence).
+create or replace function platform.reject_quota_release_after_recovery()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog, platform
+as $$
+begin
+    if old.recovery_requested_at is not null and new.state = 'released' then
+        raise exception 'reservation requires reconciliation and cannot be released'
+            using errcode = '55000';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists quota_reservation_recovery_no_release on platform.quota_reservations;
+create trigger quota_reservation_recovery_no_release
+before update of state on platform.quota_reservations
+for each row execute function platform.reject_quota_release_after_recovery();
+
 -- A lease expiry is a reconciliation signal, not a refund. The reservation
 -- remains reserved and continues consuming its quota until settle/release is
 -- resolved with evidence. SKIP LOCKED allows multiple tenant-scoped sweepers.
