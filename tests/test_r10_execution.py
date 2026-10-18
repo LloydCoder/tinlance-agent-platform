@@ -319,6 +319,8 @@ def test_sqlite_idempotency_survives_reinstantiation(tmp_path: Path, harness: ob
 
 def test_authoritative_tool_timeout_preserves_unknown_side_effect_outcome(harness: object) -> None:
     service, principal, agent, _ = harness
+    budget = FailingSettlementBudget()
+    service.budget = budget
 
     class Slow:
         def execute(self, call: ToolCall) -> str:
@@ -344,6 +346,7 @@ def test_authoritative_tool_timeout_preserves_unknown_side_effect_outcome(harnes
     result = service.execute(principal, request(principal, agent))
     assert result.state is ExecutionState.OUTCOME_UNKNOWN
     assert result.error_code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
+    assert budget.released is False
 
 
 def test_platform_budget_reservation_is_enforced_and_consumed(harness: object) -> None:
