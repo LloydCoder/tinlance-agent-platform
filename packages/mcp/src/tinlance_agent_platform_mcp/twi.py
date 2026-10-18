@@ -258,7 +258,9 @@ class TWIHTTPTransport:
             except ValueError:
                 loopback = False
             if not allow_loopback_http or not loopback:
-                raise ValueError("plain HTTP is allowed only for explicitly enabled loopback development")
+                raise ValueError(
+                    "plain HTTP is allowed only for explicitly enabled loopback development"
+                )
         if not audience or audience != audience.strip():
             raise ValueError("TWI audience must be explicit and normalized")
         if not 0.1 <= timeout_seconds <= 30:
