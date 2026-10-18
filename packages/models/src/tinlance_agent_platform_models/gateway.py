@@ -206,6 +206,7 @@ class ModelRoutingDecision:
     def model(self) -> str | None:
         return self.model_id
 
+
 class ModelRouter:
     """Deterministic, policy-constrained route selector with fail-closed audit."""
 
@@ -225,7 +226,8 @@ class ModelRouter:
             route for route in self._routes.values()
             if route.enabled
             and route.provider in request.provider_availability
-            and request.model_capability in route.capabilities\n            and request.risk_class in route.risk_classes
+            and request.model_capability in route.capabilities
+            and request.risk_class in route.risk_classes
             and request.data_classification in route.data_classifications
             and request.risk_score <= route.max_risk_score
             and request.budget_microusd <= route.max_cost_microusd
