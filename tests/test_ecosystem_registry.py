@@ -75,20 +75,28 @@ SERVICES = (
 )
 
 AGENTS = (
-    AgentRegistration("reference.enterprise-a", "platform", SHAS["platform"],
+    AgentRegistration(
+        "reference.enterprise-a",
+        "platform",
+        SHAS["platform"],
         ("agent.execute", "tool.invoke"),
         (
             ("governed-execution.v1", "1.0"),
             ("event-envelope.v1", "1.0"),
             ("trace-context.v1", "1.0"),
-        )),
-    AgentRegistration("reference.enterprise-b", "platform", SHAS["platform"],
+        ),
+    ),
+    AgentRegistration(
+        "reference.enterprise-b",
+        "platform",
+        SHAS["platform"],
         ("agent.execute", "tool.invoke"),
         (
             ("governed-execution.v1", "1.0"),
             ("event-envelope.v1", "1.0"),
             ("trace-context.v1", "1.0"),
-        )),
+        ),
+    ),
 )
 
 
