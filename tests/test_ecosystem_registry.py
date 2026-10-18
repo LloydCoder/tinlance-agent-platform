@@ -387,3 +387,55 @@ def test_deprecated_contract_requires_replacement_and_non_https_supply_chain_ref
             signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
             verification_status=SupplyChainStatus.PENDING,
         )
+
+
+def test_quarantined_repository_can_be_recorded_only_when_its_service_is_disabled():
+    metadata = v2_repository_metadata()
+    os_metadata = metadata["os"]
+    metadata["os"] = RepositoryMetadata(
+        os_metadata.publisher,
+        LifecycleMetadata(
+            LifecycleState.QUARANTINED,
+            "2026-10-18T06:52:00Z",
+            reason="security review pending",
+        ),
+        os_metadata.supply_chain,
+    )
+    quarantined = LifecycleMetadata(
+        LifecycleState.QUARANTINED,
+        "2026-10-18T06:52:00Z",
+        reason="security review pending",
+    )
+    active = LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T06:52:00Z")
+    services = tuple(
+        replace(item, enabled=False, lifecycle=quarantined)
+        if item.owner_repository_id == "os"
+        else replace(item, lifecycle=active)
+        for item in SERVICES
+    )
+    valid_snapshot(
+        schema_version="registry-manifest/v2",
+        repository_metadata=metadata,
+        services=services,
+    ).validate()
+
+
+def test_revoked_supply_chain_fails_closed_for_active_services():
+    metadata = v2_repository_metadata()
+    platform = metadata["platform"]
+    metadata["platform"] = RepositoryMetadata(
+        platform.publisher,
+        platform.lifecycle,
+        SupplyChainReferences(
+            reviewed_sha=platform.supply_chain.reviewed_sha,
+            provenance_uri=platform.supply_chain.provenance_uri,
+            sbom_uri=platform.supply_chain.sbom_uri,
+            signature_uri=platform.supply_chain.signature_uri,
+            verification_status=SupplyChainStatus.REVOKED,
+        ),
+    )
+    with pytest.raises(ValueError, match="owner supply-chain attestation is revoked"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
