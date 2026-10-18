@@ -114,7 +114,6 @@ class ModelRoute:
     task_policies: frozenset[str]
     data_classifications: frozenset[str]
     risk_classes: frozenset[str]
-    max_risk_score: int
     max_cost_microusd: int
     priority: int = 100
     tenants: frozenset[str] | None = None
@@ -152,8 +151,8 @@ class ModelRoute:
             "critical",
         }:
             raise ValueError("route risk classes are invalid")
-        if not 0 <= self.max_risk_score <= 100 or self.max_cost_microusd < 0:
-            raise ValueError("route risk and cost limits are invalid")
+        if self.max_cost_microusd < 0:
+            raise ValueError("route cost limit cannot be negative")
         for allowlist in (self.tenants, self.agents):
             if allowlist is not None and any(
                 not value or value != value.strip() for value in allowlist
@@ -169,8 +168,8 @@ class ModelRoutingRequest:
     model_capability: str
     risk_class: str
     data_classification: str
-    risk_score: int
-    budget_microusd: int
+    estimated_cost_microusd: int
+    available_budget_microusd: int
     provider_availability: frozenset[str]
     trace_id: str | None = None
 
@@ -187,8 +186,8 @@ class ModelRoutingRequest:
             raise ValueError("unsupported risk class")
         if self.data_classification not in {"public", "internal", "confidential", "restricted"}:
             raise ValueError("unsupported data classification")
-        if not 0 <= self.risk_score <= 100 or self.budget_microusd < 0:
-            raise ValueError("routing risk and budget are invalid")
+        if self.estimated_cost_microusd < 0 or self.available_budget_microusd < 0:
+            raise ValueError("estimated cost and available budget cannot be negative")
         if not self.provider_availability:
             raise ValueError("provider availability must be explicitly supplied")
         if any(
@@ -259,8 +258,8 @@ class ModelRouter:
             and request.model_capability in route.capabilities
             and request.risk_class in route.risk_classes
             and request.data_classification in route.data_classifications
-            and request.risk_score <= route.max_risk_score
-            and request.budget_microusd <= route.max_cost_microusd
+            and request.estimated_cost_microusd <= route.max_cost_microusd
+            and request.estimated_cost_microusd <= request.available_budget_microusd
             and (route.tenants is None or request.tenant_id in route.tenants)
             and (route.agents is None or request.agent_id in route.agents)
         ]
