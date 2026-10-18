@@ -346,7 +346,9 @@ class RemoteDelegation:
         if self.parent_agent_id != expected_issuer_id:
             raise PermissionError("delegation issuer does not match the trusted issuer")
         if self.audience != expected_audience or expected_audience != str(self.remote_agent_id):
-            raise PermissionError("delegation audience does not match the authenticated remote agent")
+            raise PermissionError(
+                "delegation audience does not match the authenticated remote agent"
+            )
         current_value = now or datetime.now(UTC)
         if current_value.tzinfo is None:
             raise ValueError("validation time must be timezone-aware")
