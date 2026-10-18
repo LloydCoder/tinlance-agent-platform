@@ -11,7 +11,6 @@ import hmac
 import re
 from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse
@@ -27,10 +26,10 @@ from tinlance_agent_platform_contracts import (
 
 from .gateway import ApprovalVerifier, MCPToolGateway, ToolScope
 from .twi import (
-    TWIHTTPTransport,
     TWI_OPERATION_TO_TOOL,
     compute_twi_intent_fingerprint,
     twi_tool_spec,
+    TWITransportError,
 )
 
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -157,9 +156,16 @@ class TWIAPIHandler:
             raise
         except ValueError:
             raise
-        except Exception as exc:
+        except TWITransportError as exc:
             # Never return downstream response bodies, headers, or token material.
-            return APIResponse("failed", {"error": "twi_adapter_failure"})
+            if exc.status_code in {401, 403}:
+                return APIResponse("denied", {"error": "twi_downstream_authentication_failed"})
+            if exc.status_code == 409:
+                return APIResponse("conflict", {"error": "twi_idempotency_conflict"})
+            return APIResponse(
+                "failed",
+                {"error": "twi_unavailable", "retryable": exc.retryable},
+            )
         return APIResponse("success", result)
 
     @staticmethod
