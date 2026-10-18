@@ -8,13 +8,13 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import urlparse
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from .interoperability import A2A_PROTOCOL_VERSION, A2A_SPECIFICATION_VERSION, AgentCard
+from .interoperability import A2A_PROTOCOL_VERSION, AgentCard
 
 MAX_REQUEST_BYTES = 1_048_576
 MAX_RESPONSE_BYTES = 1_048_576
@@ -364,7 +364,7 @@ class A2AProtocolService:
                     "id": task_id,
                     "status": {"state": _status_from_events(response.payload.get("events"))},
                 }
-                result = {"task": task}
+                result = task
             else:
                 return self._rpc_error(request_id, -32601, "method not supported")
             return self._json_response(200, {"jsonrpc": "2.0", "id": request_id, "result": result})
