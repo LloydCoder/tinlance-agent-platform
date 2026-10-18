@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from tinlance_agent_platform_registry.ecosystem import (
@@ -6,7 +8,14 @@ from tinlance_agent_platform_registry.ecosystem import (
     CompatibilityRule,
     ContractRegistration,
     EcosystemRegistrySnapshot,
+    IdentityStatus,
+    LifecycleMetadata,
+    LifecycleState,
+    PublisherIdentity,
+    RepositoryMetadata,
     ServiceRegistration,
+    SupplyChainReferences,
+    SupplyChainStatus,
 )
 
 SHAS = {
@@ -23,7 +32,23 @@ CONTRACTS = (
     ContractRegistration("trace-context.v1", "1.0", "tsic"),
     ContractRegistration("transformation.v1", "1.0", "developer"),
     ContractRegistration("replication.v1", "1.0", "developer"),
-    ContractRegistration("registry-manifest.v1", "1.0", "tsic"),
+    ContractRegistration(
+        "registry-manifest.v1",
+        "1.0",
+        "tsic",
+        lifecycle=LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T06:50:45Z",
+            reason="superseded by registry-manifest.v2",
+            replacement_id="registry-manifest.v2",
+        ),
+    ),
+    ContractRegistration(
+        "registry-manifest.v2",
+        "2.0",
+        "tsic",
+        lifecycle=LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T06:50:45Z"),
+    ),
 )
 
 SERVICES = (
@@ -59,7 +84,7 @@ SERVICES = (
         "developer",
         SHAS["developer"],
         "1.1",
-        ("transformation.v1", "replication.v1", "trace-context.v1", "registry-manifest.v1"),
+        ("transformation.v1", "replication.v1", "trace-context.v1", "registry-manifest.v2"),
         ("artifact.validate", "registry.validate"),
         AuthorityMode.AUTHORITY_FREE,
     ),
@@ -68,7 +93,7 @@ SERVICES = (
         "tsic",
         SHAS["tsic"],
         "1.1",
-        ("event-envelope.v1", "trace-context.v1", "registry-manifest.v1"),
+        ("event-envelope.v1", "trace-context.v1", "registry-manifest.v2"),
         ("contract.validate", "compatibility.validate"),
         AuthorityMode.CONFORMANCE_ONLY,
     ),
@@ -101,9 +126,21 @@ AGENTS = (
 
 
 def valid_snapshot(**overrides):
+    schema_version = overrides.pop("schema_version", "registry-manifest/v1")
     services = overrides.pop("services", SERVICES)
     agents = overrides.pop("agents", AGENTS)
     contracts = overrides.pop("contracts", CONTRACTS)
+    if schema_version == "registry-manifest/v2":
+        active_lifecycle = LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T00:00:00Z")
+        services = tuple(
+            replace(item, lifecycle=item.lifecycle or active_lifecycle) for item in services
+        )
+        agents = tuple(
+            replace(item, lifecycle=item.lifecycle or active_lifecycle) for item in agents
+        )
+        contracts = tuple(
+            replace(item, lifecycle=item.lifecycle or active_lifecycle) for item in contracts
+        )
     pairs = {
         (service.service_id, contract_id)
         for service in services
@@ -113,10 +150,15 @@ def valid_snapshot(**overrides):
         for agent in agents
         for contract_id, _ in agent.required_contracts
     }
+    contract_versions = {item.contract_id: item.version for item in contracts}
     rules = overrides.pop(
         "compatibility_rules",
         tuple(
-            CompatibilityRule(consumer, contract_id, ("1.0",))
+            CompatibilityRule(
+                consumer,
+                contract_id,
+                (contract_versions.get(contract_id, "1.0"),),
+            )
             for consumer, contract_id in sorted(pairs)
         ),
     )
@@ -128,6 +170,7 @@ def valid_snapshot(**overrides):
         compatibility_rules=rules,
         required_service_ids=frozenset(s.service_id for s in SERVICES),
         required_agent_ids=frozenset(a.agent_id for a in AGENTS),
+        schema_version=schema_version,
         **overrides,
     )
 
@@ -222,4 +265,256 @@ def test_registry_rejects_compatibility_that_does_not_fail_closed_and_agent_auth
             ("agent.execute",),
             (("governed-execution.v1", "1.0"),),
             AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION,
+        )
+
+
+def v2_repository_metadata():
+    result = {}
+    repository_names = {
+        "developer": "tinlance-agent-developer",
+        "os": "tinlance-agent-os",
+        "platform": "tinlance-agent-platform",
+        "platform_sdk": "tinlance-agent-platform-sdk",
+        "tsic": "tinlance-system-integration",
+    }
+    for repository_id, sha in SHAS.items():
+        result[repository_id] = RepositoryMetadata(
+            publisher=PublisherIdentity(
+                "LloydCoder",
+                "https://github.com/LloydCoder",
+                IdentityStatus.UNVERIFIED,
+            ),
+            lifecycle=LifecycleMetadata(
+                LifecycleState.ACTIVE,
+                "2026-10-18T00:00:00Z",
+            ),
+            supply_chain=SupplyChainReferences(
+                reviewed_sha=sha,
+                provenance_uri=(
+                    f"https://github.com/LloydCoder/{repository_names[repository_id]}/commit/{sha}"
+                ),
+                sbom_uri=(
+                    f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations"
+                ),
+                signature_uri=(
+                    f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations"
+                ),
+                verification_status=SupplyChainStatus.PENDING,
+            ),
+        )
+    return result
+
+
+def test_v2_registry_requires_exact_publisher_lifecycle_and_supply_chain_metadata():
+    valid_snapshot(
+        schema_version="registry-manifest/v2",
+        repository_metadata=v2_repository_metadata(),
+    ).validate()
+
+    with pytest.raises(ValueError, match="requires publisher, lifecycle and supply-chain metadata"):
+        valid_snapshot(schema_version="registry-manifest/v2").validate()
+
+
+def test_v2_registry_rejects_supply_chain_revision_drift_and_revoked_publisher():
+    metadata = v2_repository_metadata()
+    platform = metadata["platform"]
+    metadata["platform"] = RepositoryMetadata(
+        platform.publisher,
+        platform.lifecycle,
+        SupplyChainReferences(
+            reviewed_sha="f" * 40,
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + "f" * 40
+            ),
+            sbom_uri=platform.supply_chain.sbom_uri,
+            signature_uri=platform.supply_chain.signature_uri,
+            verification_status=SupplyChainStatus.PENDING,
+        ),
+    )
+    with pytest.raises(ValueError, match="supply-chain revision differs"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
+
+    metadata = v2_repository_metadata()
+    platform = metadata["platform"]
+    metadata["platform"] = RepositoryMetadata(
+        PublisherIdentity(
+            platform.publisher.publisher_id,
+            platform.publisher.identity_uri,
+            IdentityStatus.REVOKED,
+        ),
+        platform.lifecycle,
+        platform.supply_chain,
+    )
+    with pytest.raises(ValueError, match="publisher identity is revoked"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
+
+
+def test_lifecycle_quarantine_requires_reason_and_cannot_remain_enabled():
+    with pytest.raises(ValueError, match="require a reason"):
+        LifecycleMetadata(LifecycleState.QUARANTINED, "2026-10-18T00:00:00Z")
+
+    quarantined = ServiceRegistration(
+        SERVICES[0].service_id,
+        SERVICES[0].owner_repository_id,
+        SERVICES[0].reviewed_sha,
+        SERVICES[0].api_version,
+        SERVICES[0].contract_ids,
+        SERVICES[0].capabilities,
+        SERVICES[0].authority_mode,
+        True,
+        LifecycleMetadata(
+            LifecycleState.QUARANTINED,
+            "2026-10-18T00:00:00Z",
+            reason="security review pending",
+        ),
+    )
+    with pytest.raises(ValueError, match="non-active lifecycle state must fail closed"):
+        valid_snapshot(services=(quarantined, *SERVICES[1:])).validate()
+
+
+def test_deprecated_contract_requires_replacement_and_non_https_supply_chain_refs_are_rejected():
+    with pytest.raises(ValueError, match="require a replacement ID"):
+        LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T00:00:00Z",
+            reason="superseded",
+        )
+    with pytest.raises(ValueError, match="SBOM reference must point to a GitHub attestation index"):
+        SupplyChainReferences(
+            reviewed_sha=SHAS["platform"],
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + SHAS["platform"]
+            ),
+            sbom_uri="http://example.test/sbom.json",
+            signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            verification_status=SupplyChainStatus.PENDING,
+        )
+
+
+def test_quarantined_repository_can_be_recorded_only_when_its_service_is_disabled():
+    metadata = v2_repository_metadata()
+    os_metadata = metadata["os"]
+    metadata["os"] = RepositoryMetadata(
+        os_metadata.publisher,
+        LifecycleMetadata(
+            LifecycleState.QUARANTINED,
+            "2026-10-18T06:52:00Z",
+            reason="security review pending",
+        ),
+        os_metadata.supply_chain,
+    )
+    quarantined = LifecycleMetadata(
+        LifecycleState.QUARANTINED,
+        "2026-10-18T06:52:00Z",
+        reason="security review pending",
+    )
+    active = LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T06:52:00Z")
+    services = tuple(
+        replace(item, enabled=False, lifecycle=quarantined)
+        if item.owner_repository_id == "os"
+        else replace(item, lifecycle=active)
+        for item in SERVICES
+    )
+    valid_snapshot(
+        schema_version="registry-manifest/v2",
+        repository_metadata=metadata,
+        services=services,
+    ).validate()
+
+
+def test_revoked_supply_chain_fails_closed_for_active_services():
+    metadata = v2_repository_metadata()
+    platform = metadata["platform"]
+    metadata["platform"] = RepositoryMetadata(
+        platform.publisher,
+        platform.lifecycle,
+        SupplyChainReferences(
+            reviewed_sha=platform.supply_chain.reviewed_sha,
+            provenance_uri=platform.supply_chain.provenance_uri,
+            sbom_uri=platform.supply_chain.sbom_uri,
+            signature_uri=platform.supply_chain.signature_uri,
+            verification_status=SupplyChainStatus.REVOKED,
+        ),
+    )
+    with pytest.raises(ValueError, match="owner supply-chain attestation is revoked"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
+
+
+def test_deprecated_resource_replacement_must_resolve_to_an_active_resource():
+    metadata = v2_repository_metadata()
+    developer = metadata["developer"]
+    metadata["developer"] = RepositoryMetadata(
+        developer.publisher,
+        LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T06:52:00Z",
+            reason="superseded",
+            replacement_id="missing.repository",
+        ),
+        developer.supply_chain,
+    )
+    with pytest.raises(ValueError, match="deprecated repository replacement must be active"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
+
+    contracts = list(CONTRACTS)
+    v1_index = next(
+        i for i, item in enumerate(contracts) if item.contract_id == "registry-manifest.v1"
+    )
+    contracts[v1_index] = replace(
+        contracts[v1_index],
+        lifecycle=LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T06:52:00Z",
+            reason="superseded",
+            replacement_id="missing.contract",
+        ),
+    )
+    with pytest.raises(ValueError, match="deprecated contract replacement must be active"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=v2_repository_metadata(),
+            contracts=tuple(contracts),
+        ).validate()
+
+
+def test_publisher_and_supply_chain_uris_must_match_the_reviewed_identity_and_revision():
+    with pytest.raises(ValueError, match="publisher identity URI must match"):
+        PublisherIdentity(
+            "LloydCoder",
+            "https://github.com/other-account",
+            IdentityStatus.UNVERIFIED,
+        )
+
+    with pytest.raises(ValueError, match="exact reviewed GitHub commit"):
+        SupplyChainReferences(
+            reviewed_sha=SHAS["platform"],
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + "f" * 40
+            ),
+            sbom_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            verification_status=SupplyChainStatus.PENDING,
+        )
+
+    with pytest.raises(ValueError, match="GitHub attestation index"):
+        SupplyChainReferences(
+            reviewed_sha=SHAS["platform"],
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + SHAS["platform"]
+            ),
+            sbom_uri="https://example.test/sbom.json",
+            signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
+            verification_status=SupplyChainStatus.PENDING,
         )
