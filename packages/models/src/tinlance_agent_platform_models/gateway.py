@@ -304,6 +304,5 @@ class ModelRouter:
             reason_code="eligible_route_selected" if selected else "no_eligible_route",
             trace_id=request.trace_id,
         )
-        try:
         self._record(decision)
         return decision
