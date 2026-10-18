@@ -132,7 +132,10 @@ class ModelRoute:
         ):
             raise ValueError("route capabilities must be normalized and non-empty")
         if not self.data_classifications or not self.data_classifications <= {
-            "public", "internal", "confidential", "restricted"
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
         }:
             raise ValueError("route data classifications are invalid")
         if not self.risk_classes or not self.risk_classes <= {"low", "moderate", "high", "critical"}:
@@ -177,8 +180,7 @@ class ModelRoutingRequest:
         if not self.provider_availability:
             raise ValueError("provider availability must be explicitly supplied")
         if any(
-            not provider or provider != provider.strip()
-            for provider in self.provider_availability
+            not provider or provider != provider.strip() for provider in self.provider_availability
         ):
             raise ValueError("available provider names must be normalized")
         if self.trace_id is not None and (
@@ -223,7 +225,8 @@ class ModelRouter:
 
     def route(self, request: ModelRoutingRequest) -> ModelRoutingDecision:
         candidates = [
-            route for route in self._routes.values()
+            route
+            for route in self._routes.values()
             if route.enabled
             and route.provider in request.provider_availability
             and request.model_capability in route.capabilities
