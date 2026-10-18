@@ -5,8 +5,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from tinlance_agent_platform_contracts import Budget
-
 from tinlance_agent_platform_budgets import (
     BudgetScope,
     BudgetService,
@@ -21,6 +19,7 @@ from tinlance_agent_platform_budgets import (
     QuotaSettlement,
     TenantQuotaService,
 )
+from tinlance_agent_platform_contracts import Budget
 
 ROOT = Path(__file__).resolve().parents[1]
 TENANT_ID = UUID("00000000-0000-0000-0000-000000000071")
