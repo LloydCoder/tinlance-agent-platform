@@ -346,7 +346,7 @@ def test_v2_registry_rejects_supply_chain_revision_drift_and_revoked_publisher()
         platform.lifecycle,
         platform.supply_chain,
     )
-    with pytest.raises(ValueError, match="revoked publisher identity"):
+    with pytest.raises(ValueError, match="publisher identity is revoked"):
         valid_snapshot(
             schema_version="registry-manifest/v2",
             repository_metadata=metadata,
