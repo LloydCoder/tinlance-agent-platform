@@ -206,3 +206,29 @@ def test_transport_rejects_unsupported_protocol_and_media_type() -> None:
             protocol_version="1.0",
             content_type="application/json",
         )
+
+
+def test_transport_rejects_header_injection_and_non_string_json_keys() -> None:
+    transport = interop.PinnedHTTPSRemoteAgentTransport()
+    with pytest.raises(ValueError, match="credential is invalid"):
+        transport.post(
+            "https://agent.example/a2a",
+            ("93.184.216.34",),
+            "bad\\nAuthorization: Bearer attacker",
+            {"jsonrpc": "2.0"},
+            timeout_seconds=3.0,
+            max_response_bytes=1024,
+            protocol_version="1.0",
+            content_type="application/a2a+json",
+        )
+    with pytest.raises(ValueError, match="object keys must be strings"):
+        transport.post(
+            "https://agent.example/a2a",
+            ("93.184.216.34",),
+            "scoped-credential",
+            {1: "not-a-json-object-key"},  # type: ignore[dict-item]
+            timeout_seconds=3.0,
+            max_response_bytes=1024,
+            protocol_version="1.0",
+            content_type="application/a2a+json",
+        )
