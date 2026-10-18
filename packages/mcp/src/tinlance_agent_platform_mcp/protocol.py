@@ -392,6 +392,8 @@ class MCPProtocolService:
             ):
                 return self._http_error(400, "invalid_jsonrpc_id")
             header_version = normalized.get("mcp-protocol-version")
+            if not header_version or header_version != header_version.strip():
+                return self._rpc_http_error(400, request_id, -32020, "HeaderMismatch")
             if header_version != MCP_PROTOCOL_VERSION:
                 return self._json_response(
                     400,
