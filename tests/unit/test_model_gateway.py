@@ -63,6 +63,7 @@ def routing_request(**overrides: object) -> ModelRoutingRequest:
     values: dict[str, object] = {
         "tenant_id": "tenant-a",
         "agent_id": "agent-a",
+        "task_policy": "summarization-policy-v1",
         "model_capability": "summarization",
         "risk_class": "moderate",
         "data_classification": "confidential",
@@ -83,6 +84,7 @@ def route(
     priority: int = 100,
     tenants: frozenset[str] | None = None,
     classifications: frozenset[str] = frozenset({"public", "internal", "confidential"}),
+    task_policies: frozenset[str] = frozenset({"summarization-policy-v1"}),
     risk_classes: frozenset[str] = frozenset({"low", "moderate"}),
     max_risk_score: int = 50,
     max_cost_microusd: int = 100,
@@ -93,6 +95,7 @@ def route(
         provider=provider,
         model=f"{provider}-model",
         capabilities=frozenset({"summarization"}),
+        task_policies=task_policies,
         data_classifications=classifications,
         risk_classes=risk_classes,
         max_risk_score=max_risk_score,
@@ -116,6 +119,7 @@ def test_model_router_selects_deterministic_lowest_priority_eligible_route() -> 
     assert decision.provider == "provider-a"
     assert decision.model == "provider-a-model"
     assert decision.policy_version == "policy-7"
+    assert decision.task_policy == "summarization-policy-v1"
     assert decision.reason_code == "eligible_route_selected"
     assert decision.trace_id == "4bf92f3577b34da6a3ce929d0e0e4736"
     assert recorded == [decision]
