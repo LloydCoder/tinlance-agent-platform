@@ -196,7 +196,6 @@ def test_model_routing_request_rejects_invalid_risk_budget_and_context(
         routing_request(**kwargs)
 
 
-
 def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
     denied = ModelRouter(lambda _decision: None, lambda _route: False)
     with pytest.raises(PermissionError, match="not registered"):
