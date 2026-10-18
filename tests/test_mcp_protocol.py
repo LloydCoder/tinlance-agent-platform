@@ -140,7 +140,16 @@ def test_stateless_discovery_and_tools_list_are_cache_safe() -> None:
     service, _, _ = make_service()
     discovery = service.handle(headers("server/discover"), body("server/discover"))
     assert discovery.status_code == 200
-    assert decode(discovery)["result"]["protocolVersion"] == "2026-07-28"
+    discovered = decode(discovery)["result"]
+    assert discovered["supportedVersions"] == ["2026-07-28"]
+    assert discovered["resultType"] == "complete"
+    assert discovered["cacheScope"] == "private"
+    assert discovered["ttlMs"] > 0
+    assert discovered["_meta"]["io.modelcontextprotocol/serverInfo"] == {
+        "name": "tinlance-agent-platform",
+        "version": "1.0.0",
+    }
+    assert "protocolVersion" not in discovered
     listing = service.handle(headers("tools/list"), body("tools/list"))
     assert listing.status_code == 200
     result = decode(listing)["result"]
@@ -198,6 +207,7 @@ def test_protocol_rejects_origin_header_mismatch_auth_and_rate_limit() -> None:
         headers("tools/list", **{"mcp-method": "tools/call"}), body("tools/list")
     )
     assert mismatch.status_code == 400
+    assert decode(mismatch)["error"]["code"] == -32020
     assert decode(mismatch)["error"]["message"] == "HeaderMismatch"
     unauthorized_headers = headers("tools/list", authorization="Basic invalid")
     assert service.handle(unauthorized_headers, body("tools/list")).status_code == 401
@@ -350,6 +360,17 @@ def test_protocol_requires_matching_body_protocol_version_and_capabilities() -> 
         },
     )
     assert service.handle(headers("tools/list"), missing_capabilities).status_code == 400
+
+    optional_client_info = body(
+        "tools/list",
+        {
+            "_meta": {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities": {},
+            }
+        },
+    )
+    assert service.handle(headers("tools/list"), optional_client_info).status_code == 200
 
 
 def test_tool_names_follow_mcp_ascii_name_contract() -> None:
