@@ -469,6 +469,8 @@ set search_path = pg_catalog, platform
 as $$
 declare
     reservation platform.quota_reservations%rowtype;
+    prior_release platform.quota_ledger%rowtype;
+    expected_evidence jsonb;
 begin
     if platform.current_tenant_id() is distinct from p_tenant_id then
         raise exception 'tenant scope mismatch' using errcode = '42501';
@@ -483,7 +485,17 @@ begin
     select * into reservation from platform.quota_reservations
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id for update;
     if not found then raise exception 'reservation not found' using errcode = 'P0002'; end if;
-    if reservation.state = 'released' then return false; end if;
+    if reservation.state = 'released' then
+        select * into prior_release from platform.quota_ledger
+         where tenant_id = p_tenant_id and reservation_id = p_reservation_id
+           and event_type = 'released';
+        expected_evidence := coalesce(p_evidence, '{}'::jsonb)
+            || jsonb_build_object('cancellation_reason', p_reason);
+        if found and prior_release.evidence = expected_evidence then
+            return false;
+        end if;
+        raise exception 'conflicting duplicate release' using errcode = '23505';
+    end if;
     if reservation.state <> 'reserved' then
         raise exception 'settled reservation cannot be released' using errcode = '55000';
     end if;
