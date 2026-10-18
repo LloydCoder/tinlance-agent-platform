@@ -13,6 +13,7 @@ import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -134,7 +135,9 @@ class PostgresQuotaLedger:
                 raise ValueError("trace_id must be a lowercase W3C trace identifier")
             if key == "traceparent" and not cls._TRACEPARENT.fullmatch(value):
                 raise ValueError("traceparent must be a supported W3C trace context")
-            if key not in {"cancellation_reason", "trace_id", "traceparent"} and not cls._IDENTIFIER.fullmatch(value):
+            if key not in {"cancellation_reason", "trace_id", "traceparent"} and not cls._IDENTIFIER.fullmatch(
+                value
+            ):
                 raise ValueError(f"{key} must be a normalized metadata identifier")
         encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(encoded.encode("utf-8")) > 4096:
