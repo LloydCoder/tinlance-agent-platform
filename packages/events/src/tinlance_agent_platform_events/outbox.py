@@ -4,6 +4,7 @@ PostgresEventStore never opens, commits, or rolls back a transaction. The caller
 must pass the same tenant-scoped connection used for the domain state transition,
 so the state change, event row, and outbox row commit or roll back together.
 """
+
 from __future__ import annotations
 
 import json
