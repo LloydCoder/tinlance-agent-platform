@@ -189,13 +189,18 @@ class MCPToolGateway:
                 "MCP request context mismatch",
                 capability_request.risk,
             )
-        if scope.traceparent is not None and context.trace_context is not None:
-            if scope.traceparent.split("-")[1] != context.trace_context.trace_id:
+        if scope.traceparent is not None:
+            parts = scope.traceparent.split("-")
+            if (
+                context.trace_context is None
+                or parts[1] != context.trace_context.trace_id
+                or parts[2] != context.trace_context.span_id
+            ):
                 return PolicyDecision(
                     Decision.DENY,
                     "mcp-trace-boundary",
                     "1",
-                    "MCP trace context mismatch",
+                    "MCP trace context is not bound to the Platform request",
                     capability_request.risk,
                 )
         if (
