@@ -584,25 +584,22 @@ class PostgresBudgetGate:
                 return
             if current != reservation:
                 raise KeyError("durable budget reservation scope mismatch")
-        released = False
-        try:
-            released = self._transaction(
-                reservation.tenant_id,
-                lambda ledger: ledger.release(
-                    tenant_id=reservation.tenant_id,
-                    reservation_id=reservation.reservation_id,
-                    reason="cancelled-before-side-effect",
-                    evidence={"cancellation_reason": "cancelled-before-side-effect"},
-                ),
-            )
-            if not released:
-                raise RuntimeError("durable quota reservation was not released")
-            with self._lock:
-                self._active.pop(reservation.reservation_id, None)
-                self._local_accounted.discard(reservation.reservation_id)
-        finally:
-            # Local run budget is process-local; the durable ledger remains the
-            # authority if a release fails and requires recovery.
+        released = self._transaction(
+            reservation.tenant_id,
+            lambda ledger: ledger.release(
+                tenant_id=reservation.tenant_id,
+                reservation_id=reservation.reservation_id,
+                reason="cancelled-before-side-effect",
+                evidence={"cancellation_reason": "cancelled-before-side-effect"},
+            ),
+        )
+        if not released:
+            raise RuntimeError("durable quota reservation was not released")
+        with self._lock:
+            self._active.pop(reservation.reservation_id, None)
+            self._local_accounted.discard(reservation.reservation_id)
+        # Only refund local run budget after the durable release commits.
+        with suppress(Exception):
             self._run_budget.release(reservation.local_reservation)
 
     def renew(
