@@ -202,3 +202,24 @@ def test_registry_requires_complete_fail_closed_compatibility_coverage():
     snapshot = valid_snapshot()
     with pytest.raises(ValueError, match="missing compatibility rules"):
         valid_snapshot(compatibility_rules=snapshot.compatibility_rules[:-1]).validate()
+
+
+def test_registry_rejects_compatibility_that_does_not_fail_closed_and_agent_authority():
+    with pytest.raises(ValueError, match="must reject unknown"):
+        CompatibilityRule(
+            "agent-os.runtime",
+            "trace-context.v1",
+            ("1.0",),
+            reject_unknown=True,
+            reject_stale=False,
+            reject_missing=True,
+        )
+    with pytest.raises(ValueError, match="agents cannot be registered"):
+        AgentRegistration(
+            "malicious.agent",
+            "platform",
+            SHAS["platform"],
+            ("agent.execute",),
+            (("governed-execution.v1", "1.0"),),
+            AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION,
+        )
