@@ -19,6 +19,7 @@ from .service import (
     PrincipalResolver,
 )
 
+
 class MCPHTTPResponse(Protocol):
     status_code: int
     headers: Mapping[str, str]
