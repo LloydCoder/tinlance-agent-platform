@@ -49,9 +49,15 @@ class ServiceRegistration:
     enabled: bool = True
 
     def __post_init__(self) -> None:
-        if any(not value.strip() for value in (
-            self.service_id, self.owner_repository_id, self.api_version, self.reviewed_sha
-        )):
+        if any(
+            not value.strip()
+            for value in (
+                self.service_id,
+                self.owner_repository_id,
+                self.api_version,
+                self.reviewed_sha,
+            )
+        ):
             raise ValueError("service registration identity and version fields are required")
         if not _FULL_SHA.fullmatch(self.reviewed_sha):
             raise ValueError("service reviewed revision must be a full immutable commit SHA")
@@ -146,7 +152,8 @@ class EcosystemRegistrySnapshot:
                 raise ValueError(f"{repository_id}: repository revision is not a full SHA")
 
         platform_services = [
-            service for service in self.services
+            service
+            for service in self.services
             if service.authority_mode is AuthorityMode.SOLE_CONSEQUENTIAL_EXECUTION
         ]
         if len(platform_services) != 1 or platform_services[0].owner_repository_id != "platform":
@@ -186,10 +193,12 @@ class EcosystemRegistrySnapshot:
         rule_map = {(rule.consumer_id, rule.contract_id): rule for rule in self.compatibility_rules}
         required_pairs = {
             (service.service_id, contract_id)
-            for service in self.services for contract_id in service.contract_ids
+            for service in self.services
+            for contract_id in service.contract_ids
         } | {
             (agent.agent_id, contract_id)
-            for agent in self.agents for contract_id, _ in agent.required_contracts
+            for agent in self.agents
+            for contract_id, _ in agent.required_contracts
         }
         if not required_pairs.issubset(rule_map):
             missing = sorted(required_pairs - set(rule_map))
