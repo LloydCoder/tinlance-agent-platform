@@ -1,0 +1,51 @@
+name: Supply Chain Attestation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  attest:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Build package and generate CycloneDX SBOM
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install ".[security]"
+          mkdir -p dist
+          python -m pip wheel . --no-deps --wheel-dir dist
+          cyclonedx-py environment --output-format JSON --output-file sbom.json
+          test -s sbom.json
+          test "$(find dist -maxdepth 1 -name '*.whl' -type f | wc -l)" -eq 1
+      - name: Attest built wheel provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-path: dist/*.whl
+      - name: Attest SBOM for built wheel
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-path: dist/*.whl
+          sbom-path: sbom.json
