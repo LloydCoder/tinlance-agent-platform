@@ -174,6 +174,6 @@ begin
         null;
     end;
 end
-$;
+$$;
 
 rollback;
