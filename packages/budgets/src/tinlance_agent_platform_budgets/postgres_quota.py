@@ -495,9 +495,7 @@ class PostgresBudgetGate:
                 cost_units=estimate.cost_units,
                 reservation_id=reservation_id,
             )
-            returned_id = self._transaction(
-                tenant_id, lambda ledger: ledger.reserve_new(request)
-            )
+            returned_id = self._transaction(tenant_id, lambda ledger: ledger.reserve_new(request))
             if returned_id != reservation_id:
                 raise RuntimeError("durable quota reservation returned a different ID")
             reservation = PostgresBudgetReservation(
