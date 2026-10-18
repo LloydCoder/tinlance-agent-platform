@@ -87,17 +87,32 @@ def test_request_approval_tool_and_evidence_models_bind_trace_tenant():
         trace_context=context,
     )
     approval = ApprovalRequest(
-        approval_id=uuid4(), tenant_id="tenant-a", run_id=uuid4(),
-        action="tool.execute", resource="resource:1", reason="policy requires approval",
-        requested_by="subject-1", trace_context=context,
+        approval_id=uuid4(),
+        tenant_id="tenant-a",
+        run_id=uuid4(),
+        action="tool.execute",
+        resource="resource:1",
+        reason="policy requires approval",
+        requested_by="subject-1",
+        trace_context=context,
     )
     tool_call = ToolCall(
-        call_id=uuid4(), tenant_id="tenant-a", run_id=uuid4(), tool_name="search",
-        capability="search", action="read", resource="resource:1", trace_context=context,
+        call_id=uuid4(),
+        tenant_id="tenant-a",
+        run_id=uuid4(),
+        tool_name="search",
+        capability="search",
+        action="read",
+        resource="resource:1",
+        trace_context=context,
     )
     evidence_link = EvidenceLink(
-        tenant_id="tenant-a", run_id=uuid4(), action_id=uuid4(),
-        evidence_id=uuid4(), sequence=1, trace_context=context,
+        tenant_id="tenant-a",
+        run_id=uuid4(),
+        action_id=uuid4(),
+        evidence_id=uuid4(),
+        sequence=1,
+        trace_context=context,
     )
     assert request.trace_context is context
     assert approval.trace_context is context
@@ -110,6 +125,10 @@ def test_request_and_audit_lineage_rejects_cross_tenant_context():
     principal = Principal(subject_id="subject-2", principal_type="user", tenant_id="tenant-b")
     with pytest.raises(ValueError, match="lineage must match"):
         RequestContext(
-            request_id="req-1", tenant_id="tenant-b", principal=principal,
-            environment="test", trace_id=context.trace_id, trace_context=context,
+            request_id="req-1",
+            tenant_id="tenant-b",
+            principal=principal,
+            environment="test",
+            trace_id=context.trace_id,
+            trace_context=context,
         )
