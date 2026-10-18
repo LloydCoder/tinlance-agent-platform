@@ -19,14 +19,13 @@ from tinlance_agent_platform_contracts import (
     Principal,
     RequestContext,
     Reversibility,
-    RiskTier,
     TraceLineageContext,
 )
 
 from .gateway import ApprovalVerifier, MCPToolGateway, ToolScope
 from .twi import (
-    TWITransportError,
     TWI_OPERATION_TO_TOOL,
+    TWITransportError,
     compute_twi_intent_fingerprint,
     twi_tool_spec,
 )
@@ -116,7 +115,9 @@ class TWIAPIHandler:
                 arguments=arguments,
             )
             if not hmac.compare_digest(declared_fingerprint, intent_fingerprint):
-                raise PermissionError("approval intent fingerprint does not match the requested export")
+                raise PermissionError(
+                    "approval intent fingerprint does not match the requested export"
+                )
 
         scope = ToolScope(
             tenant_id=request.tenant_id,
