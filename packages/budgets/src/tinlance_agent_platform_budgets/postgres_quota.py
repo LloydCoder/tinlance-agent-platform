@@ -413,6 +413,7 @@ class PostgresBudgetGate:
         self._resolve_organization = resolve_organization
         self._active: dict[UUID, PostgresBudgetReservation] = {}
         self._pending: set[UUID] = set()
+        self._local_accounted: set[UUID] = set()
         self._lock = RLock()
 
     def _transaction(
@@ -537,30 +538,38 @@ class PostgresBudgetGate:
         except Exception:
             # The external side effect has already run. Record local measured
             # usage, but leave the durable reservation for reconciliation.
-            with suppress(Exception):
+            try:
                 self._run_budget.consume_measured(
                     reservation.local_reservation,
                     elapsed_seconds,
                 )
+            except Exception:
+                pass
+            else:
+                with self._lock:
+                    self._local_accounted.add(reservation.reservation_id)
             raise
         with self._lock:
+            already_accounted = reservation.reservation_id in self._local_accounted
             self._active.pop(reservation.reservation_id, None)
+            self._local_accounted.discard(reservation.reservation_id)
         runtime_overrun = elapsed_seconds > reservation.local_reservation.seconds
-        try:
-            if runtime_overrun:
-                self._run_budget.consume_measured(
-                    reservation.local_reservation,
-                    elapsed_seconds,
-                )
-            else:
-                self._run_budget.consume(reservation.local_reservation, elapsed_seconds)
-        except Exception:
-            with suppress(Exception):
-                self._run_budget.consume_measured(
-                    reservation.local_reservation,
-                    elapsed_seconds,
-                )
-            raise
+        if not already_accounted:
+            try:
+                if runtime_overrun:
+                    self._run_budget.consume_measured(
+                        reservation.local_reservation,
+                        elapsed_seconds,
+                    )
+                else:
+                    self._run_budget.consume(reservation.local_reservation, elapsed_seconds)
+            except Exception:
+                with suppress(Exception):
+                    self._run_budget.consume_measured(
+                        reservation.local_reservation,
+                        elapsed_seconds,
+                    )
+                raise
         if runtime_overrun:
             raise TimeoutError("measured runtime exceeded the reserved runtime budget")
         if status == "overrun":
@@ -573,6 +582,7 @@ class PostgresBudgetGate:
             current = self._active.get(reservation.reservation_id)
             if current is None:
                 # Idempotent local cleanup after a confirmed settlement/release.
+                self._local_accounted.discard(reservation.reservation_id)
                 self._run_budget.release(reservation.local_reservation)
                 return
             if current != reservation:
@@ -592,6 +602,7 @@ class PostgresBudgetGate:
                 raise RuntimeError("durable quota reservation was not released")
             with self._lock:
                 self._active.pop(reservation.reservation_id, None)
+                self._local_accounted.discard(reservation.reservation_id)
         finally:
             # Local run budget is process-local; the durable ledger remains the
             # authority if a release fails and requires recovery.
