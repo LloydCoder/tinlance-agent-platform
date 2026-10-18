@@ -420,6 +420,17 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
             raise
 
 
+def _validate_json_object_keys(value: object, path: str = "A2A payload") -> None:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if not isinstance(key, str):
+                raise ValueError(f"{path} object keys must be strings")
+            _validate_json_object_keys(nested, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, nested in enumerate(value):
+            _validate_json_object_keys(nested, f"{path}[{index}]")
+
+
 class PinnedHTTPSRemoteAgentTransport:
     """Bounded HTTPS transport for A2A that pins the validated IP and never follows redirects.
 
@@ -459,7 +470,7 @@ class PinnedHTTPSRemoteAgentTransport:
             not isinstance(bearer_token, str)
             or not bearer_token
             or bearer_token != bearer_token.strip()
-            or any(character.isspace() for character in bearer_token)
+            or re.fullmatch(r"[A-Za-z0-9._~+/=-]+", bearer_token) is None
         ):
             raise ValueError("A2A scoped credential is invalid")
         if not resolved_addresses:
@@ -475,6 +486,7 @@ class PinnedHTTPSRemoteAgentTransport:
                 raise ValueError("A2A transport refuses non-public pinned addresses")
             addresses.append(str(address))
 
+        _validate_json_object_keys(payload)
         try:
             encoded = json.dumps(
                 dict(payload),
