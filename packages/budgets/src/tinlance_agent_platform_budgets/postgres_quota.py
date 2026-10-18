@@ -37,9 +37,11 @@ class QuotaReservationRequest:
             (self.resource, "resource"),
             (self.idempotency_key, "idempotency_key"),
         ):
+            if not isinstance(value, str):
+                raise TypeError(f"{name} must be a string")
             if not value or value != value.strip():
                 raise ValueError(f"{name} must be non-empty and normalized")
-            if len(value) > (256 if name != "idempotency_key" else 256):
+            if len(value) > 256:
                 raise ValueError(f"{name} exceeds the maximum length")
             if any(ord(char) < 32 or ord(char) == 127 for char in value):
                 raise ValueError(f"{name} must not contain control characters")
