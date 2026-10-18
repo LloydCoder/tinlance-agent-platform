@@ -4,7 +4,6 @@ import threading
 from dataclasses import dataclass
 from uuid import uuid4
 
-
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_api.service import APIResponse
 from tinlance_agent_platform_multi_agent import A2AProtocolService, AgentCard, AgentSkill
