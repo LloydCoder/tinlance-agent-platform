@@ -298,7 +298,7 @@ def test_agent_card_signature_profile_uses_full_rfc8785_json_types() -> None:
 
     invalid_unicode = replace(
         make_card(),
-        security_scheme_details={"bearer": {"invalid": "\\ud800"}},
+        security_scheme_details={"bearer": {"invalid": "\ud800"}},
     )
     with pytest.raises(ValueError, match="RFC 8785"):
         invalid_unicode.canonical_payload()
