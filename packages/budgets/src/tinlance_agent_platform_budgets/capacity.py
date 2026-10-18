@@ -60,10 +60,7 @@ class CapacityObservation:
                 and math.isfinite(value)
                 for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms)
             )
-            or any(
-                value < 0
-                for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms)
-            )
+            or any(value < 0 for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms))
             or self.p95_ms > self.p99_ms
         ):
             raise ValueError("capacity observation values are invalid")
