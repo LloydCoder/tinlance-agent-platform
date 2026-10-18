@@ -214,6 +214,8 @@ class PostgresQuotaLedger:
         ):
             raise ValueError("actual quota usage must be finite and non-negative")
         evidence = self._validate_evidence(actual.evidence)
+        if "measurement_ref" not in actual.evidence:
+            raise ValueError("quota settlement requires a measurement_ref")
         evidence_json = json.dumps(
             evidence,
             sort_keys=True,
