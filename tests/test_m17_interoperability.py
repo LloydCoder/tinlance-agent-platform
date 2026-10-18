@@ -143,6 +143,20 @@ def test_remote_delegation_is_attenuated_and_expires() -> None:
     )
     assert delegation.capabilities == frozenset({"documents:read"})
     assert delegation.audience == str(remote)
+    with pytest.raises(PermissionError, match="tenant"):
+        delegation.validate(
+            expected_tenant_id="tenant-b",
+            expected_issuer_id=parent,
+            expected_audience=str(remote),
+            now=issued + timedelta(seconds=1),
+        )
+    with pytest.raises(PermissionError, match="issuer"):
+        delegation.validate(
+            expected_tenant_id="tenant-a",
+            expected_issuer_id=remote,
+            expected_audience=str(remote),
+            now=issued + timedelta(seconds=1),
+        )
     with pytest.raises(PermissionError, match="audience"):
         replace(delegation, audience=str(parent)).validate(
             expected_tenant_id="tenant-a",
