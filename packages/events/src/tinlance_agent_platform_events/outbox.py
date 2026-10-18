@@ -55,7 +55,10 @@ def _prepare_event(event: Event) -> tuple[Event, CloudEventEnvelope]:
         raise ValueError("invalid event identity or timestamp")
     if len(event.payload) > 64:
         raise ValueError("event payload has too many fields")
-    if any(not isinstance(key, str) or not isinstance(value, str) for key, value in event.payload.items()):
+    if any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in event.payload.items()
+    ):
         raise ValueError("event payload keys and values must be strings")
     sensitive_markers = (
         "secret", "password", "token", "api_key", "private_key", "credential"
