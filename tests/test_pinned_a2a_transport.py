@@ -203,7 +203,7 @@ def test_transport_rejects_unsupported_protocol_and_media_type() -> None:
             protocol_version="0.9",
             content_type="application/a2a+json",
         )
-    with pytest.raises(ValueError, match="content-type"):
+    with pytest.raises(ValueError, match="requires application/a2a\\+json"):
         transport.post(
             "https://agent.example/a2a",
             ("93.184.216.34",),
