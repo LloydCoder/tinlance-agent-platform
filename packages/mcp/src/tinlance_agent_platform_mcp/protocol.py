@@ -260,7 +260,11 @@ def _matches_schema(
         undeclared = [key for key in value if key not in properties]
         if additional is False and undeclared:
             raise ValueError(f"{path} contains undeclared properties")
-        if additional is not False and additional is not True and not isinstance(additional, Mapping):
+        if (
+            additional is not False
+            and additional is not True
+            and not isinstance(additional, Mapping)
+        ):
             raise ValueError("declared additionalProperties schema is invalid")
         for key, nested in value.items():
             child_schema = properties.get(key)
@@ -323,7 +327,8 @@ class MCPProtocolService:
         try:
             if len(raw_body) > MAX_REQUEST_BYTES:
                 return self._http_error(413, "request_too_large")
-            if normalized.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+            content_type = normalized.get("content-type", "").split(";", 1)[0].strip().lower()
+            if content_type != "application/json":
                 return self._http_error(415, "json_required")
             _validate_origin(normalized.get("origin"), self._allowed_origins)
             if normalized.get("mcp-protocol-version") != MCP_PROTOCOL_VERSION:
