@@ -49,6 +49,17 @@ class QuotaReservationRequest:
 
     def __post_init__(self) -> None:
         for value, name in (
+            (self.tenant_id, "tenant_id"),
+            (self.agent_id, "agent_id"),
+            (self.run_id, "run_id"),
+        ):
+            if not isinstance(value, UUID):
+                raise TypeError(f"{name} must be a UUID")
+        if self.organization_id is not None and not isinstance(self.organization_id, UUID):
+            raise TypeError("organization_id must be a UUID or None")
+        if self.reservation_id is not None and not isinstance(self.reservation_id, UUID):
+            raise TypeError("reservation_id must be a UUID or None")
+        for value, name in (
             (self.action, "action"),
             (self.resource, "resource"),
             (self.idempotency_key, "idempotency_key"),
