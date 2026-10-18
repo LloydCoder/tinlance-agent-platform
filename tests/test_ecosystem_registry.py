@@ -439,3 +439,41 @@ def test_revoked_supply_chain_fails_closed_for_active_services():
             schema_version="registry-manifest/v2",
             repository_metadata=metadata,
         ).validate()
+
+
+def test_deprecated_resource_replacement_must_resolve_to_an_active_resource():
+    metadata = v2_repository_metadata()
+    developer = metadata["developer"]
+    metadata["developer"] = RepositoryMetadata(
+        developer.publisher,
+        LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T06:52:00Z",
+            reason="superseded",
+            replacement_id="missing.repository",
+        ),
+        developer.supply_chain,
+    )
+    with pytest.raises(ValueError, match="deprecated repository replacement must be active"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=metadata,
+        ).validate()
+
+    contracts = list(CONTRACTS)
+    v1_index = next(i for i, item in enumerate(contracts) if item.contract_id == "registry-manifest.v1")
+    contracts[v1_index] = replace(
+        contracts[v1_index],
+        lifecycle=LifecycleMetadata(
+            LifecycleState.DEPRECATED,
+            "2026-10-18T06:52:00Z",
+            reason="superseded",
+            replacement_id="missing.contract",
+        ),
+    )
+    with pytest.raises(ValueError, match="deprecated contract replacement must be active"):
+        valid_snapshot(
+            schema_version="registry-manifest/v2",
+            repository_metadata=v2_repository_metadata(),
+            contracts=tuple(contracts),
+        ).validate()
