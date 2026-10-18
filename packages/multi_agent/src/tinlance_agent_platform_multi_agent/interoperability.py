@@ -11,6 +11,7 @@ import http.client
 import ipaddress
 import json
 import math
+import re
 import socket
 import ssl
 from collections.abc import Callable, Iterable, Mapping
