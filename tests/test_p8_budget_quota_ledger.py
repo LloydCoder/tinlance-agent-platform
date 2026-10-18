@@ -246,3 +246,39 @@ def test_budget_state_is_not_consumed_when_quota_settlement_fails() -> None:
         service.consume(reservation, elapsed_seconds=1.0)
     assert service.budget.consumed_tool_calls == 0
     assert reservation.reservation_id in service._reservations
+
+
+def test_quota_ledger_rejects_unbounded_or_free_form_evidence() -> None:
+    ledger = PostgresQuotaLedger(Connection())
+    with pytest.raises(ValueError, match="unsupported fields"):
+        ledger.settle(
+            tenant_id=TENANT_ID,
+            reservation_id=uuid4(),
+            actual=QuotaSettlement(1, 1, 1.0, {"reason": "raw user prompt"}),
+        )
+    with pytest.raises(ValueError, match="reason code"):
+        ledger.release(
+            tenant_id=TENANT_ID,
+            reservation_id=uuid4(),
+            reason="raw prompt or secret value",
+        )
+    with pytest.raises(ValueError, match="normalized reason code"):
+        ledger.settle(
+            tenant_id=TENANT_ID,
+            reservation_id=uuid4(),
+            actual=QuotaSettlement(
+                1, 1, 1.0, {"cancellation_reason": "raw prompt or secret value"}
+            ),
+        )
+
+
+def test_quota_ledger_rejects_oversized_scope_values() -> None:
+    with pytest.raises(ValueError, match="maximum length"):
+        QuotaReservationRequest(
+            tenant_id=TENANT_ID,
+            agent_id=AGENT_ID,
+            run_id=RUN_ID,
+            action="x" * 257,
+            resource="resource:one",
+            idempotency_key="p8-reservation-key-0001",
+        )
