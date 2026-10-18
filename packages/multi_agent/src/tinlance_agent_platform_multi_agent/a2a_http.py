@@ -87,6 +87,11 @@ def _traceparent(value: str | None) -> str | None:
     return value
 
 
+def _request_fingerprint(tenant_id: str, subject_id: str, request_id: str) -> str:
+    source = f"{tenant_id}:{subject_id}:{request_id}".encode()
+    return hashlib.sha256(source).hexdigest()[:32]
+
+
 def _request_id(value: object) -> str:
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         raise ValueError("JSON-RPC request id must be a string or integer")
@@ -295,9 +300,9 @@ class A2AProtocolService:
                     NAMESPACE_URL,
                     f"tinlance-a2a:{principal.tenant_id}:{principal.subject_id}:{normalized_id}",
                 )
-                fingerprint = hashlib.sha256(
-                    f"{principal.tenant_id}:{principal.subject_id}:{normalized_id}".encode()
-                ).hexdigest()[:32]
+                fingerprint = _request_fingerprint(
+                    principal.tenant_id, principal.subject_id, normalized_id
+                )
                 key = normalized.get("idempotency-key") or f"a2a-{fingerprint}"
                 if len(key) < 16 or len(key) > 256 or not key.isascii() or any(
                     ord(char) < 33 or ord(char) > 126 for char in key
@@ -327,7 +332,9 @@ class A2AProtocolService:
                 try:
                     UUID(run_id)
                 except ValueError:
-                    return self._rpc_error(request_id, -32603, "Platform returned an invalid run ID")
+                    return self._rpc_error(
+                        request_id, -32603, "Platform returned an invalid run ID"
+                    )
                 task: dict[str, object] = {
                     "kind": "task",
                     "id": run_id,
@@ -344,21 +351,25 @@ class A2AProtocolService:
                 try:
                     task_id = str(UUID(task_id_value))
                 except ValueError:
-                    return self._rpc_error(request_id, -32602, "task id must be a Platform run UUID")
+                    return self._rpc_error(
+                        request_id, -32602, "task id must be a Platform run UUID"
+                    )
                 response = self._api.dispatch(
                     A2APlatformRequest(
                         principal.tenant_id,
                         principal.subject_id,
                         "runs.events",
                         {"run_id": task_id},
-                        f"a2a-{hashlib.sha256(f'{principal.tenant_id}:{principal.subject_id}:{normalized_id}'.encode()).hexdigest()[:32]}",
+                        f"a2a-{_request_fingerprint(principal.tenant_id, principal.subject_id, normalized_id)}",
                         _traceparent(normalized.get("traceparent")),
                         None,
                         principal,
                     )
                 )
                 if response.status.casefold() not in {"ok", "success"}:
-                    return self._rpc_error(request_id, -32603, "Platform could not retrieve task events")
+                    return self._rpc_error(
+                        request_id, -32603, "Platform could not retrieve task events"
+                    )
                 task: dict[str, object] = {
                     "kind": "task",
                     "id": task_id,
