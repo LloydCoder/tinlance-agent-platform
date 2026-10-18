@@ -143,6 +143,52 @@ begin
         raise exception 'duplicate release was not idempotent';
     end if;
 
+    begin
+        perform platform.release_quota(
+            '00000000-0000-0000-0000-000000000071', second_id,
+            'different-release-reason', '{"provider":"unit-test"}'::jsonb
+        );
+        raise exception 'conflicting duplicate release was accepted';
+    exception when unique_violation then
+        null;
+    end;
+
+    begin
+        insert into platform.quota_ledger (
+            ledger_id, tenant_id, organization_id, reservation_id, run_id, event_type,
+            tool_calls, token_units, cost_units, idempotency_key, evidence
+        ) values (
+            '70000000-0000-0000-0000-000000000071',
+            '00000000-0000-0000-0000-000000000071',
+            '40000000-0000-0000-0000-000000000071', first_id,
+            '30000000-0000-0000-0000-000000000071', 'overrun',
+            0, 0, 0, 'p8-direct-insert-key-0001', '{"prompt":"raw content"}'::jsonb
+        );
+        raise exception 'ledger accepted non-allow-listed evidence';
+    exception when check_violation then
+        null;
+    end;
+
+    begin
+        update platform.organization_budget_limits
+           set max_cost_units = 'NaN'::numeric
+         where tenant_id = '00000000-0000-0000-0000-000000000071'
+           and organization_id = '40000000-0000-0000-0000-000000000071';
+        raise exception 'organization limit accepted NaN';
+    exception when check_violation then
+        null;
+    end;
+
+    begin
+        update platform.quota_reservations
+           set actual_cost_units = 'NaN'::numeric
+         where tenant_id = '00000000-0000-0000-0000-000000000071'
+           and reservation_id = first_id;
+        raise exception 'settled reservation accepted NaN usage';
+    exception when check_violation then
+        null;
+    end;
+
     if (select count(*) from platform.quota_ledger where tenant_id = '00000000-0000-0000-0000-000000000071') <> 4 then
         raise exception 'expected exactly four append-only ledger facts';
     end if;
