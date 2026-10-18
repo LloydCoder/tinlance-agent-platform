@@ -344,6 +344,15 @@ class A2AProtocolService:
                     task["contextId"] = context_id
                 result: dict[str, object] = {"task": task}
             elif method == "tasks/get":
+                history_length = params.get("historyLength", 0)
+                if (
+                    isinstance(history_length, bool)
+                    or not isinstance(history_length, int)
+                    or not 0 <= history_length <= 100
+                ):
+                    return self._rpc_error(
+                        request_id, -32602, "historyLength must be an integer from 0 to 100"
+                    )
                 task_id_value = params.get("id")
                 if not isinstance(task_id_value, str):
                     return self._rpc_error(request_id, -32602, "tasks/get requires a task id")
@@ -372,11 +381,22 @@ class A2AProtocolService:
                     return self._rpc_error(
                         request_id, -32603, "Platform could not retrieve task events"
                     )
+                events = response.payload.get("events")
                 task: dict[str, object] = {
                     "kind": "task",
                     "id": task_id,
-                    "status": {"state": _status_from_events(response.payload.get("events"))},
+                    "status": {"state": _status_from_events(events)},
                 }
+                if history_length > 0 and isinstance(events, list):
+                    history = [
+                        dict(event_payload["message"])
+                        for event in events
+                        if isinstance(event, Mapping)
+                        and isinstance(event_payload := event.get("payload"), Mapping)
+                        and isinstance(event_payload.get("message"), Mapping)
+                    ]
+                    if history:
+                        task["history"] = history[-history_length:]
                 result = task
             else:
                 return self._rpc_error(request_id, -32601, "method not supported")
