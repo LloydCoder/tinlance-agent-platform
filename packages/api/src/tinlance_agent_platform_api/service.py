@@ -98,7 +98,10 @@ class AgentPlatformAPI:
 
         fingerprint = self._fingerprint(request)
         with self._idempotency_lock:
-            key = request.idempotency_key or request.request_id
+            caller_key = request.idempotency_key or request.request_id
+            # Idempotency is scoped to the authenticated tenant and principal.
+            # A caller-controlled key must not collide across tenants.
+            key = f"{request.tenant_id}:{request.subject_id}:{caller_key}"
             existing = self._idempotency.get(key)
             if existing is not None:
                 if existing[0] != fingerprint:
