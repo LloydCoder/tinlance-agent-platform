@@ -7,6 +7,8 @@ from types import MappingProxyType
 from typing import Any
 from uuid import UUID
 
+from .trace_context import TraceLineageContext
+
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
@@ -86,6 +88,7 @@ class RequestContext:
     principal: Principal
     environment: str
     trace_id: str | None = None
+    trace_context: TraceLineageContext | None = None
 
     def __post_init__(self) -> None:
         if not self.request_id or not self.tenant_id or not self.environment:
@@ -94,6 +97,12 @@ class RequestContext:
             raise ValueError("request context identifiers must be normalized")
         if self.principal.tenant_id != self.tenant_id:
             raise ValueError("principal and request context tenants must match")
+        if self.trace_context is not None and (
+            self.trace_context.tenant_id != self.tenant_id
+            or self.trace_context.request_id != self.request_id
+            or (self.trace_id is not None and self.trace_context.trace_id != self.trace_id)
+        ):
+            raise ValueError("request and trace context lineage must match")
 
     def assert_tenant(self, tenant_id: str) -> None:
         if self.tenant_id != tenant_id:
@@ -159,6 +168,7 @@ class PolicyDecision:
     reason: str
     risk: RiskTier
     requires_approval: bool = False
+    trace_context: TraceLineageContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +180,7 @@ class EvidenceRef:
     source: str
     provenance: str
     classification: DataClass
+    trace_context: TraceLineageContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
