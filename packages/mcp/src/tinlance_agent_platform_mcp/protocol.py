@@ -160,12 +160,13 @@ def _validate_request_meta(params: Mapping[str, object], header_version: str) ->
     if not isinstance(body_version, str) or body_version != header_version:
         raise ValueError("MCP protocol version header and request metadata must match")
     client_info = metadata.get("io.modelcontextprotocol/clientInfo")
-    if not isinstance(client_info, Mapping):
-        raise ValueError("MCP request requires client identity metadata")
-    for key in ("name", "version"):
-        value = client_info.get(key)
-        if not isinstance(value, str) or not value or value != value.strip():
-            raise ValueError("MCP client identity fields must be normalized non-empty strings")
+    if client_info is not None:
+        if not isinstance(client_info, Mapping):
+            raise ValueError("MCP client identity metadata must be an object when supplied")
+        for key in ("name", "version"):
+            value = client_info.get(key)
+            if not isinstance(value, str) or not value or value != value.strip():
+                raise ValueError("MCP client identity fields must be normalized non-empty strings")
     capabilities = metadata.get("io.modelcontextprotocol/clientCapabilities")
     if not isinstance(capabilities, Mapping):
         raise ValueError("MCP request requires client capabilities metadata")
@@ -392,8 +393,20 @@ class MCPProtocolService:
                 return self._http_error(400, "invalid_jsonrpc_id")
             header_version = normalized.get("mcp-protocol-version")
             if header_version != MCP_PROTOCOL_VERSION:
-                return self._rpc_http_error(
-                    400, request_id, -32600, "UnsupportedProtocolVersionError"
+                return self._json_response(
+                    400,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32022,
+                            "message": "UnsupportedProtocolVersion",
+                            "data": {
+                                "supported": [MCP_PROTOCOL_VERSION],
+                                "requested": header_version,
+                            },
+                        },
+                    },
                 )
             method = body.get("method")
             params = body.get("params", {})
@@ -406,15 +419,16 @@ class MCPProtocolService:
                 else None
             )
             if body_version != header_version:
-                return self._rpc_http_error(400, request_id, -32600, "HeaderMismatch")
+                return self._rpc_http_error(400, request_id, -32020, "HeaderMismatch")
             if not isinstance(method, str) or normalized.get("mcp-method") != method:
                 return self._rpc_http_error(400, request_id, -32600, "HeaderMismatch")
             _validate_request_meta(params, header_version)
             if method == "server/discover":
                 result: dict[str, object] = {
-                    "protocolVersion": MCP_PROTOCOL_VERSION,
-                    "serverInfo": {"name": self._server_name, "version": self._server_version},
+                    "supportedVersions": [MCP_PROTOCOL_VERSION],
                     "capabilities": {"tools": {}},
+                    "ttlMs": self._list_ttl_ms,
+                    "cacheScope": "private",
                 }
             elif method == "tools/list":
                 result = {
@@ -439,7 +453,7 @@ class MCPProtocolService:
             elif method == "tools/call":
                 name = params.get("name")
                 if not isinstance(name, str) or normalized.get("mcp-name") != name:
-                    return self._rpc_http_error(400, request_id, -32602, "HeaderMismatch")
+                    return self._rpc_http_error(400, request_id, -32020, "HeaderMismatch")
                 tool = self._tools.get(name)
                 if tool is None:
                     return self._rpc_error(request_id, -32601, "tool not found")
@@ -502,7 +516,11 @@ class MCPProtocolService:
                 return self._rpc_error(request_id, -32601, "method not supported")
             return self._json_response(
                 200,
-                {"jsonrpc": "2.0", "id": request_id, "result": result},
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": self._decorate_result(result),
+                },
             )
         except PermissionError as exc:
             status = getattr(exc, "http_status", 403)
@@ -518,6 +536,18 @@ class MCPProtocolService:
             return self._http_error(safe_status, safe_code)
         except Exception:
             return self._http_error(500, "platform_error")
+
+    def _decorate_result(self, value: dict[str, object]) -> dict[str, object]:
+        result = dict(value)
+        result.setdefault("resultType", "complete")
+        metadata = result.get("_meta")
+        result_metadata = dict(metadata) if isinstance(metadata, Mapping) else {}
+        result_metadata.setdefault(
+            "io.modelcontextprotocol/serverInfo",
+            {"name": self._server_name, "version": self._server_version},
+        )
+        result["_meta"] = result_metadata
+        return result
 
     @staticmethod
     def _json_response(status_code: int, body: Mapping[str, object]) -> MCPHTTPResponse:
