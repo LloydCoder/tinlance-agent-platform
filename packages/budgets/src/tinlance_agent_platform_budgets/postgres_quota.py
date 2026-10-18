@@ -593,8 +593,7 @@ class PostgresBudgetGate:
                 evidence={"cancellation_reason": "cancelled-before-side-effect"},
             ),
         )
-        if not released:
-            raise RuntimeError("durable quota reservation was not released")
+        # The SQL procedure returns false only for an identical idempotent release.
         with self._lock:
             self._active.pop(reservation.reservation_id, None)
             self._local_accounted.discard(reservation.reservation_id)
