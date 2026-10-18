@@ -77,6 +77,8 @@ class TenantQuotaService:
         cost_units: float = 0.0,
     ) -> TenantReservation:
         values = (reservation_id, tenant_id, agent_id, run_id, action, resource)
+        if any(not isinstance(value, str) for value in values):
+            raise TypeError("quota reservation scope fields must be strings")
         if any(not value or value != value.strip() for value in values):
             raise ValueError("quota reservation scope is required and normalized")
         if any(len(value) > 256 for value in values):
