@@ -205,9 +205,7 @@ class PostgresOutboxPublisher:
             ).fetchone()
         return bool(row and row[0] is True)
 
-    def _release(
-        self, outbox_id: UUID | str, lease_token: UUID | str, error_code: str
-    ) -> bool:
+    def _release(self, outbox_id: UUID | str, lease_token: UUID | str, error_code: str) -> bool:
         with self._transaction() as connection:
             row = connection.execute(
                 "SELECT platform.release_outbox(%s, %s, %s, %s)",
