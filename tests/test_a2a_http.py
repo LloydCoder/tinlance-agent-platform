@@ -152,8 +152,12 @@ def test_a2a_tasks_get_reenters_platform_and_returns_task_snapshot() -> None:
 def test_a2a_rejects_bad_auth_version_origin_and_non_text_parts() -> None:
     service, _, _, _, _ = make_service()
     body = request("message/send", {"message": message()})
-    assert service.handle(headers("message/send", authorization="Bearer invalid"), body).status_code == 401
-    assert service.handle(headers("message/send", **{"a2a-version": "9.9"}), body).status_code == 400
+    unauthorized = service.handle(
+        headers("message/send", authorization="Bearer invalid"), body
+    )
+    assert unauthorized.status_code == 401
+    unsupported = service.handle(headers("message/send", **{"a2a-version": "9.9"}), body)
+    assert unsupported.status_code == 400
     assert service.handle(
         headers("message/send", origin="https://evil.example.test"), body
     ).status_code == 403
@@ -164,7 +168,10 @@ def test_a2a_rejects_bad_auth_version_origin_and_non_text_parts() -> None:
             "parts": [{"kind": "file", "file": {"uri": "https://example.test/secret"}}],
         }
     }
-    assert service.handle(headers("message/send"), request("message/send", invalid_message)).status_code == 400
+    invalid_parts = service.handle(
+        headers("message/send"), request("message/send", invalid_message)
+    )
+    assert invalid_parts.status_code == 400
 
 
 def test_a2a_requires_rate_limit_and_rejects_duplicate_json_keys() -> None:
