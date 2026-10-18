@@ -42,6 +42,7 @@ declare
     v_reservation_id uuid := '50000000-0000-0000-0000-000000000091';
     v_second_id uuid := '60000000-0000-0000-0000-000000000091';
     lease_expiry timestamptz;
+    first_lease_expiry timestamptz;
     recovery_count integer;
 begin
     perform platform.reserve_quota(
@@ -56,15 +57,16 @@ begin
     lease_expiry := platform.renew_quota_reservation(
         '00000000-0000-0000-0000-000000000091', v_reservation_id, 600
     );
-    if lease_expiry <= now() then
+    if lease_expiry <= clock_timestamp() then
         raise exception 'renewal did not extend the reservation lease';
     end if;
+    first_lease_expiry := lease_expiry;
 
     lease_expiry := platform.renew_quota_reservation(
         '00000000-0000-0000-0000-000000000091', v_reservation_id, 900
     );
-    if lease_expiry <= now() then
-        raise exception 'second renewal did not extend the reservation lease';
+    if lease_expiry <= first_lease_expiry then
+        raise exception 'second renewal did not advance the wall-clock lease';
     end if;
     if (
         select count(*) from platform.quota_ledger
