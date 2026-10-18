@@ -7,7 +7,6 @@ read from environment variables or included in exception messages.
 from __future__ import annotations
 
 import json
-import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -16,7 +15,6 @@ from urllib.parse import urlsplit
 
 from .gateway import ModelRequest, ModelResponse
 
-_TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 _RETRYABLE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -89,10 +87,6 @@ class OpenAICompatibleProvider:
             raise ValueError("provider timeout and response limit must be positive")
 
     def complete(self, request: ModelRequest) -> ModelResponse:
-        if request.trace_id is not None and (
-            not _TRACE_ID.fullmatch(request.trace_id) or set(request.trace_id) == {"0"}
-        ):
-            raise ValueError("trace_id must be a valid non-zero W3C trace identifier")
         try:
             token = self.credential_provider.token()
         except Exception as exc:
@@ -121,8 +115,8 @@ class OpenAICompatibleProvider:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
         }
-        if request.trace_id is not None:
-            headers["X-Tinlance-Trace-ID"] = request.trace_id
+        if request.traceparent is not None:
+            headers["traceparent"] = request.traceparent
         http_request = urllib.request.Request(
             self.endpoint, data=body, headers=headers, method="POST"
         )
@@ -172,7 +166,11 @@ class OpenAICompatibleProvider:
         if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
             raise ModelProviderError("provider response is missing a valid choice")
         message = choices[0].get("message")
-        if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+        if (
+            not isinstance(message, dict)
+            or not isinstance(message.get("content"), str)
+            or not message["content"]
+        ):
             raise ModelProviderError("provider response is missing text content")
         if not isinstance(usage, dict):
             raise ModelProviderError("provider usage must be an object")
