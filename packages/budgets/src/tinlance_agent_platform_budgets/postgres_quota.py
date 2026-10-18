@@ -413,6 +413,10 @@ class PostgresBudgetGate:
         self._active: dict[UUID, PostgresBudgetReservation] = {}
         self._pending: set[UUID] = set()
         self._local_accounted: set[UUID] = set()
+        # Keep the exact measured settlement across transient persistence failures.
+        # Retrying must not remeasure a completed side effect and produce conflicting evidence.
+        self._pending_settlements: dict[UUID, QuotaSettlement] = {}
+        self._settlement_inflight: set[UUID] = set()
         self._lock = RLock()
 
     def _transaction(
@@ -512,29 +516,39 @@ class PostgresBudgetGate:
             raise
 
     def consume(self, reservation: PostgresBudgetReservation, elapsed_seconds: float) -> None:
+        reservation_id = reservation.reservation_id
         with self._lock:
-            current = self._active.get(reservation.reservation_id)
+            current = self._active.get(reservation_id)
             if current != reservation:
                 raise KeyError("durable budget reservation is not active")
+            if reservation_id in self._settlement_inflight:
+                raise RuntimeError("durable budget settlement is already in progress")
+            self._settlement_inflight.add(reservation_id)
+            actual = self._pending_settlements.get(reservation_id)
         try:
-            actual = self._measure_usage(
-                reservation.scope,
-                reservation.reservation_id,
-                elapsed_seconds,
-            )
-            if not isinstance(actual, QuotaSettlement):
-                raise TypeError("Platform usage meter must return QuotaSettlement")
+            if actual is None:
+                actual = self._measure_usage(
+                    reservation.scope,
+                    reservation_id,
+                    elapsed_seconds,
+                )
+                if not isinstance(actual, QuotaSettlement):
+                    raise TypeError("Platform usage meter must return QuotaSettlement")
+                # Save the immutable measurement before attempting persistence.
+                # A retry after a DB failure reuses this exact payload/evidence.
+                with self._lock:
+                    self._pending_settlements[reservation_id] = actual
             status = self._transaction(
                 reservation.tenant_id,
                 lambda ledger: ledger.settle(
                     tenant_id=reservation.tenant_id,
-                    reservation_id=reservation.reservation_id,
+                    reservation_id=reservation_id,
                     actual=actual,
                 ),
             )
         except Exception:
             # The external side effect has already run. Record local measured
-            # usage, but leave the durable reservation for reconciliation.
+            # usage once, but leave the durable reservation for reconciliation.
             try:
                 self._run_budget.consume_measured(
                     reservation.local_reservation,
@@ -544,12 +558,16 @@ class PostgresBudgetGate:
                 pass
             else:
                 with self._lock:
-                    self._local_accounted.add(reservation.reservation_id)
+                    self._local_accounted.add(reservation_id)
             raise
+        finally:
+            with self._lock:
+                self._settlement_inflight.discard(reservation_id)
         with self._lock:
             already_accounted = reservation.reservation_id in self._local_accounted
             self._active.pop(reservation.reservation_id, None)
             self._local_accounted.discard(reservation.reservation_id)
+            self._pending_settlements.pop(reservation.reservation_id, None)
         runtime_overrun = elapsed_seconds > reservation.local_reservation.seconds
         if not already_accounted:
             try:
@@ -580,6 +598,7 @@ class PostgresBudgetGate:
             if current is None:
                 # Idempotent local cleanup after a confirmed settlement/release.
                 self._local_accounted.discard(reservation.reservation_id)
+                self._pending_settlements.pop(reservation.reservation_id, None)
                 self._run_budget.release(reservation.local_reservation)
                 return
             if current != reservation:
@@ -597,6 +616,7 @@ class PostgresBudgetGate:
         with self._lock:
             self._active.pop(reservation.reservation_id, None)
             self._local_accounted.discard(reservation.reservation_id)
+            self._pending_settlements.pop(reservation.reservation_id, None)
         # Only refund local run budget after the durable release commits.
         with suppress(Exception):
             self._run_budget.release(reservation.local_reservation)
