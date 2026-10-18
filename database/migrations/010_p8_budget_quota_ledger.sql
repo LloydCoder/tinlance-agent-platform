@@ -159,6 +159,9 @@ drop trigger if exists quota_ledger_append_only on platform.quota_ledger;
 create trigger quota_ledger_append_only
 before update or delete on platform.quota_ledger
 for each row execute function platform.reject_quota_ledger_mutation();
+create trigger quota_ledger_no_truncate
+before truncate on platform.quota_ledger
+for each statement execute function platform.reject_quota_ledger_mutation();
 
 -- Usage evidence is deliberately metadata-only; arbitrary prompts, payloads,
 -- credentials and nested provider responses must never be copied into the ledger.
