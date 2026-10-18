@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -495,7 +496,7 @@ def test_postgres_budget_gate_commits_tenant_scoped_reservation_and_settlement()
     assert "platform.reserve_quota" in reserve_connection.queries[1][0]
     assert "set_config('platform.tenant_id'" in settle_connection.queries[0][0]
     assert "platform.settle_quota" in settle_connection.queries[1][0]
-    evidence = __import__("json").loads(settle_connection.queries[1][1][-1])
+    evidence = json.loads(settle_connection.queries[1][1][-1])
     assert evidence["provider"] == "unit-test"
     assert evidence["model"] == "model-v1"
     assert evidence["price_book_version"] == "pricebook-v1"
@@ -571,3 +572,25 @@ def test_postgres_budget_gate_requires_idempotency_and_trusted_usage_callbacks()
         QuotaUsageEstimate(
             1, 1, 0.1, "provider", "model", "not a normalized price book"
         )
+
+
+def test_postgres_budget_gate_raises_confirmed_overrun_only_after_commit() -> None:
+    reservation_id = UUID("30000000-0000-0000-0000-000000000073")
+    reserve_connection = ManagedConnection(reserve_result=reservation_id)
+    settle_connection = ManagedConnection(result="overrun")
+    connections = iter((reserve_connection, settle_connection))
+    gate = PostgresBudgetGate(
+        lambda: next(connections),
+        estimate_usage=_usage_estimate,
+        measure_usage=_measured_usage,
+        resolve_organization=lambda scope: None,
+    )
+    reservation = gate.reserve_scoped(
+        _durable_scope(),
+        tool_calls=1,
+        seconds=10.0,
+        idempotency_key="p8-budget-idempotency-0003",
+    )
+    with pytest.raises(QuotaOverrunError, match="overrun was recorded"):
+        gate.consume(reservation, elapsed_seconds=2.0)
+    assert settle_connection.committed is True
