@@ -102,6 +102,9 @@ Those require environment-level evidence and load/failure testing.
 ## P8 exit gate
 
 - [ ] SQL migration validates against the supported PostgreSQL version.
+- [ ] The governed execution service can inject `PostgresBudgetGate` with
+  a real connection factory, trusted organization resolver, cost estimator and
+  measured-usage provider; no database transaction spans tool execution.
 - [ ] Tenant and organization reservation races are tested against PostgreSQL,
   not only a mocked connection or in-process lock.
 - [ ] RLS, role grants, idempotency conflicts, settlement replay, overrun,
