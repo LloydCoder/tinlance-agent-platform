@@ -199,21 +199,16 @@ def test_model_routing_request_rejects_invalid_risk_budget_and_context(
 
 
 def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
-    denied = ModelRouter(
-        lambda _decision: None, lambda _route: False, lambda _request: True
-    )
+    denied = ModelRouter(lambda _decision: None, lambda _route: False, lambda _request: True)
     with pytest.raises(PermissionError, match="not registered"):
         denied.register(route("unregistered", "provider-a"))
 
     def registry_outage(_route: ModelRoute) -> bool:
         raise OSError("registry unavailable")
 
-    unavailable = ModelRouter(
-        lambda _decision: None, registry_outage, lambda _request: True
-    )
+    unavailable = ModelRouter(lambda _decision: None, registry_outage, lambda _request: True)
     with pytest.raises(RuntimeError, match="failing closed"):
         unavailable.register(route("unverified", "provider-a"))
-
 
 @pytest.mark.parametrize(
     ("route_kwargs", "request_kwargs"),
