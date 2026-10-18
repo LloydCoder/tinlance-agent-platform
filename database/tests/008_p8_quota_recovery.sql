@@ -40,6 +40,7 @@ select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000091', 
 do $$
 declare
     v_reservation_id uuid := '50000000-0000-0000-0000-000000000091';
+    v_second_id uuid := '60000000-0000-0000-0000-000000000091';
     lease_expiry timestamptz;
     recovery_count integer;
 begin
@@ -135,6 +136,53 @@ begin
         '{"provider":"recovery-test","measurement_ref":"usage:recovered-091"}'::jsonb
     ) not in ('settled', 'overrun') then
         raise exception 'reconciliation could not settle measured usage';
+    end if;
+
+    perform platform.reserve_quota(
+        v_second_id,
+        '00000000-0000-0000-0000-000000000091',
+        null,
+        '10000000-0000-0000-0000-000000000091',
+        '30000000-0000-0000-0000-000000000091',
+        'read', 'resource:recovery-two', 'p8-recovery-idempotency-003', 1, 1, 10, 1.0
+    );
+    update platform.quota_reservations
+       set lease_expires_at = now() - interval '1 second'
+     where tenant_id = '00000000-0000-0000-0000-000000000091'
+       and quota_reservations.reservation_id = v_second_id;
+    if platform.request_expired_quota_reconciliation(
+        '00000000-0000-0000-0000-000000000091', 10
+    ) <> 1 then
+        raise exception 'second expired reservation did not enter reconciliation';
+    end if;
+
+    begin
+        perform platform.release_quota(
+            '00000000-0000-0000-0000-000000000091',
+            v_second_id,
+            'cancelled-before-side-effect',
+            '{"measurement_ref":"recovery:review-002","source_event_id":"recovery-review-002"}'::jsonb
+        );
+        raise exception 'recovery reservation was released without explicit no-side-effect confirmation';
+    exception when object_not_in_prerequisite_state then
+        null;
+    end;
+
+    if platform.release_quota(
+        '00000000-0000-0000-0000-000000000091',
+        v_second_id,
+        'confirmed-no-side-effect',
+        '{"measurement_ref":"recovery:review-002","source_event_id":"recovery-review-002"}'::jsonb
+    ) is not true then
+        raise exception 'explicit no-side-effect reconciliation did not release reservation';
+    end if;
+    if platform.release_quota(
+        '00000000-0000-0000-0000-000000000091',
+        v_second_id,
+        'confirmed-no-side-effect',
+        '{"measurement_ref":"recovery:review-002","source_event_id":"recovery-review-002"}'::jsonb
+    ) is not false then
+        raise exception 'reconciled release replay was not idempotent';
     end if;
 end
 $$;
