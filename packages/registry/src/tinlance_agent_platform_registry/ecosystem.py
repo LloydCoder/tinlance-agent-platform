@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
+from urllib.parse import urlsplit
 
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -22,12 +24,100 @@ class AuthorityMode(StrEnum):
     DELEGATED_ONLY = "delegated_only"
 
 
+class LifecycleState(StrEnum):
+    ACTIVE = "active"
+    QUARANTINED = "quarantined"
+    REVOKED = "revoked"
+    DEPRECATED = "deprecated"
+
+
+class IdentityStatus(StrEnum):
+    VERIFIED = "verified"
+    UNVERIFIED = "unverified"
+    REVOKED = "revoked"
+
+
+class SupplyChainStatus(StrEnum):
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REVOKED = "revoked"
+
+
+@dataclass(frozen=True, slots=True)
+class LifecycleMetadata:
+    state: LifecycleState
+    changed_at: str
+    reason: str | None = None
+    replacement_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.changed_at.strip():
+            raise ValueError("lifecycle changed_at is required")
+        try:
+            parsed = datetime.fromisoformat(self.changed_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("lifecycle changed_at must be an RFC 3339 timestamp") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("lifecycle changed_at must include a timezone")
+        if self.state in {LifecycleState.QUARANTINED, LifecycleState.REVOKED, LifecycleState.DEPRECATED}:
+            if not self.reason or not self.reason.strip():
+                raise ValueError("quarantined, revoked and deprecated resources require a reason")
+        if self.state is LifecycleState.DEPRECATED:
+            if not self.replacement_id or not self.replacement_id.strip():
+                raise ValueError("deprecated resources require a replacement ID")
+        elif self.replacement_id is not None:
+            raise ValueError("only deprecated resources may declare a replacement ID")
+
+
+@dataclass(frozen=True, slots=True)
+class PublisherIdentity:
+    publisher_id: str
+    identity_uri: str
+    identity_status: IdentityStatus
+
+    def __post_init__(self) -> None:
+        if not self.publisher_id.strip():
+            raise ValueError("publisher identity is required")
+        parsed = urlsplit(self.identity_uri)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+            raise ValueError("publisher identity URI must be credential-free HTTPS")
+
+
+@dataclass(frozen=True, slots=True)
+class SupplyChainReferences:
+    reviewed_sha: str
+    provenance_uri: str
+    sbom_uri: str
+    signature_uri: str
+    verification_status: SupplyChainStatus
+
+    def __post_init__(self) -> None:
+        if not _FULL_SHA.fullmatch(self.reviewed_sha):
+            raise ValueError("supply-chain reviewed revision must be a full immutable commit SHA")
+        for value, label in (
+            (self.provenance_uri, "provenance"),
+            (self.sbom_uri, "SBOM"),
+            (self.signature_uri, "signature"),
+        ):
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError(f"{label} reference must be credential-free HTTPS")
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryMetadata:
+    publisher: PublisherIdentity
+    lifecycle: LifecycleMetadata
+    supply_chain: SupplyChainReferences
+
+
 @dataclass(frozen=True, slots=True)
 class ContractRegistration:
     contract_id: str
     version: str
     owner_repository_id: str
     immutable: bool = True
+    lifecycle: LifecycleMetadata | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -47,6 +137,7 @@ class ServiceRegistration:
     capabilities: tuple[str, ...]
     authority_mode: AuthorityMode
     enabled: bool = True
+    lifecycle: LifecycleMetadata | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -75,6 +166,7 @@ class AgentRegistration:
     capabilities: tuple[str, ...]
     required_contracts: tuple[tuple[str, str], ...]
     authority_mode: AuthorityMode = AuthorityMode.DELEGATED_ONLY
+    lifecycle: LifecycleMetadata | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -125,6 +217,8 @@ class EcosystemRegistrySnapshot:
     compatibility_rules: tuple[CompatibilityRule, ...]
     required_service_ids: frozenset[str]
     required_agent_ids: frozenset[str]
+    schema_version: str = "registry-manifest/v1"
+    repository_metadata: Mapping[str, RepositoryMetadata] = field(default_factory=dict)
 
     def validate(self) -> None:
         """Raise ValueError on any missing, stale, ambiguous or incompatible registration."""
@@ -151,6 +245,21 @@ class EcosystemRegistrySnapshot:
             if not _FULL_SHA.fullmatch(sha):
                 raise ValueError(f"{repository_id}: repository revision is not a full SHA")
 
+        if self.schema_version == "registry-manifest/v2":
+            if set(self.repository_metadata) != set(self.repository_revisions):
+                raise ValueError("v2 registry requires publisher, lifecycle and supply-chain metadata for every repository")
+            for repository_id, metadata in self.repository_metadata.items():
+                if metadata.supply_chain.reviewed_sha != self.repository_revisions[repository_id]:
+                    raise ValueError(f"{repository_id}: supply-chain revision differs from reviewed repository SHA")
+                if metadata.publisher.identity_status is IdentityStatus.REVOKED:
+                    raise ValueError(f"{repository_id}: revoked publisher identity fails closed")
+                if metadata.lifecycle.state is LifecycleState.REVOKED:
+                    raise ValueError(f"{repository_id}: revoked repository fails closed")
+                if metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
+                    raise ValueError(f"{repository_id}: revoked supply-chain attestation fails closed")
+        elif self.schema_version != "registry-manifest/v1":
+            raise ValueError("unsupported ecosystem registry schema version")
+
         platform_services = [
             service
             for service in self.services
@@ -163,8 +272,14 @@ class EcosystemRegistrySnapshot:
             self._validate_owner_revision(
                 service.owner_repository_id, service.reviewed_sha, service.service_id
             )
-            if not service.enabled:
-                raise ValueError(f"{service.service_id}: required service registration is disabled")
+            if service.lifecycle is not None and service.lifecycle.state is not LifecycleState.ACTIVE and service.enabled:
+                raise ValueError(f"{service.service_id}: non-active lifecycle state must fail closed")
+            if not service.enabled and (service.lifecycle is None or service.lifecycle.state is LifecycleState.ACTIVE):
+                raise ValueError(f"{service.service_id}: required active service registration is disabled")
+            if self.schema_version == "registry-manifest/v2":
+                owner_metadata = self.repository_metadata[service.owner_repository_id]
+                if owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
+                    raise ValueError(f"{service.service_id}: owner repository is not active")
             if service.owner_repository_id != "platform" and service.authority_mode not in {
                 AuthorityMode.AUTHORITY_FREE,
                 AuthorityMode.CONFORMANCE_ONLY,
@@ -178,6 +293,10 @@ class EcosystemRegistrySnapshot:
             self._validate_owner_revision(
                 agent.owner_repository_id, agent.reviewed_sha, agent.agent_id
             )
+            if agent.lifecycle is not None and agent.lifecycle.state is not LifecycleState.ACTIVE and agent.agent_id in self.required_agent_ids:
+                raise ValueError(f"{agent.agent_id}: required agent is not active")
+            if self.schema_version == "registry-manifest/v2" and self.repository_metadata[agent.owner_repository_id].lifecycle.state is not LifecycleState.ACTIVE:
+                raise ValueError(f"{agent.agent_id}: owner repository is not active")
             if agent.authority_mode not in {
                 AuthorityMode.DELEGATED_ONLY,
                 AuthorityMode.AUTHORITY_FREE,
@@ -232,8 +351,11 @@ class EcosystemRegistrySnapshot:
         if missing:
             raise ValueError(f"{consumer_id}: missing contract registrations {sorted(missing)}")
         for contract_id in contract_ids:
-            if not contracts[contract_id].immutable:
+            contract = contracts[contract_id]
+            if not contract.immutable:
                 raise ValueError(f"{consumer_id}: contract {contract_id} is not immutable")
+            if contract.lifecycle is not None and contract.lifecycle.state is not LifecycleState.ACTIVE:
+                raise ValueError(f"{consumer_id}: contract {contract_id} is not active")
 
 
 def _assert_unique(values: Iterable[object], label: str) -> None:
