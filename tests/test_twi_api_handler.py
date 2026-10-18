@@ -148,7 +148,7 @@ class TWIAPIHandlerTests(unittest.TestCase):
             tenant_id="tenant-a",
             subject_id="subject-a",
             operation="twi.jobs.create_search",
-            payload={"kind": "search", "query": "AI security", "limit": 5},
+            payload={"query": "AI security", "limit": 5},
             request_id="platform-twi-search-0001",
             trace_id="0123456789abcdef0123456789abcdef",
             idempotency_key="search-idempotency-0001",
