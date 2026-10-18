@@ -20,9 +20,12 @@ reimplement Platform admission policy.
   organization limits, reservation state, append-only cost ledger, RLS and
   transactional SQL procedures.
 - `tests/test_m13_4_budget_governance.py` and
-  `tests/test_p8_budget_quota_ledger.py`: scope binding, concurrency races,
-  replay/idempotency, capacity envelopes, finite-value validation and adapter
-  transaction ownership.
+  `tests/test_p8_budget_quota_ledger.py`: scope binding, in-process race
+  controls, replay/idempotency, capacity envelopes, finite-value validation
+  and adapter transaction ownership.
+- `database/tests/006_p8_quota_ledger.sql` and
+  `database/tests/007_p8_quota_concurrency.sql`: PostgreSQL reservation,
+  settlement, release, append-only evidence and concurrent admission checks.
 
 ## Required semantics
 
@@ -51,8 +54,9 @@ reimplement Platform admission policy.
 9. RLS and composite tenant foreign keys prevent cross-tenant access and
    cross-tenant agent/run/organization binding.
 10. Capacity gates compare measured throughput, p95/p99 latency and concurrency
-    to the declared envelope. Invalid, NaN, infinite and non-positive limits
-    fail closed.
+    to the declared envelope. Non-finite or negative measurements/limits fail
+    closed; maximum concurrency must be positive, while zero usage budgets are
+    valid deny-all limits.
 
 ## Production boundary
 
