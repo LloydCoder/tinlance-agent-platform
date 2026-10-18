@@ -128,7 +128,7 @@ def test_model_router_selects_deterministic_lowest_priority_eligible_route() -> 
 
 def test_model_router_fails_closed_for_tenant_risk_data_budget_and_availability() -> None:
     recorded = []
-    router = ModelRouter(recorded.append)
+    router = trusted_router(recorded.append)
     router.register(
         route(
             "restricted-route",
@@ -151,7 +151,7 @@ def test_model_router_fails_closed_for_tenant_risk_data_budget_and_availability(
 
 def test_model_router_does_not_select_unavailable_provider_or_disabled_route() -> None:
     recorded = []
-    router = ModelRouter(recorded.append)
+    router = trusted_router(recorded.append)
     router.register(route("disabled", "provider-a", enabled=False))
     router.register(route("offline", "provider-c", priority=1))
 
