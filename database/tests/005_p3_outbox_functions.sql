@@ -100,7 +100,7 @@ begin
     end if;
 
     select outbox_id, lease_token into dead_id, dead_lease
-      from platform.claim_outbox_batch(10, 30);
+      from platform.claim_outbox_batch(1, 30);
     if dead_id is null or dead_lease is null then
         raise exception 'expected second outbox record to be claimed';
     end if;
@@ -148,7 +148,7 @@ begin
     end if;
 
     select outbox_id, lease_token into stale_id, stale_lease
-      from platform.claim_outbox_batch(10, 1);
+      from platform.claim_outbox_batch(1, 1);
     if stale_id is null or stale_lease is null then
         raise exception 'expected third outbox record to be claimed';
     end if;
@@ -157,7 +157,7 @@ begin
         raise exception 'expired outbox lease unexpectedly acknowledged';
     end if;
     select lease_token into reclaimed_lease
-      from platform.claim_outbox_batch(10, 30)
+      from platform.claim_outbox_batch(1, 30)
      where outbox_id = stale_id;
     if reclaimed_lease is null or reclaimed_lease = stale_lease then
         raise exception 'expired outbox lease must be reissued with a new token';
