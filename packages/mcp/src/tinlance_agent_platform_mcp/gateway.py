@@ -12,6 +12,7 @@ from tinlance_agent_platform_contracts import (
     Decision,
     PolicyDecision,
     RequestContext,
+    RiskTier,
 )
 from tinlance_agent_platform_kernel import assert_authority_boundary
 from tinlance_agent_platform_policy import evaluate
