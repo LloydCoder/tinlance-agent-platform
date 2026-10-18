@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from typing import Any, NoReturn, Protocol
 from urllib.parse import urlsplit
 
+from tinlance_agent_platform_secrets import ScopedSecretBroker, ScopedSecretHandle
+
 from .gateway import ModelRequest, ModelResponse
 
 _RETRYABLE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
@@ -31,7 +33,7 @@ class ModelProviderError(RuntimeError):
 
 
 class ModelCredentialProvider(Protocol):
-    def token(self) -> str: ...
+    def token(self, request: ModelRequest) -> str: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,13 +46,47 @@ class StaticModelCredential:
         if (
             not self.value
             or self.value != self.value.strip()
-            or any(character.isspace() for character in self.value)
-            or any(character in self.value for character in "\r\n")
+            or len(self.value) > 8192
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in self.value)
         ):
             raise ValueError("model credential must be a normalized bearer token")
 
-    def token(self) -> str:
+    def token(self, request: ModelRequest | None = None) -> str:
         return self.value
+
+
+@dataclass(frozen=True, slots=True)
+class ScopedModelCredentialProvider:
+    """Resolve a model token only for the exact Platform execution scope."""
+
+    broker: ScopedSecretBroker = field(repr=False)
+    handle: ScopedSecretHandle = field(repr=False)
+
+    def token(self, request: ModelRequest) -> str:
+        if (
+            request.principal_id is None
+            or request.execution_id is None
+            or request.capability_id is None
+        ):
+            raise PermissionError("model request lacks execution-scoped credential context")
+        if (
+            request.tenant_id != self.handle.tenant_id
+            or request.principal_id != self.handle.principal_id
+            or request.agent_id != str(self.handle.agent_id)
+            or request.execution_id != self.handle.execution_id
+            or request.capability_id != self.handle.capability_id
+        ):
+            raise PermissionError("model credential scope does not match the request")
+        return self.broker.resolve_for_execution(
+            self.handle,
+            tenant_id=request.tenant_id,
+            principal_id=request.principal_id,
+            agent_id=self.handle.agent_id,
+            execution_id=request.execution_id,
+            capability_id=request.capability_id,
+            purpose=self.handle.purpose,
+            audience=self.handle.audience,
+        )
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -97,14 +133,17 @@ class OpenAICompatibleProvider:
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         try:
-            token = self.credential_provider.token()
+            token = self.credential_provider.token(request)
+        except PermissionError:
+            raise
         except Exception as exc:
             raise ModelProviderError("provider credential retrieval failed") from exc
         if (
             not isinstance(token, str)
             or not token
             or token != token.strip()
-            or any(character.isspace() for character in token)
+            or len(token) > 8192
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in token)
         ):
             raise ModelProviderError("provider credential is invalid")
 
