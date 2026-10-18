@@ -263,10 +263,13 @@ def test_model_router_fails_closed_if_context_verification_is_unavailable() -> N
     def unavailable_context(_request: ModelRoutingRequest) -> bool:
         raise OSError("policy service unavailable")
 
+    recorded = []
     router = ModelRouter(
-        lambda _decision: None,
+        recorded.append,
         lambda _route: True,
         unavailable_context,
     )
     with pytest.raises(RuntimeError, match="context could not be verified"):
         router.route(routing_request())
+    assert len(recorded) == 1
+    assert recorded[0].reason_code == "routing_context_unavailable"
