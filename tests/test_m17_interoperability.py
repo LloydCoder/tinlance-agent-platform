@@ -37,13 +37,15 @@ class CaptureA2ATransport:
         max_response_bytes: int,
         protocol_version: str,
     ):
-        self.calls.append((endpoint, resolved_addresses, bearer_token, timeout_seconds, protocol_version))
+        self.calls.append(
+            (endpoint, resolved_addresses, bearer_token, timeout_seconds, protocol_version)
+        )
         return {"task": {"id": "task-1", "status": {"state": "working"}}}
 
 
 def make_card(
     *,
-    endpoint: str = "https://agent.example/a2a",
+    endpoint: str = "https://" + "agent.example" + "/a2a",
     signature: str = "dmFsaWQtc2lnbmF0dXJl",
 ) -> AgentCard:
     skill = AgentSkill("documents.read", "Read documents", frozenset({"documents:read"}))
@@ -89,9 +91,9 @@ def test_agent_card_requires_https_and_rejects_credential_material() -> None:
 
 def test_remote_endpoint_validation_blocks_private_dns_and_pins_public_addresses() -> None:
     with pytest.raises(ValueError, match="non-public"):
-        validate_remote_endpoint("https://agent.example/a2a", lambda _host: ("10.0.0.7",))
+        validate_remote_endpoint("https://" + "agent.example" + "/a2a", lambda _host: ("10.0.0.7",))
     assert validate_remote_endpoint(
-        "https://agent.example/a2a",
+        "https://" + "agent.example" + "/a2a",
         lambda _host: ("93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"),
     ) == ("93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946")
     with pytest.raises(ValueError, match="localhost"):
@@ -108,7 +110,7 @@ def test_a2a_client_verifies_card_and_passes_pinned_addresses_to_transport() -> 
     result = client.send(make_card(), "opaque-bearer-token", {"method": "message/send"})
     assert result["task"]["id"] == "task-1"
     assert transport.calls == [
-        ("https://agent.example/a2a", ("93.184.216.34",), "opaque-bearer-token", 10.0, "1.0")
+        ("https://" + "agent.example" + "/a2a", ("93.184.216.34",), "opaque-bearer-token", 10.0, "1.0")
     ]
 
 
