@@ -166,9 +166,12 @@ def test_a2a_rejects_bad_auth_version_origin_and_non_text_parts() -> None:
     assert unauthorized.status_code == 401
     unsupported = service.handle(headers("message/send", **{"a2a-version": "9.9"}), body)
     assert unsupported.status_code == 400
-    assert service.handle(
-        headers("message/send", origin="https://evil.example.test"), body
-    ).status_code == 403
+    assert (
+        service.handle(
+            headers("message/send", origin="https://evil.example.test"), body
+        ).status_code
+        == 403
+    )
     invalid_message = {
         "message": {
             "messageId": "message-002",
@@ -184,9 +187,12 @@ def test_a2a_rejects_bad_auth_version_origin_and_non_text_parts() -> None:
 
 def test_a2a_requires_rate_limit_and_rejects_duplicate_json_keys() -> None:
     limited, _, _, _, _ = make_service(allowed=False)
-    assert limited.handle(
-        headers("message/send"), request("message/send", {"message": message()})
-    ).status_code == 429
+    assert (
+        limited.handle(
+            headers("message/send"), request("message/send", {"message": message()})
+        ).status_code
+        == 429
+    )
     service, _, _, _, _ = make_service()
     duplicate = b'{"jsonrpc":"2.0","id":"x","id":"y","method":"tasks/get","params":{"id":"x"}}'
     assert service.handle(headers("tasks/get"), duplicate).status_code == 400
