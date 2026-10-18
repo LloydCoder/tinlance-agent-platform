@@ -11,6 +11,7 @@ from hashlib import sha256
 from typing import Protocol, cast
 from urllib.parse import urlparse
 
+
 @dataclass(frozen=True, slots=True)
 class MCPPlatformRequest:
     tenant_id: str
