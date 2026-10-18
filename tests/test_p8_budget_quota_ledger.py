@@ -535,3 +535,30 @@ def test_postgres_budget_gate_requires_single_tenant_quota_authority() -> None:
             ),
             resolve_organization=lambda scope: None,
         )
+
+
+def test_postgres_budget_gate_accounts_runtime_overrun_without_refund() -> None:
+    reserve_connection = Connection()
+    settle_connection = Connection(result="settled")
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, settle_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=1.0)
+    with pytest.raises(TimeoutError, match="runtime exceeded"):
+        gate.consume(reservation, elapsed_seconds=2.0)
+    assert settle_connection.committed
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+
+def test_postgres_budget_gate_releases_only_pre_side_effect_reservations() -> None:
+    reserve_connection = Connection()
+    release_connection = Connection()
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, release_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    gate.release(reservation)
+    assert any("platform.release_quota" in query for query, _ in release_connection.queries)
+    assert release_connection.committed
+    assert budget.budget.consumed_tool_calls == 0
