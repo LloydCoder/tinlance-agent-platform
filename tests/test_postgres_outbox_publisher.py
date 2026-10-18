@@ -124,6 +124,7 @@ def test_publisher_claims_validates_publishes_and_acknowledges() -> None:
 
 def test_provider_failure_releases_with_stable_code_not_exception_text() -> None:
     connections = []
+
     def factory():
         connection = FakeConnection(
             claim_rows=[(OUTBOX_ID, EVENT_ID, LEASE_TOKEN, 1)],
@@ -150,6 +151,7 @@ def test_provider_failure_releases_with_stable_code_not_exception_text() -> None
 
 def test_invalid_sensitive_event_is_released_without_publication() -> None:
     connections = []
+
     def factory():
         connection = FakeConnection(
             claim_rows=[(OUTBOX_ID, EVENT_ID, LEASE_TOKEN, 1)],
@@ -172,6 +174,7 @@ def test_invalid_sensitive_event_is_released_without_publication() -> None:
 
 def test_tenant_mismatch_is_rejected_before_publish() -> None:
     connections = []
+
     def factory():
         connection = FakeConnection(
             claim_rows=[(OUTBOX_ID, EVENT_ID, LEASE_TOKEN, 1)],
@@ -188,6 +191,7 @@ def test_tenant_mismatch_is_rejected_before_publish() -> None:
 
 def test_stale_ack_is_reported_as_possible_duplicate_delivery() -> None:
     connections = []
+
     def factory():
         connection = FakeConnection(
             claim_rows=[(OUTBOX_ID, EVENT_ID, LEASE_TOKEN, 1)],
@@ -204,6 +208,7 @@ def test_stale_ack_is_reported_as_possible_duplicate_delivery() -> None:
 
 def test_publisher_rejects_autocommit_connection() -> None:
     connections = []
+
     def factory():
         connection = FakeConnection(autocommit=True)
         connections.append(connection)
