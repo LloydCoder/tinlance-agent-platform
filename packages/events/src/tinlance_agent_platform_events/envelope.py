@@ -126,8 +126,14 @@ class CloudEventEnvelope:
             "data": dict(self.data),
         }
         for field in (
-            "subject", "spanid", "causationid", "workspaceid", "organizationid",
-            "actorid", "agentid", "dataschema",
+            "subject",
+            "spanid",
+            "causationid",
+            "workspaceid",
+            "organizationid",
+            "actorid",
+            "agentid",
+            "dataschema",
         ):
             current = getattr(self, field)
             if current is not None:
