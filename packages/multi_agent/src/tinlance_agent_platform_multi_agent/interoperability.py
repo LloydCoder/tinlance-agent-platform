@@ -15,7 +15,6 @@ from typing import Protocol
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-
 A2A_SPECIFICATION_VERSION = "1.0.0"
 A2A_PROTOCOL_VERSION = "1.0"
 MAX_DELEGATION_TTL_SECONDS = 3600
