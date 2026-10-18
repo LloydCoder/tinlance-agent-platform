@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from tinlance_agent_platform_registry.ecosystem import (
@@ -108,9 +110,24 @@ AGENTS = (
 
 
 def valid_snapshot(**overrides):
+    schema_version = overrides.pop("schema_version", "registry-manifest/v1")
     services = overrides.pop("services", SERVICES)
     agents = overrides.pop("agents", AGENTS)
     contracts = overrides.pop("contracts", CONTRACTS)
+    if schema_version == "registry-manifest/v2":
+        active_lifecycle = LifecycleMetadata(LifecycleState.ACTIVE, "2026-10-18T00:00:00Z")
+        services = tuple(
+            replace(item, lifecycle=item.lifecycle or active_lifecycle)
+            for item in services
+        )
+        agents = tuple(
+            replace(item, lifecycle=item.lifecycle or active_lifecycle)
+            for item in agents
+        )
+        contracts = tuple(
+            replace(item, lifecycle=item.lifecycle or active_lifecycle)
+            for item in contracts
+        )
     pairs = {
         (service.service_id, contract_id)
         for service in services
@@ -135,6 +152,7 @@ def valid_snapshot(**overrides):
         compatibility_rules=rules,
         required_service_ids=frozenset(s.service_id for s in SERVICES),
         required_agent_ids=frozenset(a.agent_id for a in AGENTS),
+        schema_version=schema_version,
         **overrides,
     )
 
