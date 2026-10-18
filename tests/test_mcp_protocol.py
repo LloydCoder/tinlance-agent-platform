@@ -92,8 +92,13 @@ def headers(method: str, **extra: str) -> dict[str, str]:
 
 
 def body(method: str, params: dict[str, object] | None = None) -> bytes:
+    request_params = dict(params or {})
+    request_params.setdefault(
+        "_meta",
+        {"io.modelcontextprotocol/clientInfo": {"name": "tinlance-tests", "version": "1.0.0"}},
+    )
     return json.dumps(
-        {"jsonrpc": "2.0", "id": "request-1", "method": method, "params": params or {}}
+        {"jsonrpc": "2.0", "id": "request-1", "method": method, "params": request_params}
     ).encode()
 
 
@@ -222,3 +227,16 @@ def test_http_server_mounts_the_mcp_service_at_the_remote_endpoint() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)
+
+
+def test_protocol_requires_valid_per_request_client_metadata() -> None:
+    service, _, _ = make_service()
+    missing = json.dumps(
+        {"jsonrpc": "2.0", "id": "missing-meta", "method": "tools/list", "params": {}}
+    ).encode()
+    assert service.handle(headers("tools/list"), missing).status_code == 400
+    invalid = body(
+        "tools/list",
+        {"_meta": {"io.modelcontextprotocol/clientInfo": {"name": " ", "version": "1.0"}}},
+    )
+    assert service.handle(headers("tools/list"), invalid).status_code == 400
