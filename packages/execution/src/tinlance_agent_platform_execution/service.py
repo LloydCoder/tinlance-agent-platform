@@ -21,7 +21,7 @@ from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_approvals import ApprovalService
-from tinlance_agent_platform_budgets import BudgetScope
+from tinlance_agent_platform_budgets import BudgetScope, QuotaReservationReplayError
 from tinlance_agent_platform_contracts import (
     AgentDefinition,
     ApprovalStatus,
@@ -644,10 +644,16 @@ class GovernedExecutionService:
                             request.run_id,
                             request.action,
                             request.resource,
+                            idempotency_key=request.idempotency_key,
                         ),
                         tool_calls=request.requested_tool_calls,
                         seconds=effective_timeout,
                     )
+                except QuotaReservationReplayError as exc:
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.IDEMPOTENCY_CONFLICT,
+                        "durable quota reservation already exists; reconcile before retrying",
+                    ) from exc
                 except (PermissionError, TimeoutError, ValueError) as exc:
                     raise ExecutionFailure(
                         ExecutionErrorCode.BUDGET_EXCEEDED,

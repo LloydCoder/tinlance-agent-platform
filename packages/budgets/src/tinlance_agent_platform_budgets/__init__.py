@@ -1,7 +1,15 @@
 """Deterministic run budgets."""
 
 from .capacity import CapacityEnvelope, CapacityGate, CapacityObservation, TenantQuota
-from .postgres_quota import PostgresQuotaLedger, QuotaReservationRequest, QuotaSettlement
+from .postgres_quota import (
+    PostgresBudgetGate,
+    PostgresBudgetReservation,
+    PostgresQuotaLedger,
+    QuotaEstimate,
+    QuotaReservationReplayError,
+    QuotaReservationRequest,
+    QuotaSettlement,
+)
 from .quota import TenantQuotaService, TenantReservation
 from .service import BudgetReservation, BudgetScope, BudgetService
 
@@ -15,7 +23,11 @@ __all__ = [
     "TenantQuota",
     "TenantQuotaService",
     "TenantReservation",
+    "PostgresBudgetGate",
+    "PostgresBudgetReservation",
     "PostgresQuotaLedger",
+    "QuotaEstimate",
+    "QuotaReservationReplayError",
     "QuotaReservationRequest",
     "QuotaSettlement",
 ]

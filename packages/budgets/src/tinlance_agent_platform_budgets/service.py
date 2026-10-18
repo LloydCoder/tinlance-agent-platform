@@ -15,6 +15,7 @@ class BudgetScope:
     run_id: UUID
     action: str
     resource: str
+    idempotency_key: str | None = None
 
     def __post_init__(self) -> None:
         values = (self.tenant_id, self.action, self.resource)
@@ -28,6 +29,16 @@ class BudgetScope:
             raise ValueError("budget scope fields must not contain control characters")
         if not isinstance(self.agent_id, UUID) or not isinstance(self.run_id, UUID):
             raise TypeError("budget scope identifiers must be UUIDs")
+        if self.idempotency_key is not None:
+            key = self.idempotency_key
+            if (
+                not isinstance(key, str)
+                or not key
+                or key != key.strip()
+                or not 16 <= len(key) <= 256
+                or any(ord(char) < 32 or ord(char) == 127 for char in key)
+            ):
+                raise ValueError("budget idempotency key must be normalized and bounded")
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +69,11 @@ class BudgetService:
     def budget(self) -> Budget:
         with self._lock:
             return self._budget
+
+    @property
+    def has_tenant_quota(self) -> bool:
+        """Whether tenant quota is enforced by the in-memory service."""
+        return self._tenant_quota is not None
 
     def reserve_scoped(
         self,
@@ -166,6 +182,36 @@ class BudgetService:
                 elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
             )
             del self._reservations[reservation.reservation_id]
+
+    def consume_measured(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
+        """Account for completed work even when settlement or runtime limits fail.
+
+        This is accounting, not admission: it records the observed duration and
+        consumes the reserved tool calls without applying a second budget check.
+        """
+        if (
+            isinstance(elapsed_seconds, bool)
+            or not isinstance(elapsed_seconds, (int, float))
+            or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0
+        ):
+            raise ValueError("elapsed time must be finite and non-negative")
+        if self._tenant_quota is not None:
+            raise RuntimeError("consume_measured is only valid without a tenant quota adapter")
+        with self._lock:
+            current = self._reservations.get(reservation.reservation_id)
+            if current != reservation:
+                raise KeyError("budget reservation does not exist")
+            self._budget = replace(
+                self._budget,
+                consumed_tool_calls=self._budget.consumed_tool_calls + current.tool_calls,
+                elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
+            )
+            del self._reservations[reservation.reservation_id]
+
+    def consume_overrun(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
+        """Compatibility wrapper for callers that explicitly record an overrun."""
+        self.consume_measured(reservation, elapsed_seconds)
 
     def release(self, reservation: BudgetReservation) -> None:
         with self._lock:

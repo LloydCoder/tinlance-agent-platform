@@ -11,11 +11,17 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from hashlib import sha256
+from threading import RLock
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
+
+from .service import BudgetReservation, BudgetScope, BudgetService
 
 _COST_QUANTUM = Decimal("0.000001")
 _MAX_COST_UNITS = Decimal("99999999999999.999999")
@@ -99,6 +105,10 @@ class QuotaSettlement:
     evidence: dict[str, Any]
 
 
+class QuotaReservationReplayError(RuntimeError):
+    """An existing idempotency key cannot start another side effect."""
+
+
 class PostgresQuotaLedger:
     """Calls the migration-owned transactional quota procedures."""
 
@@ -165,6 +175,31 @@ class PostgresQuotaLedger:
             transaction_status = getattr(info, "transaction_status", None)
             if transaction_status is None or int(transaction_status) == 0:
                 raise RuntimeError("quota ledger requires a caller-owned active transaction")
+
+    def reserve_new(self, request: QuotaReservationRequest) -> UUID:
+        """Reserve only when the idempotency key has no prior durable record.
+
+        The tenant limit row is locked before the idempotency lookup. All callers
+        of reserve_quota take this same lock, so the preflight and reservation
+        are serialized and a replay can never be mistaken for a new execution.
+        """
+        self._require_transaction()
+        tenant_row = self._connection.execute(
+            "SELECT tenant_id FROM platform.tenant_budget_limits WHERE tenant_id = %s FOR UPDATE",
+            (request.tenant_id,),
+        ).fetchone()
+        if tenant_row is None:
+            raise RuntimeError("tenant budget limit is not configured")
+        existing = self._connection.execute(
+            "SELECT reservation_id FROM platform.quota_reservations "
+            "WHERE tenant_id = %s AND idempotency_key = %s FOR UPDATE",
+            (request.tenant_id, request.idempotency_key),
+        ).fetchone()
+        if existing is not None:
+            raise QuotaReservationReplayError(
+                "quota idempotency key already exists; reconcile the original reservation"
+            )
+        return self.reserve(request)
 
     def reserve(self, request: QuotaReservationRequest) -> UUID:
         self._require_transaction()
@@ -308,3 +343,298 @@ class PostgresQuotaLedger:
         if row is None or not isinstance(row[0], bool):
             raise RuntimeError("quota release procedure returned an unexpected result")
         return row[0]
+
+
+@dataclass(frozen=True, slots=True)
+class QuotaEstimate:
+    """Platform-derived reservation estimate; never accepted as client authority."""
+
+    token_units: int
+    cost_units: float
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.token_units, bool)
+            or not isinstance(self.token_units, int)
+            or self.token_units < 0
+            or isinstance(self.cost_units, bool)
+            or not isinstance(self.cost_units, (int, float))
+            or not math.isfinite(self.cost_units)
+            or self.cost_units < 0
+        ):
+            raise ValueError("quota estimate must contain finite non-negative dimensions")
+
+
+@dataclass(frozen=True, slots=True)
+class PostgresBudgetReservation:
+    local_reservation: BudgetReservation
+    tenant_id: UUID
+    organization_id: UUID | None
+    estimate: QuotaEstimate
+    idempotency_key: str
+
+    @property
+    def reservation_id(self) -> UUID:
+        return self.local_reservation.reservation_id
+
+    @property
+    def scope(self) -> BudgetScope:
+        return self.local_reservation.scope
+
+
+class PostgresBudgetGate:
+    """Durable BudgetGate adapter with short tenant-scoped DB transactions.
+
+    The caller injects a trusted organization resolver, Platform-side cost
+    estimator, and provider usage meter. This class never trusts client-supplied
+    organization IDs or cost measurements and never holds a DB transaction open
+    while a tool performs an external side effect.
+    """
+
+    def __init__(
+        self,
+        run_budget: BudgetService,
+        *,
+        connection_factory: Callable[[], Any],
+        estimate_usage: Callable[[BudgetScope, int, float], QuotaEstimate],
+        measure_usage: Callable[[BudgetScope, UUID, float], QuotaSettlement],
+        resolve_organization: Callable[[BudgetScope], UUID | None],
+    ) -> None:
+        if run_budget.has_tenant_quota:
+            raise ValueError(
+                "PostgresBudgetGate requires a run-only BudgetService; "
+                "durable tenant quota must have one authority"
+            )
+        self._run_budget = run_budget
+        self._connection_factory = connection_factory
+        self._estimate_usage = estimate_usage
+        self._measure_usage = measure_usage
+        self._resolve_organization = resolve_organization
+        self._active: dict[UUID, PostgresBudgetReservation] = {}
+        self._pending: set[UUID] = set()
+        self._local_accounted: set[UUID] = set()
+        self._lock = RLock()
+
+    def _transaction(
+        self,
+        tenant_id: UUID,
+        operation: Callable[[PostgresQuotaLedger], Any],
+    ) -> Any:
+        connection = self._connection_factory()
+        try:
+            if getattr(connection, "autocommit", False):
+                raise RuntimeError("PostgresBudgetGate requires explicit transaction ownership")
+            connection.execute(
+                "SELECT set_config('platform.tenant_id', %s, true)",
+                (str(tenant_id),),
+            )
+            result = operation(PostgresQuotaLedger(connection))
+            connection.commit()
+            return result
+        except BaseException:
+            with suppress(Exception):
+                connection.rollback()
+            raise
+        finally:
+            with suppress(Exception):
+                connection.close()
+
+    def reserve_scoped(
+        self,
+        scope: BudgetScope,
+        *,
+        tool_calls: int,
+        seconds: float,
+    ) -> PostgresBudgetReservation:
+        if scope.idempotency_key is None:
+            raise ValueError("durable quota reservation requires an execution idempotency key")
+        try:
+            tenant_id = UUID(scope.tenant_id)
+        except (ValueError, AttributeError) as exc:
+            raise ValueError("durable quota reservation requires a UUID tenant ID") from exc
+        reservation_id = uuid5(
+            NAMESPACE_URL,
+            f"tinlance-quota:{tenant_id}:{scope.run_id}:{scope.idempotency_key}",
+        )
+        with self._lock:
+            if reservation_id in self._active or reservation_id in self._pending:
+                raise QuotaReservationReplayError(
+                    "quota reservation is already active for this idempotency key"
+                )
+            self._pending.add(reservation_id)
+        local: BudgetReservation | None = None
+        try:
+            local = self._run_budget.reserve_scoped(
+                scope,
+                tool_calls=tool_calls,
+                seconds=seconds,
+                reservation_id=reservation_id,
+            )
+            estimate = self._estimate_usage(scope, tool_calls, seconds)
+            if not isinstance(estimate, QuotaEstimate):
+                raise TypeError("Platform usage estimator must return QuotaEstimate")
+            organization_id = self._resolve_organization(scope)
+            if organization_id is not None and not isinstance(organization_id, UUID):
+                raise TypeError("trusted organization resolver must return UUID or None")
+            ledger_key = (
+                "quota:" + sha256(f"{tenant_id}:{scope.idempotency_key}".encode()).hexdigest()
+            )
+            request = QuotaReservationRequest(
+                tenant_id=tenant_id,
+                organization_id=organization_id,
+                agent_id=scope.agent_id,
+                run_id=scope.run_id,
+                action=scope.action,
+                resource=scope.resource,
+                idempotency_key=ledger_key,
+                concurrency=1,
+                tool_calls=tool_calls,
+                token_units=estimate.token_units,
+                cost_units=estimate.cost_units,
+                reservation_id=reservation_id,
+            )
+            returned_id = self._transaction(tenant_id, lambda ledger: ledger.reserve_new(request))
+            if returned_id != reservation_id:
+                raise RuntimeError("durable quota reservation returned a different ID")
+            reservation = PostgresBudgetReservation(
+                local, tenant_id, organization_id, estimate, ledger_key
+            )
+            with self._lock:
+                self._active[reservation_id] = reservation
+                self._pending.discard(reservation_id)
+            return reservation
+        except Exception:
+            with self._lock:
+                self._pending.discard(reservation_id)
+            if local is not None:
+                with suppress(Exception):
+                    self._run_budget.release(local)
+            raise
+
+    def consume(self, reservation: PostgresBudgetReservation, elapsed_seconds: float) -> None:
+        with self._lock:
+            current = self._active.get(reservation.reservation_id)
+            if current != reservation:
+                raise KeyError("durable budget reservation is not active")
+        try:
+            actual = self._measure_usage(
+                reservation.scope,
+                reservation.reservation_id,
+                elapsed_seconds,
+            )
+            if not isinstance(actual, QuotaSettlement):
+                raise TypeError("Platform usage meter must return QuotaSettlement")
+            status = self._transaction(
+                reservation.tenant_id,
+                lambda ledger: ledger.settle(
+                    tenant_id=reservation.tenant_id,
+                    reservation_id=reservation.reservation_id,
+                    actual=actual,
+                ),
+            )
+        except Exception:
+            # The external side effect has already run. Record local measured
+            # usage, but leave the durable reservation for reconciliation.
+            try:
+                self._run_budget.consume_measured(
+                    reservation.local_reservation,
+                    elapsed_seconds,
+                )
+            except Exception:
+                pass
+            else:
+                with self._lock:
+                    self._local_accounted.add(reservation.reservation_id)
+            raise
+        with self._lock:
+            already_accounted = reservation.reservation_id in self._local_accounted
+            self._active.pop(reservation.reservation_id, None)
+            self._local_accounted.discard(reservation.reservation_id)
+        runtime_overrun = elapsed_seconds > reservation.local_reservation.seconds
+        if not already_accounted:
+            try:
+                if runtime_overrun:
+                    self._run_budget.consume_measured(
+                        reservation.local_reservation,
+                        elapsed_seconds,
+                    )
+                else:
+                    self._run_budget.consume(reservation.local_reservation, elapsed_seconds)
+            except Exception:
+                with suppress(Exception):
+                    self._run_budget.consume_measured(
+                        reservation.local_reservation,
+                        elapsed_seconds,
+                    )
+                raise
+        if runtime_overrun:
+            raise TimeoutError("measured runtime exceeded the reserved runtime budget")
+        if status == "overrun":
+            raise TimeoutError("measured usage exceeded the durable quota reservation")
+        if status == "already_settled":
+            raise RuntimeError("durable quota reservation was settled by another actor")
+
+    def release(self, reservation: PostgresBudgetReservation) -> None:
+        with self._lock:
+            current = self._active.get(reservation.reservation_id)
+            if current is None:
+                # Idempotent local cleanup after a confirmed settlement/release.
+                self._local_accounted.discard(reservation.reservation_id)
+                self._run_budget.release(reservation.local_reservation)
+                return
+            if current != reservation:
+                raise KeyError("durable budget reservation scope mismatch")
+        self._transaction(
+            reservation.tenant_id,
+            lambda ledger: ledger.release(
+                tenant_id=reservation.tenant_id,
+                reservation_id=reservation.reservation_id,
+                reason="cancelled-before-side-effect",
+                evidence={"cancellation_reason": "cancelled-before-side-effect"},
+            ),
+        )
+        # The SQL procedure returns false only for an identical idempotent release.
+        with self._lock:
+            self._active.pop(reservation.reservation_id, None)
+            self._local_accounted.discard(reservation.reservation_id)
+        # Only refund local run budget after the durable release commits.
+        with suppress(Exception):
+            self._run_budget.release(reservation.local_reservation)
+
+    def renew(
+        self,
+        reservation: PostgresBudgetReservation,
+        *,
+        lease_seconds: int = 900,
+    ) -> datetime:
+        with self._lock:
+            if self._active.get(reservation.reservation_id) != reservation:
+                raise KeyError("durable budget reservation is not active")
+        renewed_until = self._transaction(
+            reservation.tenant_id,
+            lambda ledger: ledger.renew(
+                tenant_id=reservation.tenant_id,
+                reservation_id=reservation.reservation_id,
+                lease_seconds=lease_seconds,
+            ),
+        )
+        if not isinstance(renewed_until, datetime):
+            raise RuntimeError("quota lease renewal returned an unexpected result")
+        return renewed_until
+
+    def request_expired_reconciliation(
+        self,
+        tenant_id: UUID,
+        *,
+        batch_limit: int = 100,
+    ) -> int:
+        requested = self._transaction(
+            tenant_id,
+            lambda ledger: ledger.request_expired_reconciliation(
+                tenant_id=tenant_id,
+                batch_limit=batch_limit,
+            ),
+        )
+        if isinstance(requested, bool) or not isinstance(requested, int) or requested < 0:
+            raise RuntimeError("quota reconciliation request returned an unexpected result")
+        return requested

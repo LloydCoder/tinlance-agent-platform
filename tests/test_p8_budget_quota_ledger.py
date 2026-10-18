@@ -11,11 +11,15 @@ from tinlance_agent_platform_budgets import (
     CapacityEnvelope,
     CapacityGate,
     CapacityObservation,
+    PostgresBudgetGate,
     PostgresQuotaLedger,
+    QuotaEstimate,
+    QuotaReservationReplayError,
     QuotaReservationRequest,
     QuotaSettlement,
     TenantQuotaService,
 )
+from tinlance_agent_platform_contracts import Budget
 
 ROOT = Path(__file__).resolve().parents[1]
 TENANT_ID = UUID("00000000-0000-0000-0000-000000000071")
@@ -32,16 +36,31 @@ class Cursor:
 
 
 class Connection:
-    def __init__(self, *, autocommit=False, result=True, reserve_result=None):
+    def __init__(
+        self,
+        *,
+        autocommit=False,
+        result=True,
+        reserve_result=None,
+        existing_reservation=False,
+    ):
         self.autocommit = autocommit
         self.result = result
         self.reserve_result = reserve_result
+        self.existing_reservation = existing_reservation
         self.queries = []
         self.committed = False
+        self.rolled_back = False
         self.closed = False
 
     def execute(self, query, params=()):
         self.queries.append((query, params))
+        if "set_config('platform.tenant_id'" in query:
+            return Cursor((params[0],))
+        if "FROM platform.tenant_budget_limits" in query:
+            return Cursor((params[0],))
+        if "FROM platform.quota_reservations" in query:
+            return Cursor((uuid4(),)) if self.existing_reservation else Cursor(None)
         if "platform.reserve_quota" in query:
             return Cursor((self.reserve_result or params[0],))
         if "platform.settle_quota" in query:
@@ -57,6 +76,9 @@ class Connection:
 
     def commit(self):
         self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
 
     def close(self):
         self.closed = True
@@ -408,3 +430,167 @@ def test_capacity_gate_rejects_unbounded_evidence_reference() -> None:
     observation = CapacityObservation(10.0, 50.0, 100.0, 2)
     with pytest.raises(ValueError, match="capacity evidence"):
         CapacityGate(envelope, observation, " bad\nreference")
+
+
+def _postgres_budget_gate(*, connections, run_budget=None):
+    organization_id = UUID("30000000-0000-0000-0000-000000000071")
+    budget = run_budget or BudgetService(Budget(uuid4(), str(TENANT_ID), RUN_ID, 10, 30.0, 1))
+
+    def connection_factory():
+        connection = connections.pop(0)
+        return connection
+
+    gate = PostgresBudgetGate(
+        budget,
+        connection_factory=connection_factory,
+        estimate_usage=lambda scope, calls, seconds: QuotaEstimate(100, 1.25),
+        measure_usage=lambda scope, reservation_id, elapsed: QuotaSettlement(
+            1,
+            80,
+            0.8,
+            {
+                "measurement_ref": f"usage:{reservation_id}",
+                "metering_source": "unit-test",
+            },
+        ),
+        resolve_organization=lambda scope: organization_id,
+    )
+    scope = BudgetScope(
+        str(TENANT_ID),
+        AGENT_ID,
+        RUN_ID,
+        "invoice.refund",
+        "invoice:123",
+        idempotency_key="p8-gate-idempotency-key-0001",
+    )
+    return gate, budget, scope, organization_id
+
+
+def test_postgres_budget_gate_commits_tenant_scoped_reservation_and_settlement() -> None:
+    reserve_connection = Connection()
+    settle_connection = Connection(result="settled")
+    gate, budget, scope, organization_id = _postgres_budget_gate(
+        connections=[reserve_connection, settle_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    gate.consume(reservation, elapsed_seconds=2.0)
+
+    reserve_query = next(
+        (query, params)
+        for query, params in reserve_connection.queries
+        if "platform.reserve_quota" in query
+    )
+    assert reserve_query[1][2] == organization_id
+    assert any("set_config('platform.tenant_id'" in q for q, _ in reserve_connection.queries)
+    assert reserve_connection.committed and reserve_connection.closed
+    assert settle_connection.committed and settle_connection.closed
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+
+def test_postgres_budget_gate_rejects_existing_idempotency_before_side_effect() -> None:
+    connection = Connection(existing_reservation=True)
+    gate, budget, scope, _ = _postgres_budget_gate(connections=[connection])
+    with pytest.raises(QuotaReservationReplayError, match="already exists"):
+        gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    assert not any("platform.reserve_quota" in query for query, _ in connection.queries)
+    assert connection.rolled_back and connection.closed
+    assert budget.budget.consumed_tool_calls == 0
+
+
+def test_postgres_budget_gate_records_durable_overrun_before_rejecting() -> None:
+    reserve_connection = Connection()
+    settle_connection = Connection(result="overrun")
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, settle_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    with pytest.raises(TimeoutError, match="durable quota reservation"):
+        gate.consume(reservation, elapsed_seconds=2.0)
+    assert settle_connection.committed
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+
+def test_postgres_budget_gate_requires_single_tenant_quota_authority() -> None:
+    budget = BudgetService(
+        Budget(uuid4(), str(TENANT_ID), RUN_ID, 10, 30.0, 1),
+        tenant_quota=TenantQuotaService(
+            max_concurrency=1,
+            max_tool_calls=10,
+            max_token_units=1000,
+            max_cost_units=10.0,
+        ),
+    )
+    with pytest.raises(ValueError, match="one authority"):
+        PostgresBudgetGate(
+            budget,
+            connection_factory=Connection,
+            estimate_usage=lambda scope, calls, seconds: QuotaEstimate(0, 0.0),
+            measure_usage=lambda scope, reservation_id, elapsed: QuotaSettlement(
+                1, 0, 0.0, {"measurement_ref": "usage:local"}
+            ),
+            resolve_organization=lambda scope: None,
+        )
+
+
+def test_postgres_budget_gate_accounts_runtime_overrun_without_refund() -> None:
+    reserve_connection = Connection()
+    settle_connection = Connection(result="settled")
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, settle_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=1.0)
+    with pytest.raises(TimeoutError, match="runtime exceeded"):
+        gate.consume(reservation, elapsed_seconds=2.0)
+    assert settle_connection.committed
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+
+def test_postgres_budget_gate_releases_only_pre_side_effect_reservations() -> None:
+    reserve_connection = Connection()
+    release_connection = Connection()
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, release_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    gate.release(reservation)
+    assert any("platform.release_quota" in query for query, _ in release_connection.queries)
+    assert release_connection.committed
+    assert budget.budget.consumed_tool_calls == 0
+
+
+def test_postgres_budget_gate_reconciles_settlement_without_double_accounting() -> None:
+    reserve_connection = Connection()
+    failed_settlement = Connection(result="unexpected")
+    recovered_settlement = Connection(result="settled")
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, failed_settlement, recovered_settlement]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    with pytest.raises(RuntimeError, match="unexpected result"):
+        gate.consume(reservation, elapsed_seconds=2.0)
+    assert failed_settlement.rolled_back
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+    gate.consume(reservation, elapsed_seconds=2.0)
+    assert recovered_settlement.committed
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+
+def test_postgres_budget_gate_exposes_lease_renewal_and_reconciliation() -> None:
+    reserve_connection = Connection()
+    renew_until = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
+    renew_connection = Connection(result=renew_until)
+    reconciliation_connection = Connection(result=2)
+    gate, _, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, renew_connection, reconciliation_connection]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    assert gate.renew(reservation, lease_seconds=600) == renew_until
+    assert gate.request_expired_reconciliation(TENANT_ID, batch_limit=10) == 2
+    assert renew_connection.committed and renew_connection.closed
+    assert reconciliation_connection.committed and reconciliation_connection.closed
