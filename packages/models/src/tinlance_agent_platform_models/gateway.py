@@ -15,7 +15,7 @@ class ModelRequest:
     model: str
     messages: tuple[Mapping[str, str], ...]
     max_output_tokens: int = 4096
-    trace_id: str
+    trace_id: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.agent_id, self.model)):
@@ -171,7 +171,7 @@ class ModelRoutingRequest:
     estimated_cost_microusd: int
     available_budget_microusd: int
     provider_availability: frozenset[str]
-    trace_id: str | None = None
+    trace_id: str
 
     def __post_init__(self) -> None:
         for value, name in (
