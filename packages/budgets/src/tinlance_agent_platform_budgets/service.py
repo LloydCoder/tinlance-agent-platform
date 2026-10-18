@@ -1,5 +1,5 @@
-from dataclasses import dataclass, replace
 import math
+from dataclasses import dataclass, replace
 from threading import RLock
 from uuid import UUID, uuid4
 
