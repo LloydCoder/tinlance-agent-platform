@@ -1,8 +1,11 @@
 from collections.abc import Callable, Mapping
+import re
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol
 from uuid import uuid4
+
+_TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +126,9 @@ class ModelRoute:
         ):
             if not value or value != value.strip():
                 raise ValueError(f"{name} must be normalized and non-empty")
-        if not self.capabilities or any(not item or item != item.strip() for item in self.capabilities):
+        if not self.capabilities or any(
+            not item or item != item.strip() for item in self.capabilities
+        ):
             raise ValueError("route capabilities must be normalized and non-empty")
         if not self.data_classifications or not self.data_classifications <= {
             "public", "internal", "confidential", "restricted"
@@ -132,7 +137,9 @@ class ModelRoute:
         if not 0 <= self.max_risk_score <= 100 or self.max_cost_microusd < 0:
             raise ValueError("route risk and cost limits are invalid")
         for allowlist in (self.tenants, self.agents):
-            if allowlist is not None and any(not value or value != value.strip() for value in allowlist):
+            if allowlist is not None and any(
+                not value or value != value.strip() for value in allowlist
+            ):
                 raise ValueError("route allowlists must contain normalized identifiers")
 
 
@@ -163,10 +170,15 @@ class ModelRoutingRequest:
             raise ValueError("routing risk and estimated cost are invalid")
         if not self.available_providers:
             raise ValueError("provider availability must be explicitly supplied")
-        if any(not provider or provider != provider.strip() for provider in self.available_providers):
+        if any(
+            not provider or provider != provider.strip()
+            for provider in self.available_providers
+        ):
             raise ValueError("available provider names must be normalized")
-        if self.trace_id is not None and (not self.trace_id or self.trace_id != self.trace_id.strip()):
-            raise ValueError("trace_id must be normalized when supplied")
+        if self.trace_id is not None and (
+            not _TRACE_ID.fullmatch(self.trace_id) or set(self.trace_id) == {"0"}
+        ):
+            raise ValueError("trace_id must be a valid non-zero W3C trace identifier")
 
 
 @dataclass(frozen=True, slots=True)
