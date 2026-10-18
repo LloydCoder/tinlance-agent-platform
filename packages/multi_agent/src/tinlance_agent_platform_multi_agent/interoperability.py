@@ -459,11 +459,7 @@ class PinnedHTTPSRemoteAgentTransport:
             raise ValueError("unsupported A2A wire protocol version")
         if content_type != "application/a2a+json":
             raise ValueError("A2A 1.0.1 HTTP binding requires application/a2a+json")
-        if (
-            not math.isfinite(timeout_seconds)
-            or timeout_seconds <= 0
-            or timeout_seconds > 30
-        ):
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0 or timeout_seconds > 30:
             raise ValueError("A2A timeout must be finite and between 0 and 30 seconds")
         if not 1 <= max_response_bytes <= MAX_REMOTE_RESPONSE_BYTES:
             raise ValueError("A2A response limit is outside the supported bound")
