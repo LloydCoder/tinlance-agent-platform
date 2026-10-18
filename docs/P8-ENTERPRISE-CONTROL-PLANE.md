@@ -11,6 +11,13 @@ settlement, quotas, capacity gates and cost evidence. OS may request work and
 surface usage; SDK may transport typed requests/results; neither may bypass or
 reimplement Platform admission policy.
 
+## Existing enterprise controls
+
+Tenant identity and tenancy isolation, principal/workspace context, policy
+evaluation, approval requirements and approval expiry remain governed by the
+existing Platform authority contracts. P8 consumes those controls; it does not
+replace them or let a quota reservation satisfy an approval requirement.
+
 ## Repository implementation
 
 - `packages/budgets`: deterministic in-memory reference budgets and quotas.
