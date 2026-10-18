@@ -109,10 +109,18 @@ def test_request_approval_tool_and_evidence_models_bind_trace_tenant():
         trace_context=context,
     )
     audit = AuditRecord(
-        record_id=uuid4(), tenant_id="tenant-a", actor_id="subject-1", actor_type="user",
-        action="tool.execute", resource="resource:1", policy_id="policy-1",
-        policy_version="v1", decision=Decision.ALLOW, result="allowed",
-        timestamp="2026-10-18T05:00:00Z", trace_context=context,
+        record_id=uuid4(),
+        tenant_id="tenant-a",
+        actor_id="subject-1",
+        actor_type="user",
+        action="tool.execute",
+        resource="resource:1",
+        policy_id="policy-1",
+        policy_version="v1",
+        decision=Decision.ALLOW,
+        result="allowed",
+        timestamp="2026-10-18T05:00:00Z",
+        trace_context=context,
     )
     evidence_link = EvidenceLink(
         tenant_id="tenant-a",
