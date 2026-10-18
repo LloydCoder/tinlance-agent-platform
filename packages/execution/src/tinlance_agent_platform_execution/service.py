@@ -803,12 +803,36 @@ class GovernedExecutionService:
             if budget_reservation is not None and self.budget is not None:
                 try:
                     self.budget.consume(budget_reservation, elapsed)
-                except Exception as exc:
-                    self.budget.release(budget_reservation)
+                except TimeoutError as exc:
+                    # The tool has already executed. A failed settlement is not
+                    # proof that no side effect occurred, so never refund here.
+                    # Durable quota gates must leave the reservation for explicit
+                    # reconciliation; the in-memory reference gate remains held.
                     budget_reservation = None
+                    self._event(
+                        request,
+                        execution_id,
+                        "execution.budget_settlement_unknown",
+                        audit_ids,
+                    )
                     raise ExecutionFailure(
                         ExecutionErrorCode.BUDGET_EXCEEDED,
-                        "execution exceeded the reserved platform budget",
+                        "execution exceeded its reserved budget; usage remains charged or reserved",
+                    ) from exc
+                except Exception as exc:
+                    # Settlement may have failed after a consequential side effect.
+                    # Do not call release: the reservation must remain available for
+                    # recovery/reconciliation instead of silently refunding usage.
+                    budget_reservation = None
+                    self._event(
+                        request,
+                        execution_id,
+                        "execution.budget_settlement_unknown",
+                        audit_ids,
+                    )
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                        "execution completed but budget settlement could not be confirmed",
                     ) from exc
                 budget_reservation = None
             evidence_ids: list[UUID] = []
