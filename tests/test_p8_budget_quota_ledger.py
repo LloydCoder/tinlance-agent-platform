@@ -39,7 +39,9 @@ class Connection:
         self.queries.append((query, params))
         if "platform.reserve_quota" in query:
             return Cursor((params[0],))
-        return Cursor((self.result,))
+        if "platform.settle_quota" in query:
+            return Cursor((self.result if isinstance(self.result, str) else "settled",))
+        return Cursor((self.result if isinstance(self.result, bool) else True,))
 
     def commit(self):
         self.committed = True
@@ -151,7 +153,7 @@ def test_postgres_ledger_calls_transactional_procedures_without_owning_commit() 
         tenant_id=TENANT_ID,
         reservation_id=reservation_id,
         actual=QuotaSettlement(1, 80, 0.8, {"provider": "unit-test"}),
-    ) is True
+    ) == "settled"
     assert ledger.release(
         tenant_id=TENANT_ID,
         reservation_id=reservation_id,
@@ -186,3 +188,19 @@ def test_p8_migration_has_transactional_limits_rls_and_append_only_ledger() -> N
         "REVOKE UPDATE, DELETE ON platform.quota_ledger",
     ):
         assert required.lower() in migration.lower()
+
+
+def test_postgres_ledger_distinguishes_overrun_from_idempotent_settlement() -> None:
+    ledger = PostgresQuotaLedger(Connection(result="overrun"))
+    assert ledger.settle(
+        tenant_id=TENANT_ID,
+        reservation_id=uuid4(),
+        actual=QuotaSettlement(2, 200, 3.5, {"measurement_ref": "usage:123"}),
+    ) == "overrun"
+
+    replay = PostgresQuotaLedger(Connection(result="already_settled"))
+    assert replay.settle(
+        tenant_id=TENANT_ID,
+        reservation_id=uuid4(),
+        actual=QuotaSettlement(2, 200, 3.5, {}),
+    ) == "already_settled"
