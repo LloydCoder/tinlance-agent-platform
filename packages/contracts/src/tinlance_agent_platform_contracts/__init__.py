@@ -31,6 +31,7 @@ from .models import (
     Reversibility,
     RiskTier,
 )
+from .trace_context import TraceEvidenceRef, TraceLineageContext
 from .transformation import (
     Transformation,
     TransformationExecutionState,
@@ -67,6 +68,8 @@ __all__ = [
     "TaskStatus",
     "ToolCall",
     "ToolCallStatus",
+    "TraceEvidenceRef",
+    "TraceLineageContext",
     "Transformation",
     "TransformationExecutionState",
     "TransformationOutcome",

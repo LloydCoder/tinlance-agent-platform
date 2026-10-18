@@ -6,6 +6,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from .trace_context import TraceLineageContext
+
 API_VERSION = "1.1"
 
 
@@ -108,6 +110,11 @@ class ApprovalRequest:
     intent_fingerprint: str | None = None
     approved_by: str | None = None
     consumed_at: datetime | None = None
+    trace_context: TraceLineageContext | None = None
+
+    def __post_init__(self) -> None:
+        if self.trace_context is not None and self.trace_context.tenant_id != self.tenant_id:
+            raise ValueError("approval and trace context tenants must match")
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +144,11 @@ class ToolCall:
     action: str
     resource: str
     status: ToolCallStatus = ToolCallStatus.PROPOSED
+    trace_context: TraceLineageContext | None = None
+
+    def __post_init__(self) -> None:
+        if self.trace_context is not None and self.trace_context.tenant_id != self.tenant_id:
+            raise ValueError("tool call and trace context tenants must match")
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,3 +181,8 @@ class EvidenceLink:
     action_id: UUID
     evidence_id: UUID
     sequence: int
+    trace_context: TraceLineageContext | None = None
+
+    def __post_init__(self) -> None:
+        if self.trace_context is not None and self.trace_context.tenant_id != self.tenant_id:
+            raise ValueError("evidence link and trace context tenants must match")
