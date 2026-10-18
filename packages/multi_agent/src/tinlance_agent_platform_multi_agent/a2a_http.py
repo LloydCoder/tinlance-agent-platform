@@ -3,6 +3,7 @@
 This adapter owns protocol parsing only. Platform remains authoritative for identity,
 policy, approvals, budgets, capabilities, and consequential execution.
 """
+
 from __future__ import annotations
 
 import hashlib
