@@ -26,12 +26,14 @@ class AcceptCardSignature:
 class ScopedCredentialProvider:
     def __init__(self) -> None:
         self.issued = []
+        self.now: datetime | None = None
 
     def issue(self, delegation: RemoteDelegation) -> str:
         delegation.validate(
             expected_tenant_id=delegation.tenant_id,
             expected_issuer_id=delegation.parent_agent_id,
             expected_audience=delegation.audience,
+            now=self.now,
         )
         self.issued.append(delegation.delegation_id)
         return "short-lived-scoped-token"
@@ -136,6 +138,7 @@ def test_a2a_client_requires_scoped_delegation_and_pinned_transport() -> None:
     parent = uuid4()
     remote = uuid4()
     issued = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
+    credentials.now = issued + timedelta(seconds=1)
     delegation = RemoteDelegation.issue(
         tenant_id="tenant-a",
         parent_agent_id=parent,
