@@ -130,6 +130,19 @@ class TraceLineageContext:
             elif not isinstance(value, int) or isinstance(value, bool):
                 raise ValueError(f"trace attribute {key} must be a string or integer")
 
+    @property
+    def traceparent(self) -> str:
+        """Return the W3C traceparent header for the current span."""
+        return f"00-{self.trace_id}-{self.span_id}-00"
+
+    def as_headers(self) -> dict[str, str]:
+        """Propagate W3C trace context plus stable request correlation identifiers."""
+        return {
+            "traceparent": self.traceparent,
+            "x-correlation-id": self.correlation_id,
+            "x-request-id": self.request_id,
+        }
+
     def as_payload(self) -> dict[str, Any]:
         value: dict[str, Any] = {
             "schema_version": "trace-context/v1",
