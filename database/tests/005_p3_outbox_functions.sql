@@ -108,7 +108,7 @@ begin
         raise exception 'valid lease failed to release outbox record';
     end if;
     select outbox_id, lease_token into dead_id, dead_lease
-      from platform.claim_outbox_batch(10, 30);
+      from platform.claim_outbox_batch(1, 30);
     if dead_id is null or dead_lease is null then
         raise exception 'released outbox record should be claimable again';
     end if;
