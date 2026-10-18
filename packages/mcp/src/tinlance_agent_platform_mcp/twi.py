@@ -368,7 +368,7 @@ class TWIHTTPTransport:
         if tool_name == "twi_job_read":
             return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}", None
         if tool_name == "twi_job_cancel":
-            return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}/cancel", {}
+            return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}/cancel", None
         if tool_name == "twi_research_verify":
             return "/v1/research/verify", {"claims": arguments.get("claims")}
         if tool_name == "twi_world_intelligence_export":
