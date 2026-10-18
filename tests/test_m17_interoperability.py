@@ -37,9 +37,17 @@ class CaptureA2ATransport:
         timeout_seconds: float,
         max_response_bytes: int,
         protocol_version: str,
+        content_type: str,
     ):
         self.calls.append(
-            (endpoint, resolved_addresses, bearer_token, timeout_seconds, protocol_version)
+            (
+                endpoint,
+                resolved_addresses,
+                bearer_token,
+                timeout_seconds,
+                protocol_version,
+                content_type,
+            )
         )
         return {"task": {"id": "task-1", "status": {"state": "working"}}}
 
