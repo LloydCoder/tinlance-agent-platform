@@ -61,6 +61,42 @@ def _required(value: str, name: str) -> None:
         raise ValueError(f"{name} must be non-empty and normalized")
 
 
+def _validate_jcs_profile(value: object, path: str = "Agent Card security scheme details") -> None:
+    """Enforce the JSON subset whose sorted compact UTF-8 encoding equals JCS.
+
+    The current signed-card profile intentionally supports strings, booleans,
+    arrays and objects with normalized ASCII property names. Numeric, null,
+    non-ASCII property-name and non-scalar Unicode values require a full RFC 8785
+    implementation and are rejected rather than being signed non-canonically.
+    """
+    if isinstance(value, bool):
+        return
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise ValueError(f"{path} contains an invalid Unicode scalar value") from exc
+        return
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if (
+                not isinstance(key, str)
+                or not key
+                or key != key.strip()
+                or not key.isascii()
+            ):
+                raise ValueError(f"{path} keys must be normalized non-empty ASCII strings")
+            _validate_jcs_profile(nested, f"{path}.{key}")
+        return
+    if isinstance(value, (list, tuple)):
+        for index, nested in enumerate(value):
+            _validate_jcs_profile(nested, f"{path}[{index}]")
+        return
+    raise ValueError(
+        f"{path} contains a value outside the supported JCS canonicalization profile"
+    )
+
+
 def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
     parsed = urlparse(endpoint)
     allowed_schemes = {"https"} if require_https else {"https", "http"}
@@ -172,6 +208,8 @@ class AgentCard:
             raise ValueError("A2A Agent Card must declare authentication")
         if any(not scheme or scheme != scheme.strip() for scheme in self.authentication_schemes):
             raise ValueError("authentication schemes must be normalized")
+        if any(not scheme.isascii() for scheme in self.authentication_schemes):
+            raise ValueError("authentication scheme names must be ASCII for canonical signatures")
         if any(
             any(marker in scheme.lower() for marker in ("secret", "api_key=", "bearer "))
             for scheme in self.authentication_schemes
@@ -196,6 +234,7 @@ class AgentCard:
         security_schemes: dict[str, object] = {}
         security_requirements: list[dict[str, list[str]]] = []
         details = self.security_scheme_details or {}
+        _validate_jcs_profile(details)
         for scheme in self.authentication_schemes:
             configured = details.get(scheme)
             if configured is not None:
