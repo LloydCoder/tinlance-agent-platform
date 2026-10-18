@@ -185,10 +185,24 @@ as $$
                 'billing_unit', 'policy_ref', 'correlation_id', 'trace_id',
                 'traceparent'
             )
-               or jsonb_typeof(item.value) not in ('string', 'number', 'boolean')
-               or (jsonb_typeof(item.value) = 'string' and length(item.value #>> '{}') > 512)
-               or (item.key = 'cancellation_reason' and (jsonb_typeof(item.value) <> 'string'
-                   or item.value #>> '{}' !~ '^[a-z0-9][a-z0-9._:-]{0,127}$'))
+               or jsonb_typeof(item.value) <> 'string'
+               or length(item.value #>> '{}') > 512
+               or (
+                   item.key = 'cancellation_reason'
+                   and item.value #>> '{}' !~ '^[a-z0-9][a-z0-9._:-]{0,127}$'
+               )
+               or (
+                   item.key = 'trace_id'
+                   and item.value #>> '{}' !~ '^[0-9a-f]{32}$'
+               )
+               or (
+                   item.key = 'traceparent'
+                   and item.value #>> '{}' !~ '^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
+               )
+               or (
+                   item.key not in ('cancellation_reason', 'trace_id', 'traceparent')
+                   and item.value #>> '{}' !~ '^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$'
+               )
        )
 $$;
 
