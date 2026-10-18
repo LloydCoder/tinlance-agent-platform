@@ -160,9 +160,7 @@ def test_a2a_tasks_get_reenters_platform_and_returns_task_snapshot() -> None:
 def test_a2a_rejects_bad_auth_version_origin_and_non_text_parts() -> None:
     service, _, _, _, _ = make_service()
     body = request("message/send", {"message": message()})
-    unauthorized = service.handle(
-        headers("message/send", authorization="Bearer invalid"), body
-    )
+    unauthorized = service.handle(headers("message/send", authorization="Bearer invalid"), body)
     assert unauthorized.status_code == 401
     unsupported = service.handle(headers("message/send", **{"a2a-version": "9.9"}), body)
     assert unsupported.status_code == 400
