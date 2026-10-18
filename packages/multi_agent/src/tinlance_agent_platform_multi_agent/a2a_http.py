@@ -300,8 +300,11 @@ class A2AProtocolService:
                 )
                 supplied_key = normalized.get("idempotency-key")
                 key = supplied_key or f"a2a-{fingerprint}"
-                if len(key) < 16 or len(key) > 256 or not key.isascii() or any(
-                    ord(char) < 33 or ord(char) > 126 for char in key
+                if (
+                    len(key) < 16
+                    or len(key) > 256
+                    or not key.isascii()
+                    or any(ord(char) < 33 or ord(char) > 126 for char in key)
                 ):
                     return self._rpc_error(request_id, -32602, "invalid idempotency key")
                 task_seed = supplied_key or normalized_id
