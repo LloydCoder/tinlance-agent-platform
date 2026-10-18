@@ -46,7 +46,9 @@ class TenantQuotaService:
             or isinstance(max_cost_units, bool)
             or not isinstance(max_cost_units, (int, float))
             or not math.isfinite(max_cost_units)
-            or max_concurrency < 1\n            or max_tool_calls < 0\n            or max_token_units < 0
+            or max_concurrency < 1
+            or max_tool_calls < 0
+            or max_token_units < 0
             or max_cost_units < 0
         ):
             raise ValueError("tenant quota values are invalid")
@@ -85,7 +87,10 @@ class TenantQuotaService:
             or isinstance(cost_units, bool)
             or not isinstance(cost_units, (int, float))
             or not math.isfinite(cost_units)
-            or concurrency < 1\n            or tool_calls < 0\n            or token_units < 0\n            or cost_units < 0
+            or concurrency < 1
+            or tool_calls < 0
+            or token_units < 0
+            or cost_units < 0
         ):
             raise ValueError("quota reservation dimensions are invalid")
         candidate = TenantReservation(
