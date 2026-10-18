@@ -28,6 +28,19 @@ from tinlance_agent_platform_execution import (
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 
+class ReplayBudget:
+    def reserve_scoped(self, scope, *, tool_calls: int, seconds: float):
+        from tinlance_agent_platform_budgets import QuotaReservationReplayError
+
+        raise QuotaReservationReplayError("durable quota reservation already exists")
+
+    def consume(self, reservation, elapsed_seconds: float) -> None:
+        raise AssertionError("reservation replay must fail before execution")
+
+    def release(self, reservation) -> None:
+        raise AssertionError("replayed durable reservation must not be released")
+
+
 class RecordingBudget:
     def __init__(self) -> None:
         self.scope = None
@@ -405,3 +418,11 @@ def test_execution_binds_budget_reservation_to_idempotency_key() -> None:
     assert budget.scope is not None
     assert budget.scope.idempotency_key == key
     assert budget.consumed is True
+
+
+def test_durable_quota_replay_maps_to_idempotency_conflict() -> None:
+    service, principal, agent, _ = _build_harness()
+    service.budget = ReplayBudget()
+    with pytest.raises(ExecutionFailure) as exc:
+        service.execute(principal, request(principal, agent))
+    assert exc.value.code is ExecutionErrorCode.IDEMPOTENCY_CONFLICT
