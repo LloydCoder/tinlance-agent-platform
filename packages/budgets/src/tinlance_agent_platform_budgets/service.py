@@ -18,6 +18,8 @@ class BudgetScope:
 
     def __post_init__(self) -> None:
         values = (self.tenant_id, self.action, self.resource)
+        if any(not isinstance(value, str) for value in values):
+            raise TypeError("budget scope text fields must be strings")
         if any(not value or value != value.strip() for value in values):
             raise ValueError("budget scope fields are required and normalized")
         if len(self.tenant_id) > 256 or len(self.action) > 256 or len(self.resource) > 256:
@@ -116,6 +118,8 @@ class BudgetService:
         tool_calls: int = 1,
         seconds: float = 0.0,
     ) -> BudgetReservation:
+        if self._tenant_quota is not None:
+            raise RuntimeError("reserve_scoped is required when tenant quota is enabled")
         scope = BudgetScope(
             tenant_id,
             UUID(int=0),
