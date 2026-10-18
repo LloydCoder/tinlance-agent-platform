@@ -890,18 +890,18 @@ class GovernedExecutionService:
                             "execution.budget_settlement_unknown",
                             audit_ids,
                         )
-                    if exc.code not in {
-                        ExecutionErrorCode.BUDGET_EXCEEDED,
-                        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
-                    }:
-                        exc = ExecutionFailure(
-                            ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
-                            "tool execution failed after side-effect start; outcome requires reconciliation",
-                        )
                 else:
                     with suppress(Exception):
                         self.budget.release(budget_reservation)
                     budget_reservation = None
+            if side_effect_started and exc.code not in {
+                ExecutionErrorCode.BUDGET_EXCEEDED,
+                ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+            }:
+                exc = ExecutionFailure(
+                    ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                    "tool execution failed after side-effect start; outcome requires reconciliation",
+                )
             state = {
                 ExecutionErrorCode.APPROVAL_REQUIRED: ExecutionState.WAITING_APPROVAL,
                 ExecutionErrorCode.BUDGET_EXCEEDED: ExecutionState.BUDGET_EXCEEDED,
