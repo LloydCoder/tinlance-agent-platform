@@ -166,7 +166,8 @@ class EcosystemRegistrySnapshot:
             if not service.enabled:
                 raise ValueError(f"{service.service_id}: required service registration is disabled")
             if service.owner_repository_id != "platform" and service.authority_mode not in {
-                AuthorityMode.AUTHORITY_FREE, AuthorityMode.CONFORMANCE_ONLY
+                AuthorityMode.AUTHORITY_FREE,
+                AuthorityMode.CONFORMANCE_ONLY
             }:
                 raise ValueError(
                     f"{service.service_id}: non-Platform service cannot grant authority"
