@@ -700,13 +700,13 @@ class GovernedExecutionService:
                 ExecutionState.RUNNING,
                 side_effect_started=True,
             )
+            permit = self.tools.issue_permit(call, policy)
+            if permit.decision != policy:
+                raise ExecutionFailure(
+                    ExecutionErrorCode.AUTHORIZATION_DENIED,
+                    "tool authority decision diverged from Platform policy",
+                )
             try:
-                permit = self.tools.issue_permit(call, policy)
-                if permit.decision != policy:
-                    raise ExecutionFailure(
-                        ExecutionErrorCode.AUTHORIZATION_DENIED,
-                        "tool authority decision diverged from Platform policy",
-                    )
                 output = self.tools.execute(
                     call,
                     permit,
@@ -716,20 +716,33 @@ class GovernedExecutionService:
                     timeout_seconds=effective_timeout,
                 )
             except TimeoutError:
-                self._journal_state(request, execution_id, ExecutionState.TIMED_OUT)
-                self._event(request, execution_id, "execution.timed_out", audit_ids)
+                # A timeout after entering the tool gateway does not prove that
+                # the external side effect did not occur. Attempt usage settlement,
+                # but leave the reservation held if settlement cannot be confirmed.
+                elapsed = monotonic() - started
+                if budget_reservation is not None and self.budget is not None:
+                    try:
+                        self.budget.consume(budget_reservation, elapsed)
+                    except Exception:
+                        with suppress(Exception):
+                            self._event(
+                                request,
+                                execution_id,
+                                "execution.budget_settlement_unknown",
+                                audit_ids,
+                            )
+                    budget_reservation = None
+                self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
+                self._event(request, execution_id, "execution.outcome_unknown", audit_ids)
                 result = ExecutionResult(
                     execution_id,
-                    ExecutionState.TIMED_OUT,
+                    ExecutionState.OUTCOME_UNKNOWN,
                     None,
                     (),
                     tuple(audit_ids),
-                    ExecutionErrorCode.TIMEOUT,
+                    ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
                     False,
                 )
-                if budget_reservation is not None and self.budget is not None:
-                    self.budget.release(budget_reservation)
-                    budget_reservation = None
                 self.idempotency.complete(record, result)
                 if self.journal is not None:
                     self._journal_state(
@@ -763,6 +776,37 @@ class GovernedExecutionService:
             if request.approval_id is not None:
                 self._event(request, execution_id, "approval.consumed", audit_ids)
             elapsed = monotonic() - started
+            if budget_reservation is not None and self.budget is not None:
+                try:
+                    self.budget.consume(budget_reservation, elapsed)
+                except TimeoutError as exc:
+                    # The tool has already executed; do not refund an overrun.
+                    budget_reservation = None
+                    self._event(
+                        request,
+                        execution_id,
+                        "execution.budget_settlement_unknown",
+                        audit_ids,
+                    )
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.BUDGET_EXCEEDED,
+                        "execution exceeded its reserved budget; usage remains charged or reserved",
+                    ) from exc
+                except Exception as exc:
+                    # Settlement may have failed after a consequential side effect.
+                    # Keep the reservation for explicit recovery/reconciliation.
+                    budget_reservation = None
+                    self._event(
+                        request,
+                        execution_id,
+                        "execution.budget_settlement_unknown",
+                        audit_ids,
+                    )
+                    raise ExecutionFailure(
+                        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                        "execution completed but budget settlement could not be confirmed",
+                    ) from exc
+                budget_reservation = None
             if elapsed > effective_timeout:
                 self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
                 self._event(request, execution_id, "execution.timed_out", audit_ids)
@@ -775,9 +819,6 @@ class GovernedExecutionService:
                     ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
                     False,
                 )
-                if budget_reservation is not None and self.budget is not None:
-                    self.budget.release(budget_reservation)
-                    budget_reservation = None
                 self.idempotency.complete(record, result)
                 if self.journal is not None:
                     self._journal_state(
@@ -793,48 +834,12 @@ class GovernedExecutionService:
                 try:
                     output = self.secrets.redact_output(request, output)
                 except Exception as exc:
-                    if budget_reservation is not None and self.budget is not None:
-                        self.budget.release(budget_reservation)
-                        budget_reservation = None
+                    # Budget settlement precedes redaction, so a presentation-layer
+                    # failure cannot silently refund already executed work.
                     raise ExecutionFailure(
                         ExecutionErrorCode.SECRET_ACCESS_DENIED,
                         "secret redaction could not be established",
                     ) from exc
-            if budget_reservation is not None and self.budget is not None:
-                try:
-                    self.budget.consume(budget_reservation, elapsed)
-                except TimeoutError as exc:
-                    # The tool has already executed. A failed settlement is not
-                    # proof that no side effect occurred, so never refund here.
-                    # Durable quota gates must leave the reservation for explicit
-                    # reconciliation; the in-memory reference gate remains held.
-                    budget_reservation = None
-                    self._event(
-                        request,
-                        execution_id,
-                        "execution.budget_settlement_unknown",
-                        audit_ids,
-                    )
-                    raise ExecutionFailure(
-                        ExecutionErrorCode.BUDGET_EXCEEDED,
-                        "execution exceeded its reserved budget; usage remains charged or reserved",
-                    ) from exc
-                except Exception as exc:
-                    # Settlement may have failed after a consequential side effect.
-                    # Do not call release: the reservation must remain available for
-                    # recovery/reconciliation instead of silently refunding usage.
-                    budget_reservation = None
-                    self._event(
-                        request,
-                        execution_id,
-                        "execution.budget_settlement_unknown",
-                        audit_ids,
-                    )
-                    raise ExecutionFailure(
-                        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
-                        "execution completed but budget settlement could not be confirmed",
-                    ) from exc
-                budget_reservation = None
             evidence_ids: list[UUID] = []
             if request.evidence_required:
                 try:
