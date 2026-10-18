@@ -97,7 +97,7 @@ class TraceLineageContext:
             (self.operation, "operation"),
         ):
             _required(value, label)
-        for value, label in (
+        for optional_value, label in (
             (self.workspace_id, "workspace_id"),
             (self.execution_id, "execution_id"),
             (self.event_id, "event_id"),
@@ -106,29 +106,29 @@ class TraceLineageContext:
             (self.tool_call_id, "tool_call_id"),
             (self.policy_decision_id, "policy_decision_id"),
         ):
-            if value is not None:
-                _required(value, label)
+            if optional_value is not None:
+                _required(optional_value, label)
         _timestamp(self.started_at)
         if self.data_classification not in _CLASSIFICATIONS:
             raise ValueError("unsupported data classification")
         if len(self.evidence_refs) > 1000:
             raise ValueError("evidence_refs exceeds 1000 entries")
         seen: set[str] = set()
-        for key, value in self.safe_attributes:
+        for key, attribute_value in self.safe_attributes:
             if key not in _SAFE_ATTRIBUTE_KEYS:
                 raise ValueError(f"unsafe or unsupported trace attribute: {key}")
             if key in seen:
                 raise ValueError(f"duplicate trace attribute: {key}")
             seen.add(key)
-            if key == "outcome" and value not in _OUTCOMES:
+            if key == "outcome" and attribute_value not in _OUTCOMES:
                 raise ValueError("unsupported trace outcome")
             if key == "attempt" and (
-                not isinstance(value, int) or isinstance(value, bool) or value < 0 or value > 1000
+                not isinstance(attribute_value, int) or isinstance(attribute_value, bool) or attribute_value < 0 or attribute_value > 1000
             ):
                 raise ValueError("trace attempt must be an integer between 0 and 1000")
-            if isinstance(value, str):
-                _required(value, f"trace attribute {key}", 256)
-            elif not isinstance(value, int) or isinstance(value, bool):
+            if isinstance(attribute_value, str):
+                _required(attribute_value, f"trace attribute {key}", 256)
+            elif not isinstance(attribute_value, int) or isinstance(attribute_value, bool):
                 raise ValueError(f"trace attribute {key} must be a string or integer")
 
     @property
