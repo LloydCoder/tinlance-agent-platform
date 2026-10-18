@@ -88,7 +88,7 @@ class CloudEventEnvelope:
             not _SPAN_ID.fullmatch(self.spanid) or set(self.spanid) == {"0"}
         ):
             raise ValueError("spanid must be a valid non-zero W3C span identifier")
-        for value, field, limit in (
+        for optional_value, optional_field, optional_limit in (
             (self.subject, "subject", 1024),
             (self.causationid, "causationid", 256),
             (self.workspaceid, "workspaceid", 256),
@@ -96,8 +96,8 @@ class CloudEventEnvelope:
             (self.actorid, "actorid", 256),
             (self.agentid, "agentid", 256),
         ):
-            if value is not None:
-                _required(value, field, limit)
+            if optional_value is not None:
+                _required(optional_value, optional_field, optional_limit)
         if self.dataschema is not None:
             _uri_reference(self.dataschema, "dataschema", absolute=True)
         if self.dataclassification not in _CLASSIFICATIONS:
