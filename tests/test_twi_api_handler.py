@@ -6,8 +6,8 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_app.twi_api_handler import TWIAPIHandler
+from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_contracts import Principal
 from tinlance_agent_platform_mcp import (
     TWI_MCP_TOOL_DEFINITIONS,
