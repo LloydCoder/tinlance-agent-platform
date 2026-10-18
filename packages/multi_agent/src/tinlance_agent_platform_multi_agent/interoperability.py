@@ -12,9 +12,11 @@ import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
+
+import rfc8785
 
 A2A_SPECIFICATION_VERSION = "1.0.1"
 A2A_PROTOCOL_VERSION = "1.0"
@@ -242,18 +244,13 @@ class AgentCard:
         return payload
 
     def canonical_payload(self) -> bytes:
-        """Deterministic JSON for this string/boolean-only Agent Card profile.
-
-        The supported profile intentionally excludes numeric extension values so
-        sorted-key compact JSON matches the JCS canonical form for these fields.
-        """
-        return json.dumps(
-            self._unsigned_payload(),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
+        """Return the RFC 8785 canonical UTF-8 representation of the unsigned card."""
+        try:
+            # The protocol payload is assembled from JSON-compatible values; the
+            # canonicalizer performs the authoritative runtime validation.
+            return rfc8785.dumps(cast(Any, self._unsigned_payload()))
+        except (rfc8785.CanonicalizationError, TypeError, ValueError) as exc:
+            raise ValueError("Agent Card cannot be represented as RFC 8785 canonical JSON") from exc
 
     def verify_signature(self, verifier: AgentCardSignatureVerifier) -> None:
         self.validate()

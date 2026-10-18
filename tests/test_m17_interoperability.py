@@ -275,3 +275,39 @@ def test_remote_endpoint_rejects_query_parameters() -> None:
             "https://" + "agent.example" + "/a2a?access_token=unsafe",
             lambda _host: ("93.184.216.34",),
         )
+
+
+def test_agent_card_signature_profile_uses_full_rfc8785_json_types() -> None:
+    extended_card = replace(
+        make_card(),
+        security_scheme_details={
+            "bearer": {
+                "httpAuthSecurityScheme": {
+                    "scheme": "Bearer",
+                    "numericExtension": 1.25,
+                    "nullableExtension": None,
+                    "unicodeKey": "schéma",
+                }
+            }
+        },
+    )
+    canonical = extended_card.canonical_payload()
+    assert b'"numericExtension":1.25' in canonical
+    assert b'"nullableExtension":null' in canonical
+    assert "schéma".encode() in canonical
+
+    invalid_unicode = replace(
+        make_card(),
+        security_scheme_details={"bearer": {"invalid": "\ud800"}},
+    )
+    with pytest.raises(ValueError, match="RFC 8785"):
+        invalid_unicode.canonical_payload()
+
+
+def test_agent_card_canonical_payload_is_deterministic_for_rfc8785_profile() -> None:
+    card = make_card()
+    first = card.canonical_payload()
+    second = card.canonical_payload()
+    assert first == second
+    assert b'"supportedInterfaces"' in first
+    assert b'"securitySchemes"' in first
