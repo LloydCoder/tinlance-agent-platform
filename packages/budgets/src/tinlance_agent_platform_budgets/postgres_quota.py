@@ -74,12 +74,22 @@ class QuotaSettlement:
 class PostgresQuotaLedger:
     """Calls the migration-owned transactional quota procedures."""
 
-    _EVIDENCE_KEYS = frozenset({
-        "provider", "model", "price_book_version", "measurement_ref",
-        "source_event_id", "cancellation_reason", "metering_source",
-        "billing_unit", "policy_ref", "correlation_id", "trace_id",
-        "traceparent",
-    })
+    _EVIDENCE_KEYS = frozenset(
+        {
+            "provider",
+            "model",
+            "price_book_version",
+            "measurement_ref",
+            "source_event_id",
+            "cancellation_reason",
+            "metering_source",
+            "billing_unit",
+            "policy_ref",
+            "correlation_id",
+            "trace_id",
+            "traceparent",
+        }
+    )
     _REASON_CODE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
 
     @classmethod
