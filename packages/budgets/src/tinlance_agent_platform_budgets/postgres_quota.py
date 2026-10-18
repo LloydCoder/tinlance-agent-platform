@@ -412,7 +412,6 @@ class PostgresBudgetGate:
         self._measure_usage = measure_usage
         self._resolve_organization = resolve_organization
         self._active: dict[UUID, PostgresBudgetReservation] = {}
-        self._terminal: dict[UUID, str] = {}
         self._lock = RLock()
 
     def _transaction(self, tenant_id: UUID, operation: Callable[[PostgresQuotaLedger], Any]) -> Any:
@@ -515,7 +514,6 @@ class PostgresBudgetGate:
             ),
         )
         with self._lock:
-            self._terminal[reservation.reservation_id] = status
             self._active.pop(reservation.reservation_id, None)
         if elapsed_seconds > reservation.local_reservation.seconds:
             self._run_budget.consume_overrun(reservation.local_reservation, elapsed_seconds)
@@ -528,13 +526,13 @@ class PostgresBudgetGate:
 
     def release(self, reservation: PostgresBudgetReservation) -> None:
         with self._lock:
-            terminal = self._terminal.get(reservation.reservation_id)
             current = self._active.get(reservation.reservation_id)
-            if terminal in {"settled", "overrun", "already_settled", "released"}:
+            if current is None:
+                # Idempotent local cleanup after a confirmed settlement/release.
                 self._run_budget.release(reservation.local_reservation)
                 return
             if current != reservation:
-                raise KeyError("durable budget reservation is not active")
+                raise KeyError("durable budget reservation scope mismatch")
         released = False
         try:
             released = self._transaction(
@@ -549,7 +547,6 @@ class PostgresBudgetGate:
             if not released:
                 raise RuntimeError("durable quota reservation was not released")
             with self._lock:
-                self._terminal[reservation.reservation_id] = "released"
                 self._active.pop(reservation.reservation_id, None)
         finally:
             # Local run budget is process-local; the durable ledger remains the
