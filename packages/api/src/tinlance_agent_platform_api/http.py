@@ -88,6 +88,17 @@ def serve(
         server_version = "TinlanceAgentPlatform/1.1"
         sys_version = ""
 
+        def _reject_ambiguous_headers(self, names: tuple[str, ...]) -> bool:
+            for name in names:
+                values = self.headers.get_all(name, [])
+                if values is not None and len(values) > 1:
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "duplicate_header"})
+                    return True
+            if self.headers.get_all("Transfer-Encoding"):
+                self._respond(HTTPStatus.BAD_REQUEST, {"error": "unsupported_transfer_encoding"})
+                return True
+            return False
+
         def do_GET(self) -> None:  # noqa: N802
             if self.path != "/.well-known/agent-card.json" or a2a_service is None:
                 self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
@@ -99,6 +110,18 @@ def serve(
 
         def do_POST(self) -> None:  # noqa: N802
             if self.path == "/a2a":
+                if self._reject_ambiguous_headers(
+                    (
+                        "Content-Length",
+                        "Content-Type",
+                        "Authorization",
+                        "Origin",
+                        "A2A-Version",
+                        "Idempotency-Key",
+                        "traceparent",
+                    )
+                ):
+                    return
                 if a2a_service is None:
                     self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                     return
@@ -124,6 +147,18 @@ def serve(
                     )
                 return
             if self.path == "/mcp":
+                if self._reject_ambiguous_headers(
+                    (
+                        "Content-Length",
+                        "Content-Type",
+                        "Authorization",
+                        "Origin",
+                        "MCP-Protocol-Version",
+                        "Mcp-Method",
+                        "Mcp-Name",
+                    )
+                ):
+                    return
                 if mcp_service is None:
                     self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                     return
