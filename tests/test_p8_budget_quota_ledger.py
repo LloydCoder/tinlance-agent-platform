@@ -387,3 +387,15 @@ def test_postgres_settlement_requires_a_measurement_reference() -> None:
             reservation_id=uuid4(),
             actual=QuotaSettlement(1, 10, 0.1, {}),
         )
+
+
+def test_capacity_observation_rejects_non_integer_concurrency() -> None:
+    with pytest.raises(ValueError, match="capacity observation"):
+        CapacityObservation(10.0, 10.0, 20.0, "1")
+
+
+def test_capacity_gate_rejects_unbounded_evidence_reference() -> None:
+    envelope = CapacityEnvelope(10.0, 100.0, 200.0, 10)
+    observation = CapacityObservation(10.0, 50.0, 100.0, 2)
+    with pytest.raises(ValueError, match="capacity evidence"):
+        CapacityGate(envelope, observation, " bad\nreference")
