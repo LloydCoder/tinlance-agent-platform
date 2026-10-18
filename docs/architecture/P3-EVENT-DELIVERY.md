@@ -12,7 +12,7 @@ The application must begin a tenant-scoped database transaction, perform its dom
 4. On failure, call `platform.release_outbox` with a stable non-sensitive error code. The database applies bounded exponential backoff with jitter; once attempts reach `max_attempts`, the row is dead-lettered.
 5. A stale, expired or mismatched lease cannot acknowledge or release a row.
 
-A process crash after external publish but before acknowledgement can duplicate delivery. Consumers must deduplicate; the system promises at-least-once delivery, not exactly-once effects.
+A process crash after external publish but before acknowledgement can duplicate delivery. Consumers must deduplicate; the system promises at-least-once delivery, not exactly-once effects. The `ordering_key` column is metadata only in this release: the current claim function does not enforce per-key order. Any adapter that promises ordered delivery must implement and test head-of-line blocking for each aggregate before making that guarantee.
 
 ## Consumer transaction
 
