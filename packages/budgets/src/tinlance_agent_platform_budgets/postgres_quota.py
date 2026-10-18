@@ -17,6 +17,20 @@ from typing import Any
 from uuid import UUID, uuid4
 
 
+_COST_QUANTUM = Decimal("0.000001")
+_MAX_COST_UNITS = Decimal("99999999999999.999999")
+
+
+def _normalized_cost_units(value: int | float) -> Decimal:
+    try:
+        normalized = Decimal(str(value)).quantize(_COST_QUANTUM, rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("cost units exceed the supported numeric(20, 6) range") from exc
+    if not normalized.is_finite() or normalized < 0 or normalized > _MAX_COST_UNITS:
+        raise ValueError("cost units exceed the supported numeric(20, 6) range")
+    return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class QuotaReservationRequest:
     tenant_id: UUID
@@ -153,7 +167,7 @@ class PostgresQuotaLedger:
                 request.concurrency,
                 request.tool_calls,
                 request.token_units,
-                request.cost_units,
+                _normalized_cost_units(request.cost_units),
             ),
         ).fetchone()
         if row is None or not isinstance(row[0], UUID):
@@ -197,7 +211,7 @@ class PostgresQuotaLedger:
                 reservation_id,
                 actual.tool_calls,
                 actual.token_units,
-                actual.cost_units,
+                _normalized_cost_units(actual.cost_units),
                 evidence_json,
             ),
         ).fetchone()
