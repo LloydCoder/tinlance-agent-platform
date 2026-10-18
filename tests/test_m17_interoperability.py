@@ -16,9 +16,9 @@ class AcceptCardSignature:
     def verify(self, key_id: str, algorithm: str, payload: bytes, signature: str) -> bool:
         return (
             key_id == "trusted-key-1"
-            and algorithm == "ed25519"
+            and algorithm == "EdDSA"
             and payload
-            and signature == "valid-signature"
+            and signature == "dmFsaWQtc2lnbmF0dXJl"
         )
 
 
@@ -35,29 +35,30 @@ class CaptureA2ATransport:
         *,
         timeout_seconds: float,
         max_response_bytes: int,
+        protocol_version: str,
     ):
-        self.calls.append((endpoint, resolved_addresses, bearer_token, timeout_seconds))
+        self.calls.append((endpoint, resolved_addresses, bearer_token, timeout_seconds, protocol_version))
         return {"task": {"id": "task-1", "status": {"state": "working"}}}
 
 
 def make_card(
     *,
     endpoint: str = "https://agent.example/a2a",
-    signature: str = "valid-signature",
+    signature: str = "dmFsaWQtc2lnbmF0dXJl",
 ) -> AgentCard:
     skill = AgentSkill("documents.read", "Read documents", frozenset({"documents:read"}))
     return AgentCard(
         uuid4(),
-        "1.0.0",
+        "1.0",
         "remote",
         "Remote agent",
         endpoint,
         (skill,),
-        ("oauth2",),
-        "7",
+        ("bearer",),
+        "1.0.0",
         signature,
         "trusted-key-1",
-        "ed25519",
+        "EdDSA",
     )
 
 
@@ -107,7 +108,7 @@ def test_a2a_client_verifies_card_and_passes_pinned_addresses_to_transport() -> 
     result = client.send(make_card(), "opaque-bearer-token", {"method": "message/send"})
     assert result["task"]["id"] == "task-1"
     assert transport.calls == [
-        ("https://agent.example/a2a", ("93.184.216.34",), "opaque-bearer-token", 10.0)
+        ("https://agent.example/a2a", ("93.184.216.34",), "opaque-bearer-token", 10.0, "1.0")
     ]
 
 
