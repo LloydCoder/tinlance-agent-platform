@@ -19,8 +19,9 @@ class FakeCursor:
 
 
 class FakeConnection:
-    def __init__(self, *, run_exists=True, event_rows=None):
+    def __init__(self, *, run_exists=True, event_rows=None, autocommit=False):
         self.run_exists = run_exists
+        self.autocommit = autocommit
         self.event_rows = event_rows or []
         self.queries = []
         self.committed = False
@@ -105,3 +106,10 @@ def test_postgres_list_for_run_rehydrates_rows() -> None:
     assert events[0].event_id == event_id
     assert events[0].payload["state"] == "succeeded"
     assert events[0].trace_id == "4bf92f3577b34da6a3ce929d0e0e4736"
+
+
+def test_postgres_append_fails_closed_on_autocommit_connection() -> None:
+    connection = FakeConnection(autocommit=True)
+    with pytest.raises(RuntimeError, match="active transaction"):
+        PostgresEventStore(connection).append(make_event())
+    assert connection.queries == []
