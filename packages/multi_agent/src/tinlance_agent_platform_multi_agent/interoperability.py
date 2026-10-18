@@ -5,6 +5,7 @@ enter the normal Platform identity, authorization and execution boundaries.
 """
 from __future__ import annotations
 
+import base64
 import ipaddress
 import json
 from collections.abc import Callable, Iterable, Mapping
@@ -15,15 +16,18 @@ from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 
-A2A_PROTOCOL_VERSION = "1.0.0"
+A2A_SPECIFICATION_VERSION = "1.0.0"
+A2A_PROTOCOL_VERSION = "1.0"
 MAX_DELEGATION_TTL_SECONDS = 3600
 MAX_REMOTE_RESPONSE_BYTES = 1_048_576
 
 
 class AgentCardSignatureVerifier(Protocol):
-    """Verifies a canonical card payload against a trusted key registry."""
+    """Verifies a JWS signing input against a trusted key registry."""
 
-    def verify(self, key_id: str, algorithm: str, payload: bytes, signature: str) -> bool: ...
+    def verify(
+        self, key_id: str, algorithm: str, signing_input: bytes, signature: str
+    ) -> bool: ...
 
 
 class RemoteAgentTransport(Protocol):
@@ -38,6 +42,7 @@ class RemoteAgentTransport(Protocol):
         *,
         timeout_seconds: float,
         max_response_bytes: int,
+        protocol_version: str,
     ) -> Mapping[str, object]: ...
 
 
@@ -144,6 +149,7 @@ class AgentCard:
     signature: str | None = None
     key_id: str | None = None
     signature_algorithm: str | None = None
+    security_scheme_details: Mapping[str, Mapping[str, object]] | None = None
 
     def validate(self, *, require_https: bool = True) -> None:
         _validate_url(self.endpoint, require_https=require_https)
@@ -154,6 +160,8 @@ class AgentCard:
         _required(self.card_version, "agent card version")
         if not self.skills:
             raise ValueError("agent card must declare at least one skill")
+        if not self.authentication_schemes:
+            raise ValueError("A2A Agent Card must declare authentication")
         if any(not scheme or scheme != scheme.strip() for scheme in self.authentication_schemes):
             raise ValueError("authentication schemes must be normalized")
         if any(
@@ -164,45 +172,38 @@ class AgentCard:
         if self.signature is not None:
             _required(self.signature, "signature")
             _required(self.key_id or "", "signature key ID")
-            _required(self.signature_algorithm or "", "signature algorithm")
+            if self.signature_algorithm not in {"EdDSA", "ES256", "RS256"}:
+                raise ValueError("unsupported Agent Card signature algorithm")
 
-    def canonical_payload(self) -> bytes:
-        payload = {
-            "agent_id": str(self.agent_id),
-            "protocol_version": self.protocol_version,
-            "name": self.name,
-            "description": self.description,
-            "endpoint": self.endpoint,
-            "skills": [
-                {
-                    "skill_id": skill.skill_id,
-                    "description": skill.description,
-                    "capabilities": sorted(skill.capabilities),
-                }
-                for skill in self.skills
-            ],
-            "authentication_schemes": list(self.authentication_schemes),
-            "card_version": self.card_version,
-        }
-        return json.dumps(
-            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
+    @staticmethod
+    def _base64url(value: bytes) -> str:
+        return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
 
-    def verify_signature(self, verifier: AgentCardSignatureVerifier) -> None:
-        self.validate()
+    def _protected_header(self) -> dict[str, str]:
         if not self.signature or not self.key_id or not self.signature_algorithm:
-            raise PermissionError("remote Agent Card must have a verifiable signature")
-        if not verifier.verify(
-            self.key_id,
-            self.signature_algorithm,
-            self.canonical_payload(),
-            self.signature,
-        ):
-            raise PermissionError("remote Agent Card signature is not trusted")
+            raise ValueError("Agent Card signature metadata is incomplete")
+        return {"alg": self.signature_algorithm, "typ": "JOSE", "kid": self.key_id}
 
-    def as_payload(self) -> dict[str, object]:
-        """Serialize credential-free discovery metadata; never include tokens."""
-        return {
+    def _unsigned_payload(self) -> dict[str, object]:
+        security_schemes: dict[str, object] = {}
+        security_requirements: list[dict[str, list[str]]] = []
+        details = self.security_scheme_details or {}
+        for scheme in self.authentication_schemes:
+            configured = details.get(scheme)
+            if configured is not None:
+                if len(configured) != 1:
+                    raise ValueError("each A2A security scheme must define exactly one scheme type")
+                security_schemes[scheme] = dict(configured)
+            elif scheme.lower() in {"bearer", "http-bearer"}:
+                security_schemes[scheme] = {
+                    "httpAuthSecurityScheme": {"scheme": "Bearer"}
+                }
+            else:
+                raise ValueError(
+                    f"security scheme {scheme!r} requires explicit protocol details"
+                )
+            security_requirements.append({scheme: []})
+        payload: dict[str, object] = {
             "name": self.name,
             "description": self.description,
             "supportedInterfaces": [
@@ -213,31 +214,82 @@ class AgentCard:
                 }
             ],
             "version": self.card_version,
-            "securitySchemes": {
-                scheme: {"type": "http", "scheme": "bearer"}
-                for scheme in self.authentication_schemes
+            "capabilities": {
+                "streaming": False,
+                "pushNotifications": False,
+                "extendedAgentCard": False,
             },
+            "securitySchemes": security_schemes,
+            "securityRequirements": security_requirements,
+            "defaultInputModes": ["text/plain"],
+            "defaultOutputModes": ["text/plain"],
             "skills": [
                 {
                     "id": skill.skill_id,
                     "name": skill.skill_id,
                     "description": skill.description,
                     "tags": sorted(skill.capabilities),
+                    "inputModes": ["text/plain"],
+                    "outputModes": ["text/plain"],
                 }
                 for skill in self.skills
             ],
-            "extensions": [
-                {
-                    "uri": "urn:tinlance:agent-card-signature:v1",
-                    "required": True,
-                    "params": {
-                        "keyId": self.key_id,
-                        "algorithm": self.signature_algorithm,
-                        "signature": self.signature,
-                    },
-                }
-            ] if self.signature and self.key_id and self.signature_algorithm else [],
         }
+        return payload
+
+    def canonical_payload(self) -> bytes:
+        """Deterministic JSON for this string/boolean-only Agent Card profile.
+
+        The supported profile intentionally excludes numeric extension values so
+        sorted-key compact JSON matches the JCS canonical form for these fields.
+        """
+        return json.dumps(
+            self._unsigned_payload(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+
+    def verify_signature(self, verifier: AgentCardSignatureVerifier) -> None:
+        self.validate()
+        if not self.signature or not self.key_id or not self.signature_algorithm:
+            raise PermissionError("remote Agent Card must have a verifiable signature")
+        protected = self._base64url(
+            json.dumps(
+                self._protected_header(),
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        signing_input = (
+            protected.encode("ascii")
+            + b"."
+            + self._base64url(self.canonical_payload()).encode("ascii")
+        )
+        if not verifier.verify(
+            self.key_id,
+            self.signature_algorithm,
+            signing_input,
+            self.signature,
+        ):
+            raise PermissionError("remote Agent Card signature is not trusted")
+
+    def as_payload(self) -> dict[str, object]:
+        """Serialize the A2A 1.0 Agent Card without embedding credentials."""
+        payload = self._unsigned_payload()
+        if self.signature and self.key_id and self.signature_algorithm:
+            protected = self._base64url(
+                json.dumps(
+                    self._protected_header(),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+            payload["signatures"] = [
+                {"protected": protected, "signature": self.signature}
+            ]
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -350,6 +402,7 @@ class A2AClient:
             payload,
             timeout_seconds=timeout_seconds,
             max_response_bytes=MAX_REMOTE_RESPONSE_BYTES,
+            protocol_version=A2A_PROTOCOL_VERSION,
         )
         response_size = len(
             json.dumps(response, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
