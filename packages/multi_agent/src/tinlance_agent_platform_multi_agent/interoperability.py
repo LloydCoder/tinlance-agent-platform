@@ -403,19 +403,18 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
     ) -> None:
         super().__init__(host, port=port, timeout=timeout, context=context)
         self._pinned_address = str(ipaddress.ip_address(pinned_address))
+        self._tls_context = context
         if not ipaddress.ip_address(self._pinned_address).is_global:
             raise ValueError("pinned remote A2A address must be globally routable")
 
     def connect(self) -> None:
-        if self._tunnel_host:
-            raise ValueError("proxy tunneling is not supported for pinned A2A transport")
         raw_socket = socket.create_connection(
             (self._pinned_address, self.port),
             self.timeout,
-            self.source_address,
+            None,
         )
         try:
-            self.sock = self._context.wrap_socket(raw_socket, server_hostname=self.host)
+            self.sock = self._tls_context.wrap_socket(raw_socket, server_hostname=self.host)
         except Exception:
             raw_socket.close()
             raise
