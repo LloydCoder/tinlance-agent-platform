@@ -427,7 +427,6 @@ class MCPProtocolService:
             _validate_request_meta(params, header_version)
             if method == "server/discover":
                 result: dict[str, object] = {
-                    "protocolVersion": MCP_PROTOCOL_VERSION,
                     "supportedVersions": [MCP_PROTOCOL_VERSION],
                     "capabilities": {"tools": {}},
                     "ttlMs": self._list_ttl_ms,
