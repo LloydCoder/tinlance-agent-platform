@@ -106,7 +106,7 @@ class PostgresQuotaLedger:
         tenant_id: UUID,
         reservation_id: UUID,
         actual: QuotaSettlement,
-    ) -> bool:
+    ) -> str:
         self._require_transaction()
         if (
             isinstance(actual.tool_calls, bool)
@@ -131,7 +131,7 @@ class PostgresQuotaLedger:
                 evidence_json,
             ),
         ).fetchone()
-        if row is None or not isinstance(row[0], bool):
+        if row is None or row[0] not in {"settled", "already_settled", "overrun"}:
             raise RuntimeError("quota settlement procedure returned an unexpected result")
         return row[0]
 
