@@ -173,7 +173,7 @@ begin
     exception when insufficient_privilege then
         null;
     end;
-end
+end;
 $$;
 
 rollback;
