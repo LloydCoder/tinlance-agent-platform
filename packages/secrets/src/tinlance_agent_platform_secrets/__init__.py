@@ -1,4 +1,5 @@
 from .broker import SecretBroker, SecretHandle
+from .model_provider import ModelCredentialRequest, ScopedModelCredentialProvider
 from .scoped import (
     ScopedSecretBroker,
     ScopedSecretHandle,
