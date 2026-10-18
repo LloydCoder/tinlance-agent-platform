@@ -1,7 +1,10 @@
+import http.client
 import json
+import threading
 from dataclasses import dataclass
 
 from tinlance_agent_platform_api.service import APIResponse
+from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_mcp import MCPProtocolService, MCPToolDefinition
 
 
@@ -188,3 +191,34 @@ def test_duplicate_json_keys_and_invalid_traceparent_fail_closed() -> None:
         body("tools/call", {"name": "search", "arguments": {"query": "ok"}}),
     )
     assert invalid_trace.status_code == 400
+
+
+def test_http_server_mounts_the_mcp_service_at_the_remote_endpoint() -> None:
+    service, api, _ = make_service()
+    server = serve(api, Resolver(), host="127.0.0.1", port=0, mcp_service=service)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        connection = http.client.HTTPConnection(host, port, timeout=3)
+        payload = body("server/discover")
+        connection.request(
+            "POST",
+            "/mcp",
+            body=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer valid-token",
+                "MCP-Protocol-Version": "2026-07-28",
+                "Mcp-Method": "server/discover",
+            },
+        )
+        response = connection.getresponse()
+        decoded = json.loads(response.read().decode())
+        assert response.status == 200
+        assert decoded["result"]["protocolVersion"] == "2026-07-28"
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
