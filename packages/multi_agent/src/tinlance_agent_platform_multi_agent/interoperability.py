@@ -7,8 +7,13 @@ enter the normal Platform identity, authorization and execution boundaries.
 from __future__ import annotations
 
 import base64
+import http.client
 import ipaddress
 import json
+import math
+import re
+import socket
+import ssl
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -382,6 +387,156 @@ class RemoteDelegation:
             raise PermissionError("delegation audience does not match the remote agent")
         if not self.delegation_nonce.strip():
             raise PermissionError("delegation nonce is missing")
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS connection that dials a previously validated IP, not a fresh DNS result."""
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+        pinned_address: str,
+    ) -> None:
+        super().__init__(host, port=port, timeout=timeout, context=context)
+        self._pinned_address = str(ipaddress.ip_address(pinned_address))
+        self._tls_context = context
+        if not ipaddress.ip_address(self._pinned_address).is_global:
+            raise ValueError("pinned remote A2A address must be globally routable")
+
+    def connect(self) -> None:
+        raw_socket = socket.create_connection(
+            (self._pinned_address, self.port),
+            self.timeout,
+            None,
+        )
+        try:
+            self.sock = self._tls_context.wrap_socket(raw_socket, server_hostname=self.host)
+        except Exception:
+            raw_socket.close()
+            raise
+
+
+def _validate_json_object_keys(value: object, path: str = "A2A payload") -> None:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if not isinstance(key, str):
+                raise ValueError(f"{path} object keys must be strings")
+            _validate_json_object_keys(nested, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, nested in enumerate(value):
+            _validate_json_object_keys(nested, f"{path}[{index}]")
+
+
+class PinnedHTTPSRemoteAgentTransport:
+    """Bounded HTTPS transport for A2A that pins the validated IP and never follows redirects.
+
+    The hostname remains the TLS SNI/certificate-verification identity and HTTP Host
+    identity; only the TCP destination is replaced with the address set validated by
+    `validate_remote_endpoint`. No DNS lookup is performed by this transport.
+    """
+
+    def post(
+        self,
+        endpoint: str,
+        resolved_addresses: tuple[str, ...],
+        bearer_token: str,
+        payload: Mapping[str, object],
+        *,
+        timeout_seconds: float,
+        max_response_bytes: int,
+        protocol_version: str,
+        content_type: str,
+    ) -> Mapping[str, object]:
+        hostname, scheme = _validate_url(endpoint, require_https=True)
+        if scheme != "https":
+            raise ValueError("remote A2A transport requires HTTPS")
+        if protocol_version != A2A_PROTOCOL_VERSION:
+            raise ValueError("unsupported A2A wire protocol version")
+        if content_type != "application/a2a+json":
+            raise ValueError("A2A 1.0.1 HTTP binding requires application/a2a+json")
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0 or timeout_seconds > 30:
+            raise ValueError("A2A timeout must be finite and between 0 and 30 seconds")
+        if not 1 <= max_response_bytes <= MAX_REMOTE_RESPONSE_BYTES:
+            raise ValueError("A2A response limit is outside the supported bound")
+        if (
+            not isinstance(bearer_token, str)
+            or not bearer_token
+            or bearer_token != bearer_token.strip()
+            or re.fullmatch(r"[A-Za-z0-9._~+/-]+=*", bearer_token) is None
+        ):
+            raise ValueError("A2A scoped credential is invalid")
+        if not resolved_addresses:
+            raise ValueError("A2A transport requires validated destination addresses")
+
+        addresses: list[str] = []
+        for value in resolved_addresses:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as exc:
+                raise ValueError("A2A transport received an invalid pinned address") from exc
+            if not address.is_global:
+                raise ValueError("A2A transport refuses non-public pinned addresses")
+            addresses.append(str(address))
+
+        _validate_json_object_keys(payload)
+        try:
+            encoded = json.dumps(
+                dict(payload),
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("A2A request payload is not valid JSON data") from exc
+        if len(encoded) > MAX_REMOTE_RESPONSE_BYTES:
+            raise ValueError("A2A request exceeds maximum size")
+
+        parsed = urlparse(endpoint)
+        target = parsed.path or "/"
+        connection = _PinnedHTTPSConnection(
+            hostname,
+            parsed.port or 443,
+            timeout=timeout_seconds,
+            context=ssl.create_default_context(),
+            pinned_address=addresses[0],
+        )
+        try:
+            connection.request(
+                "POST",
+                target,
+                body=encoded,
+                headers={
+                    "Authorization": f"Bearer {bearer_token}",
+                    "Content-Type": content_type,
+                    "Accept": content_type,
+                    "A2A-Version": protocol_version,
+                },
+            )
+            response = connection.getresponse()
+            if not 200 <= response.status < 300:
+                raise ValueError(f"remote A2A endpoint returned HTTP {response.status}")
+            response_type = response.getheader("Content-Type", "").split(";", 1)[0].strip().lower()
+            if response_type != content_type:
+                raise ValueError("remote A2A endpoint returned an unexpected content type")
+            raw = response.read(max_response_bytes + 1)
+            if len(raw) > max_response_bytes:
+                raise ValueError("remote A2A response exceeds maximum size")
+            try:
+                decoded = json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                raise ValueError("remote A2A endpoint returned invalid JSON") from exc
+            if not isinstance(decoded, dict):
+                raise ValueError("remote A2A response must be a JSON object")
+            return decoded
+        except (OSError, TimeoutError, http.client.HTTPException) as exc:
+            # Do not surface remote response bodies, headers, or credentials.
+            raise RuntimeError("remote A2A transport failed") from exc
+        finally:
+            connection.close()
 
 
 class A2AClient:
