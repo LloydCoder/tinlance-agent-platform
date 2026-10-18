@@ -482,11 +482,15 @@ class MCPProtocolService:
         except PermissionError as exc:
             status = getattr(exc, "http_status", 403)
             code = getattr(exc, "code", "forbidden")
-            return self._http_error(status if isinstance(status, int) else 403, code if isinstance(code, str) else "forbidden")
+            safe_status = status if isinstance(status, int) else 403
+            safe_code = code if isinstance(code, str) else "forbidden"
+            return self._http_error(safe_status, safe_code)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
             status = getattr(exc, "http_status", 400)
             code = getattr(exc, "code", "invalid_request")
-            return self._http_error(status if isinstance(status, int) else 400, code if isinstance(code, str) else "invalid_request")
+            safe_status = status if isinstance(status, int) else 400
+            safe_code = code if isinstance(code, str) else "invalid_request"
+            return self._http_error(safe_status, safe_code)
         except Exception:
             return self._http_error(500, "platform_error")
 
