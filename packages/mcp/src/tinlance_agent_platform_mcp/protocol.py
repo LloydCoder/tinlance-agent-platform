@@ -211,18 +211,20 @@ def _matches_schema(
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError(f"{path} must be a finite number")
-        for keyword, predicate in (
-            ("minimum", lambda bound: value >= bound),
-            ("maximum", lambda bound: value <= bound),
-            ("exclusiveMinimum", lambda bound: value > bound),
-            ("exclusiveMaximum", lambda bound: value < bound),
-        ):
+        for keyword in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"):
             bound = schema.get(keyword)
-            if bound is not None:
-                if not isinstance(bound, (int, float)) or isinstance(bound, bool):
-                    raise ValueError(f"declared {keyword} is invalid")
-                if not predicate(bound):
-                    raise ValueError(f"{path} violates {keyword}")
+            if bound is None:
+                continue
+            if not isinstance(bound, (int, float)) or isinstance(bound, bool):
+                raise ValueError(f"declared {keyword} is invalid")
+            if keyword == "minimum" and value < bound:
+                raise ValueError(f"{path} violates {keyword}")
+            if keyword == "maximum" and value > bound:
+                raise ValueError(f"{path} violates {keyword}")
+            if keyword == "exclusiveMinimum" and value <= bound:
+                raise ValueError(f"{path} violates {keyword}")
+            if keyword == "exclusiveMaximum" and value >= bound:
+                raise ValueError(f"{path} violates {keyword}")
     if isinstance(value, (list, tuple)):
         minimum = schema.get("minItems", 0)
         maximum = schema.get("maxItems", MAX_ARGUMENTS)
