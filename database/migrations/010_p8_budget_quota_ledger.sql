@@ -149,11 +149,11 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = pg_catalog, platform
-as $
+as $$
 begin
     raise exception 'quota ledger is append-only' using errcode = '42501';
 end;
-$;
+$$;
 
 drop trigger if exists quota_ledger_append_only on platform.quota_ledger;
 create trigger quota_ledger_append_only
@@ -1150,7 +1150,7 @@ revoke all on function platform.release_quota(uuid, uuid, text, jsonb) from publ
 
                ))
        )
-$;
+$$;
 
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
@@ -2491,7 +2491,7 @@ revoke all on function platform.release_quota(uuid, uuid, text, jsonb) from publ
 
                ))
        )
-$;
+$$;
 
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
