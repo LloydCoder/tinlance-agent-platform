@@ -16,6 +16,17 @@ alter table platform.events
 create unique index if not exists uq_events_source_event_id
     on platform.events(source, event_id);
 
+-- Existing events predate P3 trace propagation. Backfill stable synthetic trace IDs
+-- and correlation IDs rather than losing legacy rows; these IDs are observability only.
+update platform.events
+   set trace_id = md5(event_id::text)
+ where trace_id is null;
+update platform.events
+   set correlation_id = coalesce(run_id::text, event_id::text)
+ where correlation_id is null;
+alter table platform.events alter column trace_id set not null;
+alter table platform.events alter column correlation_id set not null;
+
 alter table platform.events drop constraint if exists events_source_nonempty_check;
 alter table platform.events add constraint events_source_nonempty_check
     check (length(trim(source)) > 0);
