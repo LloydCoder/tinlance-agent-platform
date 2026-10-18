@@ -194,7 +194,7 @@ def _matches_schema(value: object, schema: Mapping[str, object], path: str = "ar
         if schema.get("additionalProperties", False) is False and any(
             key not in properties for key in value
         ):
-                raise ValueError(f"{path} contains undeclared properties")
+            raise ValueError(f"{path} contains undeclared properties")
         for key, nested in value.items():
             child_schema = properties.get(key)
             if child_schema is not None:
