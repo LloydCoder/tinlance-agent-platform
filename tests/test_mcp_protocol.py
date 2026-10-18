@@ -197,8 +197,8 @@ def test_protocol_rejects_origin_header_mismatch_auth_and_rate_limit() -> None:
     mismatch = service.handle(
         headers("tools/list", **{"mcp-method": "tools/call"}), body("tools/list")
     )
-    assert mismatch.status_code == 200
-    assert "error" in decode(mismatch)
+    assert mismatch.status_code == 400
+    assert decode(mismatch)["error"]["message"] == "HeaderMismatch"
     unauthorized_headers = headers("tools/list", authorization="Basic invalid")
     assert service.handle(unauthorized_headers, body("tools/list")).status_code == 401
     limited, _, _ = make_service(allowed=False)
