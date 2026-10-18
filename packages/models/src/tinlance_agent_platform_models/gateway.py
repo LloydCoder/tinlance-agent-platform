@@ -6,6 +6,7 @@ from typing import Protocol
 from uuid import uuid4
 
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
+_TRACEPARENT = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,12 +17,26 @@ class ModelRequest:
     messages: tuple[Mapping[str, str], ...]
     max_output_tokens: int = 4096
     trace_id: str | None = None
+    traceparent: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.agent_id, self.model)):
             raise ValueError("tenant, agent and model are required")
         if any(value != value.strip() for value in (self.tenant_id, self.agent_id, self.model)):
             raise ValueError("model request identifiers must be normalized")
+        if self.trace_id is not None and (
+            not _TRACE_ID.fullmatch(self.trace_id) or set(self.trace_id) == {"0"}
+        ):
+            raise ValueError("trace_id must be a valid non-zero W3C trace identifier")
+        if self.traceparent is not None:
+            match = _TRACEPARENT.fullmatch(self.traceparent)
+            if (
+                match is None
+                or set(match.group(1)) == {"0"}
+                or set(match.group(2)) == {"0"}
+                or (self.trace_id is not None and match.group(1) != self.trace_id)
+            ):
+                raise ValueError("traceparent must be a valid, matching W3C Trace Context header")
         if self.max_output_tokens < 1:
             raise ValueError("max_output_tokens must be positive")
         frozen = []
