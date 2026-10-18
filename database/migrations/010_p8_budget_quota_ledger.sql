@@ -232,8 +232,10 @@ begin
            and existing.reserved_concurrency = p_concurrency
            and existing.reserved_tool_calls = p_tool_calls
            and existing.reserved_token_units = p_token_units
-           and existing.reserved_cost_units = p_cost_units
-           and existing.state = 'reserved' then
+           and existing.reserved_cost_units = p_cost_units then
+            -- Return the original reservation for every identical replay,
+            -- regardless of its current state. Callers must inspect that state
+            -- before starting work; a retry must never create duplicate capacity.
             return existing.reservation_id;
         end if;
         raise exception 'idempotency key conflicts with existing reservation' using errcode = '23505';
