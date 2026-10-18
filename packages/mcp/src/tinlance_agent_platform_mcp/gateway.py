@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
@@ -18,6 +19,7 @@ from tinlance_agent_platform_policy import evaluate
 _MAX_ARGUMENTS = 64
 _MAX_STRING = 16_384
 _MAX_DEPTH = 8
+_TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +27,9 @@ class ToolScope:
     tenant_id: str
     capability: str
     resource: str
+    subject_id: str | None = None
+    request_id: str | None = None
+    traceparent: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.capability, self.resource)):
@@ -38,6 +43,15 @@ class ToolScope:
             )
         ):
             raise ValueError("tool scope fields must be normalized")
+        for value in (self.subject_id, self.request_id):
+            if value is not None and (not value or value != value.strip()):
+                raise ValueError("optional tool scope identity fields must be normalized")
+        if self.traceparent is not None:
+            if not _TRACEPARENT.fullmatch(self.traceparent):
+                raise ValueError("tool scope traceparent is invalid")
+            version, trace_id, span_id, _flags = self.traceparent.split("-")
+            if version == "ff" or set(trace_id) == {"0"} or set(span_id) == {"0"}:
+                raise ValueError("tool scope traceparent identifiers are invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +159,31 @@ class MCPToolGateway:
                 "MCP tenant mismatch",
                 capability_request.risk,
             )
+        if scope.subject_id is not None and scope.subject_id != context.principal.subject_id:
+            return PolicyDecision(
+                Decision.DENY,
+                "mcp-subject-boundary",
+                "1",
+                "MCP subject mismatch",
+                capability_request.risk,
+            )
+        if scope.request_id is not None and scope.request_id != context.request_id:
+            return PolicyDecision(
+                Decision.DENY,
+                "mcp-request-boundary",
+                "1",
+                "MCP request context mismatch",
+                capability_request.risk,
+            )
+        if scope.traceparent is not None and context.trace_context is not None:
+            if scope.traceparent.split("-")[1] != context.trace_context.trace_id:
+                return PolicyDecision(
+                    Decision.DENY,
+                    "mcp-trace-boundary",
+                    "1",
+                    "MCP trace context mismatch",
+                    capability_request.risk,
+                )
         if (
             scope.capability != tool.capability
             or scope.resource != tool.resource_pattern
@@ -183,6 +222,9 @@ class MCPToolGateway:
         payload = json.dumps(
             {
                 "tenant_id": tenant_id,
+                "subject_id": scope.subject_id,
+                "request_id": scope.request_id,
+                "traceparent": scope.traceparent,
                 "run_id": str(run_id),
                 "tool_name": tool_name,
                 "capability": scope.capability,
