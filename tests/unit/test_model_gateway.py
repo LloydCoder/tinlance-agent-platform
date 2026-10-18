@@ -65,7 +65,7 @@ def routing_request(**overrides: object) -> ModelRoutingRequest:
         "estimated_cost_microusd": 50,
         "available_providers": frozenset({"provider-a", "provider-b"}),
         "policy_version": "policy-7",
-        "trace_id": "trace-123",
+        "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
     }
     values.update(overrides)
     return ModelRoutingRequest(**values)  # type: ignore[arg-type]
@@ -172,6 +172,8 @@ def test_model_router_fails_closed_if_audit_recording_fails() -> None:
         {"estimated_cost_microusd": -1},
         {"data_classification": "top-secret"},
         {"available_providers": frozenset()},
+        {"trace_id": "0" * 32},
+        {"trace_id": "invalid"},
     ],
 )
 def test_model_routing_request_rejects_invalid_risk_budget_and_context(
