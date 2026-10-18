@@ -19,13 +19,18 @@ reimplement Platform admission policy.
 - `database/migrations/010_p8_budget_quota_ledger.sql`: tenant and
   organization limits, reservation state, append-only cost ledger, RLS and
   transactional SQL procedures.
+- `database/migrations/011_p8_quota_reservation_recovery.sql`: bounded
+  reservation leases and explicit reconciliation markers for expired work.
+  Expiry is never treated as proof that a consequential side effect did not occur.
 - `tests/test_m13_4_budget_governance.py` and
   `tests/test_p8_budget_quota_ledger.py`: scope binding, in-process race
   controls, replay/idempotency, capacity envelopes, finite-value validation
   and adapter transaction ownership.
 - `database/tests/006_p8_quota_ledger.sql` and
-  `database/tests/007_p8_quota_concurrency.sql`: PostgreSQL reservation,
-  settlement, release, append-only evidence and concurrent admission checks.
+  `database/tests/007_p8_quota_concurrency.sql` and
+  `database/tests/008_p8_quota_recovery.sql`: PostgreSQL reservation,
+  settlement, release, append-only evidence, concurrent admission and
+  expired-lease reconciliation checks.
 
 ## Required semantics
 
