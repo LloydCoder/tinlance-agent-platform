@@ -4,6 +4,7 @@ This is separate from the tenant-scoped resource inventory: it validates the
 system's reviewed component registrations and contract compatibility before
 those registrations are used by runtime components.
 """
+
 from __future__ import annotations
 
 import re
