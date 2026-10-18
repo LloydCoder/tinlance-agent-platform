@@ -8,17 +8,38 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Protocol
+from typing import Protocol, cast
 from urllib.parse import urlparse
 
-from tinlance_agent_platform_api.service import (
-    AgentPlatformAPI,
-    APIRequest,
-    AuthenticationError,
-    ExecutionAPIError,
-    IdempotencyConflictError,
-    PrincipalResolver,
-)
+@dataclass(frozen=True, slots=True)
+class MCPPlatformRequest:
+    tenant_id: str
+    subject_id: str
+    operation: str
+    payload: dict[str, object]
+    request_id: str
+    trace_id: str | None = None
+    idempotency_key: str | None = None
+    authenticated_principal: object | None = None
+
+
+class MCPAuthenticatedPrincipal(Protocol):
+    tenant_id: str
+    subject_id: str
+
+
+class MCPPrincipalResolver(Protocol):
+    def resolve(self, bearer_token: str) -> MCPAuthenticatedPrincipal: ...
+
+
+class MCPPlatformResponse(Protocol):
+    status: str
+    payload: dict[str, object]
+
+
+class MCPPlatformDispatcher(Protocol):
+    def dispatch(self, request: object) -> MCPPlatformResponse: ...
+
 
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MAX_REQUEST_BYTES = 1_048_576
@@ -283,8 +304,8 @@ class MCPProtocolService:
 
     def __init__(
         self,
-        api: AgentPlatformAPI,
-        resolver: PrincipalResolver,
+        api: object,
+        resolver: MCPPrincipalResolver,
         tools: tuple[MCPToolDefinition, ...],
         *,
         allowed_origins: tuple[str, ...] = (),
@@ -315,7 +336,7 @@ class MCPProtocolService:
                 raise ValueError("cleartext MCP origins are allowed only for loopback development")
         if len({tool.name for tool in tools}) != len(tools):
             raise ValueError("MCP tool names must be unique")
-        self._api = api
+        self._api = cast(MCPPlatformDispatcher, api)
         self._resolver = resolver
         self._tools = {tool.name: tool for tool in tools}
         self._allowed_origins = origins
@@ -428,7 +449,7 @@ class MCPProtocolService:
                 request_fingerprint = sha256(
                     f"{principal.tenant_id}:{principal.subject_id}:{request_id}".encode()
                 ).hexdigest()[:32]
-                request = APIRequest(
+                request = MCPPlatformRequest(
                     principal.tenant_id,
                     principal.subject_id,
                     tool.operation,
@@ -458,16 +479,14 @@ class MCPProtocolService:
                 200,
                 {"jsonrpc": "2.0", "id": request_id, "result": result},
             )
-        except AuthenticationError:
-            return self._http_error(401, "unauthorized")
-        except IdempotencyConflictError:
-            return self._http_error(409, "idempotency_conflict")
-        except ExecutionAPIError as exc:
-            return self._http_error(409, exc.code)
-        except PermissionError:
-            return self._http_error(403, "forbidden")
-        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, KeyError):
-            return self._http_error(400, "invalid_request")
+        except PermissionError as exc:
+            status = getattr(exc, "http_status", 403)
+            code = getattr(exc, "code", "forbidden")
+            return self._http_error(status if isinstance(status, int) else 403, code if isinstance(code, str) else "forbidden")
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
+            status = getattr(exc, "http_status", 400)
+            code = getattr(exc, "code", "invalid_request")
+            return self._http_error(status if isinstance(status, int) else 400, code if isinstance(code, str) else "invalid_request")
         except Exception:
             return self._http_error(500, "platform_error")
 
