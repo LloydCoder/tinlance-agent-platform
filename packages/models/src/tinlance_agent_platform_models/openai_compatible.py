@@ -10,7 +10,6 @@ import json
 import re
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Protocol
 from urllib.parse import urlsplit
@@ -131,11 +130,19 @@ class OpenAICompatibleProvider:
         try:
             with opener.open(http_request, timeout=self.timeout_seconds) as response:
                 status = getattr(response, "status", 200)
-                content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+                content_type = (
+                    response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+                )
                 if status < 200 or status >= 300:
-                    raise ModelProviderError("provider returned an unsuccessful HTTP status", status_code=status, retryable=status in _RETRYABLE_STATUS)
+                    raise ModelProviderError(
+                        "provider returned an unsuccessful HTTP status",
+                        status_code=status,
+                        retryable=status in _RETRYABLE_STATUS,
+                    )
                 if content_type != "application/json":
-                    raise ModelProviderError("provider returned an unsupported content type", status_code=status)
+                    raise ModelProviderError(
+                        "provider returned an unsupported content type", status_code=status
+                    )
                 raw = response.read(self.max_response_bytes + 1)
         except urllib.error.HTTPError as exc:
             status = int(exc.code)
