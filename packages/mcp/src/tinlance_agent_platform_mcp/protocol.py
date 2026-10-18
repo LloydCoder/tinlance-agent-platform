@@ -69,11 +69,10 @@ class MCPHTTPResponse:
     body: bytes
 
 
-class MCPRateLimiter:
+class MCPRateLimiter(Protocol):
     """Injected shared rate-limit contract; implementations must be tenant-aware."""
 
-    def allow(self, tenant_id: str, subject_id: str) -> bool:
-        raise NotImplementedError
+    def allow(self, tenant_id: str, subject_id: str) -> bool: ...
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
