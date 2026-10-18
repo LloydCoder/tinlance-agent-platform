@@ -106,10 +106,12 @@ def valid_snapshot(**overrides):
     contracts = overrides.pop("contracts", CONTRACTS)
     pairs = {
         (service.service_id, contract_id)
-        for service in services for contract_id in service.contract_ids
+        for service in services
+        for contract_id in service.contract_ids
     } | {
         (agent.agent_id, contract_id)
-        for agent in agents for contract_id, _ in agent.required_contracts
+        for agent in agents
+        for contract_id, _ in agent.required_contracts
     }
     rules = overrides.pop(
         "compatibility_rules",
