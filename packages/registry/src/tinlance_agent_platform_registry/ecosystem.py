@@ -61,9 +61,17 @@ class LifecycleMetadata:
             raise ValueError("lifecycle changed_at must be an RFC 3339 timestamp") from exc
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise ValueError("lifecycle changed_at must include a timezone")
-        if self.state in {LifecycleState.QUARANTINED, LifecycleState.REVOKED, LifecycleState.DEPRECATED}:
-            if not self.reason or not self.reason.strip():
-                raise ValueError("quarantined, revoked and deprecated resources require a reason")
+        if (
+            self.state in {
+                LifecycleState.QUARANTINED,
+                LifecycleState.REVOKED,
+                LifecycleState.DEPRECATED,
+            }
+            and (not self.reason or not self.reason.strip())
+        ):
+            raise ValueError(
+                "quarantined, revoked and deprecated resources require a reason"
+            )
         if self.state is LifecycleState.DEPRECATED:
             if not self.replacement_id or not self.replacement_id.strip():
                 raise ValueError("deprecated resources require a replacement ID")
@@ -247,7 +255,9 @@ class EcosystemRegistrySnapshot:
         if not self.contracts:
             raise ValueError("registry has no contracts")
 
-        if self.schema_version == "registry-manifest/v2" and any(item.lifecycle is None for item in self.contracts):
+        if self.schema_version == "registry-manifest/v2" and any(
+            item.lifecycle is None for item in self.contracts
+        ):
             raise ValueError("v2 contracts require lifecycle metadata")
 
         for repository_id, sha in self.repository_revisions.items():
@@ -256,18 +266,25 @@ class EcosystemRegistrySnapshot:
 
         if self.schema_version == "registry-manifest/v2":
             if set(self.repository_metadata) != set(self.repository_revisions):
-                raise ValueError("v2 registry requires publisher, lifecycle and supply-chain metadata for every repository")
+                raise ValueError(
+                    "v2 registry requires publisher, lifecycle and supply-chain metadata "
+                    "for every repository"
+                )
             for repository_id, metadata in self.repository_metadata.items():
                 if not isinstance(metadata, RepositoryMetadata):
                     raise ValueError(f"{repository_id}: v2 repository metadata has an invalid type")
                 if metadata.supply_chain.reviewed_sha != self.repository_revisions[repository_id]:
-                    raise ValueError(f"{repository_id}: supply-chain revision differs from reviewed repository SHA")
+                    raise ValueError(
+                        f"{repository_id}: supply-chain revision differs from reviewed repository SHA"
+                    )
                 if metadata.publisher.identity_status is IdentityStatus.REVOKED:
                     raise ValueError(f"{repository_id}: revoked publisher identity fails closed")
                 if metadata.lifecycle.state is LifecycleState.REVOKED:
                     raise ValueError(f"{repository_id}: revoked repository fails closed")
                 if metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
-                    raise ValueError(f"{repository_id}: revoked supply-chain attestation fails closed")
+                    raise ValueError(
+                        f"{repository_id}: revoked supply-chain attestation fails closed"
+                    )
         elif self.schema_version != "registry-manifest/v1":
             raise ValueError("unsupported ecosystem registry schema version")
 
@@ -285,10 +302,21 @@ class EcosystemRegistrySnapshot:
             self._validate_owner_revision(
                 service.owner_repository_id, service.reviewed_sha, service.service_id
             )
-            if service.lifecycle is not None and service.lifecycle.state is not LifecycleState.ACTIVE and service.enabled:
-                raise ValueError(f"{service.service_id}: non-active lifecycle state must fail closed")
-            if not service.enabled and (service.lifecycle is None or service.lifecycle.state is LifecycleState.ACTIVE):
-                raise ValueError(f"{service.service_id}: required active service registration is disabled")
+            if (
+                service.lifecycle is not None
+                and service.lifecycle.state is not LifecycleState.ACTIVE
+                and service.enabled
+            ):
+                raise ValueError(
+                    f"{service.service_id}: non-active lifecycle state must fail closed"
+                )
+            if not service.enabled and (
+                service.lifecycle is None
+                or service.lifecycle.state is LifecycleState.ACTIVE
+            ):
+                raise ValueError(
+                    f"{service.service_id}: required active service registration is disabled"
+                )
             if self.schema_version == "registry-manifest/v2":
                 owner_metadata = self.repository_metadata[service.owner_repository_id]
                 if service.enabled and owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
@@ -308,9 +336,18 @@ class EcosystemRegistrySnapshot:
             self._validate_owner_revision(
                 agent.owner_repository_id, agent.reviewed_sha, agent.agent_id
             )
-            if agent.lifecycle is not None and agent.lifecycle.state is not LifecycleState.ACTIVE and agent.agent_id in self.required_agent_ids:
+            if (
+                agent.lifecycle is not None
+                and agent.lifecycle.state is not LifecycleState.ACTIVE
+                and agent.agent_id in self.required_agent_ids
+            ):
                 raise ValueError(f"{agent.agent_id}: required agent is not active")
-            if self.schema_version == "registry-manifest/v2" and agent.lifecycle.state is LifecycleState.ACTIVE and self.repository_metadata[agent.owner_repository_id].lifecycle.state is not LifecycleState.ACTIVE:
+            if (
+                self.schema_version == "registry-manifest/v2"
+                and agent.lifecycle.state is LifecycleState.ACTIVE
+                and self.repository_metadata[agent.owner_repository_id].lifecycle.state
+                is not LifecycleState.ACTIVE
+            ):
                 raise ValueError(f"{agent.agent_id}: owner repository is not active")
             if agent.authority_mode not in {
                 AuthorityMode.DELEGATED_ONLY,
@@ -369,7 +406,10 @@ class EcosystemRegistrySnapshot:
             contract = contracts[contract_id]
             if not contract.immutable:
                 raise ValueError(f"{consumer_id}: contract {contract_id} is not immutable")
-            if contract.lifecycle is not None and contract.lifecycle.state is not LifecycleState.ACTIVE:
+            if (
+                contract.lifecycle is not None
+                and contract.lifecycle.state is not LifecycleState.ACTIVE
+            ):
                 raise ValueError(f"{consumer_id}: contract {contract_id} is not active")
 
 
