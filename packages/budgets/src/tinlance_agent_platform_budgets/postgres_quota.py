@@ -584,7 +584,7 @@ class PostgresBudgetGate:
                 return
             if current != reservation:
                 raise KeyError("durable budget reservation scope mismatch")
-        released = self._transaction(
+        self._transaction(
             reservation.tenant_id,
             lambda ledger: ledger.release(
                 tenant_id=reservation.tenant_id,
