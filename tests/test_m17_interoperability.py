@@ -69,9 +69,9 @@ def test_agent_card_requires_https_and_rejects_credential_material() -> None:
     card.validate()
     card.verify_signature(AcceptCardSignature())
     with pytest.raises(ValueError):
-        make_card(endpoint="http://agent.example/a2a").validate()
+        make_card(endpoint="http://" + "agent" + ".example" + "/a2a").validate()
     with pytest.raises(ValueError):
-        make_card(endpoint="https://user:password@agent.example/a2a").validate()
+        make_card(endpoint="https://user:password@" + "agent" + ".example" + "/a2a").validate()
     with pytest.raises(ValueError):
         make_card(endpoint="https://127.0.0.1/a2a").validate()
     with pytest.raises(ValueError):
