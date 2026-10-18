@@ -42,9 +42,15 @@ class APIHandler(Protocol):
 class AuthenticationError(PermissionError):
     """Raised when bearer authentication cannot establish a principal."""
 
+    http_status = 401
+    code = "unauthorized"
+
 
 class IdempotencyConflictError(ValueError):
     """Raised when one request ID is reused for a different consequential request."""
+
+    http_status = 409
+    code = "idempotency_conflict"
 
 
 class PrincipalResolver(Protocol):
@@ -134,6 +140,8 @@ class AgentPlatformAPI:
 
 class ExecutionAPIError(PermissionError):
     """Structured failure emitted by the governed execution contract."""
+
+    http_status = 409
 
     def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
         super().__init__(message)
