@@ -15,7 +15,7 @@ class ModelRequest:
     model: str
     messages: tuple[Mapping[str, str], ...]
     max_output_tokens: int = 4096
-    trace_id: str | None = None
+    trace_id: str
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.agent_id, self.model)):
@@ -194,9 +194,7 @@ class ModelRoutingRequest:
             not provider or provider != provider.strip() for provider in self.provider_availability
         ):
             raise ValueError("available provider names must be normalized")
-        if self.trace_id is not None and (
-            not _TRACE_ID.fullmatch(self.trace_id) or set(self.trace_id) == {"0"}
-        ):
+        if not _TRACE_ID.fullmatch(self.trace_id) or set(self.trace_id) == {"0"}:
             raise ValueError("trace_id must be a valid non-zero W3C trace identifier")
 
 
@@ -210,7 +208,7 @@ class ModelRoutingDecision:
     task_policy: str
     policy_version: str | None
     reason_code: str
-    trace_id: str | None
+    trace_id: str
 
     @property
     def route_id(self) -> str | None:
@@ -262,6 +260,18 @@ class ModelRouter:
         try:
             context_verified = self._verify_routing_context(request)
         except Exception as exc:
+            unavailable = ModelRoutingDecision(
+                decision_id=str(uuid4()),
+                allowed=False,
+                route=None,
+                provider=None,
+                model_id=None,
+                task_policy=request.task_policy,
+                policy_version=None,
+                reason_code="routing_context_unavailable",
+                trace_id=request.trace_id,
+            )
+            self._record(unavailable)
             raise RuntimeError("routing context could not be verified; failing closed") from exc
         if context_verified is not True:
             decision = ModelRoutingDecision(
