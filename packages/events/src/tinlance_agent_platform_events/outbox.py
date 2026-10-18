@@ -137,6 +137,13 @@ class PostgresEventStore:
 
     def append(self, event: Event) -> Event:
         stored, _ = _prepare_event(event)
+        if getattr(self._connection, "autocommit", False):
+            info = getattr(self._connection, "info", None)
+            transaction_status = getattr(info, "transaction_status", None)
+            if transaction_status is None or int(transaction_status) == 0:
+                raise RuntimeError(
+                    "PostgresEventStore.append requires a caller-owned active transaction"
+                )
         try:
             tenant_uuid = UUID(stored.tenant_id)
         except ValueError as exc:
