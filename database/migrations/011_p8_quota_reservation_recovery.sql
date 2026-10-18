@@ -216,6 +216,11 @@ begin
     if reservation.state <> 'reserved' then
         raise exception 'settled reservation cannot be released' using errcode = '55000';
     end if;
+    if reservation.lease_expires_at <= clock_timestamp()
+       and reservation.recovery_requested_at is null then
+        raise exception 'expired reservation must enter reconciliation before release'
+            using errcode = '55000';
+    end if;
     if reservation.recovery_requested_at is not null and (
         p_reason <> 'confirmed-no-side-effect'
         or not (p_evidence ? 'measurement_ref')
