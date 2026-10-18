@@ -8,8 +8,12 @@ import tinlance_agent_platform_multi_agent.interoperability as interop
 
 
 class FakeResponse:
-    def __init__(self, status: int = 200, body: bytes = b'{"jsonrpc":"2.0","id":"r1"}',
-                 content_type: str = "application/a2a+json") -> None:
+    def __init__(
+        self,
+        status: int = 200,
+        body: bytes = b'{"jsonrpc":"2.0","id":"r1"}',
+        content_type: str = "application/a2a+json",
+    ) -> None:
         self.status = status
         self._body = body
         self._content_type = content_type
