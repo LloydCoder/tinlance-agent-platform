@@ -2,7 +2,7 @@ name: R10 Certification
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "feature/**", "phase/p3-*"]
   pull_request:
     branches: [main]
 
