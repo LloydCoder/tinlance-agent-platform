@@ -443,7 +443,7 @@ def test_http_rejects_duplicate_mcp_routing_headers_before_dispatch() -> None:
         connection.putheader("Authorization", "Bearer valid-token")
         connection.putheader("MCP-Protocol-Version", "2026-07-28")
         connection.putheader("Mcp-Method", "server/discover")
-        connection.putheader("Mcp-Method", "tools/call")
+        connection.putheader("Mcp-Method", "server/discover")
         connection.endheaders(payload)
         response = connection.getresponse()
         response.read()
