@@ -903,7 +903,8 @@ class GovernedExecutionService:
             }:
                 exc = ExecutionFailure(
                     ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
-                    "tool execution failed after side-effect start; outcome requires reconciliation",
+                    "tool execution failed after side-effect start; "
+                    "outcome requires reconciliation",
                 )
             state = {
                 ExecutionErrorCode.APPROVAL_REQUIRED: ExecutionState.WAITING_APPROVAL,
