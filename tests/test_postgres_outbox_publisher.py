@@ -95,6 +95,7 @@ def make_publisher(connection_factory, publish):
 
 def test_publisher_claims_validates_publishes_and_acknowledges() -> None:
     connections = []
+
     def factory():
         connection = FakeConnection(
             claim_rows=[(OUTBOX_ID, EVENT_ID, LEASE_TOKEN, 1)],
