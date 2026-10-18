@@ -288,6 +288,13 @@ def test_protocol_requires_valid_per_request_client_metadata() -> None:
         {"jsonrpc": "2.0", "id": "missing-meta", "method": "tools/list", "params": {}}
     ).encode()
     assert service.handle(headers("tools/list"), missing).status_code == 400
+    missing_header = service.handle(
+        {key: value for key, value in headers("tools/list").items()
+         if key != "mcp-protocol-version"},
+        body("tools/list"),
+    )
+    assert missing_header.status_code == 400
+    assert decode(missing_header)["error"]["code"] == -32020
     invalid = body(
         "tools/list",
         {"_meta": {"io.modelcontextprotocol/clientInfo": {"name": " ", "version": "1.0"}}},
