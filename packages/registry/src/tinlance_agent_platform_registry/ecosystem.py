@@ -86,8 +86,14 @@ class PublisherIdentity:
         if not self.publisher_id.strip():
             raise ValueError("publisher identity is required")
         parsed = urlsplit(self.identity_uri)
-        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
-            raise ValueError("publisher identity URI must be credential-free HTTPS")
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "github.com"
+            or parsed.path.rstrip("/") != f"/{self.publisher_id}"
+            or parsed.username
+            or parsed.password
+        ):
+            raise ValueError("publisher identity URI must match the GitHub publisher ID")
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,14 +109,28 @@ class SupplyChainReferences:
             raise ValueError("supply-chain verification status must be canonical")
         if not _FULL_SHA.fullmatch(self.reviewed_sha):
             raise ValueError("supply-chain reviewed revision must be a full immutable commit SHA")
+        provenance = urlsplit(self.provenance_uri)
+        if (
+            provenance.scheme != "https"
+            or provenance.hostname != "github.com"
+            or not provenance.path.endswith(f"/commit/{self.reviewed_sha}")
+            or provenance.username
+            or provenance.password
+        ):
+            raise ValueError("provenance must reference the exact reviewed GitHub commit")
         for value, label in (
-            (self.provenance_uri, "provenance"),
             (self.sbom_uri, "SBOM"),
             (self.signature_uri, "signature"),
         ):
             parsed = urlsplit(value)
-            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
-                raise ValueError(f"{label} reference must be credential-free HTTPS")
+            if (
+                parsed.scheme != "https"
+                or parsed.hostname != "github.com"
+                or not parsed.path.endswith("/attestations")
+                or parsed.username
+                or parsed.password
+            ):
+                raise ValueError(f"{label} reference must point to a GitHub attestation index")
 
 
 @dataclass(frozen=True, slots=True)
