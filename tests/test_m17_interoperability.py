@@ -277,36 +277,34 @@ def test_remote_endpoint_rejects_query_parameters() -> None:
         )
 
 
-def test_agent_card_signature_profile_rejects_non_jcs_values_and_keys() -> None:
-    numeric_extension = replace(
+def test_agent_card_signature_profile_uses_full_rfc8785_json_types() -> None:
+    extended_card = replace(
         make_card(),
         security_scheme_details={
             "bearer": {
                 "httpAuthSecurityScheme": {
                     "scheme": "Bearer",
-                    "unsupportedNumericExtension": 1,
+                    "numericExtension": 1.25,
+                    "nullableExtension": None,
+                    "unicodeKey": "schéma",
                 }
             }
         },
     )
-    with pytest.raises(ValueError, match="JCS canonicalization profile"):
-        numeric_extension.verify_signature(AcceptCardSignature())
+    canonical = extended_card.canonical_payload()
+    assert b'"numericExtension":1.25' in canonical
+    assert b'"nullableExtension":null' in canonical
+    assert "schéma".encode("utf-8") in canonical
 
-    non_ascii_key = replace(
+    invalid_unicode = replace(
         make_card(),
-        security_scheme_details={
-            "bearer": {
-                "httpAuthSecurityScheme": {
-                    "schéma": "Bearer",
-                }
-            }
-        },
+        security_scheme_details={"bearer": {"invalid": "\\ud800"}},
     )
-    with pytest.raises(ValueError, match="ASCII"):
-        non_ascii_key.verify_signature(AcceptCardSignature())
+    with pytest.raises(ValueError, match="RFC 8785"):
+        invalid_unicode.canonical_payload()
 
 
-def test_agent_card_canonical_payload_is_deterministic_for_supported_profile() -> None:
+def test_agent_card_canonical_payload_is_deterministic_for_rfc8785_profile() -> None:
     card = make_card()
     first = card.canonical_payload()
     second = card.canonical_payload()
