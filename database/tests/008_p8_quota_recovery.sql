@@ -82,6 +82,18 @@ begin
      where tenant_id = '00000000-0000-0000-0000-000000000091'
        and quota_reservations.reservation_id = v_reservation_id;
 
+    begin
+        perform platform.release_quota(
+            '00000000-0000-0000-0000-000000000091',
+            v_reservation_id,
+            'cancelled-before-side-effect',
+            '{}'::jsonb
+        );
+        raise exception 'expired reservation was released before reconciliation';
+    exception when sqlstate '55000' then
+        null;
+    end;
+
     recovery_count := platform.request_expired_quota_reconciliation(
         '00000000-0000-0000-0000-000000000091', 10
     );
