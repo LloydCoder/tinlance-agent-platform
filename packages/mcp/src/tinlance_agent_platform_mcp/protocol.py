@@ -490,13 +490,15 @@ class MCPProtocolService:
                 request_fingerprint = sha256(
                     f"{principal.tenant_id}:{principal.subject_id}:{request_id}".encode()
                 ).hexdigest()[:32]
+                traceparent = _traceparent(normalized.get("traceparent"))
+                trace_id = traceparent.split("-")[1] if traceparent is not None else None
                 request = MCPPlatformRequest(
                     principal.tenant_id,
                     principal.subject_id,
                     tool.operation,
                     payload,
                     f"mcp-{request_fingerprint}",
-                    _traceparent(normalized.get("traceparent")),
+                    trace_id,
                     idempotency_key,
                     principal,
                 )
