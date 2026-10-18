@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Mapping
+from collections.abc import Mapping
 
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -29,7 +29,10 @@ class ContractRegistration:
     immutable: bool = True
 
     def __post_init__(self) -> None:
-        if any(not value.strip() for value in (self.contract_id, self.version, self.owner_repository_id)):
+        if any(
+            not value.strip()
+            for value in (self.contract_id, self.version, self.owner_repository_id)
+        ):
             raise ValueError("contract ID, version and owner are required")
 
 
@@ -67,13 +70,18 @@ class AgentRegistration:
     authority_mode: AuthorityMode = AuthorityMode.DELEGATED_ONLY
 
     def __post_init__(self) -> None:
-        if any(not value.strip() for value in (self.agent_id, self.owner_repository_id, self.reviewed_sha)):
+        if any(
+            not value.strip()
+            for value in (self.agent_id, self.owner_repository_id, self.reviewed_sha)
+        ):
             raise ValueError("agent registration identity and revision are required")
         if not _FULL_SHA.fullmatch(self.reviewed_sha):
             raise ValueError("agent reviewed revision must be a full immutable commit SHA")
         if not self.capabilities or len(set(self.capabilities)) != len(self.capabilities):
             raise ValueError("agent capabilities must be non-empty and unique")
-        if not self.required_contracts or len(set(self.required_contracts)) != len(self.required_contracts):
+        if not self.required_contracts or len(set(self.required_contracts)) != len(
+            self.required_contracts
+        ):
             raise ValueError("agent required contracts must be non-empty and unique")
         if self.authority_mode not in {AuthorityMode.DELEGATED_ONLY, AuthorityMode.AUTHORITY_FREE}:
             raise ValueError("agents cannot be registered as execution authorities")
@@ -91,10 +99,14 @@ class CompatibilityRule:
     def __post_init__(self) -> None:
         if not self.consumer_id.strip() or not self.contract_id.strip():
             raise ValueError("compatibility consumer and contract are required")
-        if not self.supported_versions or len(set(self.supported_versions)) != len(self.supported_versions):
+        if not self.supported_versions or len(set(self.supported_versions)) != len(
+            self.supported_versions
+        ):
             raise ValueError("supported contract versions must be non-empty and unique")
         if not (self.reject_unknown and self.reject_stale and self.reject_missing):
-            raise ValueError("registry compatibility must reject unknown, stale and missing registrations")
+            raise ValueError(
+                "registry compatibility must reject unknown, stale and missing registrations"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,24 +152,35 @@ class EcosystemRegistrySnapshot:
             raise ValueError("Platform must be the sole consequential execution authority")
 
         for service in self.services:
-            self._validate_owner_revision(service.owner_repository_id, service.reviewed_sha, service.service_id)
+            self._validate_owner_revision(
+                service.owner_repository_id, service.reviewed_sha, service.service_id
+            )
             if not service.enabled:
                 raise ValueError(f"{service.service_id}: required service registration is disabled")
             if service.owner_repository_id != "platform" and service.authority_mode not in {
                 AuthorityMode.AUTHORITY_FREE, AuthorityMode.CONFORMANCE_ONLY
             }:
-                raise ValueError(f"{service.service_id}: non-Platform service cannot grant authority")
+                raise ValueError(
+                    f"{service.service_id}: non-Platform service cannot grant authority"
+                )
             self._validate_contract_set(service.service_id, service.contract_ids, contracts)
 
         for agent in self.agents:
-            self._validate_owner_revision(agent.owner_repository_id, agent.reviewed_sha, agent.agent_id)
-            if agent.authority_mode not in {AuthorityMode.DELEGATED_ONLY, AuthorityMode.AUTHORITY_FREE}:
+            self._validate_owner_revision(
+                agent.owner_repository_id, agent.reviewed_sha, agent.agent_id
+            )
+            if agent.authority_mode not in {
+                AuthorityMode.DELEGATED_ONLY,
+                AuthorityMode.AUTHORITY_FREE,
+            }:
                 raise ValueError(f"{agent.agent_id}: agents cannot grant execution authority")
             required_ids = tuple(contract_id for contract_id, _ in agent.required_contracts)
             self._validate_contract_set(agent.agent_id, required_ids, contracts)
             for contract_id, version in agent.required_contracts:
                 if contracts[contract_id].version != version:
-                    raise ValueError(f"{agent.agent_id}: incompatible {contract_id} version {version}")
+                    raise ValueError(
+                        f"{agent.agent_id}: incompatible {contract_id} version {version}"
+                    )
 
         rule_map = {(rule.consumer_id, rule.contract_id): rule for rule in self.compatibility_rules}
         required_pairs = {
@@ -175,7 +198,9 @@ class EcosystemRegistrySnapshot:
             if contract is None:
                 raise ValueError(f"{consumer_id}: unknown contract {contract_id}")
             if contract.version not in rule.supported_versions:
-                raise ValueError(f"{consumer_id}: incompatible {contract_id} version {contract.version}")
+                raise ValueError(
+                    f"{consumer_id}: incompatible {contract_id} version {contract.version}"
+                )
             if not (rule.reject_unknown and rule.reject_stale and rule.reject_missing):
                 raise ValueError(f"{consumer_id}: compatibility must fail closed")
 
