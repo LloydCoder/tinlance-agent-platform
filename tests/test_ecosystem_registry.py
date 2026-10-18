@@ -150,10 +150,15 @@ def valid_snapshot(**overrides):
         for agent in agents
         for contract_id, _ in agent.required_contracts
     }
+    contract_versions = {item.contract_id: item.version for item in contracts}
     rules = overrides.pop(
         "compatibility_rules",
         tuple(
-            CompatibilityRule(consumer, contract_id, ("1.0",))
+            CompatibilityRule(
+                consumer,
+                contract_id,
+                (contract_versions.get(contract_id, "1.0"),),
+            )
             for consumer, contract_id in sorted(pairs)
         ),
     )
