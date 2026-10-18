@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass, replace
 from threading import RLock
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from tinlance_agent_platform_contracts import Budget
 
@@ -38,6 +38,7 @@ class BudgetReservation:
     tool_calls: int
     seconds: float
     scope: BudgetScope
+    idempotency_key: str | None = None
 
 
 class BudgetService:
@@ -66,6 +67,7 @@ class BudgetService:
         tool_calls: int,
         seconds: float,
         reservation_id: UUID | None = None,
+        idempotency_key: str | None = None,
     ) -> BudgetReservation:
         if scope.tenant_id != self._budget.tenant_id or scope.run_id != self._budget.run_id:
             raise PermissionError("budget is owned by another tenant or run")
@@ -79,11 +81,22 @@ class BudgetService:
             or seconds < 0
         ):
             raise ValueError("reservation dimensions must be finite and non-negative")
+        if idempotency_key is not None and (
+            not isinstance(idempotency_key, str)
+            or not 16 <= len(idempotency_key) <= 256
+            or idempotency_key != idempotency_key.strip()
+            or any(ord(char) < 32 or ord(char) == 127 for char in idempotency_key)
+        ):
+            raise ValueError("idempotency_key must be normalized and bounded")
         with self._lock:
-            rid = reservation_id or uuid4()
+            rid = reservation_id or (
+                uuid5(NAMESPACE_URL, f"tinlance-budget:{scope.tenant_id}:{idempotency_key}")
+                if idempotency_key is not None
+                else uuid4()
+            )
             existing = self._reservations.get(rid)
             candidate = BudgetReservation(
-                rid, scope.tenant_id, scope.run_id, tool_calls, seconds, scope
+                rid, scope.tenant_id, scope.run_id, tool_calls, seconds, scope, idempotency_key
             )
             if existing is not None:
                 if existing != candidate:
