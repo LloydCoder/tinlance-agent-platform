@@ -42,9 +42,15 @@ class APIHandler(Protocol):
 class AuthenticationError(PermissionError):
     """Raised when bearer authentication cannot establish a principal."""
 
+    http_status = 401
+    code = "unauthorized"
+
 
 class IdempotencyConflictError(ValueError):
     """Raised when one request ID is reused for a different consequential request."""
+
+    http_status = 409
+    code = "idempotency_conflict"
 
 
 class PrincipalResolver(Protocol):
@@ -56,8 +62,8 @@ class PrincipalResolver(Protocol):
 class AgentPlatformAPI:
     def __init__(self, handler: APIHandler) -> None:
         self._handler = handler
-        self._idempotency: dict[str, tuple[str, APIResponse]] = {}
-        self._idempotency_order: list[str] = []
+        self._idempotency: dict[tuple[str, str, str], tuple[str, APIResponse]] = {}
+        self._idempotency_order: list[tuple[str, str, str]] = []
         self._idempotency_lock = RLock()
 
     @staticmethod
@@ -92,7 +98,9 @@ class AgentPlatformAPI:
 
         fingerprint = self._fingerprint(request)
         with self._idempotency_lock:
-            key = request.idempotency_key or request.request_id
+            caller_key = request.idempotency_key or request.request_id
+            # Tuple scoping avoids cross-tenant collisions and delimiter ambiguity.
+            key = (request.tenant_id, request.subject_id, caller_key)
             existing = self._idempotency.get(key)
             if existing is not None:
                 if existing[0] != fingerprint:
@@ -134,6 +142,8 @@ class AgentPlatformAPI:
 
 class ExecutionAPIError(PermissionError):
     """Structured failure emitted by the governed execution contract."""
+
+    http_status = 409
 
     def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
         super().__init__(message)

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Protocol
 
 from .service import (
     API_VERSION,
@@ -16,6 +18,23 @@ from .service import (
     IdempotencyConflictError,
     PrincipalResolver,
 )
+
+
+class MCPHTTPResponse(Protocol):
+    status_code: int
+    headers: Mapping[str, str]
+    body: bytes
+
+
+class MCPHTTPService(Protocol):
+    def handle(self, headers: Mapping[str, str], raw_body: bytes) -> MCPHTTPResponse: ...
+
+
+class A2AHTTPService(Protocol):
+    def handle(self, headers: Mapping[str, str], raw_body: bytes) -> MCPHTTPResponse: ...
+
+    def card_response(self) -> MCPHTTPResponse: ...
+
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
@@ -56,6 +75,8 @@ def serve(
     *,
     host: str = "127.0.0.1",
     port: int = 0,
+    mcp_service: MCPHTTPService | None = None,
+    a2a_service: A2AHTTPService | None = None,
 ) -> ThreadingHTTPServer:
     """Start a local/reference HTTP server.
 
@@ -67,7 +88,113 @@ def serve(
         server_version = "TinlanceAgentPlatform/1.1"
         sys_version = ""
 
+        def _reject_ambiguous_headers(self, names: tuple[str, ...]) -> bool:
+            for name in names:
+                values = self.headers.get_all(name, [])
+                if values is not None and len(values) > 1:
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "duplicate_header"})
+                    return True
+            if self.headers.get_all("Transfer-Encoding"):
+                self._respond(HTTPStatus.BAD_REQUEST, {"error": "unsupported_transfer_encoding"})
+                return True
+            return False
+
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path != "/.well-known/agent-card.json" or a2a_service is None:
+                self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                return
+            try:
+                self._send_protocol_response(a2a_service.card_response())
+            except Exception:
+                self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "a2a_card_error"})
+
         def do_POST(self) -> None:  # noqa: N802
+            if self.path == "/a2a":
+                if self._reject_ambiguous_headers(
+                    (
+                        "Content-Length",
+                        "Content-Type",
+                        "Authorization",
+                        "Origin",
+                        "A2A-Version",
+                        "Idempotency-Key",
+                        "traceparent",
+                    )
+                ):
+                    return
+                if a2a_service is None:
+                    self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", ""))
+                except ValueError:
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_content_length"})
+                    return
+                if length < 0 or length > MAX_REQUEST_BYTES:
+                    self._respond(
+                        HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"}
+                    )
+                    return
+                try:
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("request body is truncated")
+                    protocol_response = a2a_service.handle(dict(self.headers.items()), raw)
+                    self._send_protocol_response(protocol_response)
+                except Exception:
+                    self._respond(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "a2a_transport_error"}
+                    )
+                return
+            if self.path == "/mcp":
+                if self._reject_ambiguous_headers(
+                    (
+                        "Content-Length",
+                        "Content-Type",
+                        "Authorization",
+                        "Origin",
+                        "MCP-Protocol-Version",
+                        "Mcp-Method",
+                        "Mcp-Name",
+                    )
+                ):
+                    return
+                if mcp_service is None:
+                    self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", ""))
+                except ValueError:
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_content_length"})
+                    return
+                if length < 0 or length > MAX_REQUEST_BYTES:
+                    self._respond(
+                        HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"}
+                    )
+                    return
+                if "application/json" not in self.headers.get("Content-Type", "").lower():
+                    self._respond(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_required"})
+                    return
+                try:
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("request body is truncated")
+                    mcp_response = mcp_service.handle(dict(self.headers.items()), raw)
+                    self.send_response(mcp_response.status_code)
+                    response_headers = {
+                        key.lower(): value for key, value in mcp_response.headers.items()
+                    }
+                    for key, value in mcp_response.headers.items():
+                        self.send_header(key, value)
+                    if "content-length" not in response_headers:
+                        self.send_header("Content-Length", str(len(mcp_response.body)))
+                    self.end_headers()
+                    self.wfile.write(mcp_response.body)
+                except Exception:
+                    self._respond(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "mcp_transport_error"}
+                    )
+                return
             if self.path != "/v1/agent-platform":
                 self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
@@ -125,10 +252,10 @@ def serve(
                     idempotency_key,
                     principal,
                 )
-                response = api.dispatch(request)
+                api_response = api.dispatch(request)
                 self._respond(
                     HTTPStatus.OK,
-                    {"status": response.status, "payload": response.payload},
+                    {"status": api_response.status, "payload": api_response.payload},
                 )
             except AuthenticationError:
                 self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
@@ -148,6 +275,16 @@ def serve(
                 self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_request"})
             except Exception:
                 self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "platform_error"})
+
+        def _send_protocol_response(self, response: MCPHTTPResponse) -> None:
+            normalized_headers = {key.lower(): value for key, value in response.headers.items()}
+            self.send_response(response.status_code)
+            for key, value in response.headers.items():
+                self.send_header(key, value)
+            if "content-length" not in normalized_headers:
+                self.send_header("Content-Length", str(len(response.body)))
+            self.end_headers()
+            self.wfile.write(response.body)
 
         def _respond(self, status: HTTPStatus, body: dict[str, object]) -> None:
             raw = json.dumps(body, separators=(",", ":")).encode("utf-8")
