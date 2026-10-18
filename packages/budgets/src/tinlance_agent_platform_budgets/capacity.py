@@ -131,12 +131,17 @@ class TenantQuota:
         cost_units: float,
     ) -> bool:
         if (
-            any(isinstance(value, bool) or not isinstance(value, int)
-                for value in (concurrency, tool_calls, token_units))
+            any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in (concurrency, tool_calls, token_units)
+            )
             or isinstance(cost_units, bool)
             or not isinstance(cost_units, (int, float))
             or not math.isfinite(cost_units)
-            or concurrency < 0 or tool_calls < 0 or token_units < 0 or cost_units < 0
+            or concurrency < 0
+            or tool_calls < 0
+            or token_units < 0
+            or cost_units < 0
         ):
             return False
         return (
