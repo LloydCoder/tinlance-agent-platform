@@ -9,6 +9,8 @@ from __future__ import annotations
 import base64
 import ipaddress
 import json
+
+import rfc8785
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -59,35 +61,6 @@ class RemoteAgentTransport(Protocol):
 def _required(value: str, name: str) -> None:
     if not value or value != value.strip():
         raise ValueError(f"{name} must be non-empty and normalized")
-
-
-def _validate_jcs_profile(value: object, path: str = "Agent Card security scheme details") -> None:
-    """Enforce the JSON subset whose sorted compact UTF-8 encoding equals JCS.
-
-    The current signed-card profile intentionally supports strings, booleans,
-    arrays and objects with normalized ASCII property names. Numeric, null,
-    non-ASCII property-name and non-scalar Unicode values require a full RFC 8785
-    implementation and are rejected rather than being signed non-canonically.
-    """
-    if isinstance(value, bool):
-        return
-    if isinstance(value, str):
-        try:
-            value.encode("utf-8")
-        except UnicodeEncodeError as exc:
-            raise ValueError(f"{path} contains an invalid Unicode scalar value") from exc
-        return
-    if isinstance(value, Mapping):
-        for key, nested in value.items():
-            if not isinstance(key, str) or not key or key != key.strip() or not key.isascii():
-                raise ValueError(f"{path} keys must be normalized non-empty ASCII strings")
-            _validate_jcs_profile(nested, f"{path}.{key}")
-        return
-    if isinstance(value, (list, tuple)):
-        for index, nested in enumerate(value):
-            _validate_jcs_profile(nested, f"{path}[{index}]")
-        return
-    raise ValueError(f"{path} contains a value outside the supported JCS canonicalization profile")
 
 
 def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
@@ -201,8 +174,6 @@ class AgentCard:
             raise ValueError("A2A Agent Card must declare authentication")
         if any(not scheme or scheme != scheme.strip() for scheme in self.authentication_schemes):
             raise ValueError("authentication schemes must be normalized")
-        if any(not scheme.isascii() for scheme in self.authentication_schemes):
-            raise ValueError("authentication scheme names must be ASCII for canonical signatures")
         if any(
             any(marker in scheme.lower() for marker in ("secret", "api_key=", "bearer "))
             for scheme in self.authentication_schemes
@@ -227,7 +198,6 @@ class AgentCard:
         security_schemes: dict[str, object] = {}
         security_requirements: list[dict[str, list[str]]] = []
         details = self.security_scheme_details or {}
-        _validate_jcs_profile(details)
         for scheme in self.authentication_schemes:
             configured = details.get(scheme)
             if configured is not None:
@@ -274,18 +244,11 @@ class AgentCard:
         return payload
 
     def canonical_payload(self) -> bytes:
-        """Deterministic JSON for this string/boolean-only Agent Card profile.
-
-        The supported profile intentionally excludes numeric extension values so
-        sorted-key compact JSON matches the JCS canonical form for these fields.
-        """
-        return json.dumps(
-            self._unsigned_payload(),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
+        """Return the RFC 8785 canonical UTF-8 representation of the unsigned card."""
+        try:
+            return rfc8785.dumps(self._unsigned_payload())
+        except (rfc8785.CanonicalizationError, TypeError, ValueError) as exc:
+            raise ValueError("Agent Card cannot be represented as RFC 8785 canonical JSON") from exc
 
     def verify_signature(self, verifier: AgentCardSignatureVerifier) -> None:
         self.validate()
