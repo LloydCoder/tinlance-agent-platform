@@ -1,7 +1,7 @@
 -- P8 recovery hardening: expired leases are flagged for reconciliation, never
 -- silently refunded. A crashed worker may have completed a consequential side effect.
 alter table platform.quota_reservations
-    add column if not exists lease_expires_at timestamptz not null default (now() + interval '15 minutes'),
+    add column if not exists lease_expires_at timestamptz not null default (clock_timestamp() + interval '15 minutes'),
     add column if not exists recovery_requested_at timestamptz,
     add column if not exists recovery_attempts integer not null default 0
         check (recovery_attempts >= 0);
@@ -52,12 +52,12 @@ begin
         raise exception 'reservation not found' using errcode = 'P0002';
     end if;
     if reservation.state <> 'reserved'
-       or reservation.lease_expires_at <= now()
+       or reservation.lease_expires_at <= clock_timestamp()
        or reservation.recovery_requested_at is not null then
         raise exception 'reservation is expired or requires reconciliation' using errcode = '55000';
     end if;
 
-    new_expiry := now() + make_interval(secs => p_lease_seconds);
+    new_expiry := clock_timestamp() + make_interval(secs => p_lease_seconds);
     update platform.quota_reservations
        set lease_expires_at = new_expiry
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id;
@@ -104,14 +104,14 @@ begin
           from platform.quota_reservations q
          where q.tenant_id = p_tenant_id
            and q.state = 'reserved'
-           and q.lease_expires_at <= now()
+           and q.lease_expires_at <= clock_timestamp()
            and q.recovery_requested_at is null
          order by q.lease_expires_at, q.reservation_id
          for update skip locked
          limit p_limit
     ), marked as (
         update platform.quota_reservations q
-           set recovery_requested_at = now(),
+           set recovery_requested_at = clock_timestamp(),
                recovery_attempts = q.recovery_attempts + 1
           from expired e
          where q.tenant_id = p_tenant_id
