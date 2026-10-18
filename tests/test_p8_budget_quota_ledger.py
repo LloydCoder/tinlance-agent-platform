@@ -324,11 +324,14 @@ def test_postgres_ledger_exposes_lease_renewal_and_reconciliation() -> None:
     renewed_until = datetime(2026, 10, 18, 10, 0, tzinfo=UTC)
     connection = Connection(result=renewed_until)
     ledger = PostgresQuotaLedger(connection)
-    assert ledger.renew(
-        tenant_id=TENANT_ID,
-        reservation_id=UUID("50000000-0000-0000-0000-000000000071"),
-        lease_seconds=600,
-    ) == renewed_until
+    assert (
+        ledger.renew(
+            tenant_id=TENANT_ID,
+            reservation_id=UUID("50000000-0000-0000-0000-000000000071"),
+            lease_seconds=600,
+        )
+        == renewed_until
+    )
     assert "platform.renew_quota_reservation" in connection.queries[-1][0]
 
     connection.result = 2
