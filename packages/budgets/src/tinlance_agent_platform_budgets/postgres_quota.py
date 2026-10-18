@@ -11,13 +11,14 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from hashlib import sha256
 from threading import RLock
-from typing import Any, Callable
+from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from .service import BudgetReservation, BudgetScope, BudgetService
@@ -478,7 +479,7 @@ class PostgresBudgetGate:
             if organization_id is not None and not isinstance(organization_id, UUID):
                 raise TypeError("trusted organization resolver must return UUID or None")
             ledger_key = "quota:" + sha256(
-                f"{tenant_id}:{scope.idempotency_key}".encode("utf-8")
+                f"{tenant_id}:{scope.idempotency_key}".encode()
             ).hexdigest()
             request = QuotaReservationRequest(
                 tenant_id=tenant_id,
