@@ -8,6 +8,12 @@ from .gateway import (
     ModelRoutingDecision,
     ModelRoutingRequest,
 )
+from .openai_compatible import (
+    ModelCredentialProvider,
+    ModelProviderError,
+    OpenAICompatibleProvider,
+    StaticModelCredential,
+)
 
 __all__ = [
     "ModelGateway",
@@ -18,4 +24,8 @@ __all__ = [
     "ModelRouter",
     "ModelRoutingDecision",
     "ModelRoutingRequest",
+    "ModelCredentialProvider",
+    "ModelProviderError",
+    "OpenAICompatibleProvider",
+    "StaticModelCredential",
 ]
