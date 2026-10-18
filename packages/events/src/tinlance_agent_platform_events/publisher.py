@@ -4,6 +4,7 @@ The transport is injected. Database transactions only claim, read, acknowledge,
 or release outbox records; network publication never occurs inside a database
 transaction. Delivery is at-least-once, so consumers must deduplicate.
 """
+
 from __future__ import annotations
 
 import json
