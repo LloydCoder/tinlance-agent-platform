@@ -185,4 +185,4 @@ def test_p8_migration_has_transactional_limits_rls_and_append_only_ledger() -> N
         "ENABLE ROW LEVEL SECURITY",
         "REVOKE UPDATE, DELETE ON platform.quota_ledger",
     ):
-        assert required in migration
+        assert required.lower() in migration.lower()
