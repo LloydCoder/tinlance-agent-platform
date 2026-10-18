@@ -118,7 +118,11 @@ def body(method: str, params: dict[str, object] | None = None) -> bytes:
     request_params = dict(params or {})
     request_params.setdefault(
         "_meta",
-        {"io.modelcontextprotocol/clientInfo": {"name": "tinlance-tests", "version": "1.0.0"}},
+        {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {"name": "tinlance-tests", "version": "1.0.0"},
+            "io.modelcontextprotocol/clientCapabilities": {},
+        },
     )
     return json.dumps(
         {"jsonrpc": "2.0", "id": "request-1", "method": method, "params": request_params}
@@ -138,6 +142,7 @@ def test_stateless_discovery_and_tools_list_are_cache_safe() -> None:
     assert listing.status_code == 200
     result = decode(listing)["result"]
     assert [tool["name"] for tool in result["tools"]] == ["search", "submit", "validate"]
+    assert result["resultType"] == "complete"
     assert result["cacheScope"] == "private"
     assert listing.headers["Cache-Control"] == "no-store"
 
@@ -301,3 +306,52 @@ def test_http_media_type_is_exact_and_traceparent_version_is_validated() -> None
         body("tools/call", {"name": "search", "arguments": {"query": "ok"}}),
     )
     assert invalid_version.status_code == 400
+
+
+def test_protocol_requires_matching_body_protocol_version_and_capabilities() -> None:
+    service, _, _ = make_service()
+    missing_version = body(
+        "tools/list",
+        {
+            "_meta": {
+                "io.modelcontextprotocol/clientInfo": {"name": "test", "version": "1"},
+                "io.modelcontextprotocol/clientCapabilities": {},
+            }
+        },
+    )
+    assert service.handle(headers("tools/list"), missing_version).status_code == 400
+
+    mismatch = body(
+        "tools/list",
+        {
+            "_meta": {
+                "io.modelcontextprotocol/protocolVersion": "2025-11-25",
+                "io.modelcontextprotocol/clientInfo": {"name": "test", "version": "1"},
+                "io.modelcontextprotocol/clientCapabilities": {},
+            }
+        },
+    )
+    assert service.handle(headers("tools/list"), mismatch).status_code == 400
+
+    missing_capabilities = body(
+        "tools/list",
+        {
+            "_meta": {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientInfo": {"name": "test", "version": "1"},
+            }
+        },
+    )
+    assert service.handle(headers("tools/list"), missing_capabilities).status_code == 400
+
+
+def test_tool_names_follow_mcp_ascii_name_contract() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        MCPToolDefinition(
+            "invalid tool name",
+            "Invalid name",
+            "noop",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+        )
