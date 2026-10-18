@@ -120,14 +120,16 @@ def test_model_router_selects_deterministic_lowest_priority_eligible_route() -> 
 def test_model_router_fails_closed_for_tenant_risk_data_budget_and_availability() -> None:
     recorded = []
     router = ModelRouter(recorded.append)
-    router.register(route(
-        "restricted-route",
-        "provider-a",
-        tenants=frozenset({"tenant-other"}),
-        classifications=frozenset({"public"}),
-        max_risk_score=5,
-        max_cost_microusd=10,
-    ))
+    router.register(
+        route(
+            "restricted-route",
+            "provider-a",
+            tenants=frozenset({"tenant-other"}),
+            classifications=frozenset({"public"}),
+            max_risk_score=5,
+            max_cost_microusd=10,
+        )
+    )
 
     decision = router.route(routing_request())
 
