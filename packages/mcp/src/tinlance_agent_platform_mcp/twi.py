@@ -19,6 +19,7 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 from tinlance_agent_platform_contracts import RiskTier
 
 from .gateway import MCPTool, MCPToolGateway, ToolScope
+from .protocol import MCPToolDefinition
 
 MAX_RESPONSE_BYTES = 1_048_576
 DEFAULT_TIMEOUT_SECONDS = 5.0
@@ -380,3 +381,221 @@ class TWIHTTPTransport:
                 None,
             )
         raise LookupError("TWI tool is not registered")
+
+
+# The remote MCP protocol server uses these schemas and operation names. Consequential
+# export includes Platform approval binding fields; TWIHTTPTransport strips them before HTTP.
+_TWI_SEARCH_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["query", "idempotency_key"],
+    "properties": {
+        "query": {"type": "string", "minLength": 1, "maxLength": 400},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
+        "idempotency_key": {"type": "string", "minLength": 16, "maxLength": 256},
+    },
+}
+_TWI_FETCH_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["url", "idempotency_key"],
+    "properties": {
+        "url": {"type": "string", "format": "uri", "maxLength": 4096},
+        "idempotency_key": {"type": "string", "minLength": 16, "maxLength": 256},
+    },
+}
+_TWI_BROWSER_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["url", "idempotency_key"],
+    "properties": {
+        "url": {"type": "string", "format": "uri", "maxLength": 4096},
+        "wait_until": {
+            "type": "string",
+            "enum": ["domcontentloaded", "load"],
+            "default": "domcontentloaded",
+        },
+        "timeout_ms": {"type": "integer", "minimum": 1000, "maximum": 30000, "default": 15000},
+        "include_screenshot": {"type": "boolean", "default": False},
+        "idempotency_key": {"type": "string", "minLength": 16, "maxLength": 256},
+    },
+}
+_TWI_JOB_ID_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["job_id"],
+    "properties": {"job_id": {"type": "string", "minLength": 1, "maxLength": 64}},
+}
+_TWI_VERIFY_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["claims"],
+    "properties": {
+        "claims": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["claim_id", "statement", "citations"],
+                "properties": {
+                    "claim_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+                    "statement": {"type": "string", "minLength": 1, "maxLength": 500},
+                    "citations": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["job_id", "quote"],
+                            "properties": {
+                                "job_id": {"type": "string", "minLength": 1, "maxLength": 64},
+                                "quote": {"type": "string", "minLength": 8, "maxLength": 350},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
+_TWI_EXPORT_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "claim_id",
+        "statement",
+        "job_id",
+        "quote",
+        "idempotency_key",
+        "run_id",
+        "approval_id",
+        "intent_fingerprint",
+    ],
+    "properties": {
+        "claim_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+        "statement": {"type": "string", "minLength": 1, "maxLength": 500},
+        "job_id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "quote": {"type": "string", "minLength": 8, "maxLength": 350},
+        "idempotency_key": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{16,128}$"},
+        "run_id": {"type": "string", "format": "uuid"},
+        "approval_id": {"type": "string", "format": "uuid"},
+        "intent_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    },
+}
+_TWI_EXPORT_STATUS_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["event_id"],
+    "properties": {"event_id": {"type": "string", "format": "uuid"}},
+}
+
+TWI_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = (
+    MCPToolDefinition(
+        "twi_search",
+        "Submit a bounded web search and return a durable job reference.",
+        "twi.jobs.create_search",
+        _TWI_SEARCH_SCHEMA,
+        idempotency_argument="idempotency_key",
+        open_world=True,
+    ),
+    MCPToolDefinition(
+        "twi_fetch",
+        "Submit a policy-checked public web fetch and return a durable job reference.",
+        "twi.jobs.create_fetch",
+        _TWI_FETCH_SCHEMA,
+        idempotency_argument="idempotency_key",
+        open_world=True,
+    ),
+    MCPToolDefinition(
+        "twi_browser_navigate",
+        "Capture a public web page in a fresh isolated read-only browser context.",
+        "twi.jobs.create_browser",
+        _TWI_BROWSER_SCHEMA,
+        idempotency_argument="idempotency_key",
+        open_world=True,
+    ),
+    MCPToolDefinition(
+        "twi_job_read",
+        "Read a job owned by the authenticated subject in the current tenant.",
+        "twi.jobs.read",
+        _TWI_JOB_ID_SCHEMA,
+        read_only=True,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_job_cancel",
+        "Request cancellation of a job owned by the authenticated subject.",
+        "twi.jobs.cancel",
+        _TWI_JOB_ID_SCHEMA,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_research_verify",
+        "Verify citation excerpts against caller-authorized successful TWI captures.",
+        "twi.research.verify",
+        _TWI_VERIFY_SCHEMA,
+        read_only=True,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_world_intelligence_export",
+        "Export verified source evidence to World Intelligence after human approval.",
+        "twi.world_intelligence.export_source_evidence",
+        _TWI_EXPORT_SCHEMA,
+        consequential=True,
+        idempotency_argument="idempotency_key",
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_world_intelligence_export_status",
+        "Read the status of a source-evidence export owned by the authenticated subject.",
+        "twi.world_intelligence.export_status",
+        _TWI_EXPORT_STATUS_SCHEMA,
+        read_only=True,
+        open_world=False,
+    ),
+)
+
+TWI_OPERATION_TO_TOOL: dict[str, str] = {
+    definition.operation: definition.name for definition in TWI_MCP_TOOL_DEFINITIONS
+}
+
+
+def twi_tool_spec(tool_name: str) -> _ToolSpec:
+    spec = _TOOL_SPECS.get(tool_name)
+    if spec is None:
+        raise LookupError("TWI tool is not registered")
+    return spec
+
+
+def compute_twi_intent_fingerprint(
+    *,
+    tenant_id: str,
+    subject_id: str,
+    run_id: str,
+    tool_name: str,
+    arguments: Mapping[str, object],
+) -> str:
+    """Compute the exact intent digest that a human approval must bind to."""
+
+    canonical = json.dumps(
+        {
+            "tenant_id": tenant_id,
+            "subject_id": subject_id,
+            "run_id": run_id,
+            "tool_name": tool_name,
+            "capability": twi_tool_spec(tool_name).capability,
+            "action": twi_tool_spec(tool_name).action,
+            "resource": twi_tool_spec(tool_name).resource_pattern,
+            "arguments": dict(arguments),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    from hashlib import sha256
+
+    return sha256(canonical.encode("utf-8")).hexdigest()
