@@ -28,6 +28,17 @@ class AgentCardSignatureVerifier(Protocol):
     def verify(self, key_id: str, algorithm: str, signing_input: bytes, signature: str) -> bool: ...
 
 
+class RemoteCredentialProvider(Protocol):
+    """Issue short-lived credentials bound to a Platform-validated delegation.
+
+    Implementations must verify that the delegation was minted by the trusted
+    Platform authority; callers must not turn a locally constructed dataclass
+    into remote authority.
+    """
+
+    def issue(self, delegation: RemoteDelegation) -> str: ...
+
+
 class RemoteAgentTransport(Protocol):
     """Transport must pin one of the validated addresses and must not follow redirects."""
 
@@ -57,8 +68,8 @@ def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
         raise ValueError("remote agent endpoint must be an absolute secure URL")
     if parsed.username is not None or parsed.password is not None:
         raise ValueError("remote agent endpoint must not embed credentials")
-    if parsed.fragment:
-        raise ValueError("remote agent endpoint must not contain a fragment")
+    if parsed.fragment or parsed.query:
+        raise ValueError("remote agent endpoint must not contain query parameters or fragments")
     try:
         port = parsed.port
     except ValueError as exc:
@@ -385,22 +396,40 @@ class A2AClient:
         resolver: Callable[[str], Iterable[str]],
         transport: RemoteAgentTransport,
         card_verifier: AgentCardSignatureVerifier,
+        credential_provider: RemoteCredentialProvider,
     ) -> None:
         self._resolver = resolver
         self._transport = transport
         self._card_verifier = card_verifier
+        self._credential_provider = credential_provider
 
     def send(
         self,
         card: AgentCard,
-        bearer_token: str,
+        delegation: RemoteDelegation,
         payload: Mapping[str, object],
         *,
+        expected_tenant_id: str,
+        expected_issuer_id: UUID,
+        required_capabilities: frozenset[str],
+        resource_scope: str,
+        now: datetime | None = None,
         timeout_seconds: float = 10.0,
     ) -> Mapping[str, object]:
         card.verify_signature(self._card_verifier)
-        if not bearer_token or bearer_token != bearer_token.strip():
-            raise PermissionError("A2A bearer credential is required")
+        delegation.validate(
+            expected_tenant_id=expected_tenant_id,
+            expected_issuer_id=expected_issuer_id,
+            expected_audience=str(card.agent_id),
+            now=now,
+        )
+        if not required_capabilities <= delegation.capabilities:
+            raise PermissionError("remote delegation does not grant required capabilities")
+        if resource_scope != delegation.resource_scope:
+            raise PermissionError("remote delegation resource scope does not match the request")
+        bearer_token = self._credential_provider.issue(delegation)
+        if not isinstance(bearer_token, str) or not bearer_token or bearer_token != bearer_token.strip():
+            raise PermissionError("Platform credential provider returned no scoped A2A credential")
         if not 0 < timeout_seconds <= 30:
             raise ValueError("A2A timeout must be between 0 and 30 seconds")
         encoded = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
