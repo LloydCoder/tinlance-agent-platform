@@ -470,7 +470,7 @@ class PinnedHTTPSRemoteAgentTransport:
             not isinstance(bearer_token, str)
             or not bearer_token
             or bearer_token != bearer_token.strip()
-            or re.fullmatch(r"[A-Za-z0-9._~+/=-]+", bearer_token) is None
+            or re.fullmatch(r"[A-Za-z0-9._~+/-]+=*", bearer_token) is None
         ):
             raise ValueError("A2A scoped credential is invalid")
         if not resolved_addresses:
