@@ -59,11 +59,12 @@ def routing_request(**overrides: object) -> ModelRoutingRequest:
     values: dict[str, object] = {
         "tenant_id": "tenant-a",
         "agent_id": "agent-a",
-        "capability": "summarization",
+        "model_capability": "summarization",
+        "risk_class": "moderate",
         "data_classification": "confidential",
         "risk_score": 20,
-        "estimated_cost_microusd": 50,
-        "available_providers": frozenset({"provider-a", "provider-b"}),
+        "budget_microusd": 50,
+        "provider_availability": frozenset({"provider-a", "provider-b"}),
         "policy_version": "policy-7",
         "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
     }
@@ -78,6 +79,7 @@ def route(
     priority: int = 100,
     tenants: frozenset[str] | None = None,
     classifications: frozenset[str] = frozenset({"public", "internal", "confidential"}),
+    risk_classes: frozenset[str] = frozenset({"low", "moderate"}),
     max_risk_score: int = 50,
     max_cost_microusd: int = 100,
     enabled: bool = True,
@@ -88,6 +90,7 @@ def route(
         model=f"{provider}-model",
         capabilities=frozenset({"summarization"}),
         data_classifications=classifications,
+        risk_classes=risk_classes,
         max_risk_score=max_risk_score,
         max_cost_microusd=max_cost_microusd,
         priority=priority,
@@ -110,7 +113,7 @@ def test_model_router_selects_deterministic_lowest_priority_eligible_route() -> 
     assert decision.model == "provider-a-model"
     assert decision.policy_version == "policy-7"
     assert decision.reason_code == "eligible_route_selected"
-    assert decision.trace_id == "trace-123"
+    assert decision.trace_id == "4bf92f3577b34da6a3ce929d0e0e4736"
     assert recorded == [decision]
 
 
@@ -141,7 +144,7 @@ def test_model_router_does_not_select_unavailable_provider_or_disabled_route() -
     router.register(route("disabled", "provider-a", enabled=False))
     router.register(route("offline", "provider-c", priority=1))
 
-    decision = router.route(routing_request(available_providers=frozenset({"provider-a"})))
+    decision = router.route(routing_request(provider_availability=frozenset({"provider-a"})))
 
     assert not decision.allowed
     assert decision.reason_code == "no_eligible_route"
@@ -169,9 +172,9 @@ def test_model_router_fails_closed_if_audit_recording_fails() -> None:
     [
         {"risk_score": 101},
         {"risk_score": -1},
-        {"estimated_cost_microusd": -1},
+        {"budget_microusd": -1},
         {"data_classification": "top-secret"},
-        {"available_providers": frozenset()},
+        {"provider_availability": frozenset()},
         {"trace_id": "0" * 32},
         {"trace_id": "invalid"},
     ],
