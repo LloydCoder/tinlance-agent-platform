@@ -119,6 +119,23 @@ def _validate_origin(origin: str | None, allowed_origins: frozenset[str]) -> Non
         raise PermissionError("MCP Origin is invalid")
 
 
+def _validate_request_meta(params: Mapping[str, object]) -> None:
+    metadata = params.get("_meta")
+    if not isinstance(metadata, Mapping):
+        raise ValueError("MCP request requires per-request _meta")
+    client_info = metadata.get("io.modelcontextprotocol/clientInfo")
+    if not isinstance(client_info, Mapping):
+        raise ValueError("MCP request requires client identity metadata")
+    for key in ("name", "version"):
+        value = client_info.get(key)
+        if not isinstance(value, str) or not value or value != value.strip():
+            raise ValueError("MCP client identity fields must be normalized non-empty strings")
+    capabilities = metadata.get("io.modelcontextprotocol/clientCapabilities")
+    if capabilities is not None and not isinstance(capabilities, Mapping):
+        raise ValueError("MCP client capabilities metadata must be an object")
+    _validate_value(metadata)
+
+
 def _validate_value(value: object, *, depth: int = 0) -> None:
     if depth > MAX_NESTING_DEPTH:
         raise ValueError("MCP argument nesting exceeds safety limit")
@@ -266,6 +283,7 @@ class MCPProtocolService:
             params = body.get("params", {})
             if not isinstance(params, dict):
                 return self._rpc_error(request_id, -32602, "params must be an object")
+            _validate_request_meta(params)
             if method == "server/discover":
                 result: dict[str, object] = {
                     "protocolVersion": MCP_PROTOCOL_VERSION,
