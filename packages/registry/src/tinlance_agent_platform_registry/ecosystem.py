@@ -383,7 +383,11 @@ class EcosystemRegistrySnapshot:
                     and owner_metadata.publisher.identity_status is IdentityStatus.REVOKED
                 ):
                     raise ValueError(f"{service.service_id}: owner publisher identity is revoked")
-                if service.enabled and owner_metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
+                owner_supply_chain_revoked = (
+                    owner_metadata.supply_chain.verification_status
+                    is SupplyChainStatus.REVOKED
+                )
+                if service.enabled and owner_supply_chain_revoked:
                     raise ValueError(
                         f"{service.service_id}: owner supply-chain attestation is revoked"
                     )
