@@ -4,6 +4,7 @@ The adapter is transport-only: route eligibility, authorization, budget reservat
 and tool authority remain in the Agent Platform. Credentials are injected and never
 read from environment variables or included in exception messages.
 """
+
 from __future__ import annotations
 
 import json
