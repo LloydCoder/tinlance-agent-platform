@@ -276,6 +276,31 @@ class EcosystemRegistrySnapshot:
         elif self.schema_version != "registry-manifest/v1":
             raise ValueError("unsupported ecosystem registry schema version")
 
+        if self.schema_version == "registry-manifest/v2":
+            for repository_id, metadata in self.repository_metadata.items():
+                if metadata.lifecycle.state is LifecycleState.DEPRECATED:
+                    replacement = self.repository_metadata.get(metadata.lifecycle.replacement_id or "")
+                    if replacement is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
+                        raise ValueError(f"{repository_id}: deprecated repository replacement must be active")
+            for resource_id, resource in services.items():
+                lifecycle = resource.lifecycle
+                if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
+                    replacement = services.get(lifecycle.replacement_id or "")
+                    if replacement is None or replacement.lifecycle is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
+                        raise ValueError(f"{resource_id}: deprecated service replacement must be active")
+            for resource_id, resource in agents.items():
+                lifecycle = resource.lifecycle
+                if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
+                    replacement = agents.get(lifecycle.replacement_id or "")
+                    if replacement is None or replacement.lifecycle is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
+                        raise ValueError(f"{resource_id}: deprecated agent replacement must be active")
+            for resource_id, resource in contracts.items():
+                lifecycle = resource.lifecycle
+                if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
+                    replacement = contracts.get(lifecycle.replacement_id or "")
+                    if replacement is None or replacement.lifecycle is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
+                        raise ValueError(f"{resource_id}: deprecated contract replacement must be active")
+
         platform_services = [
             service
             for service in self.services
