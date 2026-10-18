@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import ipaddress
 import json
-from hashlib import sha256
 from collections.abc import Mapping
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, Protocol
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
