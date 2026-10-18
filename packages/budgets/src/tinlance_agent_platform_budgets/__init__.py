@@ -2,6 +2,7 @@
 
 from .capacity import CapacityEnvelope, CapacityGate, CapacityObservation, TenantQuota
 from .quota import TenantQuotaService, TenantReservation
+from .postgres_quota import PostgresQuotaLedger, QuotaReservationRequest, QuotaSettlement
 from .service import BudgetReservation, BudgetScope, BudgetService
 
 __all__ = [
@@ -14,4 +15,7 @@ __all__ = [
     "TenantQuota",
     "TenantQuotaService",
     "TenantReservation",
+    "PostgresQuotaLedger",
+    "QuotaReservationRequest",
+    "QuotaSettlement",
 ]
