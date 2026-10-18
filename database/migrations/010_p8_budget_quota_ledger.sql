@@ -189,7 +189,7 @@ as $$
                    or item.value #>> '{}' !~ '^[a-z0-9][a-z0-9._:-]{0,127}$'
                ))
        )
-$;
+$$;
 
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
