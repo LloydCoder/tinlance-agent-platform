@@ -28,7 +28,7 @@ class Handler(BaseHTTPRequestHandler):
     redirect_location = None
 
     def do_POST(self):
-        Handler.last_headers = dict(self.headers.items())
+        Handler.last_headers = {key.lower(): value for key, value in self.headers.items()}
         Handler.last_body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         if Handler.response_delay:
             time.sleep(Handler.response_delay)
@@ -102,7 +102,7 @@ def test_openai_compatible_provider_normalizes_response_and_minimizes_payload(en
     assert "tenant-private" not in Handler.last_body.decode()
     assert "agent-private" not in Handler.last_body.decode()
     assert "internal_note" not in Handler.last_body.decode()
-    assert Handler.last_headers["Authorization"] == "Bearer test-secret"
+    assert Handler.last_headers["authorization"] == "Bearer test-secret"
     assert Handler.last_headers["traceparent"] == request().traceparent
 
 
