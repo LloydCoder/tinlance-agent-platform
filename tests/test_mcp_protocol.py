@@ -57,6 +57,7 @@ def make_service(*, allowed: bool = True):
                     "required": ["query"],
                     "additionalProperties": False,
                 },
+                read_only=True,
             ),
             MCPToolDefinition(
                 "validate",
@@ -80,6 +81,7 @@ def make_service(*, allowed: bool = True):
                     "required": ["scores"],
                     "additionalProperties": False,
                 },
+                read_only=True,
             ),
             MCPToolDefinition(
                 "submit",
@@ -96,6 +98,7 @@ def make_service(*, allowed: bool = True):
                 },
                 consequential=True,
                 idempotency_argument="idempotency_key",
+                destructive=True,
             ),
         ),
         allowed_origins=("https://client.example.test",),
