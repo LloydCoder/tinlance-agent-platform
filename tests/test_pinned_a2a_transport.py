@@ -75,7 +75,9 @@ def transport_call(
     )
 
 
-def test_transport_pins_validated_ip_and_preserves_hostname_for_tls(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_transport_pins_validated_ip_and_preserves_hostname_for_tls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: dict[str, Any] = {}
 
     class FakeSocket:
@@ -110,7 +112,9 @@ def test_transport_pins_validated_ip_and_preserves_hostname_for_tls(monkeypatch:
     connection.close()
 
 
-def test_transport_sends_scoped_request_to_pinned_destination(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_transport_sends_scoped_request_to_pinned_destination(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     FakeConnection.calls = []
     FakeConnection.response = FakeResponse()
     monkeypatch.setattr(interop, "_PinnedHTTPSConnection", FakeConnection)
