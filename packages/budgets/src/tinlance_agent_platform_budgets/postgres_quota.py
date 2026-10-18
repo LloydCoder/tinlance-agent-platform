@@ -58,18 +58,18 @@ class QuotaReservationRequest:
             raise TypeError("organization_id must be a UUID or None")
         if self.reservation_id is not None and not isinstance(self.reservation_id, UUID):
             raise TypeError("reservation_id must be a UUID or None")
-        for value, name in (
+        for text_value, name in (
             (self.action, "action"),
             (self.resource, "resource"),
             (self.idempotency_key, "idempotency_key"),
         ):
-            if not isinstance(value, str):
+            if not isinstance(text_value, str):
                 raise TypeError(f"{name} must be a string")
-            if not value or value != value.strip():
+            if not text_value or text_value != text_value.strip():
                 raise ValueError(f"{name} must be non-empty and normalized")
-            if len(value) > 256:
+            if len(text_value) > 256:
                 raise ValueError(f"{name} exceeds the maximum length")
-            if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            if any(ord(char) < 32 or ord(char) == 127 for char in text_value):
                 raise ValueError(f"{name} must not contain control characters")
         if not 16 <= len(self.idempotency_key) <= 256:
             raise ValueError("idempotency_key must contain 16 to 256 characters")
