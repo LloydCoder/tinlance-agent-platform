@@ -9,14 +9,14 @@ from __future__ import annotations
 import base64
 import ipaddress
 import json
-
-import rfc8785
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
+
+import rfc8785
 
 A2A_SPECIFICATION_VERSION = "1.0.1"
 A2A_PROTOCOL_VERSION = "1.0"
