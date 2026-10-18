@@ -66,9 +66,13 @@ class BudgetService:
         if scope.tenant_id != self._budget.tenant_id or scope.run_id != self._budget.run_id:
             raise PermissionError("budget is owned by another tenant or run")
         if (
-            isinstance(tool_calls, bool) or not isinstance(tool_calls, int)
-            or tool_calls < 0 or isinstance(seconds, bool)
-            or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds < 0
+            isinstance(tool_calls, bool)
+            or not isinstance(tool_calls, int)
+            or tool_calls < 0
+            or isinstance(seconds, bool)
+            or not isinstance(seconds, (int, float))
+            or not math.isfinite(seconds)
+            or seconds < 0
         ):
             raise ValueError("reservation dimensions must be finite and non-negative")
         with self._lock:
