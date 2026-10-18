@@ -1,3 +1,4 @@
+from .envelope import CloudEventEnvelope
 from .outbox import Event, EventStore, InMemoryEventStore, new_event
 
-__all__ = ["Event", "EventStore", "InMemoryEventStore", "new_event"]
+__all__ = ["CloudEventEnvelope", "Event", "EventStore", "InMemoryEventStore", "new_event"]
