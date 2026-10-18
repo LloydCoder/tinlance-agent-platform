@@ -228,14 +228,24 @@ class ModelRouter:
         self,
         record_decision: Callable[[ModelRoutingDecision], None],
         verify_registered_route: Callable[[ModelRoute], bool],
+        verify_routing_context: Callable[[ModelRoutingRequest], bool],
     ) -> None:
         if not callable(record_decision):
             raise TypeError("a durable routing-decision recorder is required")
         if not callable(verify_registered_route):
             raise TypeError("a trusted route-registry verifier is required")
+        if not callable(verify_routing_context):
+            raise TypeError("a trusted routing-context verifier is required")
         self._record_decision = record_decision
         self._verify_registered_route = verify_registered_route
+        self._verify_routing_context = verify_routing_context
         self._routes: dict[str, ModelRoute] = {}
+
+    def _record(self, decision: ModelRoutingDecision) -> None:
+        try:
+            self._record_decision(decision)
+        except Exception as exc:
+            raise RuntimeError("routing decision could not be recorded; failing closed") from exc
 
     def register(self, route: ModelRoute) -> None:
         if route.route_id in self._routes:
@@ -249,6 +259,24 @@ class ModelRouter:
         self._routes[route.route_id] = route
 
     def route(self, request: ModelRoutingRequest) -> ModelRoutingDecision:
+        try:
+            context_verified = self._verify_routing_context(request)
+        except Exception as exc:
+            raise RuntimeError("routing context could not be verified; failing closed") from exc
+        if context_verified is not True:
+            decision = ModelRoutingDecision(
+                decision_id=str(uuid4()),
+                allowed=False,
+                route=None,
+                provider=None,
+                model_id=None,
+                task_policy=request.task_policy,
+                policy_version=None,
+                reason_code="untrusted_routing_context",
+                trace_id=request.trace_id,
+            )
+            self._record(decision)
+            return decision
         candidates = [
             route
             for route in self._routes.values()
@@ -277,7 +305,5 @@ class ModelRouter:
             trace_id=request.trace_id,
         )
         try:
-            self._record_decision(decision)
-        except Exception as exc:
-            raise RuntimeError("routing decision could not be recorded; failing closed") from exc
+        self._record(decision)
         return decision
