@@ -384,8 +384,7 @@ class EcosystemRegistrySnapshot:
                 ):
                     raise ValueError(f"{service.service_id}: owner publisher identity is revoked")
                 owner_supply_chain_revoked = (
-                    owner_metadata.supply_chain.verification_status
-                    is SupplyChainStatus.REVOKED
+                    owner_metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED
                 )
                 if service.enabled and owner_supply_chain_revoked:
                     raise ValueError(
@@ -462,10 +461,7 @@ class EcosystemRegistrySnapshot:
                         raise ValueError(f"{agent.agent_id}: contract owner is not active")
                     if contract_owner.publisher.identity_status is IdentityStatus.REVOKED:
                         raise ValueError(f"{agent.agent_id}: contract owner publisher is revoked")
-                    if (
-                        contract_owner.supply_chain.verification_status
-                        is SupplyChainStatus.REVOKED
-                    ):
+                    if contract_owner.supply_chain.verification_status is SupplyChainStatus.REVOKED:
                         raise ValueError(
                             f"{agent.agent_id}: contract owner supply-chain attestation is revoked"
                         )
