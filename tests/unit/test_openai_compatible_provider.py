@@ -4,12 +4,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
+from tinlance_agent_platform_models.gateway import ModelRequest
 from tinlance_agent_platform_models.openai_compatible import (
     ModelProviderError,
     OpenAICompatibleProvider,
     StaticModelCredential,
 )
-from tinlance_agent_platform_models.gateway import ModelRequest
 
 
 class Handler(BaseHTTPRequestHandler):
