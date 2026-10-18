@@ -39,12 +39,12 @@ select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000091', 
 
 do $$
 declare
-    reservation_id uuid := '50000000-0000-0000-0000-000000000091';
+    v_reservation_id uuid := '50000000-0000-0000-0000-000000000091';
     lease_expiry timestamptz;
     recovery_count integer;
 begin
     perform platform.reserve_quota(
-        reservation_id,
+        v_reservation_id,
         '00000000-0000-0000-0000-000000000091',
         null,
         '10000000-0000-0000-0000-000000000091',
@@ -53,7 +53,7 @@ begin
     );
 
     lease_expiry := platform.renew_quota_reservation(
-        '00000000-0000-0000-0000-000000000091', reservation_id, 600
+        '00000000-0000-0000-0000-000000000091', v_reservation_id, 600
     );
     if lease_expiry <= now() then
         raise exception 'renewal did not extend the reservation lease';
@@ -62,7 +62,7 @@ begin
     update platform.quota_reservations
        set lease_expires_at = now() - interval '1 second'
      where tenant_id = '00000000-0000-0000-0000-000000000091'
-       and quota_reservations.reservation_id = reservation_id;
+       and quota_reservations.reservation_id = v_reservation_id;
 
     recovery_count := platform.request_expired_quota_reconciliation(
         '00000000-0000-0000-0000-000000000091', 10
@@ -82,7 +82,7 @@ begin
     if not exists (
         select 1 from platform.quota_ledger
         where tenant_id = '00000000-0000-0000-0000-000000000091'
-          and quota_ledger.reservation_id = reservation_id
+          and quota_ledger.reservation_id = v_reservation_id
           and event_type = 'recovery_requested'
     ) then
         raise exception 'recovery request is missing its audit ledger fact';
@@ -113,14 +113,22 @@ begin
             '30000000-0000-0000-0000-000000000091',
             'read', 'resource:another', 'p8-recovery-idempotency-002', 1, 1, 10, 1.0
         );
-        raise exception 'expired reservation stopped counting against concurrency';
     exception when raise_exception then
+        -- The quota denial is expected; the exception block isolates it from
+        -- the assertion below so a successful reservation cannot be swallowed.
         null;
     end;
+    if exists (
+        select 1 from platform.quota_reservations
+        where tenant_id = '00000000-0000-0000-0000-000000000091'
+          and idempotency_key = 'p8-recovery-idempotency-002'
+    ) then
+        raise exception 'expired reservation stopped counting against concurrency';
+    end if;
 
     if platform.settle_quota(
         '00000000-0000-0000-0000-000000000091',
-        reservation_id, 1, 10, 1.0,
+        v_reservation_id, 1, 10, 1.0,
         '{"provider":"recovery-test","measurement_ref":"usage:recovered-091"}'::jsonb
     ) not in ('settled', 'overrun') then
         raise exception 'reconciliation could not settle measured usage';
