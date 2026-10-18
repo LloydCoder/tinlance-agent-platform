@@ -147,6 +147,18 @@ begin
         raise exception 'expired reservation stopped counting against concurrency';
     end if;
 
+    begin
+        perform platform.release_quota(
+            '00000000-0000-0000-0000-000000000091',
+            v_reservation_id,
+            'lease-expired',
+            '{"measurement_ref":"recovery:review"}'::jsonb
+        );
+        raise exception 'recovery-requested reservation was released' using errcode = 'P8R02';
+    exception when sqlstate '55000' then
+        null;
+    end;
+
     if platform.settle_quota(
         '00000000-0000-0000-0000-000000000091',
         v_reservation_id, 1, 10, 1.0,
