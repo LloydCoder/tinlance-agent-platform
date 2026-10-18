@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
@@ -38,6 +39,10 @@ class QuotaReservationRequest:
         ):
             if not value or value != value.strip():
                 raise ValueError(f"{name} must be non-empty and normalized")
+            if len(value) > (256 if name != "idempotency_key" else 256):
+                raise ValueError(f"{name} exceeds the maximum length")
+            if any(ord(char) < 32 or ord(char) == 127 for char in value):
+                raise ValueError(f"{name} must not contain control characters")
         if not 16 <= len(self.idempotency_key) <= 256:
             raise ValueError("idempotency_key must contain 16 to 256 characters")
         if (
@@ -68,6 +73,40 @@ class QuotaSettlement:
 
 class PostgresQuotaLedger:
     """Calls the migration-owned transactional quota procedures."""
+
+    _EVIDENCE_KEYS = frozenset({
+        "provider", "model", "price_book_version", "measurement_ref",
+        "source_event_id", "cancellation_reason", "metering_source",
+        "billing_unit", "policy_ref", "correlation_id", "trace_id",
+        "traceparent",
+    })
+    _REASON_CODE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
+
+    @classmethod
+    def _validate_evidence(cls, evidence: dict[str, Any] | None) -> dict[str, Any]:
+        if evidence is None:
+            return {}
+        if not isinstance(evidence, dict):
+            raise ValueError("quota evidence must be a JSON object")
+        if set(evidence) - cls._EVIDENCE_KEYS:
+            raise ValueError("quota evidence contains unsupported fields")
+        for key, value in evidence.items():
+            if isinstance(value, (dict, list)) or value is None:
+                raise ValueError("quota evidence values must be scalar metadata")
+            if isinstance(value, str) and len(value) > 512:
+                raise ValueError("quota evidence string exceeds 512 characters")
+            if key == "cancellation_reason" and (
+                not isinstance(value, str) or not cls._REASON_CODE.fullmatch(value)
+            ):
+                raise ValueError("cancellation_reason must be a normalized reason code")
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("quota evidence numbers must be finite")
+            if not isinstance(value, (str, int, float, bool)):
+                raise ValueError("quota evidence values must be scalar metadata")
+        encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if len(encoded.encode("utf-8")) > 4096:
+            raise ValueError("quota evidence exceeds 4096 bytes")
+        return evidence
 
     def __init__(self, connection: Any) -> None:
         self._connection = connection
@@ -124,8 +163,9 @@ class PostgresQuotaLedger:
             or actual.cost_units < 0
         ):
             raise ValueError("actual quota usage must be finite and non-negative")
+        evidence = self._validate_evidence(actual.evidence)
         evidence_json = json.dumps(
-            actual.evidence,
+            evidence,
             sort_keys=True,
             separators=(",", ":"),
             allow_nan=False,
@@ -154,10 +194,11 @@ class PostgresQuotaLedger:
         evidence: dict[str, Any] | None = None,
     ) -> bool:
         self._require_transaction()
-        if not reason or reason != reason.strip():
-            raise ValueError("quota release reason is required and normalized")
+        if not isinstance(reason, str) or not self._REASON_CODE.fullmatch(reason):
+            raise ValueError("quota release reason must be a normalized reason code")
+        safe_evidence = self._validate_evidence(evidence)
         evidence_json = json.dumps(
-            evidence or {}, sort_keys=True, separators=(",", ":"), allow_nan=False
+            safe_evidence, sort_keys=True, separators=(",", ":"), allow_nan=False
         )
         row = self._connection.execute(
             "SELECT platform.release_quota(%s, %s, %s, %s::jsonb)",
