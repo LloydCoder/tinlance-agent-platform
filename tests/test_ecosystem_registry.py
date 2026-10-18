@@ -88,11 +88,19 @@ def test_canonical_registry_accepts_exact_revisions_and_compatible_contracts():
 def test_registry_rejects_missing_service_and_stale_reviewed_revision():
     with pytest.raises(ValueError, match="missing required services"):
         valid_snapshot(services=SERVICES[1:]).validate()
-    stale = (SERVICES[0].__class__(
-        SERVICES[0].service_id, "platform", "main", "1.1",
-        SERVICES[0].contract_ids, SERVICES[0].capabilities, SERVICES[0].authority_mode,
-    ), *SERVICES[1:])
     with pytest.raises(ValueError, match="full immutable commit SHA"):
+        ServiceRegistration(
+            SERVICES[0].service_id, "platform", "main", "1.1",
+            SERVICES[0].contract_ids, SERVICES[0].capabilities, SERVICES[0].authority_mode,
+        )
+    stale = (
+        ServiceRegistration(
+            SERVICES[0].service_id, "platform", "f" * 40, "1.1",
+            SERVICES[0].contract_ids, SERVICES[0].capabilities, SERVICES[0].authority_mode,
+        ),
+        *SERVICES[1:],
+    )
+    with pytest.raises(ValueError, match="stale reviewed revision"):
         valid_snapshot(services=stale).validate()
 
 
