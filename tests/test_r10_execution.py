@@ -32,7 +32,14 @@ class FailingSettlementBudget:
     def __init__(self) -> None:
         self.released = False
 
-    def reserve_scoped(self, scope, *, tool_calls: int, seconds: float):
+    def reserve_scoped(
+        self,
+        scope,
+        *,
+        tool_calls: int,
+        seconds: float,
+        idempotency_key: str | None = None,
+    ):
         return {"scope": scope, "tool_calls": tool_calls, "seconds": seconds}
 
     def consume(self, reservation, elapsed_seconds: float) -> None:
