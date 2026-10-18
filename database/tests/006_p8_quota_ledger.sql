@@ -3,6 +3,7 @@ begin;
 create role p8_quota_test_app nologin;
 grant usage on schema platform to p8_quota_test_app;
 grant select, insert, update, delete on all tables in schema platform to p8_quota_test_app;
+grant truncate on platform.quota_ledger to p8_quota_test_app;
 grant execute on function platform.reserve_quota(uuid, uuid, uuid, uuid, uuid, text, text, text, integer, bigint, bigint, numeric) to p8_quota_test_app;
 grant execute on function platform.settle_quota(uuid, uuid, bigint, bigint, numeric, jsonb) to p8_quota_test_app;
 grant execute on function platform.release_quota(uuid, uuid, text, jsonb) to p8_quota_test_app;
