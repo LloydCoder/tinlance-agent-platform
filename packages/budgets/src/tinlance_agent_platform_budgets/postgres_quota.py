@@ -91,6 +91,9 @@ class PostgresQuotaLedger:
         }
     )
     _REASON_CODE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
+    _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$")
+    _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
+    _TRACEPARENT = re.compile(r"^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
     @classmethod
     def _validate_evidence(cls, evidence: dict[str, Any] | None) -> dict[str, Any]:
@@ -103,16 +106,18 @@ class PostgresQuotaLedger:
         for key, value in evidence.items():
             if isinstance(value, (dict, list)) or value is None:
                 raise ValueError("quota evidence values must be scalar metadata")
-            if isinstance(value, str) and len(value) > 512:
+            if not isinstance(value, str):
+                raise ValueError("quota evidence values must be identifier strings")
+            if len(value) > 512:
                 raise ValueError("quota evidence string exceeds 512 characters")
-            if key == "cancellation_reason" and (
-                not isinstance(value, str) or not cls._REASON_CODE.fullmatch(value)
-            ):
+            if key == "cancellation_reason" and not cls._REASON_CODE.fullmatch(value):
                 raise ValueError("cancellation_reason must be a normalized reason code")
-            if isinstance(value, float) and not math.isfinite(value):
-                raise ValueError("quota evidence numbers must be finite")
-            if not isinstance(value, (str, int, float, bool)):
-                raise ValueError("quota evidence values must be scalar metadata")
+            if key == "trace_id" and not cls._TRACE_ID.fullmatch(value):
+                raise ValueError("trace_id must be a lowercase W3C trace identifier")
+            if key == "traceparent" and not cls._TRACEPARENT.fullmatch(value):
+                raise ValueError("traceparent must be a supported W3C trace context")
+            if key not in {"cancellation_reason", "trace_id", "traceparent"} and not cls._IDENTIFIER.fullmatch(value):
+                raise ValueError(f"{key} must be a normalized metadata identifier")
         encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(encoded.encode("utf-8")) > 4096:
             raise ValueError("quota evidence exceeds 4096 bytes")
