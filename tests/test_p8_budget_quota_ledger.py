@@ -562,3 +562,23 @@ def test_postgres_budget_gate_releases_only_pre_side_effect_reservations() -> No
     assert any("platform.release_quota" in query for query, _ in release_connection.queries)
     assert release_connection.committed
     assert budget.budget.consumed_tool_calls == 0
+
+
+def test_postgres_budget_gate_reconciles_settlement_without_double_accounting() -> None:
+    reserve_connection = Connection()
+    failed_settlement = Connection(result="unexpected")
+    recovered_settlement = Connection(result="settled")
+    gate, budget, scope, _ = _postgres_budget_gate(
+        connections=[reserve_connection, failed_settlement, recovered_settlement]
+    )
+    reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    with pytest.raises(RuntimeError, match="unexpected result"):
+        gate.consume(reservation, elapsed_seconds=2.0)
+    assert failed_settlement.rolled_back
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
+
+    gate.consume(reservation, elapsed_seconds=2.0)
+    assert recovered_settlement.committed
+    assert budget.budget.consumed_tool_calls == 1
+    assert budget.budget.elapsed_seconds == 2.0
