@@ -385,7 +385,8 @@ begin
        or p_actual_token_units is null or p_actual_token_units < 0
        or p_actual_cost_units is null or p_actual_cost_units < 0
        or p_actual_cost_units::text in ('NaN', 'Infinity', '-Infinity')
-       or not platform.quota_evidence_is_safe(p_evidence) then
+       or not platform.quota_evidence_is_safe(p_evidence)
+       or not (coalesce(p_evidence, '{}'::jsonb) ? 'measurement_ref') then
         raise exception 'invalid settlement amounts' using errcode = '22023';
     end if;
     normalized_actual_cost := round(p_actual_cost_units, 6);
