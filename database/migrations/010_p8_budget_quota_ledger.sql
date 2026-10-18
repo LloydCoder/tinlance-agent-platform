@@ -370,6 +370,7 @@ set search_path = pg_catalog, platform
 as $$
 declare
     reservation platform.quota_reservations%rowtype;
+    prior_settlement platform.quota_ledger%rowtype;
     tenant_limit platform.tenant_budget_limits%rowtype;
     org_limit platform.organization_budget_limits%rowtype;
     other_calls bigint;
@@ -398,9 +399,16 @@ begin
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id for update;
     if not found then raise exception 'reservation not found' using errcode = 'P0002'; end if;
     if reservation.state = 'settled' then
+        select * into prior_settlement
+          from platform.quota_ledger
+         where tenant_id = p_tenant_id
+           and reservation_id = p_reservation_id
+           and event_type in ('settled', 'overrun');
         if reservation.actual_tool_calls = p_actual_tool_calls
            and reservation.actual_token_units = p_actual_token_units
-           and reservation.actual_cost_units = normalized_actual_cost then
+           and reservation.actual_cost_units = normalized_actual_cost
+           and found
+           and prior_settlement.evidence = coalesce(p_evidence, '{}'::jsonb) then
             return 'already_settled';
         end if;
         raise exception 'conflicting duplicate settlement' using errcode = '23505';
