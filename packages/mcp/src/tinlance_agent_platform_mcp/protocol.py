@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -99,7 +100,7 @@ def _traceparent(value: str | None) -> str | None:
         return None
     if not _TRACEPARENT.fullmatch(value):
         raise ValueError("traceparent must use W3C Trace Context format")
-    if value[3:35] == "0" * 32 or value[36:52] == "0" * 16:
+    if value[:2] == "ff" or value[3:35] == "0" * 32 or value[36:52] == "0" * 16:
         raise ValueError("traceparent identifiers must not be all zero")
     return value
 
@@ -144,6 +145,8 @@ def _validate_value(value: object, *, depth: int = 0) -> None:
         if len(value) > MAX_STRING_LENGTH:
             raise ValueError("MCP string argument exceeds safety limit")
         return
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("non-finite numeric arguments are not allowed")
     if value is None or isinstance(value, (bool, int, float)):
         return
     if isinstance(value, Mapping):
@@ -163,7 +166,15 @@ def _validate_value(value: object, *, depth: int = 0) -> None:
     raise TypeError("unsupported MCP argument type")
 
 
-def _matches_schema(value: object, schema: Mapping[str, object], path: str = "arguments") -> None:
+def _matches_schema(
+    value: object,
+    schema: Mapping[str, object],
+    path: str = "arguments",
+    *,
+    depth: int = 0,
+) -> None:
+    if depth > MAX_NESTING_DEPTH:
+        raise ValueError("declared JSON schema exceeds nesting safety limit")
     expected = schema.get("type")
     valid = {
         "object": isinstance(value, Mapping),
@@ -176,31 +187,89 @@ def _matches_schema(value: object, schema: Mapping[str, object], path: str = "ar
     }.get(str(expected))
     if valid is not True:
         raise ValueError(f"{path} does not match declared JSON schema type")
+    enum = schema.get("enum")
+    if isinstance(enum, list) and value not in enum:
+        raise ValueError(f"{path} is not an allowed enum value")
+    if "const" in schema and value != schema["const"]:
+        raise ValueError(f"{path} does not match declared constant")
     if isinstance(value, str):
-        max_length = schema.get("maxLength")
+        min_length = schema.get("minLength", 0)
+        max_length = schema.get("maxLength", MAX_STRING_LENGTH)
+        if isinstance(min_length, int) and len(value) < min_length:
+            raise ValueError(f"{path} is shorter than minLength")
         if isinstance(max_length, int) and len(value) > max_length:
             raise ValueError(f"{path} exceeds maxLength")
-        enum = schema.get("enum")
-        if isinstance(enum, list) and value not in enum:
-            raise ValueError(f"{path} is not an allowed enum value")
+        pattern = schema.get("pattern")
+        if pattern is not None:
+            if not isinstance(pattern, str) or len(pattern) > 256:
+                raise ValueError("declared string pattern is invalid or too long")
+            try:
+                if re.search(pattern, value) is None:
+                    raise ValueError(f"{path} does not match declared pattern")
+            except re.error as exc:
+                raise ValueError("declared string pattern is invalid") from exc
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError(f"{path} must be a finite number")
+        for keyword, predicate in (
+            ("minimum", lambda bound: value >= bound),
+            ("maximum", lambda bound: value <= bound),
+            ("exclusiveMinimum", lambda bound: value > bound),
+            ("exclusiveMaximum", lambda bound: value < bound),
+        ):
+            bound = schema.get(keyword)
+            if bound is not None:
+                if not isinstance(bound, (int, float)) or isinstance(bound, bool):
+                    raise ValueError(f"declared {keyword} is invalid")
+                if not predicate(bound):
+                    raise ValueError(f"{path} violates {keyword}")
+    if isinstance(value, (list, tuple)):
+        minimum = schema.get("minItems", 0)
+        maximum = schema.get("maxItems", MAX_ARGUMENTS)
+        if isinstance(minimum, int) and len(value) < minimum:
+            raise ValueError(f"{path} has fewer than minItems")
+        if isinstance(maximum, int) and len(value) > maximum:
+            raise ValueError(f"{path} exceeds maxItems")
+        if schema.get("uniqueItems") is True:
+            canonical = [json.dumps(item, sort_keys=True, separators=(",", ":")) for item in value]
+            if len(canonical) != len(set(canonical)):
+                raise ValueError(f"{path} contains duplicate items")
+        item_schema = schema.get("items")
+        if item_schema is not None:
+            if not isinstance(item_schema, Mapping):
+                raise ValueError("declared array items schema is invalid")
+            for index, item in enumerate(value):
+                _matches_schema(item, item_schema, f"{path}[{index}]", depth=depth + 1)
     if isinstance(value, Mapping):
         properties = schema.get("properties", {})
         required = schema.get("required", [])
         if not isinstance(properties, Mapping) or not isinstance(required, list):
             raise ValueError("declared JSON schema is invalid")
+        if any(not isinstance(key, str) for key in required):
+            raise ValueError("declared JSON schema required keys must be strings")
+        minimum = schema.get("minProperties", 0)
+        maximum = schema.get("maxProperties", MAX_ARGUMENTS)
+        if isinstance(minimum, int) and len(value) < minimum:
+            raise ValueError(f"{path} has fewer than minProperties")
+        if isinstance(maximum, int) and len(value) > maximum:
+            raise ValueError(f"{path} exceeds maxProperties")
         missing = [key for key in required if key not in value]
         if missing:
             raise ValueError(f"{path} is missing required properties")
-        if schema.get("additionalProperties", False) is False and any(
-            key not in properties for key in value
-        ):
+        additional = schema.get("additionalProperties", False)
+        undeclared = [key for key in value if key not in properties]
+        if additional is False and undeclared:
             raise ValueError(f"{path} contains undeclared properties")
+        if additional is not False and additional is not True and not isinstance(additional, Mapping):
+            raise ValueError("declared additionalProperties schema is invalid")
         for key, nested in value.items():
             child_schema = properties.get(key)
+            if child_schema is None and isinstance(additional, Mapping):
+                child_schema = additional
             if child_schema is not None:
                 if not isinstance(child_schema, Mapping):
                     raise ValueError("declared JSON schema property is invalid")
-                _matches_schema(nested, child_schema, f"{path}.{key}")
+                _matches_schema(nested, child_schema, f"{path}.{key}", depth=depth + 1)
 
 
 class MCPProtocolService:
@@ -254,7 +323,7 @@ class MCPProtocolService:
         try:
             if len(raw_body) > MAX_REQUEST_BYTES:
                 return self._http_error(413, "request_too_large")
-            if "application/json" not in normalized.get("content-type", "").lower():
+            if normalized.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
                 return self._http_error(415, "json_required")
             _validate_origin(normalized.get("origin"), self._allowed_origins)
             if normalized.get("mcp-protocol-version") != MCP_PROTOCOL_VERSION:
@@ -276,7 +345,11 @@ class MCPProtocolService:
             if not isinstance(body, dict) or body.get("jsonrpc") != "2.0":
                 return self._http_error(400, "invalid_jsonrpc_request")
             request_id = body.get("id")
-            if isinstance(request_id, bool) or not isinstance(request_id, (str, int)):
+            if (
+                isinstance(request_id, bool)
+                or not isinstance(request_id, (str, int))
+                or (isinstance(request_id, str) and (not request_id or len(request_id) > 256))
+            ):
                 return self._http_error(400, "invalid_jsonrpc_id")
             method = body.get("method")
             if not isinstance(method, str) or normalized.get("mcp-method") != method:
