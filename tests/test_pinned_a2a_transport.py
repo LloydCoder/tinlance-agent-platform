@@ -236,3 +236,65 @@ def test_transport_rejects_header_injection_and_non_string_json_keys() -> None:
             protocol_version="1.0",
             content_type="application/a2a+json",
         )
+
+
+@pytest.mark.parametrize(
+    ("timeout_seconds", "max_response_bytes"),
+    [(0.0, 1024), (31.0, 1024), (float("nan"), 1024), (3.0, 0), (3.0, 1_048_577)],
+)
+def test_transport_rejects_unbounded_timeout_or_response_limit(
+    timeout_seconds: float,
+    max_response_bytes: int,
+) -> None:
+    with pytest.raises(ValueError):
+        interop.PinnedHTTPSRemoteAgentTransport().post(
+            "https://agent.example/a2a",
+            ("93.184.216.34",),
+            "scoped-credential",
+            {"jsonrpc": "2.0"},
+            timeout_seconds=timeout_seconds,
+            max_response_bytes=max_response_bytes,
+            protocol_version="1.0",
+            content_type="application/a2a+json",
+        )
+
+
+def test_transport_rejects_empty_or_invalid_pinned_addresses() -> None:
+    transport = interop.PinnedHTTPSRemoteAgentTransport()
+    with pytest.raises(ValueError, match="validated destination"):
+        transport_call(transport, addresses=())
+    with pytest.raises(ValueError, match="invalid pinned address"):
+        transport_call(transport, addresses=("not-an-ip",))
+
+
+def test_transport_rejects_oversized_request_and_non_object_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport = interop.PinnedHTTPSRemoteAgentTransport()
+    with pytest.raises(ValueError, match="request exceeds maximum size"):
+        transport.post(
+            "https://agent.example/a2a",
+            ("93.184.216.34",),
+            "scoped-credential",
+            {"payload": "x" * 1_048_577},
+            timeout_seconds=3.0,
+            max_response_bytes=1024,
+            protocol_version="1.0",
+            content_type="application/a2a+json",
+        )
+
+    FakeConnection.response = FakeResponse(body=b"[]")
+    monkeypatch.setattr(interop, "_PinnedHTTPSConnection", FakeConnection)
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        transport_call(transport)
+
+
+def test_transport_sanitizes_network_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FailingConnection(FakeConnection):
+        def getresponse(self) -> FakeResponse:
+            raise OSError("sensitive internal network detail")
+
+    monkeypatch.setattr(interop, "_PinnedHTTPSConnection", FailingConnection)
+    with pytest.raises(RuntimeError, match="remote A2A transport failed") as error:
+        transport_call(interop.PinnedHTTPSRemoteAgentTransport())
+    assert "sensitive internal network detail" not in str(error.value)
