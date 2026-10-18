@@ -110,6 +110,7 @@ class ModelRoute:
     provider: str
     model: str
     capabilities: frozenset[str]
+    task_policies: frozenset[str]
     data_classifications: frozenset[str]
     risk_classes: frozenset[str]
     max_risk_score: int
@@ -131,6 +132,10 @@ class ModelRoute:
             not item or item != item.strip() for item in self.capabilities
         ):
             raise ValueError("route capabilities must be normalized and non-empty")
+        if not self.task_policies or any(
+            not item or item != item.strip() for item in self.task_policies
+        ):
+            raise ValueError("route task policies must be normalized and non-empty")
         if not self.data_classifications or not self.data_classifications <= {
             "public",
             "internal",
@@ -155,6 +160,7 @@ class ModelRoute:
 class ModelRoutingRequest:
     tenant_id: str
     agent_id: str
+    task_policy: str
     model_capability: str
     risk_class: str
     data_classification: str
@@ -168,6 +174,7 @@ class ModelRoutingRequest:
         for value, name in (
             (self.tenant_id, "tenant_id"),
             (self.agent_id, "agent_id"),
+            (self.task_policy, "task_policy"),
             (self.model_capability, "model_capability"),
             (self.policy_version, "policy_version"),
         ):
@@ -198,6 +205,7 @@ class ModelRoutingDecision:
     route: str | None
     provider: str | None
     model_id: str | None
+    task_policy: str
     policy_version: str
     reason_code: str
     trace_id: str | None
@@ -244,6 +252,7 @@ class ModelRouter:
             for route in self._routes.values()
             if route.enabled
             and route.provider in request.provider_availability
+            and request.task_policy in route.task_policies
             and request.model_capability in route.capabilities
             and request.risk_class in route.risk_classes
             and request.data_classification in route.data_classifications
@@ -260,6 +269,7 @@ class ModelRouter:
             route=selected.route_id if selected else None,
             provider=selected.provider if selected else None,
             model_id=selected.model if selected else None,
+            task_policy=request.task_policy,
             policy_version=request.policy_version,
             reason_code="eligible_route_selected" if selected else "no_eligible_route",
             trace_id=request.trace_id,
