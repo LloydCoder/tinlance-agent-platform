@@ -129,11 +129,6 @@ class BudgetService:
                 raise KeyError("budget reservation does not exist")
             if elapsed_seconds > current.seconds:
                 raise TimeoutError("execution exceeded reserved runtime budget")
-            self._budget = replace(
-                self._budget,
-                consumed_tool_calls=self._budget.consumed_tool_calls + current.tool_calls,
-                elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
-            )
             if self._tenant_quota is not None:
                 self._tenant_quota.settle(
                     TenantReservation(
@@ -149,6 +144,11 @@ class BudgetService:
                         0.0,
                     )
                 )
+            self._budget = replace(
+                self._budget,
+                consumed_tool_calls=self._budget.consumed_tool_calls + current.tool_calls,
+                elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
+            )
             del self._reservations[reservation.reservation_id]
 
     def release(self, reservation: BudgetReservation) -> None:
@@ -156,7 +156,6 @@ class BudgetService:
             current = self._reservations.get(reservation.reservation_id)
             if current is not None and current != reservation:
                 raise KeyError("budget reservation scope mismatch")
-            self._reservations.pop(reservation.reservation_id, None)
             if current is not None and self._tenant_quota is not None:
                 self._tenant_quota.release(
                     TenantReservation(
@@ -172,6 +171,7 @@ class BudgetService:
                         0.0,
                     )
                 )
+            self._reservations.pop(reservation.reservation_id, None)
 
     def consume_turn(self, elapsed_seconds: float) -> None:
         if not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
