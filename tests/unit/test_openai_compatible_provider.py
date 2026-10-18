@@ -183,8 +183,6 @@ def test_openai_compatible_provider_does_not_follow_redirects(endpoint):
 def test_openai_compatible_provider_rejects_oversized_request(endpoint):
     from tinlance_agent_platform_models.openai_compatible import MAX_REQUEST_BYTES
 
-    large_request = request(
-        messages=({"role": "user", "content": "x" * (MAX_REQUEST_BYTES + 1)},)
-    )
+    large_request = request(messages=({"role": "user", "content": "x" * (MAX_REQUEST_BYTES + 1)},))
     with pytest.raises(ValueError, match="request limit"):
         provider(endpoint).complete(large_request)
