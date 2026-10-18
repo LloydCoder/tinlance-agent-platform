@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from threading import RLock
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from .envelope import CloudEventEnvelope
@@ -35,14 +35,12 @@ class Event:
     data_classification: str = "internal"
 
 
-class EventStore:
+class EventStore(Protocol):
     """Structural contract shared by in-memory and PostgreSQL stores."""
 
-    def append(self, event: Event) -> Event:
-        raise NotImplementedError
+    def append(self, event: Event) -> Event: ...
 
-    def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Event, ...]:
-        raise NotImplementedError
+    def list_for_run(self, tenant_id: str, run_id: UUID) -> tuple[Event, ...]: ...
 
 
 def _prepare_event(event: Event) -> tuple[Event, CloudEventEnvelope]:
