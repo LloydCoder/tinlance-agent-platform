@@ -27,6 +27,9 @@ class MCPPlatformRequest:
 class MCPAuthenticatedPrincipal(Protocol):
     tenant_id: str
     subject_id: str
+    scopes: frozenset[str]
+    roles: frozenset[str]
+    principal_type: str
 
 
 class MCPPrincipalResolver(Protocol):
