@@ -474,7 +474,8 @@ begin
     if platform.current_tenant_id() is distinct from p_tenant_id then
         raise exception 'tenant scope mismatch' using errcode = '42501';
     end if;
-    if p_reason is null or p_reason !~ '^[a-z0-9][a-z0-9._:-]{0,127}
+    if p_reason is null or p_reason !~ '^[a-z0-9][a-z0-9._:-]{0,127}$'
+       or not platform.quota_evidence_is_safe(p_evidence) then
         raise exception 'release reason or evidence is invalid' using errcode = '22023';
     end if;
     perform 1 from platform.tenant_budget_limits
