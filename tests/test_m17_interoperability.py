@@ -294,7 +294,7 @@ def test_agent_card_signature_profile_uses_full_rfc8785_json_types() -> None:
     canonical = extended_card.canonical_payload()
     assert b'"numericExtension":1.25' in canonical
     assert b'"nullableExtension":null' in canonical
-    assert "schéma".encode("utf-8") in canonical
+    assert "schéma".encode() in canonical
 
     invalid_unicode = replace(
         make_card(),
