@@ -10,13 +10,13 @@ This phase hardens the provider-neutral model boundary with deterministic route 
 
 ## Decision semantics
 
-- Route registrations are immutable and route IDs are unique.
+- Route registrations are immutable and route IDs are unique. Registration requires an injected trusted Platform-registry verifier; verifier denial or outage fails closed.
 - Eligibility is conjunctive: every required condition must pass; no matching route means deny/no route.
 - Candidate ordering is deterministic: ascending priority, then route ID.
 - Provider availability is explicit request context; unavailable providers cannot be selected.
 - Every allow or deny decision is passed to the configured evidence recorder before the caller receives it.
 - If decision recording fails, routing fails closed and no decision is returned to the caller.
-- Decision evidence includes a unique decision ID, selected route/provider/model where allowed, policy version, reason code, and trace ID.
+- The policy version is sourced from the verified route record, never from the caller. Decision evidence includes a unique decision ID, selected route/provider/model where allowed, trusted policy version, task policy, reason code, and trace ID.
 - Caller-supplied preference, model output, retrieved content, registry metadata, and route descriptions do not override eligibility or grant authority.
 
 ## Security and reliability tests
