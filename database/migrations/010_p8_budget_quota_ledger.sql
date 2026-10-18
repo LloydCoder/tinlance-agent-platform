@@ -186,7 +186,10 @@ as $$
                or (jsonb_typeof(item.value) = 'string' and length(item.value #>> '{}') > 512)
                or (item.key = 'cancellation_reason' and (
                    jsonb_typeof(item.value) <> 'string'
-                   or item.value #>> '{}' !~ '^[a-z0-9][a-z0-9._:-]{0,127}
+                   or item.value #>> '{}' !~ '^[a-z0-9][a-z0-9._:-]{0,127}$'
+               ))
+       )
+$;
 
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
@@ -324,7 +327,7 @@ begin
         tool_calls, token_units, cost_units, idempotency_key, evidence
     ) values (
         gen_random_uuid(), p_tenant_id, p_organization_id, p_reservation_id, p_run_id, 'reserved',
-        p_tool_calls, p_token_units, p_cost_units, p_idempotency_key, jsonb_build_object('action', p_action, 'resource', p_resource)
+        p_tool_calls, p_token_units, p_cost_units, p_idempotency_key, '{}'::jsonb
     );
     return p_reservation_id;
 end;
