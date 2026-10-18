@@ -28,6 +28,22 @@ from tinlance_agent_platform_execution import (
 from tinlance_agent_platform_tools import ToolCall, ToolGateway, ToolRegistration
 
 
+class RecordingBudget:
+    def __init__(self) -> None:
+        self.scope = None
+        self.consumed = False
+
+    def reserve_scoped(self, scope, *, tool_calls: int, seconds: float):
+        self.scope = scope
+        return scope
+
+    def consume(self, reservation, elapsed_seconds: float) -> None:
+        self.consumed = True
+
+    def release(self, reservation) -> None:
+        return None
+
+
 class FailingSettlementBudget:
     def __init__(self) -> None:
         self.released = False
@@ -378,3 +394,14 @@ def test_failed_post_execution_budget_settlement_is_not_refunded() -> None:
         service.execute(principal, request(principal, agent))
     assert exc.value.code is ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN
     assert budget.released is False
+
+
+def test_execution_binds_budget_reservation_to_idempotency_key() -> None:
+    service, principal, agent, _ = _build_harness()
+    budget = RecordingBudget()
+    service.budget = budget
+    key = "p8-idempotency-key-0001"
+    service.execute(principal, request(principal, agent, idempotency_key=key))
+    assert budget.scope is not None
+    assert budget.scope.idempotency_key == key
+    assert budget.consumed is True
