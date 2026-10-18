@@ -46,6 +46,8 @@ class Connection:
             return Cursor((self.reserve_result or params[0],))
         if "platform.settle_quota" in query:
             return Cursor((self.result if isinstance(self.result, str) else "settled",))
+        if "platform.renew_quota_reservation" in query:
+            return Cursor((self.result,))
         return Cursor((self.result if isinstance(self.result, bool) else True,))
 
     def commit(self):
@@ -198,7 +200,7 @@ def test_p8_migration_has_transactional_limits_rls_and_append_only_ledger() -> N
         "platform.settle_quota",
         "platform.release_quota",
         "ENABLE ROW LEVEL SECURITY",
-        "REVOKE UPDATE, DELETE ON platform.quota_ledger",
+        "REVOKE UPDATE, DELETE, TRUNCATE ON platform.quota_ledger",
     ):
         assert required.lower() in migration.lower()
 
