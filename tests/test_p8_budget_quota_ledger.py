@@ -11,9 +11,13 @@ from tinlance_agent_platform_budgets import (
     CapacityEnvelope,
     CapacityGate,
     CapacityObservation,
+    PostgresBudgetGate,
     PostgresQuotaLedger,
+    QuotaOverrunError,
+    QuotaReservationReplayError,
     QuotaReservationRequest,
     QuotaSettlement,
+    QuotaUsageEstimate,
     TenantQuotaService,
 )
 
@@ -408,3 +412,162 @@ def test_capacity_gate_rejects_unbounded_evidence_reference() -> None:
     observation = CapacityObservation(10.0, 50.0, 100.0, 2)
     with pytest.raises(ValueError, match="capacity evidence"):
         CapacityGate(envelope, observation, " bad\nreference")
+
+
+class ManagedConnection(Connection):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.closed = True
+        self.committed = exc_type is None
+        return False
+
+
+class UniqueViolation(Exception):
+    sqlstate = "23505"
+
+
+class ConflictingReservationConnection(ManagedConnection):
+    def execute(self, query, params=()):
+        if "platform.reserve_quota" in query:
+            self.queries.append((query, params))
+            raise UniqueViolation("idempotency key conflicts with existing reservation")
+        return super().execute(query, params)
+
+
+def _durable_scope() -> BudgetScope:
+    return BudgetScope(str(TENANT_ID), AGENT_ID, RUN_ID, "invoice.refund", "invoice:123")
+
+
+def _usage_estimate(scope, tool_calls: int, seconds: float) -> QuotaUsageEstimate:
+    return QuotaUsageEstimate(
+        tool_calls=tool_calls,
+        token_units=100,
+        cost_units=0.5,
+        provider="unit-test",
+        model="model-v1",
+        price_book_version="pricebook-v1",
+        billing_unit="request",
+        metering_source="provider-estimate",
+    )
+
+
+def _measured_usage(reservation, elapsed_seconds: float) -> QuotaSettlement:
+    return QuotaSettlement(
+        tool_calls=1,
+        token_units=80,
+        cost_units=0.4,
+        evidence={
+            "measurement_ref": "usage:unit-test-001",
+            "source_event_id": "event:usage-001",
+        },
+    )
+
+
+def test_postgres_budget_gate_commits_tenant_scoped_reservation_and_settlement() -> None:
+    reservation_id = UUID("30000000-0000-0000-0000-000000000071")
+    reserve_connection = ManagedConnection(reserve_result=reservation_id)
+    settle_connection = ManagedConnection(result="settled")
+    connections = iter((reserve_connection, settle_connection))
+    gate = PostgresBudgetGate(
+        lambda: next(connections),
+        estimate_usage=_usage_estimate,
+        measure_usage=_measured_usage,
+        resolve_organization=lambda scope: None,
+    )
+
+    reservation = gate.reserve_scoped(
+        _durable_scope(),
+        tool_calls=1,
+        seconds=10.0,
+        idempotency_key="p8-budget-idempotency-0001",
+    )
+    gate.consume(reservation, elapsed_seconds=1.5)
+
+    assert reservation.reservation_id == reservation_id
+    assert reserve_connection.committed is True
+    assert settle_connection.committed is True
+    assert reserve_connection.closed is True
+    assert settle_connection.closed is True
+    assert "set_config('platform.tenant_id'" in reserve_connection.queries[0][0]
+    assert reserve_connection.queries[0][1] == (str(TENANT_ID),)
+    assert "platform.reserve_quota" in reserve_connection.queries[1][0]
+    assert "set_config('platform.tenant_id'" in settle_connection.queries[0][0]
+    assert "platform.settle_quota" in settle_connection.queries[1][0]
+    evidence = __import__("json").loads(settle_connection.queries[1][1][-1])
+    assert evidence["provider"] == "unit-test"
+    assert evidence["model"] == "model-v1"
+    assert evidence["price_book_version"] == "pricebook-v1"
+    assert evidence["measurement_ref"] == "usage:unit-test-001"
+
+
+def test_postgres_budget_gate_rejects_existing_idempotency_before_side_effect() -> None:
+    connection = ConflictingReservationConnection()
+    measured: list[object] = []
+    gate = PostgresBudgetGate(
+        lambda: connection,
+        estimate_usage=_usage_estimate,
+        measure_usage=lambda reservation, elapsed: measured.append(reservation)
+        or _measured_usage(reservation, elapsed),
+        resolve_organization=lambda scope: None,
+    )
+    with pytest.raises(QuotaReservationReplayError, match="idempotency key conflicts"):
+        gate.reserve_scoped(
+            _durable_scope(),
+            tool_calls=1,
+            seconds=10.0,
+            idempotency_key="p8-budget-idempotency-0001",
+        )
+    assert measured == []
+    assert connection.committed is False
+    assert connection.closed is True
+
+
+def test_postgres_budget_gate_reconciles_settlement_without_double_accounting() -> None:
+    reservation_id = UUID("30000000-0000-0000-0000-000000000072")
+    reserve_first = ManagedConnection(reserve_result=reservation_id)
+    reserve_replay = ManagedConnection(reserve_result=reservation_id)
+    settle_first = ManagedConnection(result="settled")
+    settle_replay = ManagedConnection(result="already_settled")
+    connections = iter((reserve_first, reserve_replay, settle_first, settle_replay))
+    gate = PostgresBudgetGate(
+        lambda: next(connections),
+        estimate_usage=_usage_estimate,
+        measure_usage=_measured_usage,
+        resolve_organization=lambda scope: UUID("40000000-0000-0000-0000-000000000072"),
+    )
+
+    first = gate.reserve_scoped(
+        _durable_scope(),
+        tool_calls=1,
+        seconds=10.0,
+        idempotency_key="p8-budget-idempotency-0002",
+    )
+    replay = gate.reserve_scoped(
+        _durable_scope(),
+        tool_calls=1,
+        seconds=10.0,
+        idempotency_key="p8-budget-idempotency-0002",
+    )
+    assert first.reservation_id == replay.reservation_id == reservation_id
+    gate.consume(first, elapsed_seconds=1.0)
+    gate.consume(replay, elapsed_seconds=1.0)
+    assert settle_first.committed is True
+    assert settle_replay.committed is True
+    assert settle_first.queries[-1][1] == settle_replay.queries[-1][1]
+
+
+def test_postgres_budget_gate_requires_idempotency_and_trusted_usage_callbacks() -> None:
+    gate = PostgresBudgetGate(
+        lambda: ManagedConnection(),
+        estimate_usage=_usage_estimate,
+        measure_usage=_measured_usage,
+        resolve_organization=lambda scope: None,
+    )
+    with pytest.raises(ValueError, match="idempotency key"):
+        gate.reserve_scoped(_durable_scope(), tool_calls=1, seconds=1.0)
+    with pytest.raises(ValueError, match="price_book_version"):
+        QuotaUsageEstimate(
+            1, 1, 0.1, "provider", "model", "not a normalized price book"
+        )
