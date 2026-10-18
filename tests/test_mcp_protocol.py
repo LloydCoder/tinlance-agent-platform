@@ -3,8 +3,8 @@ import json
 import threading
 from dataclasses import dataclass
 
-from tinlance_agent_platform_api.service import APIResponse
 from tinlance_agent_platform_api.http import serve
+from tinlance_agent_platform_api.service import APIResponse
 from tinlance_agent_platform_mcp import MCPProtocolService, MCPToolDefinition
 
 
