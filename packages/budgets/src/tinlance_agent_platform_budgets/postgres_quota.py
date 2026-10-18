@@ -515,10 +515,13 @@ class PostgresBudgetGate:
         )
         with self._lock:
             self._active.pop(reservation.reservation_id, None)
-        if elapsed_seconds > reservation.local_reservation.seconds:
+        runtime_overrun = elapsed_seconds > reservation.local_reservation.seconds
+        if runtime_overrun:
             self._run_budget.consume_overrun(reservation.local_reservation, elapsed_seconds)
         else:
             self._run_budget.consume(reservation.local_reservation, elapsed_seconds)
+        if runtime_overrun:
+            raise TimeoutError("measured runtime exceeded the reserved runtime budget")
         if status == "overrun":
             raise TimeoutError("measured usage exceeded the durable quota reservation")
         if status == "already_settled":
