@@ -1,6 +1,13 @@
 import pytest
 
-from tinlance_agent_platform_models import ModelGateway, ModelRequest, ModelResponse
+from tinlance_agent_platform_models import (
+    ModelGateway,
+    ModelRequest,
+    ModelResponse,
+    ModelRoute,
+    ModelRouter,
+    ModelRoutingRequest,
+)
 
 
 class Provider:
@@ -46,9 +53,6 @@ def test_model_response_cannot_exceed_requested_output_budget() -> None:
     )
     with pytest.raises(ValueError):
         gateway.complete("oversized", request)
-
-
-from tinlance_agent_platform_models import ModelRoute, ModelRouter, ModelRoutingRequest
 
 
 def routing_request(**overrides: object) -> ModelRoutingRequest:
