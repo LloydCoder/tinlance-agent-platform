@@ -273,14 +273,6 @@ class EcosystemRegistrySnapshot:
                         f"{repository_id}: supply-chain revision differs from "
                         "reviewed repository SHA"
                     )
-                if metadata.publisher.identity_status is IdentityStatus.REVOKED:
-                    raise ValueError(f"{repository_id}: revoked publisher identity fails closed")
-                if metadata.lifecycle.state is LifecycleState.REVOKED:
-                    raise ValueError(f"{repository_id}: revoked repository fails closed")
-                if metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
-                    raise ValueError(
-                        f"{repository_id}: revoked supply-chain attestation fails closed"
-                    )
         elif self.schema_version != "registry-manifest/v1":
             raise ValueError("unsupported ecosystem registry schema version")
 
@@ -316,6 +308,10 @@ class EcosystemRegistrySnapshot:
                 owner_metadata = self.repository_metadata[service.owner_repository_id]
                 if service.enabled and owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
                     raise ValueError(f"{service.service_id}: owner repository is not active")
+                if service.enabled and owner_metadata.publisher.identity_status is IdentityStatus.REVOKED:
+                    raise ValueError(f"{service.service_id}: owner publisher identity is revoked")
+                if service.enabled and owner_metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
+                    raise ValueError(f"{service.service_id}: owner supply-chain attestation is revoked")
             if service.owner_repository_id != "platform" and service.authority_mode not in {
                 AuthorityMode.AUTHORITY_FREE,
                 AuthorityMode.CONFORMANCE_ONLY,
@@ -324,6 +320,16 @@ class EcosystemRegistrySnapshot:
                     f"{service.service_id}: non-Platform service cannot grant authority"
                 )
             self._validate_contract_set(service.service_id, service.contract_ids, contracts)
+            if self.schema_version == "registry-manifest/v2" and service.enabled:
+                for contract_id in service.contract_ids:
+                    contract = contracts[contract_id]
+                    contract_owner = self.repository_metadata[contract.owner_repository_id]
+                    if contract_owner.lifecycle.state is not LifecycleState.ACTIVE:
+                        raise ValueError(f"{service.service_id}: contract owner is not active")
+                    if contract_owner.publisher.identity_status is IdentityStatus.REVOKED:
+                        raise ValueError(f"{service.service_id}: contract owner publisher is revoked")
+                    if contract_owner.supply_chain.verification_status is SupplyChainStatus.REVOKED:
+                        raise ValueError(f"{service.service_id}: contract owner supply-chain attestation is revoked")
 
         for agent in self.agents:
             if self.schema_version == "registry-manifest/v2" and agent.lifecycle is None:
@@ -341,10 +347,14 @@ class EcosystemRegistrySnapshot:
                 self.schema_version == "registry-manifest/v2"
                 and agent.lifecycle is not None
                 and agent.lifecycle.state is LifecycleState.ACTIVE
-                and self.repository_metadata[agent.owner_repository_id].lifecycle.state
-                is not LifecycleState.ACTIVE
             ):
-                raise ValueError(f"{agent.agent_id}: owner repository is not active")
+                owner_metadata = self.repository_metadata[agent.owner_repository_id]
+                if owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
+                    raise ValueError(f"{agent.agent_id}: owner repository is not active")
+                if owner_metadata.publisher.identity_status is IdentityStatus.REVOKED:
+                    raise ValueError(f"{agent.agent_id}: owner publisher identity is revoked")
+                if owner_metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
+                    raise ValueError(f"{agent.agent_id}: owner supply-chain attestation is revoked")
             if agent.authority_mode not in {
                 AuthorityMode.DELEGATED_ONLY,
                 AuthorityMode.AUTHORITY_FREE,
