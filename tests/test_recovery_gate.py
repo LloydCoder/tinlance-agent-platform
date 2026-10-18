@@ -1,4 +1,5 @@
 """Canonical P10 recovery objective and failure-injection contract tests."""
+
 import pytest
 
 from tinlance_agent_platform_durability.recovery import (
