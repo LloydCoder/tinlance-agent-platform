@@ -1,4 +1,5 @@
 import json
+from contextlib import suppress
 import threading
 import time
 from datetime import UTC, datetime, timedelta
@@ -46,11 +47,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Location", Handler.redirect_location)
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
-        try:
+        # A timeout test may close the client socket before this response is written.
+        with suppress(BrokenPipeError, ConnectionResetError):
             self.wfile.write(raw)
-        except (BrokenPipeError, ConnectionResetError):
-            # Expected when a timeout test closes the client socket before response.
-            pass
 
     def log_message(self, *_args):
         pass
@@ -173,7 +172,9 @@ def test_openai_compatible_provider_rejects_oversized_response(endpoint):
 
 
 @pytest.mark.parametrize("timeout_seconds", [0, -1, float("nan"), float("inf"), -float("inf")])
-def test_openai_compatible_provider_rejects_invalid_timeout_configuration(endpoint, timeout_seconds):
+def test_openai_compatible_provider_rejects_invalid_timeout_configuration(
+    endpoint, timeout_seconds
+):
     with pytest.raises(ValueError, match="timeout must be finite and positive"):
         provider(endpoint, timeout_seconds=timeout_seconds)
 
