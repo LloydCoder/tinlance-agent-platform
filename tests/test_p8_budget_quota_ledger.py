@@ -433,7 +433,7 @@ def test_capacity_gate_rejects_unbounded_evidence_reference() -> None:
         CapacityGate(envelope, observation, " bad\nreference")
 
 
-def _postgres_budget_gate(*, connections, run_budget=None, existing_reservation=False):
+def _postgres_budget_gate(*, connections, run_budget=None):
     organization_id = UUID("30000000-0000-0000-0000-000000000071")
     budget = run_budget or BudgetService(
         Budget(uuid4(), str(TENANT_ID), RUN_ID, 10, 30.0, 1)
