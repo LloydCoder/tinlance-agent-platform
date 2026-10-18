@@ -165,6 +165,13 @@ begin
     exception when insufficient_privilege then
         null;
     end;
+
+    begin
+        truncate platform.quota_ledger;
+        raise exception 'append-only ledger allowed truncation';
+    exception when insufficient_privilege then
+        null;
+    end;
 end
 $;
 
