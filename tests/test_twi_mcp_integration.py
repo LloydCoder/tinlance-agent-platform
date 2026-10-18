@@ -26,7 +26,6 @@ from tinlance_agent_platform_mcp import (
     register_twi_tools,
 )
 
-
 TRACEPARENT = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
 EXPORT_CAPABILITY = "world-intelligence.source-evidence.export"
 EXPORT_RESOURCE = "world-intelligence://source-evidence/*"
