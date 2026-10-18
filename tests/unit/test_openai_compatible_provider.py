@@ -11,10 +11,13 @@ from tinlance_agent_platform_models.gateway import ModelRequest
 from tinlance_agent_platform_models.openai_compatible import (
     ModelProviderError,
     OpenAICompatibleProvider,
-    ScopedModelCredentialProvider,
     StaticModelCredential,
 )
-from tinlance_agent_platform_secrets import ScopedSecretBroker, ScopedSecretHandle
+from tinlance_agent_platform_secrets import (
+    ScopedModelCredentialProvider,
+    ScopedSecretBroker,
+    ScopedSecretHandle,
+)
 
 
 class Handler(BaseHTTPRequestHandler):
