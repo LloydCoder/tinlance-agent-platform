@@ -339,6 +339,7 @@ class EcosystemRegistrySnapshot:
                 raise ValueError(f"{agent.agent_id}: required agent is not active")
             if (
                 self.schema_version == "registry-manifest/v2"
+                and agent.lifecycle is not None
                 and agent.lifecycle.state is LifecycleState.ACTIVE
                 and self.repository_metadata[agent.owner_repository_id].lifecycle.state
                 is not LifecycleState.ACTIVE
