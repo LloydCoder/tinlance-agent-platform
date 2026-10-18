@@ -9,6 +9,8 @@ from .scoped import (
 
 __all__ = [
     "ScopedSecretBroker",
+    "ScopedModelCredentialProvider",
+    "ModelCredentialRequest",
     "ScopedSecretHandle",
     "ScopedSecretProvider",
     "SecretResolutionError",
