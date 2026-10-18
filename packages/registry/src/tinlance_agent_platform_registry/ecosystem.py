@@ -299,27 +299,52 @@ class EcosystemRegistrySnapshot:
         if self.schema_version == "registry-manifest/v2":
             for repository_id, metadata in self.repository_metadata.items():
                 if metadata.lifecycle.state is LifecycleState.DEPRECATED:
-                    replacement = self.repository_metadata.get(metadata.lifecycle.replacement_id or "")
-                    if replacement is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
-                        raise ValueError(f"{repository_id}: deprecated repository replacement must be active")
+                    replacement = self.repository_metadata.get(
+                        metadata.lifecycle.replacement_id or ""
+                    )
+                    if (
+                        replacement is None
+                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                    ):
+                        raise ValueError(
+                            f"{repository_id}: deprecated repository replacement must be active"
+                        )
             for resource_id, resource in services.items():
                 lifecycle = resource.lifecycle
                 if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
                     replacement = services.get(lifecycle.replacement_id or "")
-                    if replacement is None or replacement.lifecycle is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
-                        raise ValueError(f"{resource_id}: deprecated service replacement must be active")
+                    if (
+                        replacement is None
+                        or replacement.lifecycle is None
+                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                    ):
+                        raise ValueError(
+                            f"{resource_id}: deprecated service replacement must be active"
+                        )
             for resource_id, resource in agents.items():
                 lifecycle = resource.lifecycle
                 if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
                     replacement = agents.get(lifecycle.replacement_id or "")
-                    if replacement is None or replacement.lifecycle is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
-                        raise ValueError(f"{resource_id}: deprecated agent replacement must be active")
+                    if (
+                        replacement is None
+                        or replacement.lifecycle is None
+                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                    ):
+                        raise ValueError(
+                            f"{resource_id}: deprecated agent replacement must be active"
+                        )
             for resource_id, resource in contracts.items():
                 lifecycle = resource.lifecycle
                 if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
                     replacement = contracts.get(lifecycle.replacement_id or "")
-                    if replacement is None or replacement.lifecycle is None or replacement.lifecycle.state is not LifecycleState.ACTIVE:
-                        raise ValueError(f"{resource_id}: deprecated contract replacement must be active")
+                    if (
+                        replacement is None
+                        or replacement.lifecycle is None
+                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                    ):
+                        raise ValueError(
+                            f"{resource_id}: deprecated contract replacement must be active"
+                        )
 
         platform_services = [
             service
@@ -351,12 +376,24 @@ class EcosystemRegistrySnapshot:
                 )
             if self.schema_version == "registry-manifest/v2":
                 owner_metadata = self.repository_metadata[service.owner_repository_id]
-                if service.enabled and owner_metadata.lifecycle.state is not LifecycleState.ACTIVE:
+                if (
+                    service.enabled
+                    and owner_metadata.lifecycle.state is not LifecycleState.ACTIVE
+                ):
                     raise ValueError(f"{service.service_id}: owner repository is not active")
-                if service.enabled and owner_metadata.publisher.identity_status is IdentityStatus.REVOKED:
+                if (
+                    service.enabled
+                    and owner_metadata.publisher.identity_status is IdentityStatus.REVOKED
+                ):
                     raise ValueError(f"{service.service_id}: owner publisher identity is revoked")
-                if service.enabled and owner_metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
-                    raise ValueError(f"{service.service_id}: owner supply-chain attestation is revoked")
+                if (
+                    service.enabled
+                    and owner_metadata.supply_chain.verification_status
+                    is SupplyChainStatus.REVOKED
+                ):
+                    raise ValueError(
+                        f"{service.service_id}: owner supply-chain attestation is revoked"
+                    )
             if service.owner_repository_id != "platform" and service.authority_mode not in {
                 AuthorityMode.AUTHORITY_FREE,
                 AuthorityMode.CONFORMANCE_ONLY,
@@ -373,8 +410,13 @@ class EcosystemRegistrySnapshot:
                         raise ValueError(f"{service.service_id}: contract owner is not active")
                     if contract_owner.publisher.identity_status is IdentityStatus.REVOKED:
                         raise ValueError(f"{service.service_id}: contract owner publisher is revoked")
-                    if contract_owner.supply_chain.verification_status is SupplyChainStatus.REVOKED:
-                        raise ValueError(f"{service.service_id}: contract owner supply-chain attestation is revoked")
+                    if (
+                        contract_owner.supply_chain.verification_status
+                        is SupplyChainStatus.REVOKED
+                    ):
+                        raise ValueError(
+                            f"{service.service_id}: contract owner supply-chain attestation is revoked"
+                        )
 
         for agent in self.agents:
             if self.schema_version == "registry-manifest/v2" and agent.lifecycle is None:
@@ -399,7 +441,9 @@ class EcosystemRegistrySnapshot:
                 if owner_metadata.publisher.identity_status is IdentityStatus.REVOKED:
                     raise ValueError(f"{agent.agent_id}: owner publisher identity is revoked")
                 if owner_metadata.supply_chain.verification_status is SupplyChainStatus.REVOKED:
-                    raise ValueError(f"{agent.agent_id}: owner supply-chain attestation is revoked")
+                    raise ValueError(
+                        f"{agent.agent_id}: owner supply-chain attestation is revoked"
+                    )
             if agent.authority_mode not in {
                 AuthorityMode.DELEGATED_ONLY,
                 AuthorityMode.AUTHORITY_FREE,
@@ -423,8 +467,13 @@ class EcosystemRegistrySnapshot:
                         raise ValueError(f"{agent.agent_id}: contract owner is not active")
                     if contract_owner.publisher.identity_status is IdentityStatus.REVOKED:
                         raise ValueError(f"{agent.agent_id}: contract owner publisher is revoked")
-                    if contract_owner.supply_chain.verification_status is SupplyChainStatus.REVOKED:
-                        raise ValueError(f"{agent.agent_id}: contract owner supply-chain attestation is revoked")
+                    if (
+                        contract_owner.supply_chain.verification_status
+                        is SupplyChainStatus.REVOKED
+                    ):
+                        raise ValueError(
+                            f"{agent.agent_id}: contract owner supply-chain attestation is revoked"
+                        )
 
         rule_map = {(rule.consumer_id, rule.contract_id): rule for rule in self.compatibility_rules}
         required_pairs = {
