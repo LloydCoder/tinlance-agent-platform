@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -21,13 +22,21 @@ class Handler(BaseHTTPRequestHandler):
     }
     last_headers = None
     last_body = None
+    response_content_type = "application/json"
+    response_raw = None
+    response_delay = 0.0
+    redirect_location = None
 
     def do_POST(self):
         Handler.last_headers = dict(self.headers.items())
         Handler.last_body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-        raw = json.dumps(Handler.response_document).encode()
+        if Handler.response_delay:
+            time.sleep(Handler.response_delay)
+        raw = Handler.response_raw or json.dumps(Handler.response_document).encode()
         self.send_response(Handler.response_status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", Handler.response_content_type)
+        if Handler.redirect_location:
+            self.send_header("Location", Handler.redirect_location)
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -49,6 +58,10 @@ def endpoint():
     }
     Handler.last_headers = None
     Handler.last_body = None
+    Handler.response_content_type = "application/json"
+    Handler.response_raw = None
+    Handler.response_delay = 0.0
+    Handler.redirect_location = None
     yield f"http://127.0.0.1:{server.server_port}/v1/chat/completions"
     server.shutdown()
     thread.join(timeout=2)
@@ -141,3 +154,37 @@ def test_openai_compatible_provider_rejects_embedded_credentials():
             ),
             StaticModelCredential("test-secret"),
         )
+
+
+def test_openai_compatible_provider_rejects_oversized_response(endpoint):
+    with pytest.raises(ModelProviderError, match="size limit"):
+        provider(endpoint, max_response_bytes=10).complete(request())
+
+
+def test_openai_compatible_provider_rejects_invalid_json(endpoint):
+    Handler.response_raw = b"not-json"
+    with pytest.raises(ModelProviderError, match="invalid JSON"):
+        provider(endpoint).complete(request())
+
+
+def test_openai_compatible_provider_rejects_unsupported_content_type(endpoint):
+    Handler.response_content_type = "text/plain"
+    with pytest.raises(ModelProviderError, match="content type"):
+        provider(endpoint).complete(request())
+
+
+def test_openai_compatible_provider_does_not_follow_redirects(endpoint):
+    Handler.response_status = 302
+    Handler.redirect_location = "/redirect-target"
+    with pytest.raises(ModelProviderError):
+        provider(endpoint).complete(request())
+
+
+def test_openai_compatible_provider_rejects_oversized_request(endpoint):
+    from tinlance_agent_platform_models.openai_compatible import MAX_REQUEST_BYTES
+
+    large_request = request(
+        messages=({"role": "user", "content": "x" * (MAX_REQUEST_BYTES + 1)},)
+    )
+    with pytest.raises(ValueError, match="request limit"):
+        provider(endpoint).complete(large_request)
