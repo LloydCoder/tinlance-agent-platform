@@ -12,7 +12,7 @@ import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
@@ -246,7 +246,9 @@ class AgentCard:
     def canonical_payload(self) -> bytes:
         """Return the RFC 8785 canonical UTF-8 representation of the unsigned card."""
         try:
-            return rfc8785.dumps(self._unsigned_payload())
+            # The protocol payload is assembled from JSON-compatible values; the
+            # canonicalizer performs the authoritative runtime validation.
+            return rfc8785.dumps(cast(Any, self._unsigned_payload()))
         except (rfc8785.CanonicalizationError, TypeError, ValueError) as exc:
             raise ValueError("Agent Card cannot be represented as RFC 8785 canonical JSON") from exc
 
