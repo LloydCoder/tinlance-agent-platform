@@ -199,8 +199,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         gateway = MCPToolGateway(self.transport)
         register_twi_tools(gateway)
         export = next(
-            tool for tool in TWI_TOOL_REGISTRATIONS
-            if tool.name == "twi_world_intelligence_export"
+            tool for tool in TWI_TOOL_REGISTRATIONS if tool.name == "twi_world_intelligence_export"
         )
         self.assertTrue(export.requires_approval)
         self.assertEqual(export.risk, RiskTier.HIGH)
@@ -242,25 +241,17 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
         self.assertEqual(self.issuer.calls[0]["audience"], "tinlance-web-intelligence")
-        self.assertEqual(
-            self.issuer.calls[0]["scopes"], frozenset({"twi:observations:export"})
-        )
+        self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:observations:export"}))
         request = self.http.calls[0]
         self.assertEqual(request["method"], "POST")
         self.assertEqual(
             request["url"],
             "https://twi.internal/v1/integrations/world-intelligence/exports",
         )
-        self.assertEqual(
-            request["headers"]["Authorization"], "Bearer platform-minted-twi-token"
-        )
+        self.assertEqual(request["headers"]["Authorization"], "Bearer platform-minted-twi-token")
         self.assertNotIn("inbound-token", request["headers"]["Authorization"])
-        self.assertEqual(
-            request["headers"]["Idempotency-Key"], "source-evidence-export-0001"
-        )
-        self.assertNotIn(
-            "idempotency_key", json.loads(request["body"].decode("utf-8"))
-        )
+        self.assertEqual(request["headers"]["Idempotency-Key"], "source-evidence-export-0001")
+        self.assertNotIn("idempotency_key", json.loads(request["body"].decode("utf-8")))
         self.assertEqual(request["headers"]["X-Request-ID"], "twi-request-0001")
         self.assertEqual(request["headers"]["traceparent"], TRACEPARENT)
 
