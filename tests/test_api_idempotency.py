@@ -1,9 +1,9 @@
 import pytest
 
 from tinlance_agent_platform_api.service import (
+    AgentPlatformAPI,
     APIRequest,
     APIResponse,
-    AgentPlatformAPI,
     IdempotencyConflictError,
 )
 
