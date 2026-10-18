@@ -100,7 +100,10 @@ class OpenAICompatibleProvider:
             or isinstance(self.max_response_bytes, bool)
             or self.max_response_bytes < 1
         ):
-            raise ValueError("provider timeout must be finite and positive; response limit must be a positive integer")
+            raise ValueError(
+                "provider timeout must be finite and positive; "
+                "response limit must be a positive integer"
+            )
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         try:
