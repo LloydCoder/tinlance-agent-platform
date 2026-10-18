@@ -59,6 +59,29 @@ def make_service(*, allowed: bool = True):
                 },
             ),
             MCPToolDefinition(
+                "validate",
+                "Validate bounded structured inputs",
+                "validation.check",
+                {
+                    "type": "object",
+                    "properties": {
+                        "scores": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10,
+                            },
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": True,
+                        }
+                    },
+                    "required": ["scores"],
+                    "additionalProperties": False,
+                },
+            ),
+            MCPToolDefinition(
                 "submit",
                 "Submit a consequential operation",
                 "runs.create",
@@ -114,7 +137,7 @@ def test_stateless_discovery_and_tools_list_are_cache_safe() -> None:
     listing = service.handle(headers("tools/list"), body("tools/list"))
     assert listing.status_code == 200
     result = decode(listing)["result"]
-    assert [tool["name"] for tool in result["tools"]] == ["search", "submit"]
+    assert [tool["name"] for tool in result["tools"]] == ["search", "submit", "validate"]
     assert result["cacheScope"] == "private"
     assert listing.headers["Cache-Control"] == "no-store"
 
@@ -240,3 +263,41 @@ def test_protocol_requires_valid_per_request_client_metadata() -> None:
         {"_meta": {"io.modelcontextprotocol/clientInfo": {"name": " ", "version": "1.0"}}},
     )
     assert service.handle(headers("tools/list"), invalid).status_code == 400
+
+
+def test_tool_schema_enforces_nested_arrays_and_numeric_bounds() -> None:
+    service, _, _ = make_service()
+    valid = service.handle(
+        headers("tools/call", **{"mcp-name": "validate"}),
+        body("tools/call", {"name": "validate", "arguments": {"scores": [0, 5, 10]}}),
+    )
+    assert valid.status_code == 200
+    duplicate = service.handle(
+        headers("tools/call", **{"mcp-name": "validate"}),
+        body("tools/call", {"name": "validate", "arguments": {"scores": [3, 3]}}),
+    )
+    assert duplicate.status_code == 400
+    out_of_range = service.handle(
+        headers("tools/call", **{"mcp-name": "validate"}),
+        body("tools/call", {"name": "validate", "arguments": {"scores": [11]}}),
+    )
+    assert out_of_range.status_code == 400
+
+
+def test_http_media_type_is_exact_and_traceparent_version_is_validated() -> None:
+    service, _, _ = make_service()
+    wrong_media_type = service.handle(
+        headers("tools/list", **{"content-type": "application/jsonp"}), body("tools/list")
+    )
+    assert wrong_media_type.status_code == 415
+    invalid_version = service.handle(
+        headers(
+            "tools/call",
+            **{
+                "mcp-name": "search",
+                "traceparent": "ff-" + "1" * 32 + "-" + "2" * 16 + "-01",
+            },
+        ),
+        body("tools/call", {"name": "search", "arguments": {"query": "ok"}}),
+    )
+    assert invalid_version.status_code == 400
