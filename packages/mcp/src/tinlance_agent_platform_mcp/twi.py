@@ -355,9 +355,11 @@ class TWIHTTPTransport:
             headers["traceparent"] = scope.traceparent
         if spec.idempotency_argument is not None:
             headers[_IDEMPOTENCY_HEADER] = str(arguments[spec.idempotency_argument])
-        body = None if payload is None else json.dumps(
-            payload, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
+        body = (
+            None
+            if payload is None
+            else json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        )
         if body is not None:
             headers["Content-Type"] = "application/json"
         response = self._http.request(
