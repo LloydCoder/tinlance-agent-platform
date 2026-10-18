@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from threading import RLock
 
 
@@ -35,7 +36,14 @@ class TenantQuotaService:
         max_token_units: int,
         max_cost_units: float,
     ) -> None:
-        if max_concurrency < 1 or max_tool_calls < 0 or max_token_units < 0 or max_cost_units < 0:
+        if (
+            isinstance(max_concurrency, bool) or not isinstance(max_concurrency, int)
+            or isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int)
+            or isinstance(max_token_units, bool) or not isinstance(max_token_units, int)
+            or not math.isfinite(max_cost_units)
+            or max_concurrency < 1 or max_tool_calls < 0 or max_token_units < 0
+            or max_cost_units < 0
+        ):
             raise ValueError("tenant quota values are invalid")
         self._limits = (
             max_concurrency,
@@ -64,7 +72,12 @@ class TenantQuotaService:
         values = (reservation_id, tenant_id, agent_id, run_id, action, resource)
         if any(not value or value != value.strip() for value in values):
             raise ValueError("quota reservation scope is required and normalized")
-        if concurrency < 1 or tool_calls < 0 or token_units < 0 or cost_units < 0:
+        if (
+            any(isinstance(value, bool) or not isinstance(value, int)
+                for value in (concurrency, tool_calls, token_units))
+            or not math.isfinite(cost_units)
+            or concurrency < 1 or tool_calls < 0 or token_units < 0 or cost_units < 0
+        ):
             raise ValueError("quota reservation dimensions are invalid")
         candidate = TenantReservation(
             reservation_id,
@@ -107,8 +120,10 @@ class TenantQuotaService:
             current = self._reservations.get(reservation.reservation_id)
             if current != reservation:
                 raise KeyError("quota reservation does not exist")
+            # Concurrency is an in-flight gauge, not cumulative consumption.
+            # Removing the reservation below releases its concurrency atomically.
             self._consumed = (
-                self._consumed[0] + reservation.concurrency,
+                self._consumed[0],
                 self._consumed[1] + reservation.tool_calls,
                 self._consumed[2] + reservation.token_units,
                 self._consumed[3] + reservation.cost_units,
