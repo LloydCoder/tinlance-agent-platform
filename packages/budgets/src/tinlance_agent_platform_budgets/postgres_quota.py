@@ -415,7 +415,7 @@ class PostgresBudgetGate:
         self._local_accounted: set[UUID] = set()
         # Keep the exact measured settlement across transient persistence failures.
         # Retrying must not remeasure a completed side effect and produce conflicting evidence.
-        self._pending_settlements: dict[UUID, QuotaSettlement] = {}
+        self._pending_settlements: dict[UUID, tuple[QuotaSettlement, float]] = {}
         self._settlement_inflight: set[UUID] = set()
         self._lock = RLock()
 
@@ -524,9 +524,9 @@ class PostgresBudgetGate:
             if reservation_id in self._settlement_inflight:
                 raise RuntimeError("durable budget settlement is already in progress")
             self._settlement_inflight.add(reservation_id)
-            actual = self._pending_settlements.get(reservation_id)
+            pending = self._pending_settlements.get(reservation_id)
         try:
-            if actual is None:
+            if pending is None:
                 actual = self._measure_usage(
                     reservation.scope,
                     reservation_id,
@@ -537,7 +537,12 @@ class PostgresBudgetGate:
                 # Save the immutable measurement before attempting persistence.
                 # A retry after a DB failure reuses this exact payload/evidence.
                 with self._lock:
-                    self._pending_settlements[reservation_id] = actual
+                    self._pending_settlements[reservation_id] = (actual, elapsed_seconds)
+            else:
+                actual, measured_elapsed = pending
+                # The first measurement owns both evidence and elapsed runtime.
+                # Never let a retry alter either value.
+                elapsed_seconds = measured_elapsed
             status = self._transaction(
                 reservation.tenant_id,
                 lambda ledger: ledger.settle(
@@ -591,6 +596,21 @@ class PostgresBudgetGate:
             raise TimeoutError("measured usage exceeded the durable quota reservation")
         if status == "already_settled":
             raise RuntimeError("durable quota reservation was settled by another actor")
+
+    def retry_pending_settlement(self, reservation_id: UUID) -> None:
+        """Retry persistence of an already measured settlement without re-metering.
+
+        A worker may call this while the process still owns the reservation after
+        a transient database failure. Process-crash recovery remains the durable
+        lease/reconciliation workflow; this method is not a replacement for it.
+        """
+        with self._lock:
+            reservation = self._active.get(reservation_id)
+            pending = self._pending_settlements.get(reservation_id)
+            if reservation is None or pending is None:
+                raise KeyError("no pending measured settlement exists for reservation")
+            measured_elapsed = pending[1]
+        self.consume(reservation, measured_elapsed)
 
     def release(self, reservation: PostgresBudgetReservation) -> None:
         with self._lock:

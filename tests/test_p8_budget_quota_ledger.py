@@ -585,7 +585,7 @@ def test_postgres_budget_gate_reconciles_settlement_without_double_accounting() 
     assert budget.budget.elapsed_seconds == 2.0
     assert len(measurements) == 1
 
-    gate.consume(reservation, elapsed_seconds=2.0)
+    gate.retry_pending_settlement(reservation.reservation_id)
     assert recovered_settlement.committed
     assert budget.budget.consumed_tool_calls == 1
     assert budget.budget.elapsed_seconds == 2.0
