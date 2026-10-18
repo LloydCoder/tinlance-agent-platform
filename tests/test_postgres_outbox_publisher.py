@@ -5,7 +5,6 @@ import pytest
 
 from tinlance_agent_platform_events.publisher import PostgresOutboxPublisher
 
-
 TENANT_ID = UUID("00000000-0000-0000-0000-000000000061")
 RUN_ID = UUID("40000000-0000-0000-0000-000000000061")
 EVENT_ID = UUID("50000000-0000-0000-0000-000000000061")
