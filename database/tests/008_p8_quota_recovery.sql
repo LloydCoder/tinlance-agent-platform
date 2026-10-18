@@ -60,6 +60,21 @@ begin
         raise exception 'renewal did not extend the reservation lease';
     end if;
 
+    lease_expiry := platform.renew_quota_reservation(
+        '00000000-0000-0000-0000-000000000091', v_reservation_id, 900
+    );
+    if lease_expiry <= now() then
+        raise exception 'second renewal did not extend the reservation lease';
+    end if;
+    if (
+        select count(*) from platform.quota_ledger
+        where tenant_id = '00000000-0000-0000-0000-000000000091'
+          and reservation_id = v_reservation_id
+          and event_type = 'lease_renewed'
+    ) <> 2 then
+        raise exception 'lease renewals were not individually audited';
+    end if;
+
     update platform.quota_reservations
        set lease_expires_at = now() - interval '1 second'
      where tenant_id = '00000000-0000-0000-0000-000000000091'
