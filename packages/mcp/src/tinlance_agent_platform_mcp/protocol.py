@@ -421,7 +421,7 @@ class MCPProtocolService:
             if body_version != header_version:
                 return self._rpc_http_error(400, request_id, -32020, "HeaderMismatch")
             if not isinstance(method, str) or normalized.get("mcp-method") != method:
-                return self._rpc_http_error(400, request_id, -32600, "HeaderMismatch")
+                return self._rpc_http_error(400, request_id, -32020, "HeaderMismatch")
             _validate_request_meta(params, header_version)
             if method == "server/discover":
                 result: dict[str, object] = {
