@@ -295,18 +295,20 @@ class A2AProtocolService:
             if method == "message/send":
                 message = params.get("message")
                 intent, context_id = _text_from_message(message)
-                task_id = uuid5(
-                    NAMESPACE_URL,
-                    f"tinlance-a2a:{principal.tenant_id}:{principal.subject_id}:{normalized_id}",
-                )
                 fingerprint = _request_fingerprint(
                     principal.tenant_id, principal.subject_id, normalized_id
                 )
-                key = normalized.get("idempotency-key") or f"a2a-{fingerprint}"
+                supplied_key = normalized.get("idempotency-key")
+                key = supplied_key or f"a2a-{fingerprint}"
                 if len(key) < 16 or len(key) > 256 or not key.isascii() or any(
                     ord(char) < 33 or ord(char) > 126 for char in key
                 ):
                     return self._rpc_error(request_id, -32602, "invalid idempotency key")
+                task_seed = supplied_key or normalized_id
+                task_id = uuid5(
+                    NAMESPACE_URL,
+                    f"tinlance-a2a:{principal.tenant_id}:{principal.subject_id}:{task_seed}",
+                )
                 request = A2APlatformRequest(
                     principal.tenant_id,
                     principal.subject_id,
