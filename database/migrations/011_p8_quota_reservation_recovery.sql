@@ -4,7 +4,11 @@ alter table platform.quota_reservations
     add column if not exists lease_expires_at timestamptz not null default (clock_timestamp() + interval '15 minutes'),
     add column if not exists recovery_requested_at timestamptz,
     add column if not exists recovery_attempts integer not null default 0
-        check (recovery_attempts >= 0);
+        check (recovery_attempts >= 0),
+    add column if not exists recovery_resolution text
+        check (recovery_resolution is null or recovery_resolution = 'confirmed-no-side-effect'),
+    add column if not exists recovery_evidence_ref text,
+    add column if not exists recovery_resolved_at timestamptz;
 
 create index if not exists idx_quota_reservations_expiry
     on platform.quota_reservations(tenant_id, lease_expires_at)
@@ -87,8 +91,12 @@ security invoker
 set search_path = pg_catalog, platform
 as $$
 begin
-    if old.recovery_requested_at is not null and new.state = 'released' then
-        raise exception 'reservation requires reconciliation and cannot be released'
+    if old.recovery_requested_at is not null and new.state = 'released' and not (
+        new.recovery_resolution = 'confirmed-no-side-effect'
+        and new.recovery_evidence_ref is not null
+        and new.recovery_resolved_at is not null
+    ) then
+        raise exception 'reservation requires explicit no-side-effect reconciliation before release'
             using errcode = '55000';
     end if;
     return new;
@@ -216,8 +224,15 @@ begin
         raise exception 'recovery-requested reservation requires explicit no-side-effect evidence'
             using errcode = '55000';
     end if;
+    if reservation.recovery_requested_at is not null then
+        update platform.quota_reservations
+           set recovery_resolution = 'confirmed-no-side-effect',
+               recovery_evidence_ref = p_evidence->>'measurement_ref',
+               recovery_resolved_at = clock_timestamp()
+         where tenant_id = p_tenant_id and reservation_id = p_reservation_id;
+    end if;
     update platform.quota_reservations
-       set state = 'released', released_at = now()
+       set state = 'released', released_at = clock_timestamp()
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id;
     insert into platform.quota_ledger (
         ledger_id, tenant_id, organization_id, reservation_id, run_id, event_type,
