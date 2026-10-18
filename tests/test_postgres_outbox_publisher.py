@@ -1,5 +1,5 @@
-from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from datetime import datetime, UTC
+from uuid import UUID
 
 import pytest
 
@@ -115,7 +115,11 @@ def test_publisher_claims_validates_publishes_and_acknowledges() -> None:
     assert published[0].as_payload()["executionid"] == str(RUN_ID)
     assert all(connection.committed for connection in connections)
     assert all(connection.closed for connection in connections)
-    assert any("platform.ack_outbox" in query for connection in connections for query, _ in connection.queries)
+    assert any(
+        "platform.ack_outbox" in query
+        for connection in connections
+        for query, _ in connection.queries
+    )
 
 
 def test_provider_failure_releases_with_stable_code_not_exception_text() -> None:
