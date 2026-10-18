@@ -75,6 +75,8 @@ class MCPToolDefinition:
             or self.idempotency_argument != self.idempotency_argument.strip()
         ):
             raise ValueError("idempotency argument name must be normalized")
+        if len(self.name) > 128 or re.fullmatch(r"[A-Za-z0-9_.-]+", self.name) is None:
+            raise ValueError("MCP tool name must use 1-128 allowed ASCII characters")
         if self.input_schema.get("type") != "object":
             raise ValueError("MCP tool input schema must be an object schema")
         properties = self.input_schema.get("properties", {})
@@ -143,10 +145,13 @@ def _validate_origin(origin: str | None, allowed_origins: frozenset[str]) -> Non
         raise PermissionError("MCP Origin is invalid")
 
 
-def _validate_request_meta(params: Mapping[str, object]) -> None:
+def _validate_request_meta(params: Mapping[str, object], header_version: str) -> None:
     metadata = params.get("_meta")
     if not isinstance(metadata, Mapping):
         raise ValueError("MCP request requires per-request _meta")
+    body_version = metadata.get("io.modelcontextprotocol/protocolVersion")
+    if not isinstance(body_version, str) or body_version != header_version:
+        raise ValueError("MCP protocol version header and request metadata must match")
     client_info = metadata.get("io.modelcontextprotocol/clientInfo")
     if not isinstance(client_info, Mapping):
         raise ValueError("MCP request requires client identity metadata")
@@ -155,8 +160,8 @@ def _validate_request_meta(params: Mapping[str, object]) -> None:
         if not isinstance(value, str) or not value or value != value.strip():
             raise ValueError("MCP client identity fields must be normalized non-empty strings")
     capabilities = metadata.get("io.modelcontextprotocol/clientCapabilities")
-    if capabilities is not None and not isinstance(capabilities, Mapping):
-        raise ValueError("MCP client capabilities metadata must be an object")
+    if not isinstance(capabilities, Mapping):
+        raise ValueError("MCP request requires client capabilities metadata")
     _validate_value(metadata)
 
 
@@ -386,7 +391,7 @@ class MCPProtocolService:
             params = body.get("params", {})
             if not isinstance(params, dict):
                 return self._rpc_error(request_id, -32602, "params must be an object")
-            _validate_request_meta(params)
+            _validate_request_meta(params, MCP_PROTOCOL_VERSION)
             if method == "server/discover":
                 result: dict[str, object] = {
                     "protocolVersion": MCP_PROTOCOL_VERSION,
@@ -395,6 +400,7 @@ class MCPProtocolService:
                 }
             elif method == "tools/list":
                 result = {
+                    "resultType": "complete",
                     "tools": [
                         {
                             "name": tool.name,
