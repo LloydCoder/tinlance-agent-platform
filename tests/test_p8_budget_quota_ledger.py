@@ -316,3 +316,37 @@ def test_consume_turn_rejects_boolean_non_finite_and_non_numeric_values(elapsed)
     service = BudgetService(Budget(uuid4(), "tenant-a", uuid4(), 10, 60.0, 3))
     with pytest.raises(ValueError, match="finite and non-negative"):
         service.consume_turn(elapsed)
+
+
+def test_postgres_ledger_exposes_lease_renewal_and_reconciliation() -> None:
+    renewed_until = datetime(2026, 10, 18, 10, 0, tzinfo=UTC)
+    connection = Connection(result=renewed_until)
+    ledger = PostgresQuotaLedger(connection)
+    assert ledger.renew(
+        tenant_id=TENANT_ID,
+        reservation_id=UUID("50000000-0000-0000-0000-000000000071"),
+        lease_seconds=600,
+    ) == renewed_until
+    assert "platform.renew_quota_reservation" in connection.queries[-1][0]
+
+    connection.result = 2
+    assert ledger.request_expired_reconciliation(tenant_id=TENANT_ID, batch_limit=20) == 2
+    assert "platform.request_expired_quota_reconciliation" in connection.queries[-1][0]
+
+
+@pytest.mark.parametrize("lease_seconds", [True, 0, 59, 3601, 1.5])
+def test_postgres_ledger_rejects_invalid_lease_duration(lease_seconds) -> None:
+    ledger = PostgresQuotaLedger(Connection())
+    with pytest.raises(ValueError, match="lease_seconds"):
+        ledger.renew(
+            tenant_id=TENANT_ID,
+            reservation_id=UUID("50000000-0000-0000-0000-000000000071"),
+            lease_seconds=lease_seconds,
+        )
+
+
+@pytest.mark.parametrize("batch_limit", [True, 0, 1001, 1.5])
+def test_postgres_ledger_rejects_invalid_reconciliation_batch(batch_limit) -> None:
+    ledger = PostgresQuotaLedger(Connection())
+    with pytest.raises(ValueError, match="batch_limit"):
+        ledger.request_expired_reconciliation(tenant_id=TENANT_ID, batch_limit=batch_limit)
