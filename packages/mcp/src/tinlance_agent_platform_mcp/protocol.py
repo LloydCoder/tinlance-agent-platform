@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
+from typing import Protocol
 from dataclasses import dataclass
 from hashlib import sha256
 from urllib.parse import urlparse
@@ -108,7 +109,13 @@ def _validate_origin(origin: str | None, allowed_origins: frozenset[str]) -> Non
     if origin == "null" or origin not in allowed_origins:
         raise PermissionError("MCP Origin is not allowed")
     parsed = urlparse(origin)
-    if parsed.scheme not in {"https", "http"} or not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
+    if (
+        parsed.scheme not in {"https", "http"}
+        or not parsed.netloc
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
         raise PermissionError("MCP Origin is invalid")
 
 
@@ -166,8 +173,9 @@ def _matches_schema(value: object, schema: Mapping[str, object], path: str = "ar
         missing = [key for key in required if key not in value]
         if missing:
             raise ValueError(f"{path} is missing required properties")
-        if schema.get("additionalProperties", False) is False:
-            if any(key not in properties for key in value):
+        if schema.get("additionalProperties", False) is False and any(
+            key not in properties for key in value
+        ):
                 raise ValueError(f"{path} contains undeclared properties")
         for key, nested in value.items():
             child_schema = properties.get(key)
@@ -299,7 +307,11 @@ class MCPProtocolService:
                 payload = dict(arguments)
                 if tool.idempotency_argument is not None:
                     supplied_key = payload.pop(tool.idempotency_argument, None)
-                    if idempotency_key is not None and supplied_key is not None and idempotency_key != supplied_key:
+                    if (
+                        idempotency_key is not None
+                        and supplied_key is not None
+                        and idempotency_key != supplied_key
+                    ):
                         return self._rpc_error(request_id, -32602, "conflicting idempotency keys")
                     idempotency_key = idempotency_key or supplied_key
                 if tool.consequential and (
