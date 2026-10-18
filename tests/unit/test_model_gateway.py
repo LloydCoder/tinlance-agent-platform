@@ -67,8 +67,8 @@ def routing_request(**overrides: object) -> ModelRoutingRequest:
         "model_capability": "summarization",
         "risk_class": "moderate",
         "data_classification": "confidential",
-        "risk_score": 20,
-        "budget_microusd": 50,
+        "estimated_cost_microusd": 50,
+        "available_budget_microusd": 100,
         "provider_availability": frozenset({"provider-a", "provider-b"}),
         "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
     }
@@ -88,7 +88,6 @@ def route(
     classifications: frozenset[str] = frozenset({"public", "internal", "confidential"}),
     task_policies: frozenset[str] = frozenset({"summarization-policy-v1"}),
     risk_classes: frozenset[str] = frozenset({"low", "moderate"}),
-    max_risk_score: int = 50,
     max_cost_microusd: int = 100,
     enabled: bool = True,
 ) -> ModelRoute:
@@ -101,7 +100,6 @@ def route(
         task_policies=task_policies,
         data_classifications=classifications,
         risk_classes=risk_classes,
-        max_risk_score=max_risk_score,
         max_cost_microusd=max_cost_microusd,
         priority=priority,
         tenants=tenants,
@@ -138,7 +136,7 @@ def test_model_router_fails_closed_for_tenant_risk_data_budget_and_availability(
             "provider-a",
             tenants=frozenset({"tenant-other"}),
             classifications=frozenset({"public"}),
-            max_risk_score=5,
+            risk_classes=frozenset({"high"}),
             max_cost_microusd=10,
         )
     )
@@ -184,9 +182,9 @@ def test_model_router_fails_closed_if_audit_recording_fails() -> None:
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"risk_score": 101},
-        {"risk_score": -1},
-        {"budget_microusd": -1},
+        {"estimated_cost_microusd": -1},
+        {"available_budget_microusd": -1},
+        {"risk_class": "unclassified"},
         {"data_classification": "top-secret"},
         {"provider_availability": frozenset()},
         {"trace_id": "0" * 32},
@@ -222,8 +220,8 @@ def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
         ({"capabilities": frozenset({"translation"})}, {}),
         ({"risk_classes": frozenset({"high"})}, {}),
         ({"classifications": frozenset({"public"})}, {}),
-        ({"max_risk_score": 10}, {}),
         ({"max_cost_microusd": 10}, {}),
+        ({}, {"available_budget_microusd": 10}),
         ({}, {"provider_availability": frozenset({"provider-b"})}),
         ({"enabled": False}, {}),
     ],
