@@ -7,6 +7,8 @@ from tinlance_agent_platform_budgets import (
     CapacityEnvelope,
     CapacityGate,
     CapacityObservation,
+    BudgetScope,
+    BudgetService,
     PostgresQuotaLedger,
     QuotaReservationRequest,
     QuotaSettlement,
@@ -204,3 +206,31 @@ def test_postgres_ledger_distinguishes_overrun_from_idempotent_settlement() -> N
         reservation_id=uuid4(),
         actual=QuotaSettlement(2, 200, 3.5, {}),
     ) == "already_settled"
+
+
+def test_capacity_rejects_boolean_and_non_numeric_measurements() -> None:
+    with pytest.raises(ValueError, match="capacity envelope"):
+        CapacityEnvelope(True, 1.0, 2.0, 1)
+    with pytest.raises(ValueError, match="capacity observation"):
+        CapacityObservation("not-a-number", 1.0, 2.0, 1)
+
+
+def test_budget_state_is_not_consumed_when_quota_settlement_fails() -> None:
+    from tinlance_agent_platform_contracts import Budget
+
+    budget = Budget(uuid4(), "tenant-a", uuid4(), 10, 60.0, 3)
+    quota = TenantQuotaService(
+        max_concurrency=1, max_tool_calls=3, max_token_units=100, max_cost_units=10.0
+    )
+    service = BudgetService(budget, tenant_quota=quota)
+    scope = BudgetScope("tenant-a", uuid4(), budget.run_id, "invoice.refund", "invoice:123")
+    reservation = service.reserve_scoped(scope, tool_calls=1, seconds=5.0)
+
+    def fail_settlement(_reservation) -> None:
+        raise KeyError("simulated quota ledger conflict")
+
+    quota.settle = fail_settlement
+    with pytest.raises(KeyError, match="simulated quota ledger conflict"):
+        service.consume(reservation, elapsed_seconds=1.0)
+    assert service.budget.consumed_tool_calls == 0
+    assert reservation.reservation_id in service._reservations
