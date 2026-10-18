@@ -52,7 +52,7 @@ begin
     exception when check_violation then
         null;
     end;
-    select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000032', true);
+    perform set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000032', true);
     if exists (select 1 from platform.inbox) then
         raise exception 'cross-tenant inbox visibility detected';
     end if;
