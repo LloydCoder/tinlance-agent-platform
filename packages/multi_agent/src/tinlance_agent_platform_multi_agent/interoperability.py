@@ -428,7 +428,11 @@ class A2AClient:
         if resource_scope != delegation.resource_scope:
             raise PermissionError("remote delegation resource scope does not match the request")
         bearer_token = self._credential_provider.issue(delegation)
-        if not isinstance(bearer_token, str) or not bearer_token or bearer_token != bearer_token.strip():
+        if (
+            not isinstance(bearer_token, str)
+            or not bearer_token
+            or bearer_token != bearer_token.strip()
+        ):
             raise PermissionError("Platform credential provider returned no scoped A2A credential")
         if not 0 < timeout_seconds <= 30:
             raise ValueError("A2A timeout must be between 0 and 30 seconds")
