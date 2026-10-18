@@ -76,7 +76,9 @@ create table if not exists platform.quota_reservations (
         (state = 'reserved' and settled_at is null and released_at is null
             and actual_tool_calls is null and actual_token_units is null and actual_cost_units is null)
         or (state = 'settled' and settled_at is not null and released_at is null
-            and actual_tool_calls >= 0 and actual_token_units >= 0 and actual_cost_units >= 0)
+            and actual_tool_calls is not null and actual_tool_calls >= 0
+            and actual_token_units is not null and actual_token_units >= 0
+            and actual_cost_units is not null and actual_cost_units >= 0)
         or (state = 'released' and released_at is not null and settled_at is null
             and actual_tool_calls is null and actual_token_units is null and actual_cost_units is null)
     )
@@ -193,6 +195,10 @@ $$;
 
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
+alter table platform.quota_ledger
+    add constraint quota_ledger_safe_evidence
+    check (platform.quota_evidence_is_safe(evidence));
+
 create or replace function platform.reserve_quota(
     p_reservation_id uuid,
     p_tenant_id uuid,
@@ -228,10 +234,13 @@ begin
        or p_token_units is null or p_token_units < 0
        or p_cost_units is null or p_cost_units < 0 or p_cost_units::text in ('NaN', 'Infinity', '-Infinity')
        or p_action is null or length(trim(p_action)) not between 1 and 256
-       or p_action ~ '[[:cntrl:]]'
+       or p_action <> btrim(p_action) or p_action ~ '[[:cntrl:]]'
        or p_resource is null or length(trim(p_resource)) not between 1 and 256
-       or p_resource ~ '[[:cntrl:]]'
-       or p_idempotency_key is null or length(p_idempotency_key) not between 16 and 256 then
+       or p_resource <> btrim(p_resource) or p_resource ~ '[[:cntrl:]]'
+       or p_idempotency_key is null
+       or length(p_idempotency_key) not between 16 and 256
+       or p_idempotency_key <> btrim(p_idempotency_key)
+       or p_idempotency_key ~ '[[:cntrl:]]' then
         raise exception 'invalid quota reservation' using errcode = '22023';
     end if;
 
@@ -252,8 +261,7 @@ begin
      where tenant_id = p_tenant_id and idempotency_key = p_idempotency_key
      for update;
     if found then
-        if existing.reservation_id = p_reservation_id
-           and existing.organization_id is not distinct from p_organization_id
+        if existing.organization_id is not distinct from p_organization_id
            and existing.agent_id = p_agent_id and existing.run_id = p_run_id
            and existing.action = p_action and existing.resource = p_resource
            and existing.reserved_concurrency = p_concurrency
