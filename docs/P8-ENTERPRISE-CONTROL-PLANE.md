@@ -28,7 +28,10 @@ replace them or let a quota reservation satisfy an approval requirement.
   measured-usage evidence and trusted organization resolution. It derives a
   stable reservation ID from the authenticated execution idempotency key,
   rejects an existing durable reservation before a new side effect, and never
-  holds a database transaction open while the tool executes.
+  holds a database transaction open while the tool executes. After a transient
+  settlement persistence failure, `retry_pending_settlement(reservation_id)`
+  retries the exact cached `QuotaSettlement` and original elapsed-runtime value
+  without re-metering or changing evidence.
 - `database/migrations/010_p8_budget_quota_ledger.sql`: tenant and
   organization limits, reservation state, append-only cost ledger, RLS and
   transactional SQL procedures.
@@ -97,7 +100,9 @@ reconciliation worker must review expired reservations; expiry is not permission
 to release quota automatically. This repository change does **not** prove that
 those external components, migration pipelines, secret managers, multi-region
 failover or production telemetry have been deployed.
-Those require environment-level evidence and load/failure testing.
+Those require environment-level evidence and load/failure testing. The pending
+settlement cache is process-local: process-crash recovery still depends on the
+persisted lease/reconciliation workflow and an independently deployed worker.
 
 ## P8 exit gate
 
