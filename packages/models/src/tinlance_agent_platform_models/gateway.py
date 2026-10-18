@@ -111,6 +111,7 @@ class ModelRoute:
     model: str
     capabilities: frozenset[str]
     data_classifications: frozenset[str]
+    risk_classes: frozenset[str]
     max_risk_score: int
     max_cost_microusd: int
     priority: int = 100
@@ -134,6 +135,8 @@ class ModelRoute:
             "public", "internal", "confidential", "restricted"
         }:
             raise ValueError("route data classifications are invalid")
+        if not self.risk_classes or not self.risk_classes <= {"low", "moderate", "high", "critical"}:
+            raise ValueError("route risk classes are invalid")
         if not 0 <= self.max_risk_score <= 100 or self.max_cost_microusd < 0:
             raise ValueError("route risk and cost limits are invalid")
         for allowlist in (self.tenants, self.agents):
@@ -147,11 +150,12 @@ class ModelRoute:
 class ModelRoutingRequest:
     tenant_id: str
     agent_id: str
-    capability: str
+    model_capability: str
+    risk_class: str
     data_classification: str
     risk_score: int
-    estimated_cost_microusd: int
-    available_providers: frozenset[str]
+    budget_microusd: int
+    provider_availability: frozenset[str]
     policy_version: str
     trace_id: str | None = None
 
@@ -159,20 +163,22 @@ class ModelRoutingRequest:
         for value, name in (
             (self.tenant_id, "tenant_id"),
             (self.agent_id, "agent_id"),
-            (self.capability, "capability"),
+            (self.model_capability, "model_capability"),
             (self.policy_version, "policy_version"),
         ):
             if not value or value != value.strip():
                 raise ValueError(f"{name} must be normalized and non-empty")
+        if self.risk_class not in {"low", "moderate", "high", "critical"}:
+            raise ValueError("unsupported risk class")
         if self.data_classification not in {"public", "internal", "confidential", "restricted"}:
             raise ValueError("unsupported data classification")
-        if not 0 <= self.risk_score <= 100 or self.estimated_cost_microusd < 0:
-            raise ValueError("routing risk and estimated cost are invalid")
-        if not self.available_providers:
+        if not 0 <= self.risk_score <= 100 or self.budget_microusd < 0:
+            raise ValueError("routing risk and budget are invalid")
+        if not self.provider_availability:
             raise ValueError("provider availability must be explicitly supplied")
         if any(
             not provider or provider != provider.strip()
-            for provider in self.available_providers
+            for provider in self.provider_availability
         ):
             raise ValueError("available provider names must be normalized")
         if self.trace_id is not None and (
@@ -211,8 +217,8 @@ class ModelRouter:
         candidates = [
             route for route in self._routes.values()
             if route.enabled
-            and route.provider in request.available_providers
-            and request.capability in route.capabilities
+            and route.provider in request.provider_availability
+            and request.model_capability in route.capabilities\n            and request.risk_class in route.risk_classes
             and request.data_classification in route.data_classifications
             and request.risk_score <= route.max_risk_score
             and request.estimated_cost_microusd <= route.max_cost_microusd
