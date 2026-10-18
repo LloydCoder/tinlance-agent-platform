@@ -534,6 +534,7 @@ class GovernedExecutionService:
             )
         audit_ids: list[UUID] = []
         budget_reservation: Any | None = None
+        side_effect_started = False
         try:
             self._event(request, execution_id, "execution.requested", audit_ids)
             self._event(request, execution_id, "execution.authenticated", audit_ids)
@@ -694,18 +695,19 @@ class GovernedExecutionService:
                 request.action,
                 request.resource,
             )
-            self._journal_state(
-                request,
-                execution_id,
-                ExecutionState.RUNNING,
-                side_effect_started=True,
-            )
             permit = self.tools.issue_permit(call, policy)
             if permit.decision != policy:
                 raise ExecutionFailure(
                     ExecutionErrorCode.AUTHORIZATION_DENIED,
                     "tool authority decision diverged from Platform policy",
                 )
+            self._journal_state(
+                request,
+                execution_id,
+                ExecutionState.RUNNING,
+                side_effect_started=True,
+            )
+            side_effect_started = True
             try:
                 output = self.tools.execute(
                     call,
@@ -876,9 +878,30 @@ class GovernedExecutionService:
             return result
         except ExecutionFailure as exc:
             if budget_reservation is not None and self.budget is not None:
-                with suppress(Exception):
-                    self.budget.release(budget_reservation)
-                budget_reservation = None
+                if side_effect_started:
+                    # Once the tool gateway has been entered, an exception is not
+                    # proof that no external side effect occurred. Keep the quota
+                    # reservation for reconciliation and surface an unknown outcome.
+                    budget_reservation = None
+                    with suppress(Exception):
+                        self._event(
+                            request,
+                            execution_id,
+                            "execution.budget_settlement_unknown",
+                            audit_ids,
+                        )
+                    if exc.code not in {
+                        ExecutionErrorCode.BUDGET_EXCEEDED,
+                        ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                    }:
+                        exc = ExecutionFailure(
+                            ExecutionErrorCode.EXECUTION_OUTCOME_UNKNOWN,
+                            "tool execution failed after side-effect start; outcome requires reconciliation",
+                        )
+                else:
+                    with suppress(Exception):
+                        self.budget.release(budget_reservation)
+                    budget_reservation = None
             state = {
                 ExecutionErrorCode.APPROVAL_REQUIRED: ExecutionState.WAITING_APPROVAL,
                 ExecutionErrorCode.BUDGET_EXCEEDED: ExecutionState.BUDGET_EXCEEDED,
@@ -906,9 +929,19 @@ class GovernedExecutionService:
             raise
         except Exception as exc:
             if budget_reservation is not None and self.budget is not None:
-                with suppress(Exception):
-                    self.budget.release(budget_reservation)
-                budget_reservation = None
+                if side_effect_started:
+                    budget_reservation = None
+                    with suppress(Exception):
+                        self._event(
+                            request,
+                            execution_id,
+                            "execution.budget_settlement_unknown",
+                            audit_ids,
+                        )
+                else:
+                    with suppress(Exception):
+                        self.budget.release(budget_reservation)
+                    budget_reservation = None
             self._journal_state(request, execution_id, ExecutionState.OUTCOME_UNKNOWN)
             with suppress(Exception):
                 self._event(request, execution_id, "execution.failed", audit_ids)
