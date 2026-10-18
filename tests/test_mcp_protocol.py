@@ -458,6 +458,7 @@ def test_http_rejects_duplicate_mcp_routing_headers_before_dispatch() -> None:
         server.server_close()
         thread.join(timeout=3)
 
+
 def test_valid_traceparent_dispatches_only_canonical_trace_id() -> None:
     service, api, _ = make_service()
     trace_id = "0123456789abcdef0123456789abcdef"
@@ -469,4 +470,3 @@ def test_valid_traceparent_dispatches_only_canonical_trace_id() -> None:
     assert response.status_code == 200
     assert len(api.requests) == 1
     assert api.requests[0].trace_id == trace_id
-
