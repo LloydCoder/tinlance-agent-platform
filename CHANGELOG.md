@@ -14,6 +14,7 @@ The format follows the principles of [Keep a Changelog](https://keepachangelog.c
 
 ### Changed
 
+- Pin the reference-agent package to the exact merged Platform SDK revision used by the P9 ecosystem lock.
 - Reworked README, contribution guidance and security policy for stranger-ready usage and explicit production boundaries.
 
 ## [2026-10-03] — Final M29 forensic reconciliation
