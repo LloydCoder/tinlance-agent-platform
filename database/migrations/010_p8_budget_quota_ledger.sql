@@ -183,7 +183,7 @@ as $$
                 'provider', 'model', 'price_book_version', 'measurement_ref',
                 'source_event_id', 'cancellation_reason', 'metering_source',
                 'billing_unit', 'policy_ref', 'correlation_id', 'trace_id',
-                'traceparent'
+                'traceparent', 'lease_expires_at'
             )
                or jsonb_typeof(item.value) <> 'string'
                or length(item.value #>> '{}') > 512
