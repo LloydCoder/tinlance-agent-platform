@@ -74,7 +74,9 @@ begin
     if (
         select state from platform.quota_reservations
         where tenant_id = '00000000-0000-0000-0000-000000000091'
-          and quota_reservations.reservation_id = reservation_id
+          and quota_reservations.reservation_id = v_reservation_id
+          and recovery_attempts = 1
+          and recovery_requested_at is not null
     ) <> 'reserved' then
         raise exception 'expired reservation was silently refunded';
     end if;
@@ -97,7 +99,7 @@ begin
 
     begin
         perform platform.renew_quota_reservation(
-            '00000000-0000-0000-0000-000000000091', reservation_id, 600
+            '00000000-0000-0000-0000-000000000091', v_reservation_id, 600
         );
         raise exception 'expired reservation was renewed without reconciliation';
     exception when object_not_in_prerequisite_state then
@@ -113,7 +115,7 @@ begin
             '30000000-0000-0000-0000-000000000091',
             'read', 'resource:another', 'p8-recovery-idempotency-002', 1, 1, 10, 1.0
         );
-    exception when raise_exception then
+    exception when sqlstate 'P0001' then
         -- The quota denial is expected; the exception block isolates it from
         -- the assertion below so a successful reservation cannot be swallowed.
         null;
