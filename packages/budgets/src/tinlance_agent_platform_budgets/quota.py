@@ -40,6 +40,8 @@ class TenantQuotaService:
             isinstance(max_concurrency, bool) or not isinstance(max_concurrency, int)
             or isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int)
             or isinstance(max_token_units, bool) or not isinstance(max_token_units, int)
+            or isinstance(max_cost_units, bool)
+            or not isinstance(max_cost_units, (int, float))
             or not math.isfinite(max_cost_units)
             or max_concurrency < 1 or max_tool_calls < 0 or max_token_units < 0
             or max_cost_units < 0
@@ -75,6 +77,8 @@ class TenantQuotaService:
         if (
             any(isinstance(value, bool) or not isinstance(value, int)
                 for value in (concurrency, tool_calls, token_units))
+            or isinstance(cost_units, bool)
+            or not isinstance(cost_units, (int, float))
             or not math.isfinite(cost_units)
             or concurrency < 1 or tool_calls < 0 or token_units < 0 or cost_units < 0
         ):
