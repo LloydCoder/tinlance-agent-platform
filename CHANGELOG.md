@@ -8,6 +8,7 @@ The format follows the principles of [Keep a Changelog](https://keepachangelog.c
 
 ### Added
 
+- P9 work in progress: stateless MCP 2026-07-28 HTTP adapter at `POST /mcp`, strict protocol/header and argument validation, authenticated Platform dispatch, and A2A signature/endpoint/delegation controls. This is not yet a certified or production-deployed service.
 - 2026 community-health files, issue forms, pull-request template, documentation index and LLM-oriented documentation index.
 - Root .gitignore coverage for Python artifacts, local environments, secrets, generated state and operating-system files.
 
