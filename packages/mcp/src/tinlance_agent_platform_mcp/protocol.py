@@ -59,6 +59,9 @@ class MCPToolDefinition:
     input_schema: Mapping[str, object]
     consequential: bool = False
     idempotency_argument: str | None = None
+    read_only: bool = False
+    destructive: bool = False
+    open_world: bool = True
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -70,6 +73,10 @@ class MCPToolDefinition:
                 raise ValueError(f"{label} must be non-empty and normalized")
         if self.consequential and not self.idempotency_argument:
             raise ValueError("consequential MCP tools require an idempotency argument")
+        if self.consequential and self.read_only:
+            raise ValueError("consequential MCP tools cannot be annotated read-only")
+        if self.destructive and not self.consequential:
+            raise ValueError("destructive MCP tools must be consequential")
         if self.idempotency_argument is not None and (
             not self.idempotency_argument
             or self.idempotency_argument != self.idempotency_argument.strip()
@@ -407,10 +414,10 @@ class MCPProtocolService:
                             "description": tool.description,
                             "inputSchema": dict(tool.input_schema),
                             "annotations": {
-                                "readOnlyHint": not tool.consequential,
-                                "destructiveHint": tool.consequential,
+                                "readOnlyHint": tool.read_only,
+                                "destructiveHint": tool.destructive,
                                 "idempotentHint": tool.idempotency_argument is not None,
-                                "openWorldHint": True,
+                                "openWorldHint": tool.open_world,
                             },
                         }
                         for tool in sorted(self._tools.values(), key=lambda item: item.name)
