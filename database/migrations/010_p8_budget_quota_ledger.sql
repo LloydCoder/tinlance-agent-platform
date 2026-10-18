@@ -238,6 +238,7 @@ declare
     reserved_calls bigint;
     reserved_tokens bigint;
     reserved_cost numeric(20, 6);
+    normalized_cost numeric(20, 6);
 begin
     if platform.current_tenant_id() is distinct from p_tenant_id then
         raise exception 'tenant scope mismatch' using errcode = '42501';
@@ -256,6 +257,7 @@ begin
        or p_idempotency_key ~ '[[:cntrl:]]' then
         raise exception 'invalid quota reservation' using errcode = '22023';
     end if;
+    normalized_cost := round(p_cost_units, 6);
 
     select * into tenant_limit from platform.tenant_budget_limits
      where tenant_id = p_tenant_id for update;
@@ -279,7 +281,7 @@ begin
            and existing.reserved_concurrency = p_concurrency
            and existing.reserved_tool_calls = p_tool_calls
            and existing.reserved_token_units = p_token_units
-           and existing.reserved_cost_units = p_cost_units then
+           and existing.reserved_cost_units = normalized_cost then
             -- Return the original reservation for every identical replay,
             -- regardless of its current state. Callers must inspect that state
             -- before starting work; a retry must never create duplicate capacity.
@@ -312,7 +314,7 @@ begin
 
     if tenant_limit.used_tool_calls + reserved_calls + p_tool_calls > tenant_limit.max_tool_calls
        or tenant_limit.used_token_units + reserved_tokens + p_token_units > tenant_limit.max_token_units
-       or tenant_limit.used_cost_units + reserved_cost + p_cost_units > tenant_limit.max_cost_units
+       or tenant_limit.used_cost_units + reserved_cost + normalized_cost > tenant_limit.max_cost_units
        or reserved_concurrency + p_concurrency > tenant_limit.max_concurrency then
         raise exception 'tenant quota exhausted' using errcode = 'P0001';
     end if;
@@ -328,7 +330,7 @@ begin
            and qr.state = 'reserved';
         if org_limit.used_tool_calls + reserved_calls + p_tool_calls > org_limit.max_tool_calls
            or org_limit.used_token_units + reserved_tokens + p_token_units > org_limit.max_token_units
-           or org_limit.used_cost_units + reserved_cost + p_cost_units > org_limit.max_cost_units
+           or org_limit.used_cost_units + reserved_cost + normalized_cost > org_limit.max_cost_units
            or reserved_concurrency + p_concurrency > org_limit.max_concurrency then
             raise exception 'organization quota exhausted' using errcode = 'P0001';
         end if;
@@ -340,7 +342,7 @@ begin
         reserved_cost_units
     ) values (
         p_reservation_id, p_tenant_id, p_organization_id, p_agent_id, p_run_id, p_action, p_resource,
-        p_idempotency_key, p_concurrency, p_tool_calls, p_token_units, p_cost_units
+        p_idempotency_key, p_concurrency, p_tool_calls, p_token_units, normalized_cost
     );
 
     insert into platform.quota_ledger (
@@ -374,6 +376,7 @@ declare
     other_tokens bigint;
     other_cost numeric(20, 6);
     event_kind text := 'settled';
+    normalized_actual_cost numeric(20, 6);
 begin
     if platform.current_tenant_id() is distinct from p_tenant_id then
         raise exception 'tenant scope mismatch' using errcode = '42501';
@@ -385,6 +388,7 @@ begin
        or not platform.quota_evidence_is_safe(p_evidence) then
         raise exception 'invalid settlement amounts' using errcode = '22023';
     end if;
+    normalized_actual_cost := round(p_actual_cost_units, 6);
 
     select * into tenant_limit from platform.tenant_budget_limits
      where tenant_id = p_tenant_id for update;
@@ -395,7 +399,7 @@ begin
     if reservation.state = 'settled' then
         if reservation.actual_tool_calls = p_actual_tool_calls
            and reservation.actual_token_units = p_actual_token_units
-           and reservation.actual_cost_units = p_actual_cost_units then
+           and reservation.actual_cost_units = normalized_actual_cost then
             return 'already_settled';
         end if;
         raise exception 'conflicting duplicate settlement' using errcode = '23505';
@@ -420,7 +424,7 @@ begin
        and qr.reservation_id <> p_reservation_id;
     if tenant_limit.used_tool_calls + other_calls + p_actual_tool_calls > tenant_limit.max_tool_calls
        or tenant_limit.used_token_units + other_tokens + p_actual_token_units > tenant_limit.max_token_units
-       or tenant_limit.used_cost_units + other_cost + p_actual_cost_units > tenant_limit.max_cost_units then
+       or tenant_limit.used_cost_units + other_cost + normalized_actual_cost > tenant_limit.max_cost_units then
         event_kind := 'overrun';
     end if;
 
@@ -433,7 +437,7 @@ begin
            and qr.state = 'reserved' and qr.reservation_id <> p_reservation_id;
         if org_limit.used_tool_calls + other_calls + p_actual_tool_calls > org_limit.max_tool_calls
            or org_limit.used_token_units + other_tokens + p_actual_token_units > org_limit.max_token_units
-           or org_limit.used_cost_units + other_cost + p_actual_cost_units > org_limit.max_cost_units then
+           or org_limit.used_cost_units + other_cost + normalized_actual_cost > org_limit.max_cost_units then
             event_kind := 'overrun';
         end if;
     end if;
@@ -442,14 +446,14 @@ begin
     update platform.tenant_budget_limits
        set used_tool_calls = used_tool_calls + p_actual_tool_calls,
            used_token_units = used_token_units + p_actual_token_units,
-           used_cost_units = used_cost_units + p_actual_cost_units,
+           used_cost_units = used_cost_units + normalized_actual_cost,
            version = version + 1, updated_at = now()
      where tenant_id = p_tenant_id;
     if reservation.organization_id is not null then
         update platform.organization_budget_limits
            set used_tool_calls = used_tool_calls + p_actual_tool_calls,
                used_token_units = used_token_units + p_actual_token_units,
-               used_cost_units = used_cost_units + p_actual_cost_units,
+               used_cost_units = used_cost_units + normalized_actual_cost,
                version = version + 1, updated_at = now()
          where tenant_id = p_tenant_id and organization_id = reservation.organization_id;
     end if;
