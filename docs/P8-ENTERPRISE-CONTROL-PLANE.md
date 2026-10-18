@@ -26,11 +26,11 @@ reimplement Platform admission policy.
   `tests/test_p8_budget_quota_ledger.py`: scope binding, in-process race
   controls, replay/idempotency, capacity envelopes, finite-value validation
   and adapter transaction ownership.
-- `database/tests/006_p8_quota_ledger.sql` and
-  `database/tests/007_p8_quota_concurrency.sql` and
+- `database/tests/006_p8_quota_ledger.sql`,
+  `database/tests/007_p8_quota_concurrency.sql`, and
   `database/tests/008_p8_quota_recovery.sql`: PostgreSQL reservation,
-  settlement, release, append-only evidence, concurrent admission and
-  expired-lease reconciliation checks.
+  settlement, release, append-only evidence, tenant/organization concurrent
+  admission and expired-lease reconciliation checks.
 
 ## Required semantics
 
@@ -41,18 +41,23 @@ reimplement Platform admission policy.
    reservation intent; changed scope or dimensions are rejected.
 3. Concurrency is an in-flight gauge. Settlement releases concurrency while
    charging actual tool calls, tokens and cost.
-4. Settlement is idempotent for identical actual usage. Conflicting replays
-   fail closed. A usage overrun is recorded as `overrun`, charged to the
-   ledger and returned explicitly so the caller stops further work.
+4. Settlement requires a bounded `measurement_ref` and is idempotent for
+   identical actual usage. Conflicting replays fail closed. Cost is normalized
+   to the ledger's six-decimal numeric scale before comparison or charging.
+   A usage overrun is recorded as `overrun`, charged to the ledger and
+   returned explicitly so the caller stops further work.
 5. Release is permitted only for an un-settled reservation and requires a
    normalized reason. Cancellation after a consequential side effect must
-   settle observed usage rather than pretend it was refunded.
+   settle observed usage rather than pretend it was refunded. Once recovery
+   has been requested for an expired lease, release is blocked; reconciliation
+   must settle measured usage (zero only with an explicit measurement reference).
 6. Partial settlement charges measured usage and releases the unused estimate.
    A release before side effects charges zero; a post-side-effect cancellation
    is not automatically refundable.
-7. Cost evidence is append-only and bounded to allow-listed scalar metadata.
-   Prompts, arbitrary provider bodies, credentials and secrets are not ledger
-   evidence.
+7. Cost evidence is append-only and bounded to allow-listed identifier
+   metadata. Trace identifiers are format-validated; prompts, arbitrary
+   provider bodies, credentials and secrets are not ledger evidence. Lease
+   renewals and recovery requests are separately recorded in the ledger.
 8. All database calls participate in the caller's tenant-scoped transaction.
    Domain state, reservation transition and ledger entry must commit or roll
    back together. The adapter does not commit or close caller-owned connections.
@@ -66,8 +71,8 @@ reimplement Platform admission policy.
 ## Production boundary
 
 The in-memory quota implementation is a reference/test implementation only.
-The PostgreSQL adapter requires migration 010 to be applied and invoked inside
-a real tenant-scoped transaction. This repository change does **not** prove
+The PostgreSQL adapter requires migrations 010 and 011 to be applied and
+invoked inside a real tenant-scoped transaction. This repository change does **not** prove
 that a production database, migration pipeline, runtime database role, secret
 manager, multi-region failover, or production telemetry has been deployed.
 Those require environment-level evidence and load/failure testing.
