@@ -145,10 +145,11 @@ class PostgresQuotaLedger:
                 raise ValueError("trace_id must be a lowercase W3C trace identifier")
             if key == "traceparent" and not cls._TRACEPARENT.fullmatch(value):
                 raise ValueError("traceparent must be a supported W3C trace context")
-            if (
-                key not in {"cancellation_reason", "trace_id", "traceparent"}
-                and not cls._IDENTIFIER.fullmatch(value)
-            ):
+            if key not in {
+                "cancellation_reason",
+                "trace_id",
+                "traceparent",
+            } and not cls._IDENTIFIER.fullmatch(value):
                 raise ValueError(f"{key} must be a normalized metadata identifier")
         encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(encoded.encode("utf-8")) > 4096:
@@ -279,12 +280,7 @@ class PostgresQuotaLedger:
             "SELECT platform.request_expired_quota_reconciliation(%s, %s)",
             (tenant_id, batch_limit),
         ).fetchone()
-        if (
-            row is None
-            or isinstance(row[0], bool)
-            or not isinstance(row[0], int)
-            or row[0] < 0
-        ):
+        if row is None or isinstance(row[0], bool) or not isinstance(row[0], int) or row[0] < 0:
             raise RuntimeError("quota reconciliation request returned an unexpected result")
         return row[0]
 
