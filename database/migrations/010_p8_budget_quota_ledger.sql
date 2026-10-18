@@ -16,10 +16,10 @@ create table if not exists platform.tenant_budget_limits (
     max_concurrency integer not null check (max_concurrency > 0),
     max_tool_calls bigint not null check (max_tool_calls >= 0),
     max_token_units bigint not null check (max_token_units >= 0),
-    max_cost_units numeric(20, 6) not null check (max_cost_units >= 0),
+    max_cost_units numeric(20, 6) not null check (max_cost_units >= 0 and max_cost_units::text <> 'NaN'),
     used_tool_calls bigint not null default 0 check (used_tool_calls >= 0),
     used_token_units bigint not null default 0 check (used_token_units >= 0),
-    used_cost_units numeric(20, 6) not null default 0 check (used_cost_units >= 0),
+    used_cost_units numeric(20, 6) not null default 0 check (used_cost_units >= 0 and used_cost_units::text <> 'NaN'),
     version bigint not null default 1 check (version > 0),
     updated_at timestamptz not null default now()
 );
@@ -55,7 +55,7 @@ create table if not exists platform.quota_reservations (
     reserved_concurrency integer not null check (reserved_concurrency > 0),
     reserved_tool_calls bigint not null check (reserved_tool_calls >= 0),
     reserved_token_units bigint not null check (reserved_token_units >= 0),
-    reserved_cost_units numeric(20, 6) not null check (reserved_cost_units >= 0),
+    reserved_cost_units numeric(20, 6) not null check (reserved_cost_units >= 0 and reserved_cost_units::text <> 'NaN'),
     actual_tool_calls bigint,
     actual_token_units bigint,
     actual_cost_units numeric(20, 6),
@@ -68,6 +68,8 @@ create table if not exists platform.quota_reservations (
     unique (tenant_id, reservation_id),
     foreign key (tenant_id, organization_id)
         references platform.organizations(tenant_id, organization_id),
+    foreign key (tenant_id, agent_id)
+        references platform.agents(tenant_id, agent_id),
     foreign key (tenant_id, run_id)
         references platform.runs(tenant_id, run_id),
     check (
@@ -98,7 +100,7 @@ create table if not exists platform.quota_ledger (
     ),
     tool_calls bigint not null check (tool_calls >= 0),
     token_units bigint not null check (token_units >= 0),
-    cost_units numeric(20, 6) not null check (cost_units >= 0),
+    cost_units numeric(20, 6) not null check (cost_units >= 0 and cost_units::text <> 'NaN'),
     idempotency_key text not null,
     evidence jsonb not null default '{}'::jsonb,
     occurred_at timestamptz not null default now(),
@@ -175,11 +177,24 @@ begin
     if p_concurrency is null or p_concurrency < 1
        or p_tool_calls is null or p_tool_calls < 0
        or p_token_units is null or p_token_units < 0
-       or p_cost_units is null or p_cost_units < 0
+       or p_cost_units is null or p_cost_units < 0 or p_cost_units::text in ('NaN', 'Infinity', '-Infinity')
        or p_action is null or length(trim(p_action)) = 0
        or p_resource is null or length(trim(p_resource)) = 0
        or p_idempotency_key is null or length(p_idempotency_key) not between 16 and 256 then
         raise exception 'invalid quota reservation' using errcode = '22023';
+    end if;
+
+    select * into tenant_limit from platform.tenant_budget_limits
+     where tenant_id = p_tenant_id for update;
+    if not found then
+        raise exception 'tenant budget limits are not configured' using errcode = 'P0002';
+    end if;
+
+    if not exists (
+        select 1 from platform.tenants
+         where tenant_id = p_tenant_id and status = 'active'
+    ) then
+        raise exception 'tenant is not active' using errcode = '42501';
     end if;
 
     select * into existing from platform.quota_reservations
@@ -200,17 +215,17 @@ begin
         raise exception 'idempotency key conflicts with existing reservation' using errcode = '23505';
     end if;
 
-    select * into tenant_limit from platform.tenant_budget_limits
-     where tenant_id = p_tenant_id for update;
-    if not found then
-        raise exception 'tenant budget limits are not configured' using errcode = 'P0002';
-    end if;
-
     if p_organization_id is not null then
         select * into org_limit from platform.organization_budget_limits
          where tenant_id = p_tenant_id and organization_id = p_organization_id for update;
         if not found then
             raise exception 'organization budget limits are not configured' using errcode = 'P0002';
+        end if;
+        if not exists (
+            select 1 from platform.organizations
+             where tenant_id = p_tenant_id and organization_id = p_organization_id and status = 'active'
+        ) then
+            raise exception 'organization is not active' using errcode = '42501';
         end if;
     end if;
 
@@ -291,10 +306,14 @@ begin
     end if;
     if p_actual_tool_calls is null or p_actual_tool_calls < 0
        or p_actual_token_units is null or p_actual_token_units < 0
-       or p_actual_cost_units is null or p_actual_cost_units < 0 then
+       or p_actual_cost_units is null or p_actual_cost_units < 0
+       or p_actual_cost_units::text in ('NaN', 'Infinity', '-Infinity') then
         raise exception 'invalid settlement amounts' using errcode = '22023';
     end if;
 
+    select * into tenant_limit from platform.tenant_budget_limits
+     where tenant_id = p_tenant_id for update;
+    if not found then raise exception 'tenant budget limits are not configured' using errcode = 'P0002'; end if;
     select * into reservation from platform.quota_reservations
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id for update;
     if not found then raise exception 'reservation not found' using errcode = 'P0002'; end if;
@@ -310,8 +329,6 @@ begin
         raise exception 'released reservation cannot be settled' using errcode = '55000';
     end if;
 
-    select * into tenant_limit from platform.tenant_budget_limits
-     where tenant_id = p_tenant_id for update;
     if reservation.organization_id is not null then
         select * into org_limit from platform.organization_budget_limits
          where tenant_id = p_tenant_id and organization_id = reservation.organization_id for update;
@@ -395,6 +412,9 @@ begin
     if p_reason is null or length(trim(p_reason)) = 0 then
         raise exception 'release reason is required' using errcode = '22023';
     end if;
+    perform 1 from platform.tenant_budget_limits
+     where tenant_id = p_tenant_id for update;
+    if not found then raise exception 'tenant budget limits are not configured' using errcode = 'P0002'; end if;
     select * into reservation from platform.quota_reservations
      where tenant_id = p_tenant_id and reservation_id = p_reservation_id for update;
     if not found then raise exception 'reservation not found' using errcode = 'P0002'; end if;
