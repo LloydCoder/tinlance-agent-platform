@@ -12,6 +12,9 @@ from tinlance_agent_platform_mcp import MCPProtocolService, MCPToolDefinition
 class Principal:
     tenant_id: str = "tenant-a"
     subject_id: str = "subject-a"
+    scopes: frozenset[str] = frozenset({"web.search", "validation.check", "runs.create"})
+    roles: frozenset[str] = frozenset()
+    principal_type: str = "user"
 
 
 class Resolver:
