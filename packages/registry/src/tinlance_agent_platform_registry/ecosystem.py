@@ -299,48 +299,48 @@ class EcosystemRegistrySnapshot:
         if self.schema_version == "registry-manifest/v2":
             for repository_id, metadata in self.repository_metadata.items():
                 if metadata.lifecycle.state is LifecycleState.DEPRECATED:
-                    replacement = self.repository_metadata.get(
+                    repository_replacement = self.repository_metadata.get(
                         metadata.lifecycle.replacement_id or ""
                     )
                     if (
-                        replacement is None
-                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                        repository_replacement is None
+                        or repository_replacement.lifecycle.state is not LifecycleState.ACTIVE
                     ):
                         raise ValueError(
                             f"{repository_id}: deprecated repository replacement must be active"
                         )
-            for resource_id, resource in services.items():
-                lifecycle = resource.lifecycle
+            for resource_id, service_resource in services.items():
+                lifecycle = service_resource.lifecycle
                 if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
-                    replacement = services.get(lifecycle.replacement_id or "")
+                    service_replacement = services.get(lifecycle.replacement_id or "")
                     if (
-                        replacement is None
-                        or replacement.lifecycle is None
-                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                        service_replacement is None
+                        or service_replacement.lifecycle is None
+                        or service_replacement.lifecycle.state is not LifecycleState.ACTIVE
                     ):
                         raise ValueError(
                             f"{resource_id}: deprecated service replacement must be active"
                         )
-            for resource_id, resource in agents.items():
-                lifecycle = resource.lifecycle
+            for resource_id, agent_resource in agents.items():
+                lifecycle = agent_resource.lifecycle
                 if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
-                    replacement = agents.get(lifecycle.replacement_id or "")
+                    agent_replacement = agents.get(lifecycle.replacement_id or "")
                     if (
-                        replacement is None
-                        or replacement.lifecycle is None
-                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                        agent_replacement is None
+                        or agent_replacement.lifecycle is None
+                        or agent_replacement.lifecycle.state is not LifecycleState.ACTIVE
                     ):
                         raise ValueError(
                             f"{resource_id}: deprecated agent replacement must be active"
                         )
-            for resource_id, resource in contracts.items():
-                lifecycle = resource.lifecycle
+            for resource_id, contract_resource in contracts.items():
+                lifecycle = contract_resource.lifecycle
                 if lifecycle is not None and lifecycle.state is LifecycleState.DEPRECATED:
-                    replacement = contracts.get(lifecycle.replacement_id or "")
+                    contract_replacement = contracts.get(lifecycle.replacement_id or "")
                     if (
-                        replacement is None
-                        or replacement.lifecycle is None
-                        or replacement.lifecycle.state is not LifecycleState.ACTIVE
+                        contract_replacement is None
+                        or contract_replacement.lifecycle is None
+                        or contract_replacement.lifecycle.state is not LifecycleState.ACTIVE
                     ):
                         raise ValueError(
                             f"{resource_id}: deprecated contract replacement must be active"
@@ -480,12 +480,12 @@ class EcosystemRegistrySnapshot:
             missing = sorted(required_pairs - set(rule_map))
             raise ValueError(f"registry is missing compatibility rules: {missing}")
         for (consumer_id, contract_id), rule in rule_map.items():
-            contract = contracts.get(contract_id)
-            if contract is None:
+            rule_contract = contracts.get(contract_id)
+            if rule_contract is None:
                 raise ValueError(f"{consumer_id}: unknown contract {contract_id}")
-            if contract.version not in rule.supported_versions:
+            if rule_contract.version not in rule.supported_versions:
                 raise ValueError(
-                    f"{consumer_id}: incompatible {contract_id} version {contract.version}"
+                    f"{consumer_id}: incompatible {contract_id} version {rule_contract.version}"
                 )
             if not (rule.reject_unknown and rule.reject_stale and rule.reject_missing):
                 raise ValueError(f"{consumer_id}: compatibility must fail closed")
