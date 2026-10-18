@@ -290,9 +290,15 @@ def v2_repository_metadata():
             ),
             supply_chain=SupplyChainReferences(
                 reviewed_sha=sha,
-                provenance_uri=f"https://github.com/LloydCoder/{repository_names[repository_id]}/commit/{sha}",
-                sbom_uri=f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations",
-                signature_uri=f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations",
+                provenance_uri=(
+                    f"https://github.com/LloydCoder/{repository_names[repository_id]}/commit/{sha}"
+                ),
+                sbom_uri=(
+                    f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations"
+                ),
+                signature_uri=(
+                    f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations"
+                ),
                 verification_status=SupplyChainStatus.PENDING,
             ),
         )
@@ -461,7 +467,9 @@ def test_deprecated_resource_replacement_must_resolve_to_an_active_resource():
         ).validate()
 
     contracts = list(CONTRACTS)
-    v1_index = next(i for i, item in enumerate(contracts) if item.contract_id == "registry-manifest.v1")
+    v1_index = next(
+        i for i, item in enumerate(contracts) if item.contract_id == "registry-manifest.v1"
+    )
     contracts[v1_index] = replace(
         contracts[v1_index],
         lifecycle=LifecycleMetadata(
@@ -490,7 +498,9 @@ def test_publisher_and_supply_chain_uris_must_match_the_reviewed_identity_and_re
     with pytest.raises(ValueError, match="exact reviewed GitHub commit"):
         SupplyChainReferences(
             reviewed_sha=SHAS["platform"],
-            provenance_uri="https://github.com/LloydCoder/tinlance-agent-platform/commit/" + "f" * 40,
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + "f" * 40
+            ),
             sbom_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
             signature_uri="https://github.com/LloydCoder/tinlance-agent-platform/attestations",
             verification_status=SupplyChainStatus.PENDING,
