@@ -63,6 +63,7 @@ def request(**overrides):
         "messages": ({"role": "user", "content": "hello", "internal_note": "must-not-leak"},),
         "max_output_tokens": 32,
         "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
     }
     values.update(overrides)
     return ModelRequest(**values)
@@ -89,7 +90,7 @@ def test_openai_compatible_provider_normalizes_response_and_minimizes_payload(en
     assert "agent-private" not in Handler.last_body.decode()
     assert "internal_note" not in Handler.last_body.decode()
     assert Handler.last_headers["Authorization"] == "Bearer test-secret"
-    assert Handler.last_headers["X-Tinlance-Trace-ID"] == request().trace_id
+    assert Handler.last_headers["traceparent"] == request().traceparent
 
 
 def test_openai_compatible_provider_normalizes_retryable_http_errors(endpoint):
@@ -113,7 +114,12 @@ def test_openai_compatible_provider_rejects_model_mismatch(endpoint):
 
 def test_openai_compatible_provider_rejects_invalid_trace_id(endpoint):
     with pytest.raises(ValueError, match="trace_id"):
-        provider(endpoint).complete(request(trace_id="0" * 32))
+        request(trace_id="0" * 32)
+
+
+def test_openai_compatible_provider_rejects_invalid_traceparent(endpoint):
+    with pytest.raises(ValueError, match="traceparent"):
+        request(traceparent="00-" + "0" * 32 + "-00f067aa0ba902b7-01")
 
 
 def test_openai_compatible_provider_rejects_non_https_remote_endpoint():
