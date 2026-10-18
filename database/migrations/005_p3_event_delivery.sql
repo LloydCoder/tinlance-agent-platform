@@ -70,7 +70,7 @@ create table if not exists platform.inbox (
     event_id text not null,
     consumer_id text not null,
     payload_digest char(64) not null,
-    processed_at timestamptz not null default now(),
+    processed_at timestamptz not null default clock_timestamp(),
     primary key (tenant_id, event_source, event_id, consumer_id),
     check (length(trim(event_source)) > 0),
     check (length(trim(event_id)) > 0),
@@ -110,15 +110,15 @@ begin
         where o.tenant_id = platform.current_tenant_id()
           and o.published_at is null
           and o.dead_lettered_at is null
-          and o.available_at <= now()
-          and (o.lease_expires_at is null or o.lease_expires_at <= now())
+          and o.available_at <= clock_timestamp()
+          and (o.lease_expires_at is null or o.lease_expires_at <= clock_timestamp())
         order by o.available_at, o.outbox_id
         for update skip locked
         limit p_limit
     )
     update platform.outbox o
        set lease_token = gen_random_uuid(),
-           lease_expires_at = now() + make_interval(secs => p_lease_seconds),
+           lease_expires_at = clock_timestamp() + make_interval(secs => p_lease_seconds),
            attempts = o.attempts + 1
       from candidates c
      where o.outbox_id = c.outbox_id
@@ -137,11 +137,11 @@ declare
     affected integer;
 begin
     update platform.outbox
-       set published_at = now(), lease_token = null, lease_expires_at = null
+       set published_at = clock_timestamp(), lease_token = null, lease_expires_at = null
      where outbox_id = p_outbox_id
        and tenant_id = platform.current_tenant_id()
        and lease_token = p_lease_token
-       and lease_expires_at > now()
+       and lease_expires_at > clock_timestamp()
        and published_at is null
        and dead_lettered_at is null;
     get diagnostics affected = row_count;
@@ -170,10 +170,10 @@ begin
         raise exception 'retry base must be between 0 and 3600 seconds';
     end if;
     update platform.outbox
-       set dead_lettered_at = case when attempts >= max_attempts then now() else null end,
+       set dead_lettered_at = case when attempts >= max_attempts then clock_timestamp() else null end,
            available_at = case when attempts >= max_attempts
                                then available_at
-                               else now() + (
+                               else clock_timestamp() + (
                                    least(
                                        86400::double precision,
                                        p_retry_base_seconds::double precision
@@ -190,7 +190,7 @@ begin
      where outbox_id = p_outbox_id
        and tenant_id = platform.current_tenant_id()
        and lease_token = p_lease_token
-       and lease_expires_at > now()
+       and lease_expires_at > clock_timestamp()
        and published_at is null
        and dead_lettered_at is null;
     get diagnostics affected = row_count;
