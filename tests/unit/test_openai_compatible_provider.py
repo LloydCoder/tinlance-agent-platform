@@ -1,7 +1,7 @@
 import json
-from contextlib import suppress
 import threading
 import time
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from uuid import uuid4
