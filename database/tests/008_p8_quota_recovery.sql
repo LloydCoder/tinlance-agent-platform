@@ -205,6 +205,17 @@ begin
     ) is not true then
         raise exception 'explicit no-side-effect reconciliation did not release reservation';
     end if;
+    if not exists (
+        select 1 from platform.quota_reservations
+        where tenant_id = '00000000-0000-0000-0000-000000000091'
+          and reservation_id = v_second_id
+          and state = 'released'
+          and recovery_resolution = 'confirmed-no-side-effect'
+          and recovery_evidence_ref = 'recovery:review-002'
+          and recovery_resolved_at is not null
+    ) then
+        raise exception 'recovery resolution was not durably recorded';
+    end if;
     if platform.release_quota(
         '00000000-0000-0000-0000-000000000091',
         v_second_id,
