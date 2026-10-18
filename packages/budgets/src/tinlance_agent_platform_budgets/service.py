@@ -183,13 +183,13 @@ class BudgetService:
             )
             del self._reservations[reservation.reservation_id]
 
-    def consume_overrun(
+    def consume_measured(
         self, reservation: BudgetReservation, elapsed_seconds: float
     ) -> None:
-        """Account for completed work even when measured time exceeds its reservation.
+        """Account for completed work even when settlement or runtime limits fail.
 
-        This is accounting, not admission: it records the actual observed duration
-        and consumes the reserved tool calls without applying a second budget check.
+        This is accounting, not admission: it records the observed duration and
+        consumes the reserved tool calls without applying a second budget check.
         """
         if (
             isinstance(elapsed_seconds, bool)
@@ -199,7 +199,7 @@ class BudgetService:
         ):
             raise ValueError("elapsed time must be finite and non-negative")
         if self._tenant_quota is not None:
-            raise RuntimeError("consume_overrun is only valid without a tenant quota adapter")
+            raise RuntimeError("consume_measured is only valid without a tenant quota adapter")
         with self._lock:
             current = self._reservations.get(reservation.reservation_id)
             if current != reservation:
@@ -210,6 +210,12 @@ class BudgetService:
                 elapsed_seconds=self._budget.elapsed_seconds + elapsed_seconds,
             )
             del self._reservations[reservation.reservation_id]
+
+    def consume_overrun(
+        self, reservation: BudgetReservation, elapsed_seconds: float
+    ) -> None:
+        """Compatibility wrapper for callers that explicitly record an overrun."""
+        self.consume_measured(reservation, elapsed_seconds)
 
     def release(self, reservation: BudgetReservation) -> None:
         with self._lock:
