@@ -383,7 +383,7 @@ def test_deprecated_contract_requires_replacement_and_non_https_supply_chain_ref
             "2026-10-18T00:00:00Z",
             reason="superseded",
         )
-    with pytest.raises(ValueError, match="SBOM reference must be credential-free HTTPS"):
+    with pytest.raises(ValueError, match="SBOM reference must point to a GitHub attestation index"):
         SupplyChainReferences(
             reviewed_sha=SHAS["platform"],
             provenance_uri=(
