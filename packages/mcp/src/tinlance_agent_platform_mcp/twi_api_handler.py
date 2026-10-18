@@ -102,9 +102,8 @@ class TWIAPIHandler:
             except (ValueError, TypeError, AttributeError) as exc:
                 raise PermissionError("a valid Platform run and approval are required") from exc
             declared_fingerprint = arguments.pop("intent_fingerprint", None)
-            if (
-                not isinstance(declared_fingerprint, str)
-                or not _INTENT_FINGERPRINT.fullmatch(declared_fingerprint)
+            if not isinstance(declared_fingerprint, str) or not _INTENT_FINGERPRINT.fullmatch(
+                declared_fingerprint
             ):
                 raise PermissionError("a valid approval intent fingerprint is required")
             intent_fingerprint = compute_twi_intent_fingerprint(
