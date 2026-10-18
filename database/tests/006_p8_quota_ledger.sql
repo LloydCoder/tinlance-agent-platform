@@ -148,7 +148,24 @@ begin
     if (select used_tool_calls from platform.tenant_budget_limits where tenant_id = '00000000-0000-0000-0000-000000000071') <> 1 then
         raise exception 'settlement usage was not accounted exactly once';
     end if;
+
+    begin
+        update platform.quota_ledger
+           set cost_units = 999
+         where tenant_id = '00000000-0000-0000-0000-000000000071';
+        raise exception 'append-only ledger allowed an update';
+    exception when insufficient_privilege then
+        null;
+    end;
+
+    begin
+        delete from platform.quota_ledger
+         where tenant_id = '00000000-0000-0000-0000-000000000071';
+        raise exception 'append-only ledger allowed a delete';
+    exception when insufficient_privilege then
+        null;
+    end;
 end
-$$;
+$;
 
 rollback;
