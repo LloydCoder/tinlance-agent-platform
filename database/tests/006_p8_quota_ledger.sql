@@ -106,6 +106,16 @@ begin
         raise exception 'settlement retry was not idempotent';
     end if;
 
+    begin
+        perform platform.settle_quota(
+            '00000000-0000-0000-0000-000000000071', first_id, 1, 10, 1.0,
+            '{"provider":"different-provider","measurement_ref":"usage:p8-test"}'::jsonb
+        );
+        raise exception 'settlement replay accepted conflicting evidence';
+    exception when unique_violation then
+        null;
+    end;
+
     replay_id := platform.reserve_quota(
         first_id,
         '00000000-0000-0000-0000-000000000071',
