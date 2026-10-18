@@ -354,13 +354,16 @@ class A2AProtocolService:
                     return self._rpc_error(
                         request_id, -32602, "task id must be a Platform run UUID"
                     )
+                request_fingerprint = _request_fingerprint(
+                    principal.tenant_id, principal.subject_id, normalized_id
+                )
                 response = self._api.dispatch(
                     A2APlatformRequest(
                         principal.tenant_id,
                         principal.subject_id,
                         "runs.events",
                         {"run_id": task_id},
-                        f"a2a-{_request_fingerprint(principal.tenant_id, principal.subject_id, normalized_id)}",
+                        f"a2a-{request_fingerprint}",
                         _traceparent(normalized.get("traceparent")),
                         None,
                         principal,
