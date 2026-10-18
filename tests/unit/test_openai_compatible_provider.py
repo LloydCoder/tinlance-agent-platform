@@ -1,7 +1,9 @@
 import json
 import threading
 import time
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from uuid import uuid4
 
 import pytest
 
@@ -10,6 +12,11 @@ from tinlance_agent_platform_models.openai_compatible import (
     ModelProviderError,
     OpenAICompatibleProvider,
     StaticModelCredential,
+)
+from tinlance_agent_platform_secrets import (
+    ScopedModelCredentialProvider,
+    ScopedSecretBroker,
+    ScopedSecretHandle,
 )
 
 
@@ -186,3 +193,96 @@ def test_openai_compatible_provider_rejects_oversized_request(endpoint):
     large_request = request(messages=({"role": "user", "content": "x" * (MAX_REQUEST_BYTES + 1)},))
     with pytest.raises(ValueError, match="request limit"):
         provider(endpoint).complete(large_request)
+
+
+class FakeScopedSecretProvider:
+    def resolve(self, handle):
+        return "scoped-secret"
+
+
+def scoped_request(**overrides):
+    tenant_id = "tenant-scoped"
+    principal_id = "principal-scoped"
+    agent_id = uuid4()
+    execution_id = uuid4()
+    capability_id = "model.inference"
+    values = {
+        "tenant_id": tenant_id,
+        "agent_id": str(agent_id),
+        "model": "test-model",
+        "messages": ({"role": "user", "content": "hello"},),
+        "max_output_tokens": 32,
+        "principal_id": principal_id,
+        "execution_id": execution_id,
+        "capability_id": capability_id,
+    }
+    values.update(overrides)
+    handle = ScopedSecretHandle(
+        name="model-provider-token",
+        version="v1",
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+        agent_id=agent_id,
+        execution_id=execution_id,
+        capability_id=capability_id,
+        purpose="model-inference",
+        audience="openai-compatible-provider",
+        issued_at=datetime.now(UTC) - timedelta(seconds=1),
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    credential_provider = ScopedModelCredentialProvider(
+        ScopedSecretBroker(FakeScopedSecretProvider()), handle
+    )
+    return ModelRequest(**values), credential_provider
+
+
+def test_scoped_model_credential_is_bound_to_execution_context(endpoint):
+    scoped, credential_provider = scoped_request()
+    response = OpenAICompatibleProvider(
+        endpoint=endpoint,
+        credential_provider=credential_provider,
+        allow_insecure_localhost=True,
+    ).complete(scoped)
+    assert response.output == "safe answer"
+    assert Handler.last_headers["authorization"] == "Bearer scoped-secret"
+    wrong_tenant_request = ModelRequest(
+        tenant_id="other-tenant",
+        agent_id=scoped.agent_id,
+        model=scoped.model,
+        messages=scoped.messages,
+        max_output_tokens=scoped.max_output_tokens,
+        principal_id=scoped.principal_id,
+        execution_id=scoped.execution_id,
+        capability_id=scoped.capability_id,
+    )
+    with pytest.raises(PermissionError, match="scope"):
+        credential_provider.token(wrong_tenant_request)
+
+
+def test_scoped_model_credential_rejects_missing_execution_context():
+    _, credential_provider = scoped_request()
+    with pytest.raises(PermissionError, match="lacks execution-scoped"):
+        credential_provider.token(request())
+
+
+def test_scoped_model_credential_rejects_expired_handle():
+    scoped, credential_provider = scoped_request()
+    handle = credential_provider.handle
+    expired_handle = ScopedSecretHandle(
+        name=handle.name,
+        version=handle.version,
+        tenant_id=handle.tenant_id,
+        principal_id=handle.principal_id,
+        agent_id=handle.agent_id,
+        execution_id=handle.execution_id,
+        capability_id=handle.capability_id,
+        purpose=handle.purpose,
+        audience=handle.audience,
+        issued_at=datetime.now(UTC) - timedelta(minutes=2),
+        expires_at=datetime.now(UTC) - timedelta(minutes=1),
+    )
+    provider_with_expired_handle = ScopedModelCredentialProvider(
+        ScopedSecretBroker(FakeScopedSecretProvider()), expired_handle
+    )
+    with pytest.raises(PermissionError, match="expired"):
+        provider_with_expired_handle.token(scoped)

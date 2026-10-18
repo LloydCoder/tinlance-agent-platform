@@ -1,4 +1,5 @@
 from .broker import SecretBroker, SecretHandle
+from .model_provider import ModelCredentialRequest, ScopedModelCredentialProvider
 from .scoped import (
     ScopedSecretBroker,
     ScopedSecretHandle,
@@ -8,6 +9,8 @@ from .scoped import (
 
 __all__ = [
     "ScopedSecretBroker",
+    "ScopedModelCredentialProvider",
+    "ModelCredentialRequest",
     "ScopedSecretHandle",
     "ScopedSecretProvider",
     "SecretResolutionError",

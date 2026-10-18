@@ -12,7 +12,7 @@ The Platform's OpenAI-compatible chat-completions adapter implements the existin
 
 The adapter propagates a validated W3C `traceparent` header when supplied; a bare trace ID is not substituted for a complete trace context. The adapter deliberately does not retry provider calls automatically. A timeout or connection failure can occur after a provider has accepted and billed a request; automatic retries could duplicate cost or effects. It marks retryable transport/status errors so a higher-level Platform policy can decide whether a bounded retry is safe. Provider requests do not include tenant or agent identifiers; only a validated W3C `traceparent` is propagated. A trace ID alone is not sent as a non-standard substitute for a full trace context.
 
-Credentials are injected via a protocol. `StaticModelCredential` is suitable for tests or caller-managed short-lived credentials; production must use a secret-manager-backed implementation. No live provider credential or external production connection is asserted by repository tests.
+Credentials are injected via a protocol. `ScopedModelCredentialProvider` resolves through the Platform's `ScopedSecretBroker` and requires matching tenant, principal, agent, execution and capability context before a secret can be released; handle expiry and purpose/audience checks remain enforced by the broker. `StaticModelCredential` is for deterministic tests only. The external secret backend remains responsible for storage, encryption and rotation. Repository tests do not assert a live provider credential or external production connection.
 
 ## Exit gate
 

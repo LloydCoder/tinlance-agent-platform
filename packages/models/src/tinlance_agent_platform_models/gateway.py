@@ -3,7 +3,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
 _TRACEPARENT = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
@@ -18,6 +18,9 @@ class ModelRequest:
     max_output_tokens: int = 4096
     trace_id: str | None = None
     traceparent: str | None = None
+    principal_id: str | None = None
+    execution_id: UUID | None = None
+    capability_id: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.agent_id, self.model)):
@@ -37,6 +40,21 @@ class ModelRequest:
                 or (self.trace_id is not None and match.group(1) != self.trace_id)
             ):
                 raise ValueError("traceparent must be a valid, matching W3C Trace Context header")
+        scope = (self.principal_id, self.execution_id, self.capability_id)
+        if any(value is not None for value in scope) and not all(
+            value is not None for value in scope
+        ):
+            raise ValueError("execution-scoped model context must be complete")
+        if self.principal_id is not None and (
+            not self.principal_id or self.principal_id != self.principal_id.strip()
+        ):
+            raise ValueError("principal_id must be normalized when provided")
+        if self.capability_id is not None and (
+            not self.capability_id or self.capability_id != self.capability_id.strip()
+        ):
+            raise ValueError("capability_id must be normalized when provided")
+        if self.execution_id is not None and not isinstance(self.execution_id, UUID):
+            raise ValueError("execution_id must be a UUID when provided")
         if self.max_output_tokens < 1:
             raise ValueError("max_output_tokens must be positive")
         frozen = []

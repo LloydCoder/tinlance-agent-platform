@@ -31,7 +31,7 @@ class ModelProviderError(RuntimeError):
 
 
 class ModelCredentialProvider(Protocol):
-    def token(self) -> str: ...
+    def token(self, request: ModelRequest) -> str: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,12 +44,12 @@ class StaticModelCredential:
         if (
             not self.value
             or self.value != self.value.strip()
-            or any(character.isspace() for character in self.value)
-            or any(character in self.value for character in "\r\n")
+            or len(self.value) > 8192
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in self.value)
         ):
             raise ValueError("model credential must be a normalized bearer token")
 
-    def token(self) -> str:
+    def token(self, request: ModelRequest | None = None) -> str:
         return self.value
 
 
@@ -97,14 +97,17 @@ class OpenAICompatibleProvider:
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         try:
-            token = self.credential_provider.token()
+            token = self.credential_provider.token(request)
+        except PermissionError:
+            raise
         except Exception as exc:
             raise ModelProviderError("provider credential retrieval failed") from exc
         if (
             not isinstance(token, str)
             or not token
             or token != token.strip()
-            or any(character.isspace() for character in token)
+            or len(token) > 8192
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in token)
         ):
             raise ModelProviderError("provider credential is invalid")
 
