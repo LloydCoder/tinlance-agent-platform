@@ -30,10 +30,10 @@ create table if not exists platform.organization_budget_limits (
     max_concurrency integer not null check (max_concurrency > 0),
     max_tool_calls bigint not null check (max_tool_calls >= 0),
     max_token_units bigint not null check (max_token_units >= 0),
-    max_cost_units numeric(20, 6) not null check (max_cost_units >= 0),
+    max_cost_units numeric(20, 6) not null check (max_cost_units >= 0 and max_cost_units::text <> 'NaN'),
     used_tool_calls bigint not null default 0 check (used_tool_calls >= 0),
     used_token_units bigint not null default 0 check (used_token_units >= 0),
-    used_cost_units numeric(20, 6) not null default 0 check (used_cost_units >= 0),
+    used_cost_units numeric(20, 6) not null default 0 check (used_cost_units >= 0 and used_cost_units::text <> 'NaN'),
     version bigint not null default 1 check (version > 0),
     updated_at timestamptz not null default now(),
     primary key (tenant_id, organization_id),
@@ -78,7 +78,8 @@ create table if not exists platform.quota_reservations (
         or (state = 'settled' and settled_at is not null and released_at is null
             and actual_tool_calls is not null and actual_tool_calls >= 0
             and actual_token_units is not null and actual_token_units >= 0
-            and actual_cost_units is not null and actual_cost_units >= 0)
+            and actual_cost_units is not null and actual_cost_units >= 0
+            and actual_cost_units::text <> 'NaN')
         or (state = 'released' and released_at is not null and settled_at is null
             and actual_tool_calls is null and actual_token_units is null and actual_cost_units is null)
     )
