@@ -94,6 +94,8 @@ class MCPTool:
             raise ValueError("MCP tool fields must be normalized")
         if self.requires_approval and self.risk is None:
             raise ValueError("approval-gated MCP tools must declare an authoritative risk tier")
+        if self.requires_approval and self.idempotency_argument is None:
+            raise ValueError("approval-gated MCP tools must declare an idempotency argument")
         if self.idempotency_argument is not None and not self.idempotency_argument.strip():
             raise ValueError("MCP idempotency argument must be normalized")
 
@@ -236,7 +238,11 @@ class MCPToolGateway:
                 capability_request.risk,
             )
         decision = evaluate(capability_request)
-        if tool.requires_approval and decision.decision is not Decision.DENY and not decision.requires_approval:
+        if (
+            tool.requires_approval
+            and decision.decision is Decision.ALLOW
+            and not decision.requires_approval
+        ):
             return PolicyDecision(
                 Decision.REQUIRE_APPROVAL,
                 decision.policy_id,
