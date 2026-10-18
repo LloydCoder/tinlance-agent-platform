@@ -275,3 +275,41 @@ def test_remote_endpoint_rejects_query_parameters() -> None:
             "https://" + "agent.example" + "/a2a?access_token=unsafe",
             lambda _host: ("93.184.216.34",),
         )
+
+
+def test_agent_card_signature_profile_rejects_non_jcs_values_and_keys() -> None:
+    numeric_extension = replace(
+        make_card(),
+        security_scheme_details={
+            "bearer": {
+                "httpAuthSecurityScheme": {
+                    "scheme": "Bearer",
+                    "unsupportedNumericExtension": 1,
+                }
+            }
+        },
+    )
+    with pytest.raises(ValueError, match="JCS canonicalization profile"):
+        numeric_extension.verify_signature(AcceptCardSignature())
+
+    non_ascii_key = replace(
+        make_card(),
+        security_scheme_details={
+            "bearer": {
+                "httpAuthSecurityScheme": {
+                    "schéma": "Bearer",
+                }
+            }
+        },
+    )
+    with pytest.raises(ValueError, match="ASCII"):
+        non_ascii_key.verify_signature(AcceptCardSignature())
+
+
+def test_agent_card_canonical_payload_is_deterministic_for_supported_profile() -> None:
+    card = make_card()
+    first = card.canonical_payload()
+    second = card.canonical_payload()
+    assert first == second
+    assert b'"supportedInterfaces"' in first
+    assert b'"securitySchemes"' in first
