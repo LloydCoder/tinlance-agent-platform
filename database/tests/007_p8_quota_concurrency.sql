@@ -89,6 +89,10 @@ select reservation_id from dblink_get_result('p8_race_one', false) as result(res
 insert into p8_race_results
 select reservation_id from dblink_get_result('p8_race_two', false) as result(reservation_id uuid);
 
+-- Drain each asynchronous connection after the first result set.
+select * from dblink_get_result('p8_race_one', false) as result(reservation_id uuid);
+select * from dblink_get_result('p8_race_two', false) as result(reservation_id uuid);
+
 do $$
 begin
     if (select count(*) from p8_race_results) <> 1 then
