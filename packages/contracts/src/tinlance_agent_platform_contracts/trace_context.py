@@ -3,6 +3,7 @@
 Trace data is audit/observability metadata, never an authorization grant.
 Sensitive payloads and credentials are not accepted as attributes.
 """
+
 from __future__ import annotations
 
 import re
@@ -156,8 +157,14 @@ class TraceLineageContext:
             "data_classification": self.data_classification,
         }
         for key in (
-            "parent_span_id", "workspace_id", "execution_id", "event_id",
-            "decision_id", "approval_id", "tool_call_id", "policy_decision_id",
+            "parent_span_id",
+            "workspace_id",
+            "execution_id",
+            "event_id",
+            "decision_id",
+            "approval_id",
+            "tool_call_id",
+            "policy_decision_id",
         ):
             current = getattr(self, key)
             if current is not None:
