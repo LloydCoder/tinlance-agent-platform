@@ -55,6 +55,10 @@ def test_model_response_cannot_exceed_requested_output_budget() -> None:
         gateway.complete("oversized", request)
 
 
+def trusted_router(recorder):
+    return ModelRouter(recorder, lambda _route: True)
+
+
 def routing_request(**overrides: object) -> ModelRoutingRequest:
     values: dict[str, object] = {
         "tenant_id": "tenant-a",
@@ -101,7 +105,7 @@ def route(
 
 def test_model_router_selects_deterministic_lowest_priority_eligible_route() -> None:
     recorded = []
-    router = ModelRouter(recorded.append)
+    router = trusted_router(recorded.append)
     router.register(route("route-b", "provider-b", priority=20))
     router.register(route("route-a", "provider-a", priority=10))
 
@@ -153,7 +157,7 @@ def test_model_router_does_not_select_unavailable_provider_or_disabled_route() -
 
 
 def test_model_router_rejects_duplicate_route_ids() -> None:
-    router = ModelRouter(lambda _decision: None)
+    router = trusted_router(lambda _decision: None)
     router.register(route("same", "provider-a"))
     with pytest.raises(ValueError, match="immutable and unique"):
         router.register(route("same", "provider-b"))
@@ -163,7 +167,7 @@ def test_model_router_fails_closed_if_audit_recording_fails() -> None:
     def broken_recorder(_decision: object) -> None:
         raise OSError("audit backend unavailable")
 
-    router = ModelRouter(broken_recorder)
+    router = trusted_router(broken_recorder)
     router.register(route("route-a", "provider-a"))
     with pytest.raises(RuntimeError, match="failing closed"):
         router.route(routing_request())
@@ -186,3 +190,17 @@ def test_model_routing_request_rejects_invalid_risk_budget_and_context(
 ) -> None:
     with pytest.raises(ValueError):
         routing_request(**kwargs)
+
+
+
+def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
+    denied = ModelRouter(lambda _decision: None, lambda _route: False)
+    with pytest.raises(PermissionError, match="not registered"):
+        denied.register(route("unregistered", "provider-a"))
+
+    def registry_outage(_route: ModelRoute) -> bool:
+        raise OSError("registry unavailable")
+
+    unavailable = ModelRouter(lambda _decision: None, registry_outage)
+    with pytest.raises(RuntimeError, match="failing closed"):
+        unavailable.register(route("unverified", "provider-a"))
