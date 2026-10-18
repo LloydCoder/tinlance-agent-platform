@@ -110,7 +110,13 @@ def test_a2a_client_verifies_card_and_passes_pinned_addresses_to_transport() -> 
     result = client.send(make_card(), "opaque-bearer-token", {"method": "message/send"})
     assert result["task"]["id"] == "task-1"
     assert transport.calls == [
-        ("https://" + "agent.example" + "/a2a", ("93.184.216.34",), "opaque-bearer-token", 10.0, "1.0")
+        (
+            "https://" + "agent.example" + "/a2a",
+            ("93.184.216.34",),
+            "opaque-bearer-token",
+            10.0,
+            "1.0",
+        )
     ]
 
 
