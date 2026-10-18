@@ -142,6 +142,30 @@ create policy quota_ledger_tenant_isolation on platform.quota_ledger
 
 revoke update, delete on platform.quota_ledger from public;
 
+-- Usage evidence is deliberately metadata-only; arbitrary prompts, payloads,
+-- credentials and nested provider responses must never be copied into the ledger.
+create or replace function platform.quota_evidence_is_safe(p_evidence jsonb)
+returns boolean
+language sql
+immutable
+set search_path = pg_catalog, platform
+as $
+    select jsonb_typeof(coalesce(p_evidence, '{}'::jsonb)) = 'object'
+       and octet_length(coalesce(p_evidence, '{}'::jsonb)::text) <= 4096
+       and not exists (
+           select 1
+             from jsonb_each(coalesce(p_evidence, '{}'::jsonb)) as item(key, value)
+            where item.key not in (
+                'provider', 'model', 'price_book_version', 'measurement_ref',
+                'source_event_id', 'cancellation_reason', 'metering_source',
+                'billing_unit', 'policy_ref', 'correlation_id', 'trace_id',
+                'traceparent', 'reason'
+            )
+               or jsonb_typeof(item.value) not in ('string', 'number', 'boolean')
+               or (jsonb_typeof(item.value) = 'string' and length(item.value #>> '{}') > 512)
+       )
+$;
+
 -- Reservation admission serializes on limit rows so concurrent workers cannot
 -- oversubscribe either tenant or organization limits.
 create or replace function platform.reserve_quota(
@@ -307,7 +331,8 @@ begin
     if p_actual_tool_calls is null or p_actual_tool_calls < 0
        or p_actual_token_units is null or p_actual_token_units < 0
        or p_actual_cost_units is null or p_actual_cost_units < 0
-       or p_actual_cost_units::text in ('NaN', 'Infinity', '-Infinity') then
+       or p_actual_cost_units::text in ('NaN', 'Infinity', '-Infinity')
+       or not platform.quota_evidence_is_safe(p_evidence) then
         raise exception 'invalid settlement amounts' using errcode = '22023';
     end if;
 
@@ -412,8 +437,9 @@ begin
     if platform.current_tenant_id() is distinct from p_tenant_id then
         raise exception 'tenant scope mismatch' using errcode = '42501';
     end if;
-    if p_reason is null or length(trim(p_reason)) = 0 then
-        raise exception 'release reason is required' using errcode = '22023';
+    if p_reason is null or length(trim(p_reason)) = 0
+       or not platform.quota_evidence_is_safe(p_evidence) then
+        raise exception 'release reason or evidence is invalid' using errcode = '22023';
     end if;
     perform 1 from platform.tenant_budget_limits
      where tenant_id = p_tenant_id for update;
