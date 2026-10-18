@@ -51,6 +51,8 @@ class LifecycleMetadata:
     replacement_id: str | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.state, LifecycleState):
+            raise ValueError("lifecycle state must be a canonical LifecycleState")
         if not self.changed_at.strip():
             raise ValueError("lifecycle changed_at is required")
         try:
@@ -76,6 +78,8 @@ class PublisherIdentity:
     identity_status: IdentityStatus
 
     def __post_init__(self) -> None:
+        if not isinstance(self.identity_status, IdentityStatus):
+            raise ValueError("publisher identity status must be canonical")
         if not self.publisher_id.strip():
             raise ValueError("publisher identity is required")
         parsed = urlsplit(self.identity_uri)
@@ -92,6 +96,8 @@ class SupplyChainReferences:
     verification_status: SupplyChainStatus
 
     def __post_init__(self) -> None:
+        if not isinstance(self.verification_status, SupplyChainStatus):
+            raise ValueError("supply-chain verification status must be canonical")
         if not _FULL_SHA.fullmatch(self.reviewed_sha):
             raise ValueError("supply-chain reviewed revision must be a full immutable commit SHA")
         for value, label in (
@@ -241,6 +247,9 @@ class EcosystemRegistrySnapshot:
         if not self.contracts:
             raise ValueError("registry has no contracts")
 
+        if self.schema_version == "registry-manifest/v2" and any(item.lifecycle is None for item in self.contracts):
+            raise ValueError("v2 contracts require lifecycle metadata")
+
         for repository_id, sha in self.repository_revisions.items():
             if not _FULL_SHA.fullmatch(sha):
                 raise ValueError(f"{repository_id}: repository revision is not a full SHA")
@@ -249,6 +258,8 @@ class EcosystemRegistrySnapshot:
             if set(self.repository_metadata) != set(self.repository_revisions):
                 raise ValueError("v2 registry requires publisher, lifecycle and supply-chain metadata for every repository")
             for repository_id, metadata in self.repository_metadata.items():
+                if not isinstance(metadata, RepositoryMetadata):
+                    raise ValueError(f"{repository_id}: v2 repository metadata has an invalid type")
                 if metadata.supply_chain.reviewed_sha != self.repository_revisions[repository_id]:
                     raise ValueError(f"{repository_id}: supply-chain revision differs from reviewed repository SHA")
                 if metadata.publisher.identity_status is IdentityStatus.REVOKED:
@@ -269,6 +280,8 @@ class EcosystemRegistrySnapshot:
             raise ValueError("Platform must be the sole consequential execution authority")
 
         for service in self.services:
+            if self.schema_version == "registry-manifest/v2" and service.lifecycle is None:
+                raise ValueError(f"{service.service_id}: v2 service lifecycle metadata is required")
             self._validate_owner_revision(
                 service.owner_repository_id, service.reviewed_sha, service.service_id
             )
@@ -290,12 +303,14 @@ class EcosystemRegistrySnapshot:
             self._validate_contract_set(service.service_id, service.contract_ids, contracts)
 
         for agent in self.agents:
+            if self.schema_version == "registry-manifest/v2" and agent.lifecycle is None:
+                raise ValueError(f"{agent.agent_id}: v2 agent lifecycle metadata is required")
             self._validate_owner_revision(
                 agent.owner_repository_id, agent.reviewed_sha, agent.agent_id
             )
             if agent.lifecycle is not None and agent.lifecycle.state is not LifecycleState.ACTIVE and agent.agent_id in self.required_agent_ids:
                 raise ValueError(f"{agent.agent_id}: required agent is not active")
-            if self.schema_version == "registry-manifest/v2" and agent.agent_id in self.required_agent_ids and self.repository_metadata[agent.owner_repository_id].lifecycle.state is not LifecycleState.ACTIVE:
+            if self.schema_version == "registry-manifest/v2" and agent.lifecycle.state is LifecycleState.ACTIVE and self.repository_metadata[agent.owner_repository_id].lifecycle.state is not LifecycleState.ACTIVE:
                 raise ValueError(f"{agent.agent_id}: owner repository is not active")
             if agent.authority_mode not in {
                 AuthorityMode.DELEGATED_ONLY,
