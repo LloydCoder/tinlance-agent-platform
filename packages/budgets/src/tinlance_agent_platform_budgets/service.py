@@ -183,9 +183,7 @@ class BudgetService:
             )
             del self._reservations[reservation.reservation_id]
 
-    def consume_measured(
-        self, reservation: BudgetReservation, elapsed_seconds: float
-    ) -> None:
+    def consume_measured(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
         """Account for completed work even when settlement or runtime limits fail.
 
         This is accounting, not admission: it records the observed duration and
@@ -211,9 +209,7 @@ class BudgetService:
             )
             del self._reservations[reservation.reservation_id]
 
-    def consume_overrun(
-        self, reservation: BudgetReservation, elapsed_seconds: float
-    ) -> None:
+    def consume_overrun(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
         """Compatibility wrapper for callers that explicitly record an overrun."""
         self.consume_measured(reservation, elapsed_seconds)
 
