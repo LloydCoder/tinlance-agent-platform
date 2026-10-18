@@ -62,23 +62,30 @@ def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
     if port is not None and not 1 <= port <= 65535:
         raise ValueError("remote agent endpoint port is invalid")
     hostname = parsed.hostname.rstrip(".").lower()
-    if hostname == "localhost" or hostname.endswith(".localhost"):
+    local_development = (
+        not require_https
+        and parsed.scheme == "http"
+        and (hostname == "localhost" or hostname.endswith(".localhost"))
+    )
+    if (hostname == "localhost" or hostname.endswith(".localhost")) and not local_development:
         raise ValueError("remote agent endpoint must not target localhost")
-    if parsed.scheme == "http":
+    if parsed.scheme == "http" and not local_development:
         try:
             local_address = ipaddress.ip_address(hostname)
         except ValueError:
             local_address = None
-        if hostname != "localhost" and not (
-            local_address is not None and local_address.is_loopback
-        ):
+        if local_address is None or not local_address.is_loopback:
             raise ValueError("cleartext HTTP is allowed only for loopback development")
     try:
         address = ipaddress.ip_address(hostname)
     except ValueError:
         address = None
     if address is not None and not address.is_global:
-        raise ValueError("remote agent endpoint must not target a non-public IP address")
+        loopback_development = (
+            not require_https and parsed.scheme == "http" and address.is_loopback
+        )
+        if not loopback_development:
+            raise ValueError("remote agent endpoint must not target a non-public IP address")
     return hostname, parsed.scheme
 
 
