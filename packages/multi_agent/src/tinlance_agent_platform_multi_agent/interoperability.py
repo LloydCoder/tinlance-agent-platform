@@ -331,7 +331,22 @@ class RemoteDelegation:
             expires_at=issued_at + timedelta(seconds=ttl_seconds),
         )
 
-    def validate(self, *, now: datetime | None = None) -> None:
+    def validate(
+        self,
+        *,
+        expected_tenant_id: str,
+        expected_issuer_id: UUID,
+        expected_audience: str,
+        now: datetime | None = None,
+    ) -> None:
+        _required(expected_tenant_id, "expected tenant")
+        _required(expected_audience, "expected audience")
+        if self.tenant_id != expected_tenant_id:
+            raise PermissionError("delegation tenant does not match the authenticated tenant")
+        if self.parent_agent_id != expected_issuer_id:
+            raise PermissionError("delegation issuer does not match the trusted issuer")
+        if self.audience != expected_audience or expected_audience != str(self.remote_agent_id):
+            raise PermissionError("delegation audience does not match the authenticated remote agent")
         current_value = now or datetime.now(UTC)
         if current_value.tzinfo is None:
             raise ValueError("validation time must be timezone-aware")
