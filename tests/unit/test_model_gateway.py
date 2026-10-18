@@ -70,7 +70,6 @@ def routing_request(**overrides: object) -> ModelRoutingRequest:
         "risk_score": 20,
         "budget_microusd": 50,
         "provider_availability": frozenset({"provider-a", "provider-b"}),
-        "policy_version": "policy-7",
         "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
     }
     values.update(overrides)
@@ -81,6 +80,7 @@ def route(
     route_id: str,
     provider: str,
     *,
+    policy_version: str = "policy-7",
     priority: int = 100,
     tenants: frozenset[str] | None = None,
     classifications: frozenset[str] = frozenset({"public", "internal", "confidential"}),
@@ -94,6 +94,7 @@ def route(
         route_id=route_id,
         provider=provider,
         model=f"{provider}-model",
+        policy_version=policy_version,
         capabilities=frozenset({"summarization"}),
         task_policies=task_policies,
         data_classifications=classifications,
