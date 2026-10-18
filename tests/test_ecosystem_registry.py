@@ -234,6 +234,13 @@ def test_registry_rejects_compatibility_that_does_not_fail_closed_and_agent_auth
 
 def v2_repository_metadata():
     result = {}
+    repository_names = {
+        "developer": "tinlance-agent-developer",
+        "os": "tinlance-agent-os",
+        "platform": "tinlance-agent-platform",
+        "platform_sdk": "tinlance-agent-platform-sdk",
+        "tsic": "tinlance-system-integration",
+    }
     for repository_id, sha in SHAS.items():
         result[repository_id] = RepositoryMetadata(
             publisher=PublisherIdentity(
@@ -247,9 +254,9 @@ def v2_repository_metadata():
             ),
             supply_chain=SupplyChainReferences(
                 reviewed_sha=sha,
-                provenance_uri=f"https://github.com/LloydCoder/{repository_id}/commit/{sha}",
-                sbom_uri=f"https://github.com/LloydCoder/{repository_id}/attestations",
-                signature_uri=f"https://github.com/LloydCoder/{repository_id}/attestations",
+                provenance_uri=f"https://github.com/LloydCoder/{repository_names[repository_id]}/commit/{sha}",
+                sbom_uri=f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations",
+                signature_uri=f"https://github.com/LloydCoder/{repository_names[repository_id]}/attestations",
                 verification_status=SupplyChainStatus.PENDING,
             ),
         )
