@@ -67,7 +67,8 @@ class BudgetService:
             raise PermissionError("budget is owned by another tenant or run")
         if (
             isinstance(tool_calls, bool) or not isinstance(tool_calls, int)
-            or tool_calls < 0 or not math.isfinite(seconds) or seconds < 0
+            or tool_calls < 0 or isinstance(seconds, bool)
+            or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds < 0
         ):
             raise ValueError("reservation dimensions must be finite and non-negative")
         with self._lock:
@@ -121,7 +122,12 @@ class BudgetService:
         return self.reserve_scoped(scope, tool_calls=tool_calls, seconds=seconds)
 
     def consume(self, reservation: BudgetReservation, elapsed_seconds: float) -> None:
-        if not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
+        if (
+            isinstance(elapsed_seconds, bool)
+            or not isinstance(elapsed_seconds, (int, float))
+            or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0
+        ):
             raise ValueError("elapsed time must be finite and non-negative")
         with self._lock:
             current = self._reservations.get(reservation.reservation_id)
