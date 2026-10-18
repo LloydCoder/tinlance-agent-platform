@@ -4,11 +4,11 @@ from uuid import UUID, uuid4
 import pytest
 
 from tinlance_agent_platform_budgets import (
+    BudgetScope,
+    BudgetService,
     CapacityEnvelope,
     CapacityGate,
     CapacityObservation,
-    BudgetScope,
-    BudgetService,
     PostgresQuotaLedger,
     QuotaReservationRequest,
     QuotaSettlement,
