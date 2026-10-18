@@ -30,9 +30,10 @@ class Cursor:
 
 
 class Connection:
-    def __init__(self, *, autocommit=False, result=True):
+    def __init__(self, *, autocommit=False, result=True, reserve_result=None):
         self.autocommit = autocommit
         self.result = result
+        self.reserve_result = reserve_result
         self.queries = []
         self.committed = False
         self.closed = False
@@ -40,7 +41,7 @@ class Connection:
     def execute(self, query, params=()):
         self.queries.append((query, params))
         if "platform.reserve_quota" in query:
-            return Cursor((params[0],))
+            return Cursor((self.reserve_result or params[0],))
         if "platform.settle_quota" in query:
             return Cursor((self.result if isinstance(self.result, str) else "settled",))
         return Cursor((self.result if isinstance(self.result, bool) else True,))
@@ -282,3 +283,10 @@ def test_quota_ledger_rejects_oversized_scope_values() -> None:
             resource="resource:one",
             idempotency_key="p8-reservation-key-0001",
         )
+
+
+def test_postgres_ledger_returns_stable_id_for_idempotent_retry() -> None:
+    original_id = uuid4()
+    ledger = PostgresQuotaLedger(Connection(reserve_result=original_id))
+    retried = ledger.reserve(request(reservation_id=uuid4()))
+    assert retried == original_id
