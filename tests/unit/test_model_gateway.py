@@ -210,6 +210,7 @@ def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
     with pytest.raises(RuntimeError, match="failing closed"):
         unavailable.register(route("unverified", "provider-a"))
 
+
 @pytest.mark.parametrize(
     ("route_kwargs", "request_kwargs"),
     [
@@ -236,7 +237,6 @@ def test_model_router_denies_each_ineligible_route_dimension(
     assert decision.route is None
     assert decision.model_id is None
     assert decision.reason_code == "no_eligible_route"
-
 
 
 def test_model_router_denies_untrusted_routing_context_with_evidence() -> None:
