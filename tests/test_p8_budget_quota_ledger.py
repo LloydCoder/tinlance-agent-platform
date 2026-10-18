@@ -569,16 +569,28 @@ def test_postgres_budget_gate_reconciles_settlement_without_double_accounting() 
         connections=[reserve_connection, failed_settlement, recovered_settlement]
     )
     reservation = gate.reserve_scoped(scope, tool_calls=1, seconds=10.0)
+    original_measure = gate._measure_usage
+    measurements = []
+
+    def record_measurement(scope, reservation_id, elapsed):
+        result = original_measure(scope, reservation_id, elapsed)
+        measurements.append(result)
+        return result
+
+    gate._measure_usage = record_measurement
     with pytest.raises(RuntimeError, match="unexpected result"):
         gate.consume(reservation, elapsed_seconds=2.0)
     assert failed_settlement.rolled_back
     assert budget.budget.consumed_tool_calls == 1
     assert budget.budget.elapsed_seconds == 2.0
+    assert len(measurements) == 1
 
     gate.consume(reservation, elapsed_seconds=2.0)
     assert recovered_settlement.committed
     assert budget.budget.consumed_tool_calls == 1
     assert budget.budget.elapsed_seconds == 2.0
+    assert len(measurements) == 1, "retry must reuse the original immutable measurement"
+    assert gate._pending_settlements == {}
 
 
 def test_postgres_budget_gate_exposes_lease_renewal_and_reconciliation() -> None:
