@@ -14,6 +14,7 @@ from tinlance_agent_platform_contracts import (
     RequestContext,
     Reversibility,
     RiskTier,
+    TraceLineageContext,
 )
 from tinlance_agent_platform_mcp import (
     MCPToolGateway,
@@ -132,11 +133,22 @@ def _context(*, subject_id: str = "subject-a") -> RequestContext:
         tenant_id="tenant-a",
         scopes=frozenset({EXPORT_CAPABILITY}),
     )
+    trace_context = TraceLineageContext(
+        trace_id="0123456789abcdef0123456789abcdef",
+        span_id="0123456789abcdef",
+        correlation_id="twi-request-0001",
+        request_id="twi-request-0001",
+        tenant_id="tenant-a",
+        operation="twi-world-intelligence-export",
+        started_at="2026-10-18T12:00:00Z",
+    )
     return RequestContext(
         request_id="twi-request-0001",
         tenant_id="tenant-a",
         principal=principal,
         environment="test",
+        trace_id=trace_context.trace_id,
+        trace_context=trace_context,
     )
 
 
