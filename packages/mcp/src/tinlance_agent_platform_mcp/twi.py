@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+from hashlib import sha256
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -596,6 +597,4 @@ def compute_twi_intent_fingerprint(
         separators=(",", ":"),
         ensure_ascii=False,
     )
-    from hashlib import sha256
-
     return sha256(canonical.encode("utf-8")).hexdigest()
