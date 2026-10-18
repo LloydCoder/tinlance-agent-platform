@@ -25,11 +25,14 @@ class CapacityEnvelope:
                     self.maximum_p99_ms,
                 )
             )
-            or any(value < 0 for value in (
-                self.minimum_throughput_per_minute,
-                self.maximum_p95_ms,
-                self.maximum_p99_ms,
-            ))
+            or any(
+                value < 0
+                for value in (
+                    self.minimum_throughput_per_minute,
+                    self.maximum_p95_ms,
+                    self.maximum_p99_ms,
+                )
+            )
             or isinstance(self.maximum_concurrency, bool)
             or not isinstance(self.maximum_concurrency, int)
             or self.maximum_concurrency < 1
@@ -54,9 +57,15 @@ class CapacityObservation:
                 and math.isfinite(value)
                 for value in (self.throughput_per_minute, self.p95_ms, self.p99_ms)
             )
-            or any(value < 0 for value in (
-                self.throughput_per_minute, self.p95_ms, self.p99_ms, self.concurrency
-            ))
+            or any(
+                value < 0
+                for value in (
+                    self.throughput_per_minute,
+                    self.p95_ms,
+                    self.p99_ms,
+                    self.concurrency,
+                )
+            )
             or isinstance(self.concurrency, bool)
             or not isinstance(self.concurrency, int)
             or self.p95_ms > self.p99_ms
