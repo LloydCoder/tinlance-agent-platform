@@ -147,6 +147,10 @@ def test_stateless_discovery_and_tools_list_are_cache_safe() -> None:
     assert [tool["name"] for tool in result["tools"]] == ["search", "submit", "validate"]
     assert result["resultType"] == "complete"
     assert result["cacheScope"] == "private"
+    listed = {tool["name"]: tool for tool in result["tools"]}
+    assert listed["search"]["annotations"]["readOnlyHint"] is True
+    assert listed["submit"]["annotations"]["readOnlyHint"] is False
+    assert listed["submit"]["annotations"]["destructiveHint"] is True
     assert listing.headers["Cache-Control"] == "no-store"
 
 
@@ -357,4 +361,27 @@ def test_tool_names_follow_mcp_ascii_name_contract() -> None:
             "Invalid name",
             "noop",
             {"type": "object", "properties": {}, "additionalProperties": False},
+        )
+
+
+def test_tool_behavior_annotations_must_be_explicit_and_consistent() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="cannot be annotated read-only"):
+        MCPToolDefinition(
+            "mutate",
+            "Mutate data",
+            "data.mutate",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+            consequential=True,
+            idempotency_argument="idempotency_key",
+            read_only=True,
+        )
+    with pytest.raises(ValueError, match="must be consequential"):
+        MCPToolDefinition(
+            "delete",
+            "Delete data",
+            "data.delete",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+            destructive=True,
         )
