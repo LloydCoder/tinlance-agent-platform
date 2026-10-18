@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
-from typing import Protocol
 from dataclasses import dataclass
 from hashlib import sha256
+from typing import Protocol
 from urllib.parse import urlparse
 
 from tinlance_agent_platform_api.service import (
