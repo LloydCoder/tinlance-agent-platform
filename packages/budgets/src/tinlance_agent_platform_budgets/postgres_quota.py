@@ -148,9 +148,11 @@ class PostgresQuotaLedger:
                 request.cost_units,
             ),
         ).fetchone()
-        if row is None or row[0] != reservation_id:
+        if row is None or not isinstance(row[0], UUID):
             raise RuntimeError("quota reservation procedure returned an unexpected result")
-        return reservation_id
+        # A replay may use a newly generated candidate ID; the database returns
+        # the stable ID for the original idempotency key and intent.
+        return row[0]
 
     def settle(
         self,
