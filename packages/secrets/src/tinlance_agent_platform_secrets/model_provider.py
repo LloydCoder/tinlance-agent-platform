@@ -3,6 +3,7 @@
 This module depends on the Platform secret broker and a structural request protocol,
 not on the models package, preserving the package dependency boundary.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
