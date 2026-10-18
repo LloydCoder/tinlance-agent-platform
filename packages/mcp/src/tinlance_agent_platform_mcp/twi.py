@@ -11,12 +11,10 @@ import ipaddress
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from http.client import HTTPResponse
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
-from uuid import UUID
 
 from tinlance_agent_platform_contracts import RiskTier
 
@@ -73,10 +71,10 @@ class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(
         self,
         request: Request,
-        file: HTTPResponse,
+        file: Any,
         code: int,
         message: str,
-        headers: Mapping[str, str],
+        headers: Any,
         new_url: str,
     ) -> None:
         return None
