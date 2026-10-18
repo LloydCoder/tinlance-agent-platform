@@ -7,9 +7,9 @@ those registrations are used by runtime components.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from collections.abc import Mapping
 
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
