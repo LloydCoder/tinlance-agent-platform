@@ -158,7 +158,9 @@ def test_postgres_ledger_calls_transactional_procedures_without_owning_commit() 
         ledger.settle(
             tenant_id=TENANT_ID,
             reservation_id=reservation_id,
-            actual=QuotaSettlement(1, 80, 0.8, {"provider": "unit-test", "measurement_ref": "usage:unit-test"}),
+            actual=QuotaSettlement(
+                1, 80, 0.8, {"provider": "unit-test", "measurement_ref": "usage:unit-test"}
+            ),
         )
         == "settled"
     )
