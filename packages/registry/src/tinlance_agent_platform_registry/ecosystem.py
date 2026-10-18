@@ -306,7 +306,9 @@ class EcosystemRegistrySnapshot:
                 raise ValueError(
                     f"{service.service_id}: non-active lifecycle state must fail closed"
                 )
-            if not service.enabled and (service.lifecycle is None or service.lifecycle.state is LifecycleState.ACTIVE):
+            if not service.enabled and (
+                service.lifecycle is None or service.lifecycle.state is LifecycleState.ACTIVE
+            ):
                 raise ValueError(
                     f"{service.service_id}: required active service registration is disabled"
                 )
