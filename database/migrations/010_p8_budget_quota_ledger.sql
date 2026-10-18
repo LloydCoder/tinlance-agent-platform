@@ -286,13 +286,13 @@ begin
         end if;
     end if;
 
-    select coalesce(sum(reserved_concurrency), 0),
-           coalesce(sum(reserved_tool_calls), 0),
-           coalesce(sum(reserved_token_units), 0),
-           coalesce(sum(reserved_cost_units), 0)
+    select coalesce(sum(qr.reserved_concurrency), 0),
+           coalesce(sum(qr.reserved_tool_calls), 0),
+           coalesce(sum(qr.reserved_token_units), 0),
+           coalesce(sum(qr.reserved_cost_units), 0)
       into reserved_concurrency, reserved_calls, reserved_tokens, reserved_cost
-      from platform.quota_reservations
-     where tenant_id = p_tenant_id and state = 'reserved';
+      from platform.quota_reservations qr
+     where qr.tenant_id = p_tenant_id and qr.state = 'reserved';
 
     if tenant_limit.used_tool_calls + reserved_calls + p_tool_calls > tenant_limit.max_tool_calls
        or tenant_limit.used_token_units + reserved_tokens + p_token_units > tenant_limit.max_token_units
@@ -302,13 +302,14 @@ begin
     end if;
 
     if p_organization_id is not null then
-        select coalesce(sum(reserved_concurrency), 0),
-               coalesce(sum(reserved_tool_calls), 0),
-               coalesce(sum(reserved_token_units), 0),
-               coalesce(sum(reserved_cost_units), 0)
+        select coalesce(sum(qr.reserved_concurrency), 0),
+               coalesce(sum(qr.reserved_tool_calls), 0),
+               coalesce(sum(qr.reserved_token_units), 0),
+               coalesce(sum(qr.reserved_cost_units), 0)
           into reserved_concurrency, reserved_calls, reserved_tokens, reserved_cost
-          from platform.quota_reservations
-         where tenant_id = p_tenant_id and organization_id = p_organization_id and state = 'reserved';
+          from platform.quota_reservations qr
+         where qr.tenant_id = p_tenant_id and qr.organization_id = p_organization_id
+           and qr.state = 'reserved';
         if org_limit.used_tool_calls + reserved_calls + p_tool_calls > org_limit.max_tool_calls
            or org_limit.used_token_units + reserved_tokens + p_token_units > org_limit.max_token_units
            or org_limit.used_cost_units + reserved_cost + p_cost_units > org_limit.max_cost_units
@@ -392,11 +393,12 @@ begin
          where tenant_id = p_tenant_id and organization_id = reservation.organization_id for update;
     end if;
 
-    select coalesce(sum(reserved_tool_calls), 0), coalesce(sum(reserved_token_units), 0),
-           coalesce(sum(reserved_cost_units), 0)
+    select coalesce(sum(qr.reserved_tool_calls), 0), coalesce(sum(qr.reserved_token_units), 0),
+           coalesce(sum(qr.reserved_cost_units), 0)
       into other_calls, other_tokens, other_cost
-      from platform.quota_reservations
-     where tenant_id = p_tenant_id and state = 'reserved' and reservation_id <> p_reservation_id;
+      from platform.quota_reservations qr
+     where qr.tenant_id = p_tenant_id and qr.state = 'reserved'
+       and qr.reservation_id <> p_reservation_id;
     if tenant_limit.used_tool_calls + other_calls + p_actual_tool_calls > tenant_limit.max_tool_calls
        or tenant_limit.used_token_units + other_tokens + p_actual_token_units > tenant_limit.max_token_units
        or tenant_limit.used_cost_units + other_cost + p_actual_cost_units > tenant_limit.max_cost_units then
@@ -404,12 +406,12 @@ begin
     end if;
 
     if reservation.organization_id is not null then
-        select coalesce(sum(reserved_tool_calls), 0), coalesce(sum(reserved_token_units), 0),
-               coalesce(sum(reserved_cost_units), 0)
+        select coalesce(sum(qr.reserved_tool_calls), 0), coalesce(sum(qr.reserved_token_units), 0),
+               coalesce(sum(qr.reserved_cost_units), 0)
           into other_calls, other_tokens, other_cost
-          from platform.quota_reservations
-         where tenant_id = p_tenant_id and organization_id = reservation.organization_id
-           and state = 'reserved' and reservation_id <> p_reservation_id;
+          from platform.quota_reservations qr
+         where qr.tenant_id = p_tenant_id and qr.organization_id = reservation.organization_id
+           and qr.state = 'reserved' and qr.reservation_id <> p_reservation_id;
         if org_limit.used_tool_calls + other_calls + p_actual_tool_calls > org_limit.max_tool_calls
            or org_limit.used_token_units + other_tokens + p_actual_token_units > org_limit.max_token_units
            or org_limit.used_cost_units + other_cost + p_actual_cost_units > org_limit.max_cost_units then
