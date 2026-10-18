@@ -79,12 +79,7 @@ def _validate_jcs_profile(value: object, path: str = "Agent Card security scheme
         return
     if isinstance(value, Mapping):
         for key, nested in value.items():
-            if (
-                not isinstance(key, str)
-                or not key
-                or key != key.strip()
-                or not key.isascii()
-            ):
+            if not isinstance(key, str) or not key or key != key.strip() or not key.isascii():
                 raise ValueError(f"{path} keys must be normalized non-empty ASCII strings")
             _validate_jcs_profile(nested, f"{path}.{key}")
         return
@@ -92,9 +87,7 @@ def _validate_jcs_profile(value: object, path: str = "Agent Card security scheme
         for index, nested in enumerate(value):
             _validate_jcs_profile(nested, f"{path}[{index}]")
         return
-    raise ValueError(
-        f"{path} contains a value outside the supported JCS canonicalization profile"
-    )
+    raise ValueError(f"{path} contains a value outside the supported JCS canonicalization profile")
 
 
 def _validate_url(endpoint: str, *, require_https: bool) -> tuple[str, str]:
