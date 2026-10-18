@@ -199,7 +199,7 @@ class PostgresQuotaLedger:
             or row[0] not in {"settled", "already_settled", "overrun"}
         ):
             raise RuntimeError("quota settlement procedure returned an unexpected result")
-        return row[0]
+        return str(row[0])
 
     def release(
         self,
