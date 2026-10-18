@@ -274,7 +274,9 @@ def test_http_server_mounts_the_mcp_service_at_the_remote_endpoint() -> None:
         response = connection.getresponse()
         decoded = json.loads(response.read().decode())
         assert response.status == 200
-        assert decoded["result"]["protocolVersion"] == "2026-07-28"
+        assert decoded["result"]["supportedVersions"] == ["2026-07-28"]
+        assert decoded["result"]["resultType"] == "complete"
+        assert "io.modelcontextprotocol/serverInfo" in decoded["result"]["_meta"]
         connection.close()
     finally:
         server.shutdown()
