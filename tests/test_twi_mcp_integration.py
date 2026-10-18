@@ -17,12 +17,12 @@ from tinlance_agent_platform_contracts import (
     TraceLineageContext,
 )
 from tinlance_agent_platform_mcp import (
-    MCPToolGateway,
-    TWIHTTPTransport,
-    TWIHTTPResponse,
     TWI_TOOL_REGISTRATIONS,
-    TWITransportError,
+    MCPToolGateway,
     ToolScope,
+    TWIHTTPResponse,
+    TWIHTTPTransport,
+    TWITransportError,
     register_twi_tools,
 )
 
@@ -303,7 +303,9 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
                 {"query": "query", "idempotency_key": "search-idempotency-0001"},
                 ToolScope("tenant-a", "web.search", "web://search/*"),
             )
-        redirect_http = FakeHTTPClient(TWIHTTPResponse(302, {"location": "https://evil.example"}, b""))
+        redirect_http = FakeHTTPClient(
+            TWIHTTPResponse(302, {"location": "https://evil.example"}, b"")
+        )
         redirect_transport = TWIHTTPTransport(
             base_url="https://twi.internal",
             audience="tinlance-web-intelligence",
