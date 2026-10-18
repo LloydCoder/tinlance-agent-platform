@@ -73,6 +73,9 @@ values
     '00000000-0000-0000-0000-000000000041',
     '50000000-0000-0000-0000-000000000043', 10
 );
+update platform.outbox
+   set available_at = clock_timestamp() + interval '1 hour'
+ where outbox_id = '60000000-0000-0000-0000-000000000043';
 
 set role p3_outbox_app;
 select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000041', true);
@@ -147,6 +150,9 @@ begin
         raise exception 'conflicting inbox payload digest was unexpectedly accepted';
     end if;
 
+    update platform.outbox
+       set available_at = clock_timestamp()
+     where outbox_id = '60000000-0000-0000-0000-000000000043';
     select outbox_id, lease_token into stale_id, stale_lease
       from platform.claim_outbox_batch(1, 1);
     if stale_id is null or stale_lease is null then
