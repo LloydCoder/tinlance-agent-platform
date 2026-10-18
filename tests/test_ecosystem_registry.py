@@ -323,7 +323,9 @@ def test_v2_registry_rejects_supply_chain_revision_drift_and_revoked_publisher()
         platform.lifecycle,
         SupplyChainReferences(
             reviewed_sha="f" * 40,
-            provenance_uri=platform.supply_chain.provenance_uri,
+            provenance_uri=(
+                "https://github.com/LloydCoder/tinlance-agent-platform/commit/" + "f" * 40
+            ),
             sbom_uri=platform.supply_chain.sbom_uri,
             signature_uri=platform.supply_chain.signature_uri,
             verification_status=SupplyChainStatus.PENDING,
