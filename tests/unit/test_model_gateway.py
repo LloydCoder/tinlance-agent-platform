@@ -83,6 +83,8 @@ def route(
     policy_version: str = "policy-7",
     priority: int = 100,
     tenants: frozenset[str] | None = None,
+    agents: frozenset[str] | None = None,
+    capabilities: frozenset[str] = frozenset({"summarization"}),
     classifications: frozenset[str] = frozenset({"public", "internal", "confidential"}),
     task_policies: frozenset[str] = frozenset({"summarization-policy-v1"}),
     risk_classes: frozenset[str] = frozenset({"low", "moderate"}),
@@ -95,7 +97,7 @@ def route(
         provider=provider,
         model=f"{provider}-model",
         policy_version=policy_version,
-        capabilities=frozenset({"summarization"}),
+        capabilities=capabilities,
         task_policies=task_policies,
         data_classifications=classifications,
         risk_classes=risk_classes,
@@ -103,6 +105,7 @@ def route(
         max_cost_microusd=max_cost_microusd,
         priority=priority,
         tenants=tenants,
+        agents=agents,
         enabled=enabled,
     )
 
@@ -208,3 +211,31 @@ def test_model_router_rejects_unregistered_route_and_registry_outage() -> None:
     unavailable = ModelRouter(lambda _decision: None, registry_outage)
     with pytest.raises(RuntimeError, match="failing closed"):
         unavailable.register(route("unverified", "provider-a"))
+
+
+@pytest.mark.parametrize(
+    ("route_kwargs", "request_kwargs"),
+    [
+        ({"tenants": frozenset({"tenant-other"})}, {}),
+        ({"agents": frozenset({"agent-other"})}, {}),
+        ({"task_policies": frozenset({"translation-policy-v1"})}, {}),
+        ({"capabilities": frozenset({"translation"})}, {}),
+        ({"risk_classes": frozenset({"high"})}, {}),
+        ({"classifications": frozenset({"public"})}, {}),
+        ({"max_risk_score": 10}, {}),
+        ({"max_cost_microusd": 10}, {}),
+        ({}, {"provider_availability": frozenset({"provider-b"})}),
+        ({"enabled": False}, {}),
+    ],
+)
+def test_model_router_denies_each_ineligible_route_dimension(
+    route_kwargs: dict[str, object],
+    request_kwargs: dict[str, object],
+) -> None:
+    router = trusted_router(lambda _decision: None)
+    router.register(route("route-under-test", "provider-a", **route_kwargs))
+    decision = router.route(routing_request(**request_kwargs))
+    assert not decision.allowed
+    assert decision.route is None
+    assert decision.model_id is None
+    assert decision.reason_code == "no_eligible_route"
