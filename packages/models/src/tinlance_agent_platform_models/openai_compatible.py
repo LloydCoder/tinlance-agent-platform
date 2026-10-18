@@ -8,6 +8,7 @@ read from environment variables or included in exception messages.
 from __future__ import annotations
 
 import json
+import math
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -92,8 +93,17 @@ class OpenAICompatibleProvider:
         localhost = parsed.hostname.lower() in {"localhost", "127.0.0.1", "::1"}
         if parsed.scheme == "http" and not (self.allow_insecure_localhost and localhost):
             raise ValueError("HTTPS is required except for explicitly allowed loopback tests")
-        if self.timeout_seconds <= 0 or self.max_response_bytes < 1:
-            raise ValueError("provider timeout and response limit must be positive")
+        if (
+            not math.isfinite(self.timeout_seconds)
+            or self.timeout_seconds <= 0
+            or not isinstance(self.max_response_bytes, int)
+            or isinstance(self.max_response_bytes, bool)
+            or self.max_response_bytes < 1
+        ):
+            raise ValueError(
+                "provider timeout must be finite and positive; "
+                "response limit must be a positive integer"
+            )
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         try:

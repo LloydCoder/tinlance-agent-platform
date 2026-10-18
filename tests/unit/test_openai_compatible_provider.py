@@ -1,6 +1,7 @@
 import json
 import threading
 import time
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from uuid import uuid4
@@ -46,7 +47,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Location", Handler.redirect_location)
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
-        self.wfile.write(raw)
+        # A timeout test may close the client socket before this response is written.
+        with suppress(BrokenPipeError, ConnectionResetError):
+            self.wfile.write(raw)
 
     def log_message(self, *_args):
         pass
@@ -166,6 +169,27 @@ def test_openai_compatible_provider_rejects_embedded_credentials():
 def test_openai_compatible_provider_rejects_oversized_response(endpoint):
     with pytest.raises(ModelProviderError, match="size limit"):
         provider(endpoint, max_response_bytes=10).complete(request())
+
+
+@pytest.mark.parametrize("timeout_seconds", [0, -1, float("nan"), float("inf"), -float("inf")])
+def test_openai_compatible_provider_rejects_invalid_timeout_configuration(
+    endpoint, timeout_seconds
+):
+    with pytest.raises(ValueError, match="timeout must be finite and positive"):
+        provider(endpoint, timeout_seconds=timeout_seconds)
+
+
+@pytest.mark.parametrize("max_response_bytes", [0, -1, True, float("inf"), 1.5])
+def test_openai_compatible_provider_rejects_invalid_response_limit(endpoint, max_response_bytes):
+    with pytest.raises(ValueError, match="response limit must be a positive integer"):
+        provider(endpoint, max_response_bytes=max_response_bytes)
+
+
+def test_openai_compatible_provider_times_out_with_sanitized_error(endpoint):
+    Handler.response_delay = 0.2
+    with pytest.raises(ModelProviderError, match="provider request timed out") as caught:
+        provider(endpoint, timeout_seconds=0.01).complete(request())
+    assert "test-secret" not in str(caught.value)
 
 
 def test_openai_compatible_provider_rejects_invalid_json(endpoint):
