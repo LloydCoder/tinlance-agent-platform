@@ -151,16 +151,22 @@ def test_postgres_ledger_calls_transactional_procedures_without_owning_commit() 
     reservation_id = uuid4()
     actual = ledger.reserve(request(reservation_id=reservation_id))
     assert actual == reservation_id
-    assert ledger.settle(
-        tenant_id=TENANT_ID,
-        reservation_id=reservation_id,
-        actual=QuotaSettlement(1, 80, 0.8, {"provider": "unit-test"}),
-    ) == "settled"
-    assert ledger.release(
-        tenant_id=TENANT_ID,
-        reservation_id=reservation_id,
-        reason="cancelled-before-side-effect",
-    ) is True
+    assert (
+        ledger.settle(
+            tenant_id=TENANT_ID,
+            reservation_id=reservation_id,
+            actual=QuotaSettlement(1, 80, 0.8, {"provider": "unit-test"}),
+        )
+        == "settled"
+    )
+    assert (
+        ledger.release(
+            tenant_id=TENANT_ID,
+            reservation_id=reservation_id,
+            reason="cancelled-before-side-effect",
+        )
+        is True
+    )
     assert len(connection.queries) == 3
     assert all("platform." in query for query, _ in connection.queries)
     assert connection.committed is False
@@ -174,9 +180,9 @@ def test_postgres_ledger_rejects_autocommit_without_active_transaction() -> None
 
 
 def test_p8_migration_has_transactional_limits_rls_and_append_only_ledger() -> None:
-    migration = (
-        ROOT / "database/migrations/010_p8_budget_quota_ledger.sql"
-    ).read_text(encoding="utf-8")
+    migration = (ROOT / "database/migrations/010_p8_budget_quota_ledger.sql").read_text(
+        encoding="utf-8"
+    )
     for required in (
         "platform.tenant_budget_limits",
         "platform.organization_budget_limits",
@@ -194,18 +200,24 @@ def test_p8_migration_has_transactional_limits_rls_and_append_only_ledger() -> N
 
 def test_postgres_ledger_distinguishes_overrun_from_idempotent_settlement() -> None:
     ledger = PostgresQuotaLedger(Connection(result="overrun"))
-    assert ledger.settle(
-        tenant_id=TENANT_ID,
-        reservation_id=uuid4(),
-        actual=QuotaSettlement(2, 200, 3.5, {"measurement_ref": "usage:123"}),
-    ) == "overrun"
+    assert (
+        ledger.settle(
+            tenant_id=TENANT_ID,
+            reservation_id=uuid4(),
+            actual=QuotaSettlement(2, 200, 3.5, {"measurement_ref": "usage:123"}),
+        )
+        == "overrun"
+    )
 
     replay = PostgresQuotaLedger(Connection(result="already_settled"))
-    assert replay.settle(
-        tenant_id=TENANT_ID,
-        reservation_id=uuid4(),
-        actual=QuotaSettlement(2, 200, 3.5, {}),
-    ) == "already_settled"
+    assert (
+        replay.settle(
+            tenant_id=TENANT_ID,
+            reservation_id=uuid4(),
+            actual=QuotaSettlement(2, 200, 3.5, {}),
+        )
+        == "already_settled"
+    )
 
 
 def test_capacity_rejects_boolean_and_non_numeric_measurements() -> None:
