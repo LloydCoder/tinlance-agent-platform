@@ -49,7 +49,9 @@ def test_child_span_keeps_trace_and_tenant_lineage():
     assert child.trace_id == "4bf92f3577b34da6a3ce929d0e0e4736"
     assert child.parent_span_id == "00f067aa0ba902b7"
     assert child.tenant_id == "tenant-a"
-    assert child.as_headers()["traceparent"] == "00-4bf92f3577b34da6a3ce929d0e0e4736-1111111111111111-00"
+    assert child.as_headers()["traceparent"] == (
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-1111111111111111-00"
+    )
 
 
 @pytest.mark.parametrize(
@@ -71,7 +73,6 @@ def test_invalid_trace_or_sensitive_attributes_fail_closed(overrides):
 def test_evidence_digest_must_be_sha256():
     with pytest.raises(ValueError, match="SHA-256"):
         TraceEvidenceRef(evidence_id="evidence:1", kind="tool-output", sha256="bad")
-
 
 
 def test_request_approval_tool_and_evidence_models_bind_trace_tenant():
