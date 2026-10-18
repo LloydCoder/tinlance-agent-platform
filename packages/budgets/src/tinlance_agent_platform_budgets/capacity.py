@@ -92,8 +92,29 @@ class CapacityGate:
         )
 
     def evaluate(self) -> None:
-        if not self.within:
-            raise RuntimeError("capacity envelope was exceeded")
+        violations: list[str] = []
+        if self.observation.throughput_per_minute < self.envelope.minimum_throughput_per_minute:
+            violations.append(
+                f"throughput {self.observation.throughput_per_minute:g}/min is below "
+                f"{self.envelope.minimum_throughput_per_minute:g}/min"
+            )
+        if self.observation.p95_ms > self.envelope.maximum_p95_ms:
+            violations.append(
+                f"p95 latency {self.observation.p95_ms:g}ms exceeds "
+                f"{self.envelope.maximum_p95_ms:g}ms"
+            )
+        if self.observation.p99_ms > self.envelope.maximum_p99_ms:
+            violations.append(
+                f"p99 latency {self.observation.p99_ms:g}ms exceeds "
+                f"{self.envelope.maximum_p99_ms:g}ms"
+            )
+        if self.observation.concurrency > self.envelope.maximum_concurrency:
+            violations.append(
+                f"concurrency {self.observation.concurrency} exceeds "
+                f"{self.envelope.maximum_concurrency}"
+            )
+        if violations:
+            raise RuntimeError("capacity envelope was exceeded: " + "; ".join(violations))
 
 
 @dataclass(frozen=True, slots=True)
