@@ -164,7 +164,8 @@ class PostgresEventStore:
         self._connection.execute(
             "INSERT INTO platform.events "
             "(event_id, tenant_id, run_id, event_type, payload, sequence, occurred_at, "
-            "source, correlation_id, causation_id, trace_id, span_id, schema_uri, data_classification) "
+            "source, correlation_id, causation_id, trace_id, span_id, schema_uri, "
+            "data_classification) "
             "VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 stored.event_id,
