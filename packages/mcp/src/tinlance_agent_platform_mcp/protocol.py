@@ -69,6 +69,26 @@ class MCPHTTPResponse:
     body: bytes
 
 
+class MCPRateLimiter:
+    """Injected shared rate-limit contract; implementations must be tenant-aware."""
+
+    def allow(self, tenant_id: str, subject_id: str) -> bool:
+        raise NotImplementedError
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _reject_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant is not allowed: {value}")
+
+
 def _headers(headers: Mapping[str, str]) -> dict[str, str]:
     return {str(key).lower(): str(value) for key, value in headers.items()}
 
@@ -168,6 +188,7 @@ class MCPProtocolService:
         tools: tuple[MCPToolDefinition, ...],
         *,
         allowed_origins: tuple[str, ...] = (),
+        rate_limiter: MCPRateLimiter | None = None,
         server_name: str = "tinlance-agent-platform",
         server_version: str = "1.1.0",
         list_ttl_ms: int = 30_000,
@@ -176,6 +197,8 @@ class MCPProtocolService:
             raise ValueError("MCP server identity is required")
         if not 1_000 <= list_ttl_ms <= 300_000:
             raise ValueError("MCP list cache TTL must be between 1s and 5m")
+        if rate_limiter is None:
+            raise ValueError("MCP protocol service requires a shared rate limiter")
         origins = frozenset(allowed_origins)
         for origin in origins:
             parsed = urlparse(origin)
@@ -196,6 +219,7 @@ class MCPProtocolService:
         self._resolver = resolver
         self._tools = {tool.name: tool for tool in tools}
         self._allowed_origins = origins
+        self._rate_limiter = rate_limiter
         self._server_name = server_name
         self._server_version = server_version
         self._list_ttl_ms = list_ttl_ms
@@ -217,7 +241,13 @@ class MCPProtocolService:
                 principal = self._resolver.resolve(token[7:].strip())
             except PermissionError:
                 return self._http_error(401, "unauthorized")
-            body = json.loads(raw_body.decode("utf-8"))
+            if not self._rate_limiter.allow(principal.tenant_id, principal.subject_id):
+                return self._http_error(429, "rate_limited")
+            body = json.loads(
+                raw_body.decode("utf-8"),
+                object_pairs_hook=_unique_object,
+                parse_constant=_reject_constant,
+            )
             if not isinstance(body, dict) or body.get("jsonrpc") != "2.0":
                 return self._http_error(400, "invalid_jsonrpc_request")
             request_id = body.get("id")
@@ -242,6 +272,12 @@ class MCPProtocolService:
                             "name": tool.name,
                             "description": tool.description,
                             "inputSchema": dict(tool.input_schema),
+                            "annotations": {
+                                "readOnlyHint": not tool.consequential,
+                                "destructiveHint": tool.consequential,
+                                "idempotentHint": tool.idempotency_argument is not None,
+                                "openWorldHint": True,
+                            },
                         }
                         for tool in sorted(self._tools.values(), key=lambda item: item.name)
                     ],
@@ -269,10 +305,16 @@ class MCPProtocolService:
                     idempotency_key = idempotency_key or supplied_key
                 if tool.consequential and (
                     not isinstance(idempotency_key, str)
-                    or not idempotency_key.strip()
+                    or len(idempotency_key) < 16
                     or len(idempotency_key) > 256
+                    or not idempotency_key.isascii()
+                    or any(ord(char) < 33 or ord(char) > 126 for char in idempotency_key)
                 ):
-                    return self._rpc_error(request_id, -32602, "consequential tool call requires an idempotency key")
+                    return self._rpc_error(
+                        request_id,
+                        -32602,
+                        "consequential tool call requires a normalized idempotency key",
+                    )
                 request_fingerprint = sha256(
                     f"{principal.tenant_id}:{principal.subject_id}:{request_id}".encode()
                 ).hexdigest()[:32]
