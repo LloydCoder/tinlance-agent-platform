@@ -21,9 +21,8 @@ from tinlance_agent_platform_contracts import (
     Reversibility,
     TraceLineageContext,
 )
-
-from .gateway import ApprovalVerifier, MCPToolGateway, ToolScope
-from .twi import (
+from tinlance_agent_platform_mcp.gateway import ApprovalVerifier, MCPToolGateway, ToolScope
+from tinlance_agent_platform_mcp.twi import (
     TWI_OPERATION_TO_TOOL,
     TWITransportError,
     compute_twi_intent_fingerprint,

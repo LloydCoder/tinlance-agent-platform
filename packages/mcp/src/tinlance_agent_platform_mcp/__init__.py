@@ -11,7 +11,6 @@ from .twi import (
     compute_twi_intent_fingerprint,
     register_twi_tools,
 )
-from .twi_api_handler import TWIAPIHandler
 
 __all__ = [
     "MCPExecutionPermit",
@@ -21,7 +20,6 @@ __all__ = [
     "MCPToolDefinition",
     "MCPToolGateway",
     "ToolScope",
-    "TWIAPIHandler",
     "TWIHTTPResponse",
     "TWIHTTPTransport",
     "TWI_MCP_TOOL_DEFINITIONS",

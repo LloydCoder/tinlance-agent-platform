@@ -355,9 +355,11 @@ class TWIHTTPTransport:
             headers["traceparent"] = scope.traceparent
         if spec.idempotency_argument is not None:
             headers[_IDEMPOTENCY_HEADER] = str(arguments[spec.idempotency_argument])
-        body = None if payload is None else json.dumps(
-            payload, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
+        body = (
+            None
+            if payload is None
+            else json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        )
         if body is not None:
             headers["Content-Type"] = "application/json"
         response = self._http.request(
@@ -406,9 +408,9 @@ class TWIHTTPTransport:
                 "payload": {key: arguments[key] for key in browser_fields if key in arguments},
             }
         if tool_name == "twi_job_read":
-            return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}", None
+            return f"/v1/jobs/{quote(str(arguments.get('job_id', '')), safe='')}", None
         if tool_name == "twi_job_cancel":
-            return f"/v1/jobs/{quote(str(arguments.get('job_id', ''), safe=''))}/cancel", None
+            return f"/v1/jobs/{quote(str(arguments.get('job_id', '')), safe='')}/cancel", None
         if tool_name == "twi_research_verify":
             return "/v1/research/verify", {"claims": arguments.get("claims")}
         if tool_name == "twi_world_intelligence_export":

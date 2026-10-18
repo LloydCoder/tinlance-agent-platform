@@ -51,6 +51,7 @@ packages = [
   "packages/attestation/src/tinlance_agent_platform_attestation",
   "packages/crypto/src/tinlance_agent_platform_crypto",
   "packages/compliance/src/tinlance_agent_platform_compliance",
+  "packages/app/src/tinlance_agent_platform_app",
 ]
 
 [tool.pytest.ini_options]
