@@ -185,8 +185,7 @@ class PostgresQuotaLedger:
         """
         self._require_transaction()
         tenant_row = self._connection.execute(
-            "SELECT tenant_id FROM platform.tenant_budget_limits "
-            "WHERE tenant_id = %s FOR UPDATE",
+            "SELECT tenant_id FROM platform.tenant_budget_limits WHERE tenant_id = %s FOR UPDATE",
             (request.tenant_id,),
         ).fetchone()
         if tenant_row is None:
@@ -478,9 +477,9 @@ class PostgresBudgetGate:
             organization_id = self._resolve_organization(scope)
             if organization_id is not None and not isinstance(organization_id, UUID):
                 raise TypeError("trusted organization resolver must return UUID or None")
-            ledger_key = "quota:" + sha256(
-                f"{tenant_id}:{scope.idempotency_key}".encode()
-            ).hexdigest()
+            ledger_key = (
+                "quota:" + sha256(f"{tenant_id}:{scope.idempotency_key}".encode()).hexdigest()
+            )
             request = QuotaReservationRequest(
                 tenant_id=tenant_id,
                 organization_id=organization_id,
