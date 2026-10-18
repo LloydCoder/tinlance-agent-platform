@@ -16,7 +16,7 @@ from typing import Protocol
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-A2A_SPECIFICATION_VERSION = "1.0.0"
+A2A_SPECIFICATION_VERSION = "1.0.1"
 A2A_PROTOCOL_VERSION = "1.0"
 MAX_DELEGATION_TTL_SECONDS = 3600
 MAX_REMOTE_RESPONSE_BYTES = 1_048_576
@@ -41,6 +41,7 @@ class RemoteAgentTransport(Protocol):
         timeout_seconds: float,
         max_response_bytes: int,
         protocol_version: str,
+        content_type: str,
     ) -> Mapping[str, object]: ...
 
 
@@ -415,6 +416,7 @@ class A2AClient:
             timeout_seconds=timeout_seconds,
             max_response_bytes=MAX_REMOTE_RESPONSE_BYTES,
             protocol_version=A2A_PROTOCOL_VERSION,
+            content_type="application/a2a+json",
         )
         response_size = len(
             json.dumps(response, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
