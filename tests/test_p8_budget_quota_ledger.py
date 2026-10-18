@@ -290,3 +290,29 @@ def test_postgres_ledger_returns_stable_id_for_idempotent_retry() -> None:
     ledger = PostgresQuotaLedger(Connection(reserve_result=original_id))
     retried = ledger.reserve(request(reservation_id=uuid4()))
     assert retried == original_id
+
+
+def test_legacy_budget_methods_cannot_bypass_enabled_tenant_quota() -> None:
+    from tinlance_agent_platform_contracts import Budget
+
+    budget = Budget(uuid4(), "tenant-a", uuid4(), 10, 60.0, 3)
+    quota = TenantQuotaService(
+        max_concurrency=1, max_tool_calls=3, max_token_units=100, max_cost_units=10.0
+    )
+    service = BudgetService(budget, tenant_quota=quota)
+    with pytest.raises(RuntimeError, match="reserve_scoped"):
+        service.reserve("tenant-a", budget.run_id)
+    with pytest.raises(RuntimeError, match="scoped budget reservation"):
+        service.consume_turn(1.0)
+    with pytest.raises(RuntimeError, match="scoped budget reservation"):
+        service.consume_tool_call()
+    assert quota.consumed == (0, 0, 0, 0.0)
+
+
+@pytest.mark.parametrize("elapsed", [True, float("nan"), float("inf"), "1"])
+def test_consume_turn_rejects_boolean_non_finite_and_non_numeric_values(elapsed) -> None:
+    from tinlance_agent_platform_contracts import Budget
+
+    service = BudgetService(Budget(uuid4(), "tenant-a", uuid4(), 10, 60.0, 3))
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        service.consume_turn(elapsed)
