@@ -40,16 +40,18 @@ class FakeTokenIssuer:
         traceparent: str | None,
         expires_in_seconds: int,
     ) -> str:
-        self.calls.append({
-            "tenant_id": tenant_id,
-            "subject_id": subject_id,
-            "audience": audience,
-            "scopes": scopes,
-            "purpose": purpose,
-            "request_id": request_id,
-            "traceparent": traceparent,
-            "expires_in_seconds": expires_in_seconds,
-        })
+        self.calls.append(
+            {
+                "tenant_id": tenant_id,
+                "subject_id": subject_id,
+                "audience": audience,
+                "scopes": scopes,
+                "purpose": purpose,
+                "request_id": request_id,
+                "traceparent": traceparent,
+                "expires_in_seconds": expires_in_seconds,
+            }
+        )
         return "platform-minted-world-intelligence-token"
 
 
@@ -71,13 +73,15 @@ class FakeHTTPClient:
         body: bytes | None,
         timeout_seconds: float,
     ) -> WorldIntelligenceHTTPResponse:
-        self.calls.append({
-            "method": method,
-            "url": url,
-            "headers": dict(headers),
-            "body": body,
-            "timeout_seconds": timeout_seconds,
-        })
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": dict(headers),
+                "body": body,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
         return self.response
 
 
@@ -184,9 +188,7 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
             audience="world-intelligence",
             token_issuer=self.issuer,
             http_client=FakeHTTPClient(
-                WorldIntelligenceHTTPResponse(
-                    302, {"location": "https://evil.example"}, b""
-                )
+                WorldIntelligenceHTTPResponse(302, {"location": "https://evil.example"}, b"")
             ),
         )
         with self.assertRaises(WorldIntelligenceTransportError) as caught:
@@ -257,12 +259,14 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.issuer = FakeTokenIssuer()
         self.http = FakeHTTPClient()
-        self.gateway = MCPToolGateway(WorldIntelligenceHTTPTransport(
-            base_url="https://world-intelligence.internal",
-            audience="world-intelligence",
-            token_issuer=self.issuer,
-            http_client=self.http,
-        ))
+        self.gateway = MCPToolGateway(
+            WorldIntelligenceHTTPTransport(
+                base_url="https://world-intelligence.internal",
+                audience="world-intelligence",
+                token_issuer=self.issuer,
+                http_client=self.http,
+            )
+        )
         register_world_intelligence_tools(self.gateway)
         self.delegate = FakeDelegate()
         self.handler = WorldIntelligenceAPIHandler(
