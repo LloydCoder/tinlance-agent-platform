@@ -284,7 +284,6 @@ class TWIAPIHandlerTests(unittest.TestCase):
             {"run_id", "approval_id", "intent_fingerprint", "idempotency_key"} <= required
         )
 
-
     def test_evidence_export_operation_uses_scoped_platform_token(self) -> None:
         request = APIRequest(
             tenant_id="tenant-a",
@@ -347,7 +346,6 @@ class TWIAPIHandlerTests(unittest.TestCase):
             self.http.calls[0]["url"],
             "https://twi.internal/v1/monitors/monitor-0001",
         )
-
 
     def test_remote_mcp_catalog_registers_all_twi_operations(self) -> None:
         names = {tool.name for tool in TWI_MCP_TOOL_DEFINITIONS}
