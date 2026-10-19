@@ -285,5 +285,49 @@ class TWIAPIHandlerTests(unittest.TestCase):
         )
 
 
+    def test_monitor_delete_requires_exact_intent_bound_human_approval(self) -> None:
+        run_id = uuid4()
+        approval_id = uuid4()
+        business_arguments: dict[str, object] = {
+            "monitor_id": "monitor-0001",
+            "idempotency_key": "monitor-delete-idempotency-0001",
+        }
+        fingerprint = compute_twi_intent_fingerprint(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            run_id=str(run_id),
+            tool_name="twi_monitor_delete",
+            arguments=business_arguments,
+        )
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="twi.monitors.delete",
+            payload={
+                **business_arguments,
+                "run_id": str(run_id),
+                "approval_id": str(approval_id),
+                "intent_fingerprint": fingerprint,
+            },
+            request_id="platform-twi-monitor-delete-0001",
+            trace_id="0123456789abcdef0123456789abcdef",
+            idempotency_key="monitor-delete-idempotency-0001",
+            authenticated_principal=_principal("web.monitor.delete"),
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertEqual(len(self.approvals.calls), 1)
+        self.assertEqual(self.approvals.calls[0]["approval_id"], approval_id)
+        self.assertEqual(self.approvals.calls[0]["run_id"], run_id)
+        self.assertEqual(self.approvals.calls[0]["action"], "delete")
+        self.assertEqual(self.approvals.calls[0]["resource"], "twi://monitors/{monitor_id}")
+        self.assertEqual(self.approvals.calls[0]["intent_fingerprint"], fingerprint)
+        self.assertEqual(self.http.calls[0]["method"], "DELETE")
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/monitors/monitor-0001",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
