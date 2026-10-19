@@ -433,10 +433,7 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         called_payload = json.loads(called.body)
         self.assertEqual(called.status_code, 200)
         self.assertFalse(called_payload["result"]["isError"])
-        self.assertEqual(
-            called_payload["result"]["_meta"]["io.modelcontextprotocol/resultType"],
-            "complete",
-        )
+        self.assertEqual(called_payload["result"]["resultType"], "complete")
         self.assertEqual(len(self.http.calls), 1)
         child_traceparent = self.issuer.calls[0]["traceparent"]
         self.assertEqual(child_traceparent.split("-")[1], TRACE_ID)
