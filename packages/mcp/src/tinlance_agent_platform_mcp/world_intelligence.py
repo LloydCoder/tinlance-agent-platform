@@ -299,7 +299,7 @@ WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = tuple(
     MCPToolDefinition(
         name,
         f"Read World Intelligence {name.removeprefix('world_intelligence_query_').replace('_', ' ')} through Platform policy.",
-        f"world_intelligence.{name.removeprefix('world_intelligence_query_')}",
+        f"world_intelligence.{name.removeprefix('world_intelligence_')}",
         _query_schema(),
         read_only=True,
         open_world=False,
