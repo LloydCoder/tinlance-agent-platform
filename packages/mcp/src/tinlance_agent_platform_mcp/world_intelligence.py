@@ -128,7 +128,9 @@ _QUERY_SPECS: dict[str, _QuerySpec] = {
         "world-intelligence.query_event", "world-intelligence://events", "/v1/events"
     ),
     "world_intelligence_query_world_state": _QuerySpec(
-        "world-intelligence.query_world_state", "world-intelligence://world-state", "/v1/world-state"
+        "world-intelligence.query_world_state",
+        "world-intelligence://world-state",
+        "/v1/world-state",
     ),
     "world_intelligence_query_changes": _QuerySpec(
         "world-intelligence.query_changes", "world-intelligence://changes", "/v1/changes"
@@ -151,7 +153,10 @@ _QUERY_SPECS: dict[str, _QuerySpec] = {
 WORLD_INTELLIGENCE_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = tuple(
     MCPTool(
         name=name,
-        description=f"Read World Intelligence {name.removeprefix('world_intelligence_query_').replace('_', ' ')} under Platform policy.",
+        description=(
+            "Read World Intelligence "
+            f"{name.removeprefix('world_intelligence_query_').replace('_', ' ')} under Platform policy."
+        ),
         capability=spec.capability,
         resource_pattern=spec.resource,
         action="read",
@@ -198,7 +203,9 @@ class WorldIntelligenceHTTPTransport:
             except ValueError:
                 loopback = False
             if not allow_loopback_http or not loopback:
-                raise ValueError("plain HTTP is allowed only for explicitly enabled loopback development")
+                raise ValueError(
+                    "plain HTTP is allowed only for explicitly enabled loopback development"
+                )
         if audience != "world-intelligence" or audience != audience.strip():
             raise ValueError("World Intelligence audience must be the exact registered audience")
         if not 0.1 <= timeout_seconds <= 30:
@@ -273,13 +280,15 @@ class WorldIntelligenceHTTPTransport:
             decoded = json.loads(response.body)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise WorldIntelligenceTransportError(response.status_code) from exc
-        if (
-            not isinstance(decoded, dict)
-            or not isinstance(decoded.get("items"), list)
-            or any(not isinstance(item, dict) for item in decoded["items"])
-            or not (decoded.get("next_cursor") is None or isinstance(decoded.get("next_cursor"), str))
-            or not (decoded.get("total") is None or (isinstance(decoded.get("total"), int) and not isinstance(decoded.get("total"), bool)))
-        ):
+        if not isinstance(decoded, dict) or not isinstance(decoded.get("items"), list):
+            raise WorldIntelligenceTransportError(response.status_code)
+        if any(not isinstance(item, dict) for item in decoded["items"]):
+            raise WorldIntelligenceTransportError(response.status_code)
+        next_cursor = decoded.get("next_cursor")
+        if next_cursor is not None and not isinstance(next_cursor, str):
+            raise WorldIntelligenceTransportError(response.status_code)
+        total = decoded.get("total")
+        if total is not None and (not isinstance(total, int) or isinstance(total, bool)):
             raise WorldIntelligenceTransportError(response.status_code)
         return decoded
 
@@ -300,7 +309,10 @@ def _query_schema() -> dict[str, object]:
 WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = tuple(
     MCPToolDefinition(
         name,
-        f"Read World Intelligence {name.removeprefix('world_intelligence_query_').replace('_', ' ')} through Platform policy.",
+        (
+            "Read World Intelligence "
+            f"{name.removeprefix('world_intelligence_query_').replace('_', ' ')} through Platform policy."
+        ),
         f"world_intelligence.{name.removeprefix('world_intelligence_')}",
         _query_schema(),
         read_only=True,
