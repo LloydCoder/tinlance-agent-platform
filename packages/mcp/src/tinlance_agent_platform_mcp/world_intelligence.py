@@ -150,6 +150,10 @@ _QUERY_SPECS: dict[str, _QuerySpec] = {
 }
 
 
+def _display_name(name: str) -> str:
+    return name.removeprefix("world_intelligence_query_").replace("_", " ")
+
+
 WORLD_INTELLIGENCE_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = tuple(
     MCPTool(
         name=name,
@@ -293,10 +297,6 @@ class WorldIntelligenceHTTPTransport:
         if total is not None and (not isinstance(total, int) or isinstance(total, bool)):
             raise WorldIntelligenceTransportError(response.status_code)
         return decoded
-
-
-def _display_name(name: str) -> str:
-    return name.removeprefix("world_intelligence_query_").replace("_", " ")
 
 
 def _query_schema() -> dict[str, object]:
