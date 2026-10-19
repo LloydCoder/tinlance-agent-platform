@@ -523,11 +523,7 @@ class TWIHTTPTransport:
             job_id = quote(str(arguments.get("job_id", "")), safe="")
             return f"/v1/jobs/{job_id}/evidence", None
         if tool_name == "twi_monitor_create":
-            payload = {
-                key: arguments[key]
-                for key in ("target_url", "policy")
-                if key in arguments
-            }
+            payload = {key: arguments[key] for key in ("target_url", "policy") if key in arguments}
             return "/v1/monitors", payload
         if tool_name == "twi_monitor_read":
             monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
