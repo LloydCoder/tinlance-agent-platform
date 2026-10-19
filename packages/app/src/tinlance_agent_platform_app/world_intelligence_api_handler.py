@@ -17,6 +17,7 @@ from tinlance_agent_platform_contracts import (
     TraceLineageContext,
 )
 from tinlance_agent_platform_mcp.gateway import MCPToolGateway, ToolScope
+from tinlance_agent_platform_mcp.protocol import MCPPlatformDispatcher, MCPPlatformRequest
 from tinlance_agent_platform_mcp.world_intelligence import (
     WORLD_INTELLIGENCE_OPERATION_TO_TOOL,
     WORLD_INTELLIGENCE_TOOL_REGISTRATIONS,
@@ -24,6 +25,7 @@ from tinlance_agent_platform_mcp.world_intelligence import (
 )
 
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
+_TRACEPARENT = re.compile(r"^(?!ff-)[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
 _PURPOSE = re.compile(r"^[a-z][a-z0-9._:-]{0,127}$")
 
 
@@ -55,6 +57,17 @@ class WorldIntelligenceAPIHandler:
             raise PermissionError("Platform principal is not authorized for the requested purpose")
 
         trace_id = request.trace_id
+        parent_span_id = None
+        incoming_traceparent = request.traceparent
+        if incoming_traceparent is not None:
+            match = _TRACEPARENT.fullmatch(incoming_traceparent)
+            if match is None or match.group(1) == "0" * 32 or match.group(2) == "0" * 16:
+                raise PermissionError("Platform traceparent is invalid")
+            incoming_trace_id = match.group(1)
+            if trace_id is not None and trace_id != incoming_trace_id:
+                raise PermissionError("Platform trace ID does not match traceparent")
+            trace_id = incoming_trace_id
+            parent_span_id = match.group(2)
         if trace_id is not None and not _TRACE_ID.fullmatch(trace_id):
             raise PermissionError("Platform trace ID is invalid")
         trace_id = trace_id or uuid4().hex
@@ -63,6 +76,7 @@ class WorldIntelligenceAPIHandler:
         trace_context = TraceLineageContext(
             trace_id=trace_id,
             span_id=span_id,
+            parent_span_id=parent_span_id,
             correlation_id=request.request_id,
             request_id=request.request_id,
             tenant_id=request.tenant_id,
@@ -154,3 +168,34 @@ class WorldIntelligenceAPIHandler:
             roles=string_set("roles"),
             scopes=string_set("scopes"),
         )
+
+class WorldIntelligenceMCPDispatcher:
+    """Compose the World Intelligence handler into the MCP protocol dispatch boundary."""
+
+    def __init__(
+        self,
+        *,
+        delegate: MCPPlatformDispatcher,
+        handler: WorldIntelligenceAPIHandler,
+    ) -> None:
+        self._delegate = delegate
+        self._handler = handler
+
+    def dispatch(self, request: object) -> APIResponse:
+        if not isinstance(request, MCPPlatformRequest):
+            raise TypeError("MCP dispatcher requires a normalized MCPPlatformRequest")
+        if request.operation not in WORLD_INTELLIGENCE_OPERATION_TO_TOOL:
+            return self._delegate.dispatch(request)
+        api_request = APIRequest(
+            tenant_id=request.tenant_id,
+            subject_id=request.subject_id,
+            operation=request.operation,
+            payload=dict(request.payload),
+            request_id=request.request_id,
+            trace_id=request.trace_id,
+            idempotency_key=request.idempotency_key,
+            authenticated_principal=request.authenticated_principal,
+            traceparent=request.traceparent,
+        )
+        return self._handler.handle(api_request)
+
