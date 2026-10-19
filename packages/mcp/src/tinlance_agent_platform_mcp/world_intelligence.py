@@ -321,6 +321,7 @@ WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = tuple(
     for name in _QUERY_SPECS
 )
 
+
 def with_world_intelligence_tools(
     existing: tuple[MCPToolDefinition, ...],
 ) -> tuple[MCPToolDefinition, ...]:
