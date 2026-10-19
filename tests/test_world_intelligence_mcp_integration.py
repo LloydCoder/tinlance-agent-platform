@@ -296,6 +296,21 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
 
+    def test_handler_preserves_w3c_sampling_flags(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="world_intelligence.query_entities",
+            payload={"purpose": "account_research"},
+            request_id="platform-wi-query-unsampled",
+            trace_id=TRACE_ID,
+            authenticated_principal=_principal(ENTITY_CAPABILITY, PURPOSE_SCOPE),
+            traceparent=f"00-{TRACE_ID}-0123456789abcdef-00",
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertTrue(self.issuer.calls[0]["traceparent"].endswith("-00"))
+
     def test_handler_requires_resource_capability_before_network_call(self) -> None:
         request = APIRequest(
             tenant_id="tenant-a",
