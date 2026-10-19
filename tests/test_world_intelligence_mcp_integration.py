@@ -169,6 +169,12 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
                 {"purpose": "account_research", "limit": 1001},
                 _scope(),
             )
+        with self.assertRaises(ValueError):
+            self.transport.call(
+                "world_intelligence_query_entities",
+                {"purpose": "account_research", "tenant_id": "tenant-b"},
+                _scope(),
+            )
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
 
