@@ -120,6 +120,19 @@ def _scope(*, subject_id: str = "subject-a") -> ToolScope:
     )
 
 
+class CapturingGateway:
+    def __init__(self, inner: MCPToolGateway) -> None:
+        self.inner = inner
+        self.contexts = []
+
+    def register(self, tool) -> None:
+        self.inner.register(tool)
+
+    def call(self, *args, **kwargs):
+        self.contexts.append(args[0])
+        return self.inner.call(*args, **kwargs)
+
+
 class WorldIntelligenceTransportTests(unittest.TestCase):
     def setUp(self) -> None:
         self.issuer = FakeTokenIssuer()
@@ -310,6 +323,10 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         response = self.handler.handle(request)
         self.assertEqual(response.status, "success")
         self.assertTrue(self.issuer.calls[0]["traceparent"].endswith("-00"))
+        self.assertEqual(
+            self.gateway.contexts[-1].trace_context.parent_span_id,
+            "0123456789abcdef",
+        )
 
     def test_handler_requires_resource_capability_before_network_call(self) -> None:
         request = APIRequest(
@@ -438,6 +455,10 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         child_traceparent = self.issuer.calls[0]["traceparent"]
         self.assertEqual(child_traceparent.split("-")[1], TRACE_ID)
         self.assertNotEqual(child_traceparent.split("-")[2], TRACEPARENT.split("-")[2])
+        self.assertEqual(
+            self.gateway.contexts[-1].trace_context.parent_span_id,
+            TRACEPARENT.split("-")[2],
+        )
 
     def test_handler_rejects_identity_mismatch_and_delegates_other_operations(self) -> None:
         request = APIRequest(
