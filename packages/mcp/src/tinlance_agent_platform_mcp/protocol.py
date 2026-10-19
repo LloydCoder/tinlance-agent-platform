@@ -38,8 +38,11 @@ class MCPPrincipalResolver(Protocol):
 
 
 class MCPPlatformResponse(Protocol):
-    status: str
-    payload: dict[str, object]
+    @property
+    def status(self) -> str: ...
+
+    @property
+    def payload(self) -> dict[str, object]: ...
 
 
 class MCPPlatformDispatcher(Protocol):
