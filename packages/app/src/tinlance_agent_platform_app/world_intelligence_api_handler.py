@@ -62,6 +62,7 @@ class WorldIntelligenceAPIHandler:
 
         trace_id = request.trace_id
         parent_span_id = None
+        trace_flags = "01"
         incoming_traceparent = request.traceparent
         if incoming_traceparent is not None:
             match = _TRACEPARENT.fullmatch(incoming_traceparent)
@@ -72,11 +73,12 @@ class WorldIntelligenceAPIHandler:
                 raise PermissionError("Platform trace ID does not match traceparent")
             trace_id = incoming_trace_id
             parent_span_id = match.group(2)
+            trace_flags = match.group(3)
         if trace_id is not None and not _TRACE_ID.fullmatch(trace_id):
             raise PermissionError("Platform trace ID is invalid")
         trace_id = trace_id or uuid4().hex
         span_id = uuid4().hex[:16]
-        traceparent = f"00-{trace_id}-{span_id}-01"
+        traceparent = f"00-{trace_id}-{span_id}-{trace_flags}"
         trace_context = TraceLineageContext(
             trace_id=trace_id,
             span_id=span_id,
