@@ -368,7 +368,6 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
                 http_client=self.http,
             )
 
-
     def test_evidence_export_accepts_vendor_json_media_type(self) -> None:
         self.http.response = TWIHTTPResponse(
             200,
