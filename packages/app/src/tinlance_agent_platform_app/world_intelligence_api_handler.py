@@ -17,7 +17,11 @@ from tinlance_agent_platform_contracts import (
     TraceLineageContext,
 )
 from tinlance_agent_platform_mcp.gateway import MCPToolGateway, ToolScope
-from tinlance_agent_platform_mcp.protocol import MCPPlatformDispatcher, MCPPlatformRequest
+from tinlance_agent_platform_mcp.protocol import (
+    MCPPlatformDispatcher,
+    MCPPlatformRequest,
+    MCPPlatformResponse,
+)
 from tinlance_agent_platform_mcp.world_intelligence import (
     WORLD_INTELLIGENCE_OPERATION_TO_TOOL,
     WORLD_INTELLIGENCE_TOOL_REGISTRATIONS,
@@ -182,7 +186,7 @@ class WorldIntelligenceMCPDispatcher:
         self._delegate = delegate
         self._handler = handler
 
-    def dispatch(self, request: object) -> APIResponse:
+    def dispatch(self, request: object) -> MCPPlatformResponse:
         if not isinstance(request, MCPPlatformRequest):
             raise TypeError("MCP dispatcher requires a normalized MCPPlatformRequest")
         if request.operation not in WORLD_INTELLIGENCE_OPERATION_TO_TOOL:
