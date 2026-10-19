@@ -20,6 +20,7 @@ from .world_intelligence import (
     WorldIntelligenceTokenIssuer,
     WorldIntelligenceTransportError,
     register_world_intelligence_tools,
+    with_world_intelligence_tools,
 )
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "WorldIntelligenceTokenIssuer",
     "WorldIntelligenceTransportError",
     "register_world_intelligence_tools",
+    "with_world_intelligence_tools",
     "TWITransportError",
     "compute_twi_intent_fingerprint",
     "register_twi_tools",

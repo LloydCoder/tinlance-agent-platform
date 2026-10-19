@@ -1,20 +1,26 @@
 from __future__ import annotations
 
+import json
 import unittest
 from collections.abc import Mapping
 from typing import Any
 
-from tinlance_agent_platform_app.world_intelligence_api_handler import WorldIntelligenceAPIHandler
+from tinlance_agent_platform_app.world_intelligence_api_handler import (
+    WorldIntelligenceAPIHandler,
+    WorldIntelligenceMCPDispatcher,
+)
 
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_contracts import Principal
 from tinlance_agent_platform_mcp import (
+    MCPProtocolService,
     MCPToolGateway,
     ToolScope,
     WorldIntelligenceHTTPResponse,
     WorldIntelligenceHTTPTransport,
     WorldIntelligenceTransportError,
     register_world_intelligence_tools,
+    with_world_intelligence_tools,
 )
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"
@@ -112,6 +118,19 @@ def _scope(*, subject_id: str = "subject-a") -> ToolScope:
         request_id="platform-wi-query-0001",
         traceparent=TRACEPARENT,
     )
+
+
+class CapturingGateway:
+    def __init__(self, inner: MCPToolGateway) -> None:
+        self.inner = inner
+        self.contexts = []
+
+    def register(self, tool) -> None:
+        self.inner.register(tool)
+
+    def call(self, *args, **kwargs):
+        self.contexts.append(args[0])
+        return self.inner.call(*args, **kwargs)
 
 
 class WorldIntelligenceTransportTests(unittest.TestCase):
@@ -259,7 +278,7 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.issuer = FakeTokenIssuer()
         self.http = FakeHTTPClient()
-        self.gateway = MCPToolGateway(
+        raw_gateway = MCPToolGateway(
             WorldIntelligenceHTTPTransport(
                 base_url="https://world-intelligence.internal",
                 audience="world-intelligence",
@@ -267,6 +286,7 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
                 http_client=self.http,
             )
         )
+        self.gateway = CapturingGateway(raw_gateway)
         register_world_intelligence_tools(self.gateway)
         self.delegate = FakeDelegate()
         self.handler = WorldIntelligenceAPIHandler(
@@ -289,6 +309,25 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
             self.handler.handle(request)
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
+
+    def test_handler_preserves_w3c_sampling_flags(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="world_intelligence.query_entities",
+            payload={"purpose": "account_research"},
+            request_id="platform-wi-query-unsampled",
+            trace_id=TRACE_ID,
+            authenticated_principal=_principal(ENTITY_CAPABILITY, PURPOSE_SCOPE),
+            traceparent=f"00-{TRACE_ID}-0123456789abcdef-00",
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertTrue(self.issuer.calls[0]["traceparent"].endswith("-00"))
+        self.assertEqual(
+            self.gateway.contexts[-1].trace_context.parent_span_id,
+            "0123456789abcdef",
+        )
 
     def test_handler_requires_resource_capability_before_network_call(self) -> None:
         request = APIRequest(
@@ -319,6 +358,108 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         self.assertEqual(response.status, "success")
         self.assertEqual(response.payload["items"], [{"id": "entity-1"}])
         self.assertEqual(len(self.http.calls), 1)
+
+    def test_mcp_protocol_lists_and_dispatches_world_intelligence_tools(self) -> None:
+        class Resolver:
+            def resolve(self, token):
+                if token != "valid-user-token":
+                    raise PermissionError("invalid token")
+                return _principal(ENTITY_CAPABILITY, PURPOSE_SCOPE)
+
+        class RateLimiter:
+            def allow(self, _tenant_id, _subject_id):
+                return True
+
+        class ExistingDispatcher:
+            def dispatch(self, request):
+                return APIResponse("success", {"delegated": request.operation})
+
+        dispatcher = WorldIntelligenceMCPDispatcher(
+            delegate=ExistingDispatcher(),
+            handler=self.handler,
+        )
+        service = MCPProtocolService(
+            dispatcher,
+            Resolver(),
+            with_world_intelligence_tools(()),
+            allowed_origins=(),
+            rate_limiter=RateLimiter(),
+        )
+        meta = {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {
+                "name": "tinlance-query-test",
+                "version": "1.0.0",
+            },
+            "io.modelcontextprotocol/clientCapabilities": {},
+        }
+
+        listed = service.handle(
+            {
+                "content-type": "application/json",
+                "authorization": "Bearer valid-user-token",
+                "mcp-protocol-version": "2026-07-28",
+                "mcp-method": "tools/list",
+            },
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": "list-1",
+                    "method": "tools/list",
+                    "params": {"_meta": meta},
+                }
+            ).encode(),
+        )
+        listed_payload = json.loads(listed.body)
+        names = {tool["name"] for tool in listed_payload["result"]["tools"]}
+        self.assertIn("world_intelligence_query_entities", names)
+        self.assertIn("world_intelligence_query_regions", names)
+        region_tool = next(
+            tool
+            for tool in listed_payload["result"]["tools"]
+            if tool["name"] == "world_intelligence_query_regions"
+        )
+        self.assertTrue(region_tool["annotations"]["readOnlyHint"])
+        self.assertFalse(region_tool["annotations"]["destructiveHint"])
+
+        called = service.handle(
+            {
+                "content-type": "application/json",
+                "authorization": "Bearer valid-user-token",
+                "mcp-protocol-version": "2026-07-28",
+                "mcp-method": "tools/call",
+                "mcp-name": "world_intelligence_query_entities",
+                "traceparent": TRACEPARENT,
+            },
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": "call-1",
+                    "method": "tools/call",
+                    "params": {
+                        "_meta": meta,
+                        "name": "world_intelligence_query_entities",
+                        "arguments": {
+                            "purpose": "account_research",
+                            "limit": 10,
+                            "cursor": 0,
+                        },
+                    },
+                }
+            ).encode(),
+        )
+        called_payload = json.loads(called.body)
+        self.assertEqual(called.status_code, 200)
+        self.assertFalse(called_payload["result"]["isError"])
+        self.assertEqual(called_payload["result"]["resultType"], "complete")
+        self.assertEqual(len(self.http.calls), 1)
+        child_traceparent = self.issuer.calls[0]["traceparent"]
+        self.assertEqual(child_traceparent.split("-")[1], TRACE_ID)
+        self.assertNotEqual(child_traceparent.split("-")[2], TRACEPARENT.split("-")[2])
+        self.assertEqual(
+            self.gateway.contexts[-1].trace_context.parent_span_id,
+            TRACEPARENT.split("-")[2],
+        )
 
     def test_handler_rejects_identity_mismatch_and_delegates_other_operations(self) -> None:
         request = APIRequest(

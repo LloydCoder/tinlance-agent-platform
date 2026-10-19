@@ -321,6 +321,19 @@ WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = tuple(
     for name in _QUERY_SPECS
 )
 
+
+def with_world_intelligence_tools(
+    existing: tuple[MCPToolDefinition, ...],
+) -> tuple[MCPToolDefinition, ...]:
+    """Return a protocol tool set with World Intelligence tools, rejecting collisions."""
+    combined = (*existing, *WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS)
+    names = [tool.name for tool in combined]
+    operations = [tool.operation for tool in combined]
+    if len(names) != len(set(names)) or len(operations) != len(set(operations)):
+        raise ValueError("MCP tool names and operations must be unique")
+    return combined
+
+
 WORLD_INTELLIGENCE_OPERATION_TO_TOOL: dict[str, str] = {
     definition.operation: definition.name for definition in WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS
 }

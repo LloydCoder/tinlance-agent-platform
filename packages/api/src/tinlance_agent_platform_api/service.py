@@ -27,6 +27,7 @@ class APIRequest:
     trace_id: str | None = None
     idempotency_key: str | None = None
     authenticated_principal: object | None = None
+    traceparent: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
