@@ -94,7 +94,7 @@ class TWIAPIHandler:
         )
         approval_id: UUID | None = None
         intent_fingerprint: str | None = None
-        if tool_name == "twi_world_intelligence_export":
+        if spec.requires_approval:
             try:
                 run_id = UUID(str(arguments.pop("run_id")))
                 approval_id = UUID(str(arguments.pop("approval_id")))
@@ -114,7 +114,7 @@ class TWIAPIHandler:
             )
             if not hmac.compare_digest(declared_fingerprint, intent_fingerprint):
                 raise PermissionError(
-                    "approval intent fingerprint does not match the requested export"
+                    "approval intent fingerprint does not match the requested operation"
                 )
 
         scope = ToolScope(

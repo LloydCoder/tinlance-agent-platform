@@ -284,6 +284,98 @@ class TWIAPIHandlerTests(unittest.TestCase):
             {"run_id", "approval_id", "intent_fingerprint", "idempotency_key"} <= required
         )
 
+    def test_evidence_export_operation_uses_scoped_platform_token(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="twi.jobs.export_evidence",
+            payload={"job_id": "job-0000000000000001"},
+            request_id="platform-twi-evidence-0001",
+            trace_id="0123456789abcdef0123456789abcdef",
+            authenticated_principal=_principal("web.evidence.export"),
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:evidence:export"}))
+        self.assertEqual(self.http.calls[0]["method"], "GET")
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/jobs/job-0000000000000001/evidence",
+        )
+        self.assertIsNone(self.http.calls[0]["body"])
+
+    def test_monitor_delete_requires_exact_intent_bound_human_approval(self) -> None:
+        run_id = uuid4()
+        approval_id = uuid4()
+        business_arguments: dict[str, object] = {
+            "monitor_id": "monitor-0001",
+            "idempotency_key": "monitor-delete-idempotency-0001",
+        }
+        fingerprint = compute_twi_intent_fingerprint(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            run_id=str(run_id),
+            tool_name="twi_monitor_delete",
+            arguments=business_arguments,
+        )
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="twi.monitors.delete",
+            payload={
+                **business_arguments,
+                "run_id": str(run_id),
+                "approval_id": str(approval_id),
+                "intent_fingerprint": fingerprint,
+            },
+            request_id="platform-twi-monitor-delete-0001",
+            trace_id="0123456789abcdef0123456789abcdef",
+            idempotency_key="monitor-delete-idempotency-0001",
+            authenticated_principal=_principal("web.monitor.delete"),
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertEqual(len(self.approvals.calls), 1)
+        self.assertEqual(self.approvals.calls[0]["approval_id"], approval_id)
+        self.assertEqual(self.approvals.calls[0]["run_id"], run_id)
+        self.assertEqual(self.approvals.calls[0]["action"], "delete")
+        self.assertEqual(self.approvals.calls[0]["resource"], "twi://monitors/{monitor_id}")
+        self.assertEqual(self.approvals.calls[0]["intent_fingerprint"], fingerprint)
+        self.assertEqual(self.http.calls[0]["method"], "DELETE")
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/monitors/monitor-0001",
+        )
+
+    def test_remote_mcp_catalog_registers_all_twi_operations(self) -> None:
+        names = {tool.name for tool in TWI_MCP_TOOL_DEFINITIONS}
+        self.assertEqual(
+            names,
+            {
+                "twi_search",
+                "twi_fetch",
+                "twi_browser_navigate",
+                "twi_job_read",
+                "twi_job_cancel",
+                "twi_research_verify",
+                "twi_world_intelligence_export",
+                "twi_world_intelligence_export_status",
+                "twi_evidence_export",
+                "twi_monitor_create",
+                "twi_monitor_read",
+                "twi_monitor_run",
+                "twi_monitor_pause",
+                "twi_monitor_resume",
+                "twi_monitor_delete",
+            },
+        )
+        delete = next(
+            tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_monitor_delete"
+        )
+        self.assertTrue(delete.consequential)
+        self.assertTrue(delete.destructive)
+        self.assertEqual(delete.idempotency_argument, "idempotency_key")
+
 
 if __name__ == "__main__":
     unittest.main()

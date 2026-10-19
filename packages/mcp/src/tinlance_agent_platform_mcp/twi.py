@@ -199,6 +199,67 @@ _TOOL_SPECS: dict[str, _ToolSpec] = {
         method="GET",
         route="/v1/integrations/world-intelligence/exports/{event_id}",
     ),
+    "twi_evidence_export": _ToolSpec(
+        capability="web.evidence.export",
+        action="read",
+        resource_pattern="twi://jobs/{job_id}/evidence",
+        required_scope="twi:evidence:export",
+        method="GET",
+        route="/v1/jobs/{job_id}/evidence",
+    ),
+    "twi_monitor_create": _ToolSpec(
+        capability="web.monitor.create",
+        action="create",
+        resource_pattern="web://monitors/*",
+        required_scope="twi:monitors:write",
+        method="POST",
+        route="/v1/monitors",
+        idempotency_argument="idempotency_key",
+    ),
+    "twi_monitor_read": _ToolSpec(
+        capability="web.monitor.read",
+        action="read",
+        resource_pattern="twi://monitors/{monitor_id}",
+        required_scope="twi:monitors:read",
+        method="GET",
+        route="/v1/monitors/{monitor_id}",
+    ),
+    "twi_monitor_run": _ToolSpec(
+        capability="web.monitor.run",
+        action="submit",
+        resource_pattern="twi://monitors/{monitor_id}/runs",
+        required_scope="twi:monitors:write",
+        method="POST",
+        route="/v1/monitors/{monitor_id}/runs",
+        idempotency_argument="idempotency_key",
+    ),
+    "twi_monitor_pause": _ToolSpec(
+        capability="web.monitor.pause",
+        action="pause",
+        resource_pattern="twi://monitors/{monitor_id}",
+        required_scope="twi:monitors:write",
+        method="POST",
+        route="/v1/monitors/{monitor_id}/pause",
+    ),
+    "twi_monitor_resume": _ToolSpec(
+        capability="web.monitor.resume",
+        action="resume",
+        resource_pattern="twi://monitors/{monitor_id}",
+        required_scope="twi:monitors:write",
+        method="POST",
+        route="/v1/monitors/{monitor_id}/resume",
+    ),
+    "twi_monitor_delete": _ToolSpec(
+        capability="web.monitor.delete",
+        action="delete",
+        resource_pattern="twi://monitors/{monitor_id}",
+        required_scope="twi:monitors:delete",
+        method="DELETE",
+        route="/v1/monitors/{monitor_id}",
+        idempotency_argument="idempotency_key",
+        risk=RiskTier.HIGH,
+        requires_approval=True,
+    ),
 }
 
 
@@ -253,6 +314,41 @@ TWI_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = tuple(
             "twi_world_intelligence_export_status",
             "Read the status of a source-evidence export owned by the authenticated subject.",
             _TOOL_SPECS["twi_world_intelligence_export_status"],
+        ),
+        (
+            "twi_evidence_export",
+            "Export integrity-checked bytes and provenance for a successful fetch job.",
+            _TOOL_SPECS["twi_evidence_export"],
+        ),
+        (
+            "twi_monitor_create",
+            "Create a tenant-scoped monitor for a policy-checked public web URL.",
+            _TOOL_SPECS["twi_monitor_create"],
+        ),
+        (
+            "twi_monitor_read",
+            "Read monitor state within the authenticated tenant and subject scope.",
+            _TOOL_SPECS["twi_monitor_read"],
+        ),
+        (
+            "twi_monitor_run",
+            "Enqueue one idempotent monitor capture; recurrence remains with Agent OS.",
+            _TOOL_SPECS["twi_monitor_run"],
+        ),
+        (
+            "twi_monitor_pause",
+            "Pause future monitor run enqueues while accepted work drains.",
+            _TOOL_SPECS["twi_monitor_pause"],
+        ),
+        (
+            "twi_monitor_resume",
+            "Resume a paused monitor so Agent OS may enqueue future runs.",
+            _TOOL_SPECS["twi_monitor_resume"],
+        ),
+        (
+            "twi_monitor_delete",
+            "Redact and tombstone a monitor after bound human approval.",
+            _TOOL_SPECS["twi_monitor_delete"],
         ),
     )
 )
@@ -377,7 +473,7 @@ class TWIHTTPTransport:
         if response.status_code == 204 or not response.body:
             return {}
         content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
-        if content_type != "application/json":
+        if content_type != "application/json" and not content_type.endswith("+json"):
             raise TWITransportError(response.status_code)
         try:
             decoded = json.loads(response.body)
@@ -423,11 +519,30 @@ class TWIHTTPTransport:
                 f"/v1/integrations/world-intelligence/exports/{quote(str(event_id), safe='')}",
                 None,
             )
+        if tool_name == "twi_evidence_export":
+            job_id = quote(str(arguments.get("job_id", "")), safe="")
+            return f"/v1/jobs/{job_id}/evidence", None
+        if tool_name == "twi_monitor_create":
+            payload = {key: arguments[key] for key in ("target_url", "policy") if key in arguments}
+            return "/v1/monitors", payload
+        if tool_name == "twi_monitor_read":
+            monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
+            return f"/v1/monitors/{monitor_id}", None
+        if tool_name == "twi_monitor_run":
+            monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
+            return f"/v1/monitors/{monitor_id}/runs", None
+        if tool_name in {"twi_monitor_pause", "twi_monitor_resume"}:
+            monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
+            action = "pause" if tool_name == "twi_monitor_pause" else "resume"
+            return f"/v1/monitors/{monitor_id}/{action}", None
+        if tool_name == "twi_monitor_delete":
+            monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
+            return f"/v1/monitors/{monitor_id}", None
         raise LookupError("TWI tool is not registered")
 
 
-# The remote MCP protocol server uses these schemas and operation names. Consequential
-# export includes Platform approval binding fields; TWIHTTPTransport strips them before HTTP.
+# The remote MCP protocol server uses these schemas and operation names. Approval-gated
+# operations include Platform-only binding fields; TWIHTTPTransport strips them before HTTP.
 _TWI_SEARCH_SCHEMA: dict[str, object] = {
     "type": "object",
     "additionalProperties": False,
@@ -534,6 +649,59 @@ _TWI_EXPORT_STATUS_SCHEMA: dict[str, object] = {
     "required": ["event_id"],
     "properties": {"event_id": {"type": "string", "format": "uuid"}},
 }
+_TWI_EVIDENCE_EXPORT_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["job_id"],
+    "properties": {"job_id": {"type": "string", "minLength": 1, "maxLength": 64}},
+}
+_TWI_MONITOR_CREATE_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["target_url", "idempotency_key"],
+    "properties": {
+        "target_url": {"type": "string", "format": "uri", "maxLength": 4096},
+        "policy": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"max_bytes": {"type": "integer", "minimum": 1}},
+        },
+        "idempotency_key": {"type": "string", "minLength": 16, "maxLength": 256},
+    },
+}
+_TWI_MONITOR_ID_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["monitor_id"],
+    "properties": {"monitor_id": {"type": "string", "minLength": 1, "maxLength": 64}},
+}
+_TWI_MONITOR_RUN_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["monitor_id", "idempotency_key"],
+    "properties": {
+        "monitor_id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "idempotency_key": {"type": "string", "minLength": 16, "maxLength": 256},
+    },
+}
+_TWI_MONITOR_DELETE_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "monitor_id",
+        "idempotency_key",
+        "run_id",
+        "approval_id",
+        "intent_fingerprint",
+    ],
+    "properties": {
+        "monitor_id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "idempotency_key": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{16,128}$"},
+        "run_id": {"type": "string", "format": "uuid"},
+        "approval_id": {"type": "string", "format": "uuid"},
+        "intent_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    },
+}
 
 TWI_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = (
     MCPToolDefinition(
@@ -598,6 +766,63 @@ TWI_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = (
         "twi.world_intelligence.export_status",
         _TWI_EXPORT_STATUS_SCHEMA,
         read_only=True,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_evidence_export",
+        "Export integrity-checked acquisition bytes and provenance for a successful fetch job. "
+        "MCP responses are bounded to 1 MiB; larger packages require the authenticated HTTP API.",
+        "twi.jobs.export_evidence",
+        _TWI_EVIDENCE_EXPORT_SCHEMA,
+        read_only=True,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_monitor_create",
+        "Create a tenant-scoped monitor for a policy-checked public web URL.",
+        "twi.monitors.create",
+        _TWI_MONITOR_CREATE_SCHEMA,
+        idempotency_argument="idempotency_key",
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_monitor_read",
+        "Read monitor state within the authenticated tenant and subject scope.",
+        "twi.monitors.read",
+        _TWI_MONITOR_ID_SCHEMA,
+        read_only=True,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_monitor_run",
+        "Enqueue one idempotent monitor capture; recurrence remains with Agent OS.",
+        "twi.monitors.run",
+        _TWI_MONITOR_RUN_SCHEMA,
+        idempotency_argument="idempotency_key",
+        open_world=True,
+    ),
+    MCPToolDefinition(
+        "twi_monitor_pause",
+        "Pause future monitor run enqueues while accepted work drains.",
+        "twi.monitors.pause",
+        _TWI_MONITOR_ID_SCHEMA,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_monitor_resume",
+        "Resume a paused monitor so Agent OS may enqueue future runs.",
+        "twi.monitors.resume",
+        _TWI_MONITOR_ID_SCHEMA,
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_monitor_delete",
+        "Redact and tombstone a monitor after bound human approval.",
+        "twi.monitors.delete",
+        _TWI_MONITOR_DELETE_SCHEMA,
+        consequential=True,
+        destructive=True,
+        idempotency_argument="idempotency_key",
         open_world=False,
     ),
 )

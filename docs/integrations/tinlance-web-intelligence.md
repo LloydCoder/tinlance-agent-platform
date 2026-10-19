@@ -30,12 +30,19 @@ a static bearer token or caller-supplied identity claims are not an acceptable p
 | `twi_browser_navigate` | `POST /v1/jobs` (`kind=browser`) | `twi:browser` | Isolated browser policy, egress controls, resource budgets |
 | `twi_job_read` | `GET /v1/jobs/{job_id}` | `twi:jobs:read` | Tenant/subject-scoped read |
 | `twi_job_cancel` | `POST /v1/jobs/{job_id}/cancel` | `twi:jobs:cancel` | Authenticated cancellation of the caller's job |
+| `twi_evidence_export` | `GET /v1/jobs/{job_id}/evidence` | `twi:evidence:export` | Tenant/subject-scoped evidence export; MCP response is bounded to 1 MiB, larger packages use the authenticated HTTP API |
+| `twi_monitor_create` | `POST /v1/monitors` | `twi:monitors:write` | Idempotent monitor creation using TWI URL safety policy |
+| `twi_monitor_read` | `GET /v1/monitors/{monitor_id}` | `twi:monitors:read` | Tenant/subject-scoped monitor read |
+| `twi_monitor_run` | `POST /v1/monitors/{monitor_id}/runs` | `twi:monitors:write` | Explicit idempotent capture enqueue; Agent OS owns recurrence |
+| `twi_monitor_pause` | `POST /v1/monitors/{monitor_id}/pause` | `twi:monitors:write` | Pause future run enqueues |
+| `twi_monitor_resume` | `POST /v1/monitors/{monitor_id}/resume` | `twi:monitors:write` | Resume a paused monitor |
+| `twi_monitor_delete` | `DELETE /v1/monitors/{monitor_id}` | `twi:monitors:delete` | Destructive redaction/tombstone; high-risk, exact-intent human approval and idempotency key required |
 | `twi_research_verify` | `POST /v1/research/verify` | `twi:research:verify` | Verifies captured-source provenance and exact excerpt matches; not factual truth |
 | `twi_world_intelligence_export` | `POST /v1/integrations/world-intelligence/exports` | `twi:observations:export` | High-risk consequential operation; requires a bound, one-time human approval and idempotency key |
 | `twi_world_intelligence_export_status` | `GET /v1/integrations/world-intelligence/exports/{event_id}` | `twi:observations:export:read` | Tenant/subject-scoped read |
 
 The MCP tool's Platform capability and risk metadata are authoritative. A caller cannot downgrade a
-registered high-risk export to low risk. Export is denied until the approval verifier validates the
+registered high-risk export or monitor deletion to low risk. Export is denied until the approval verifier validates the
 approval against the exact tenant, run, action, resource, and intent fingerprint.
 
 ## Approval binding for source-evidence export
@@ -73,3 +80,9 @@ The Platform tests cover token audience/scope minting, tenant and subject bindin
 strict export intent fingerprints, high-risk approval enforcement, idempotency, redirect rejection,
 and fail-closed transport errors. These are reference integration tests; they do not by themselves
 prove that a production deployment has been wired or deployed.
+
+## Monitor and evidence-export boundaries
+
+Monitor operations are explicit requests only. TWI stores monitor definitions and bounded change observations; Agent OS owns recurrence. Monitor deletion requires its own twi:monitors:delete scope and a one-time approval bound to the exact tenant, subject, run, operation, resource and argument fingerprint. Pause/resume do not delete monitor data.
+
+The evidence-export endpoint returns application/vnd.tinlance.twi-evidence+json. The Platform MCP transport intentionally enforces the protocol's 1 MiB response ceiling. Packages larger than that ceiling fail closed through MCP and must be retrieved using the authenticated TWI HTTP API with the same tenant/subject scope; do not raise the MCP response limit to accommodate arbitrary artifact sizes.
