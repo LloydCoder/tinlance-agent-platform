@@ -396,6 +396,13 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         names = {tool["name"] for tool in listed_payload["result"]["tools"]}
         self.assertIn("world_intelligence_query_entities", names)
         self.assertIn("world_intelligence_query_regions", names)
+        region_tool = next(
+            tool
+            for tool in listed_payload["result"]["tools"]
+            if tool["name"] == "world_intelligence_query_regions"
+        )
+        self.assertTrue(region_tool["annotations"]["readOnlyHint"])
+        self.assertFalse(region_tool["annotations"]["destructiveHint"])
 
         called = service.handle(
             {
