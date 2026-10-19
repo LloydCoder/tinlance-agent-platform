@@ -11,6 +11,16 @@ from .twi import (
     compute_twi_intent_fingerprint,
     register_twi_tools,
 )
+from .world_intelligence import (
+    WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS,
+    WORLD_INTELLIGENCE_OPERATION_TO_TOOL,
+    WORLD_INTELLIGENCE_TOOL_REGISTRATIONS,
+    WorldIntelligenceHTTPResponse,
+    WorldIntelligenceHTTPTransport,
+    WorldIntelligenceTokenIssuer,
+    WorldIntelligenceTransportError,
+    register_world_intelligence_tools,
+)
 
 __all__ = [
     "MCPExecutionPermit",
@@ -26,6 +36,14 @@ __all__ = [
     "TWI_OPERATION_TO_TOOL",
     "TWIServiceTokenIssuer",
     "TWI_TOOL_REGISTRATIONS",
+    "WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS",
+    "WORLD_INTELLIGENCE_OPERATION_TO_TOOL",
+    "WORLD_INTELLIGENCE_TOOL_REGISTRATIONS",
+    "WorldIntelligenceHTTPResponse",
+    "WorldIntelligenceHTTPTransport",
+    "WorldIntelligenceTokenIssuer",
+    "WorldIntelligenceTransportError",
+    "register_world_intelligence_tools",
     "TWITransportError",
     "compute_twi_intent_fingerprint",
     "register_twi_tools",
