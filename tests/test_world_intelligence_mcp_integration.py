@@ -278,7 +278,7 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.issuer = FakeTokenIssuer()
         self.http = FakeHTTPClient()
-        self.gateway = MCPToolGateway(
+        raw_gateway = MCPToolGateway(
             WorldIntelligenceHTTPTransport(
                 base_url="https://world-intelligence.internal",
                 audience="world-intelligence",
@@ -286,6 +286,7 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
                 http_client=self.http,
             )
         )
+        self.gateway = CapturingGateway(raw_gateway)
         register_world_intelligence_tools(self.gateway)
         self.delegate = FakeDelegate()
         self.handler = WorldIntelligenceAPIHandler(
