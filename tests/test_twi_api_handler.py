@@ -351,7 +351,9 @@ class TWIAPIHandlerTests(unittest.TestCase):
                 "twi_monitor_delete",
             },
         )
-        delete = next(tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_monitor_delete")
+        delete = next(
+            tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_monitor_delete"
+        )
         self.assertTrue(delete.consequential)
         self.assertTrue(delete.destructive)
         self.assertEqual(delete.idempotency_argument, "idempotency_key")
