@@ -22,6 +22,7 @@ class MCPPlatformRequest:
     trace_id: str | None = None
     idempotency_key: str | None = None
     authenticated_principal: object | None = None
+    traceparent: str | None = None
 
 
 class MCPAuthenticatedPrincipal(Protocol):
@@ -504,6 +505,7 @@ class MCPProtocolService:
                     trace_id,
                     idempotency_key,
                     principal,
+                    traceparent=traceparent,
                 )
                 response = self._api.dispatch(request)
                 result = {
