@@ -155,7 +155,7 @@ WORLD_INTELLIGENCE_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = tuple(
         name=name,
         description=(
             "Read World Intelligence "
-            f"{name.removeprefix('world_intelligence_query_').replace('_', ' ')} under Platform policy."
+            f"{_display_name(name)} under Platform policy."
         ),
         capability=spec.capability,
         resource_pattern=spec.resource,
@@ -293,6 +293,10 @@ class WorldIntelligenceHTTPTransport:
         return decoded
 
 
+def _display_name(name: str) -> str:
+    return name.removeprefix("world_intelligence_query_").replace("_", " ")
+
+
 def _query_schema() -> dict[str, object]:
     return {
         "type": "object",
@@ -311,7 +315,7 @@ WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = tuple(
         name,
         (
             "Read World Intelligence "
-            f"{name.removeprefix('world_intelligence_query_').replace('_', ' ')} through Platform policy."
+            f"{_display_name(name)} through Platform policy."
         ),
         f"world_intelligence.{name.removeprefix('world_intelligence_')}",
         _query_schema(),
