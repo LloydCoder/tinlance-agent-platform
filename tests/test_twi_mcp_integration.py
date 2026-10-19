@@ -125,12 +125,14 @@ class ApprovedIntent:
         )
 
 
-def _context(*, subject_id: str = "subject-a") -> RequestContext:
+def _context(
+    *, subject_id: str = "subject-a", scopes: frozenset[str] | None = None
+) -> RequestContext:
     principal = Principal(
         subject_id=subject_id,
         principal_type="user",
         tenant_id="tenant-a",
-        scopes=frozenset({EXPORT_CAPABILITY}),
+        scopes=scopes if scopes is not None else frozenset({EXPORT_CAPABILITY}),
     )
     trace_context = TraceLineageContext(
         trace_id="0123456789abcdef0123456789abcdef",
@@ -151,24 +153,37 @@ def _context(*, subject_id: str = "subject-a") -> RequestContext:
     )
 
 
-def _scope(*, subject_id: str = "subject-a", request_id: str = "twi-request-0001") -> ToolScope:
+def _scope(
+    *,
+    subject_id: str = "subject-a",
+    request_id: str = "twi-request-0001",
+    capability: str = EXPORT_CAPABILITY,
+    resource: str = EXPORT_RESOURCE,
+) -> ToolScope:
     return ToolScope(
         tenant_id="tenant-a",
-        capability=EXPORT_CAPABILITY,
-        resource=EXPORT_RESOURCE,
+        capability=capability,
+        resource=resource,
         subject_id=subject_id,
         request_id=request_id,
         traceparent=TRACEPARENT,
     )
 
 
-def _capability_request(*, risk: RiskTier = RiskTier.HIGH) -> CapabilityRequest:
+def _capability_request(
+    *,
+    risk: RiskTier = RiskTier.HIGH,
+    capability: str = EXPORT_CAPABILITY,
+    action: str = "submit",
+    resource: str = EXPORT_RESOURCE,
+    reversibility: Reversibility = Reversibility.REVERSIBLE,
+) -> CapabilityRequest:
     return CapabilityRequest(
-        action="submit",
-        resource=EXPORT_RESOURCE,
-        capabilities=frozenset({EXPORT_CAPABILITY}),
+        action=action,
+        resource=resource,
+        capabilities=frozenset({capability}),
         risk=risk,
-        reversibility=Reversibility.REVERSIBLE,
+        reversibility=reversibility,
         data_class=DataClass.PUBLIC,
         blast_radius="single",
     )
@@ -204,7 +219,27 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         self.assertTrue(export.requires_approval)
         self.assertEqual(export.risk, RiskTier.HIGH)
         self.assertEqual(export.idempotency_argument, "idempotency_key")
-        self.assertEqual(len(TWI_TOOL_REGISTRATIONS), 8)
+        self.assertEqual(len(TWI_TOOL_REGISTRATIONS), 15)
+        self.assertEqual(
+            {tool.name for tool in TWI_TOOL_REGISTRATIONS},
+            {
+                "twi_search",
+                "twi_fetch",
+                "twi_browser_navigate",
+                "twi_job_read",
+                "twi_job_cancel",
+                "twi_research_verify",
+                "twi_world_intelligence_export",
+                "twi_world_intelligence_export_status",
+                "twi_evidence_export",
+                "twi_monitor_create",
+                "twi_monitor_read",
+                "twi_monitor_run",
+                "twi_monitor_pause",
+                "twi_monitor_resume",
+                "twi_monitor_delete",
+            },
+        )
 
     def test_export_is_blocked_without_human_approval_before_network_call(self) -> None:
         gateway = MCPToolGateway(self.transport)
@@ -332,6 +367,154 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
                 token_issuer=self.issuer,
                 http_client=self.http,
             )
+
+
+    def test_evidence_export_accepts_vendor_json_media_type(self) -> None:
+        self.http.response = TWIHTTPResponse(
+            200,
+            {"content-type": "application/vnd.tinlance.twi-evidence+json"},
+            json.dumps({"schema_version": "1.0.0", "content_sha256": "a" * 64}).encode(),
+        )
+        result = self.transport.call(
+            "twi_evidence_export",
+            {"job_id": "job-0000000000000001"},
+            ToolScope(
+                tenant_id="tenant-a",
+                capability="web.evidence.export",
+                resource="twi://jobs/{job_id}/evidence",
+                subject_id="subject-a",
+                request_id="twi-request-0002",
+            ),
+        )
+        self.assertEqual(result["schema_version"], "1.0.0")
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/jobs/job-0000000000000001/evidence",
+        )
+        self.assertEqual(self.http.calls[0]["method"], "GET")
+
+    def test_monitor_operations_map_to_tenant_scoped_api_routes(self) -> None:
+        cases = (
+            (
+                "twi_monitor_create",
+                {
+                    "target_url": "https://example.com",
+                    "policy": {"max_bytes": 4096},
+                    "idempotency_key": "monitor-create-idempotency-0001",
+                },
+                "web.monitor.create",
+                "web://monitors/*",
+                "POST",
+                "/v1/monitors",
+                True,
+            ),
+            (
+                "twi_monitor_read",
+                {"monitor_id": "monitor-0001"},
+                "web.monitor.read",
+                "twi://monitors/{monitor_id}",
+                "GET",
+                "/v1/monitors/monitor-0001",
+                False,
+            ),
+            (
+                "twi_monitor_run",
+                {
+                    "monitor_id": "monitor-0001",
+                    "idempotency_key": "monitor-run-idempotency-0001",
+                },
+                "web.monitor.run",
+                "twi://monitors/{monitor_id}/runs",
+                "POST",
+                "/v1/monitors/monitor-0001/runs",
+                True,
+            ),
+            (
+                "twi_monitor_pause",
+                {"monitor_id": "monitor-0001"},
+                "web.monitor.pause",
+                "twi://monitors/{monitor_id}",
+                "POST",
+                "/v1/monitors/monitor-0001/pause",
+                False,
+            ),
+            (
+                "twi_monitor_resume",
+                {"monitor_id": "monitor-0001"},
+                "web.monitor.resume",
+                "twi://monitors/{monitor_id}",
+                "POST",
+                "/v1/monitors/monitor-0001/resume",
+                False,
+            ),
+            (
+                "twi_monitor_delete",
+                {
+                    "monitor_id": "monitor-0001",
+                    "idempotency_key": "monitor-delete-idempotency-0001",
+                },
+                "web.monitor.delete",
+                "twi://monitors/{monitor_id}",
+                "DELETE",
+                "/v1/monitors/monitor-0001",
+                True,
+            ),
+        )
+        for name, arguments, capability, resource, method, path, has_key in cases:
+            with self.subTest(tool=name):
+                result = self.transport.call(
+                    name,
+                    arguments,
+                    ToolScope(
+                        tenant_id="tenant-a",
+                        capability=capability,
+                        resource=resource,
+                        subject_id="subject-a",
+                        request_id="twi-request-0003",
+                    ),
+                )
+                self.assertIsInstance(result, dict)
+                request = self.http.calls[-1]
+                self.assertEqual(request["method"], method)
+                self.assertEqual(request["url"], f"https://twi.internal{path}")
+                if has_key:
+                    self.assertIn("Idempotency-Key", request["headers"])
+
+    def test_monitor_delete_is_approval_gated_before_network_call(self) -> None:
+        gateway = MCPToolGateway(self.transport)
+        register_twi_tools(gateway)
+        capability = "web.monitor.delete"
+        resource = "twi://monitors/{monitor_id}"
+        arguments = {
+            "monitor_id": "monitor-0001",
+            "idempotency_key": "monitor-delete-idempotency-0001",
+        }
+        context = _context(scopes=frozenset({capability}))
+        scope = _scope(capability=capability, resource=resource)
+        request = _capability_request(
+            capability=capability,
+            action="delete",
+            resource=resource,
+            reversibility=Reversibility.PARTIALLY_REVERSIBLE,
+        )
+        with self.assertRaisesRegex(PermissionError, "approved human review"):
+            gateway.call(context, scope, "twi_monitor_delete", arguments, request, uuid4())
+        self.assertEqual(self.http.calls, [])
+
+        approvals = ApprovedIntent()
+        gateway.call(
+            context,
+            scope,
+            "twi_monitor_delete",
+            arguments,
+            request,
+            uuid4(),
+            approval_id=uuid4(),
+            approval_verifier=approvals,
+            intent_fingerprint="delete-intent-fingerprint",
+        )
+        self.assertEqual(len(approvals.calls), 1)
+        self.assertEqual(self.http.calls[0]["method"], "DELETE")
 
 
 if __name__ == "__main__":
