@@ -225,6 +225,8 @@ class WorldIntelligenceHTTPTransport:
             or not scope.request_id
         ):
             raise PermissionError("World Intelligence query lacks authenticated Platform scope")
+        if not set(arguments).issubset({"purpose", "limit", "cursor"}):
+            raise ValueError("World Intelligence query contains unsupported arguments")
         purpose = arguments.get("purpose")
         if not isinstance(purpose, str) or not _PURPOSE_VALUE.fullmatch(purpose):
             raise ValueError("an authorized normalized query purpose is required")
