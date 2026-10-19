@@ -19,6 +19,7 @@ from tinlance_agent_platform_contracts import (
 from tinlance_agent_platform_mcp.gateway import MCPToolGateway, ToolScope
 from tinlance_agent_platform_mcp.world_intelligence import (
     WORLD_INTELLIGENCE_OPERATION_TO_TOOL,
+    WORLD_INTELLIGENCE_TOOL_REGISTRATIONS,
     WorldIntelligenceTransportError,
 )
 
@@ -76,13 +77,7 @@ class WorldIntelligenceAPIHandler:
             trace_id=trace_id,
             trace_context=trace_context,
         )
-        spec = next(
-            item for item in __import__(
-                "tinlance_agent_platform_mcp.world_intelligence",
-                fromlist=["WORLD_INTELLIGENCE_TOOL_REGISTRATIONS"],
-            ).WORLD_INTELLIGENCE_TOOL_REGISTRATIONS
-            if item.name == tool_name
-        )
+        spec = next(item for item in WORLD_INTELLIGENCE_TOOL_REGISTRATIONS if item.name == tool_name)
         arguments = dict(request.payload)
         scope = ToolScope(
             tenant_id=request.tenant_id,
