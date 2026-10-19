@@ -274,6 +274,8 @@ class WorldIntelligenceHTTPTransport:
                 response.status_code,
                 retryable=response.status_code in {408, 425, 429, 500, 502, 503, 504},
             )
+        if len(response.body) > MAX_RESPONSE_BYTES:
+            raise WorldIntelligenceTransportError(response.status_code)
         if response.headers.get("content-type", "").split(";", 1)[0].lower() != "application/json":
             raise WorldIntelligenceTransportError(response.status_code)
         try:
