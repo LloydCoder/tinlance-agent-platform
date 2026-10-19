@@ -157,10 +157,7 @@ def _display_name(name: str) -> str:
 WORLD_INTELLIGENCE_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = tuple(
     MCPTool(
         name=name,
-        description=(
-            "Read World Intelligence "
-            f"{_display_name(name)} under Platform policy."
-        ),
+        description=(f"Read World Intelligence {_display_name(name)} under Platform policy."),
         capability=spec.capability,
         resource_pattern=spec.resource,
         action="read",
@@ -315,10 +312,7 @@ def _query_schema() -> dict[str, object]:
 WORLD_INTELLIGENCE_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = tuple(
     MCPToolDefinition(
         name,
-        (
-            "Read World Intelligence "
-            f"{_display_name(name)} through Platform policy."
-        ),
+        (f"Read World Intelligence {_display_name(name)} through Platform policy."),
         f"world_intelligence.{name.removeprefix('world_intelligence_')}",
         _query_schema(),
         read_only=True,
