@@ -329,5 +329,33 @@ class TWIAPIHandlerTests(unittest.TestCase):
         )
 
 
+    def test_remote_mcp_catalog_registers_all_twi_operations(self) -> None:
+        names = {tool.name for tool in TWI_MCP_TOOL_DEFINITIONS}
+        self.assertEqual(
+            names,
+            {
+                "twi_search",
+                "twi_fetch",
+                "twi_browser_navigate",
+                "twi_job_read",
+                "twi_job_cancel",
+                "twi_research_verify",
+                "twi_world_intelligence_export",
+                "twi_world_intelligence_export_status",
+                "twi_evidence_export",
+                "twi_monitor_create",
+                "twi_monitor_read",
+                "twi_monitor_run",
+                "twi_monitor_pause",
+                "twi_monitor_resume",
+                "twi_monitor_delete",
+            },
+        )
+        delete = next(tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_monitor_delete")
+        self.assertTrue(delete.consequential)
+        self.assertTrue(delete.destructive)
+        self.assertEqual(delete.idempotency_argument, "idempotency_key")
+
+
 if __name__ == "__main__":
     unittest.main()
