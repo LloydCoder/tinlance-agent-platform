@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 import unittest
 from collections.abc import Mapping
 from typing import Any
 
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_app.world_intelligence_api_handler import WorldIntelligenceAPIHandler
-from tinlance_agent_platform_contracts import Principal, RequestContext, TraceLineageContext
+from tinlance_agent_platform_contracts import Principal
 from tinlance_agent_platform_mcp import (
     MCPToolGateway,
     ToolScope,
@@ -183,19 +182,37 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
             base_url="https://world-intelligence.internal",
             audience="world-intelligence",
             token_issuer=self.issuer,
-            http_client=FakeHTTPClient(WorldIntelligenceHTTPResponse(302, {"location": "https://evil.example"}, b"")),
+            http_client=FakeHTTPClient(
+                WorldIntelligenceHTTPResponse(
+                    302, {"location": "https://evil.example"}, b""
+                )
+            ),
         )
         with self.assertRaises(WorldIntelligenceTransportError) as caught:
-            redirect.call("world_intelligence_query_entities", {"purpose": "account_research"}, _scope())
+            redirect.call(
+                "world_intelligence_query_entities",
+                {"purpose": "account_research"},
+                _scope(),
+            )
         self.assertFalse(caught.exception.retryable)
         malformed = WorldIntelligenceHTTPTransport(
             base_url="https://world-intelligence.internal",
             audience="world-intelligence",
             token_issuer=self.issuer,
-            http_client=FakeHTTPClient(WorldIntelligenceHTTPResponse(200, {"content-type": "application/json"}, b'{"items":"not-an-array"}')),
+            http_client=FakeHTTPClient(
+                WorldIntelligenceHTTPResponse(
+                    200,
+                    {"content-type": "application/json"},
+                    b'{"items":"not-an-array"}',
+                )
+            ),
         )
         with self.assertRaises(WorldIntelligenceTransportError):
-            malformed.call("world_intelligence_query_entities", {"purpose": "account_research"}, _scope())
+            malformed.call(
+                "world_intelligence_query_entities",
+                {"purpose": "account_research"},
+                _scope(),
+            )
 
     def test_production_transport_requires_https_and_exact_audience(self) -> None:
         with self.assertRaises(ValueError):
