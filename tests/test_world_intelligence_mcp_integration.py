@@ -221,7 +221,9 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
                 audience="world-intelligence",
                 token_issuer=self.issuer,
                 http_client=FakeHTTPClient(
-                    WorldIntelligenceHTTPResponse(status_code, {"content-type": "application/json"}, b"{}")
+                    WorldIntelligenceHTTPResponse(
+                        status_code, {"content-type": "application/json"}, b"{}"
+                    )
                 ),
             )
             with self.subTest(status_code=status_code):
