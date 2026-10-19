@@ -214,6 +214,25 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
                 _scope(),
             )
 
+    def test_transient_http_failure_is_retryable_and_authorization_failure_is_not(self) -> None:
+        for status_code, retryable in ((503, True), (403, False)):
+            transport = WorldIntelligenceHTTPTransport(
+                base_url="https://world-intelligence.internal",
+                audience="world-intelligence",
+                token_issuer=self.issuer,
+                http_client=FakeHTTPClient(
+                    WorldIntelligenceHTTPResponse(status_code, {"content-type": "application/json"}, b"{}")
+                ),
+            )
+            with self.subTest(status_code=status_code):
+                with self.assertRaises(WorldIntelligenceTransportError) as caught:
+                    transport.call(
+                        "world_intelligence_query_entities",
+                        {"purpose": "account_research"},
+                        _scope(),
+                    )
+                self.assertEqual(caught.exception.retryable, retryable)
+
     def test_production_transport_requires_https_and_exact_audience(self) -> None:
         with self.assertRaises(ValueError):
             WorldIntelligenceHTTPTransport(
@@ -260,6 +279,21 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
             authenticated_principal=_principal(ENTITY_CAPABILITY),
         )
         with self.assertRaisesRegex(PermissionError, "not authorized for the requested purpose"):
+            self.handler.handle(request)
+        self.assertEqual(self.http.calls, [])
+        self.assertEqual(self.issuer.calls, [])
+
+    def test_handler_requires_resource_capability_before_network_call(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="world_intelligence.query_entities",
+            payload={"purpose": "account_research"},
+            request_id="platform-wi-query-missing-capability",
+            trace_id=TRACE_ID,
+            authenticated_principal=_principal(PURPOSE_SCOPE),
+        )
+        with self.assertRaises(PermissionError):
             self.handler.handle(request)
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
