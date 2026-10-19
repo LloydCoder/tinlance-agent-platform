@@ -77,7 +77,9 @@ class WorldIntelligenceAPIHandler:
             trace_id=trace_id,
             trace_context=trace_context,
         )
-        spec = next(item for item in WORLD_INTELLIGENCE_TOOL_REGISTRATIONS if item.name == tool_name)
+        spec = next(
+            item for item in WORLD_INTELLIGENCE_TOOL_REGISTRATIONS if item.name == tool_name
+        )
         arguments = dict(request.payload)
         scope = ToolScope(
             tenant_id=request.tenant_id,
@@ -99,7 +101,8 @@ class WorldIntelligenceAPIHandler:
         )
         run_id = uuid5(
             NAMESPACE_URL,
-            f"world-intelligence:{request.tenant_id}:{request.subject_id}:{request.request_id}:{tool_name}",
+            "world-intelligence:"
+            f"{request.tenant_id}:{request.subject_id}:{request.request_id}:{tool_name}",
         )
         try:
             result = self._gateway.call(
