@@ -545,8 +545,8 @@ class TWIHTTPTransport:
         raise LookupError("TWI tool is not registered")
 
 
-# The remote MCP protocol server uses these schemas and operation names. Consequential
-# export includes Platform approval binding fields; TWIHTTPTransport strips them before HTTP.
+# The remote MCP protocol server uses these schemas and operation names. Approval-gated
+# operations include Platform-only binding fields; TWIHTTPTransport strips them before HTTP.
 _TWI_SEARCH_SCHEMA: dict[str, object] = {
     "type": "object",
     "additionalProperties": False,
