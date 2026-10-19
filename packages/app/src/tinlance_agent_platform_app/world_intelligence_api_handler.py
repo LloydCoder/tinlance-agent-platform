@@ -169,6 +169,7 @@ class WorldIntelligenceAPIHandler:
             scopes=string_set("scopes"),
         )
 
+
 class WorldIntelligenceMCPDispatcher:
     """Compose the World Intelligence handler into the MCP protocol dispatch boundary."""
 
