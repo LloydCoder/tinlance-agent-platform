@@ -285,6 +285,26 @@ class TWIAPIHandlerTests(unittest.TestCase):
         )
 
 
+    def test_evidence_export_operation_uses_scoped_platform_token(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="twi.jobs.export_evidence",
+            payload={"job_id": "job-0000000000000001"},
+            request_id="platform-twi-evidence-0001",
+            trace_id="0123456789abcdef0123456789abcdef",
+            authenticated_principal=_principal("web.evidence.export"),
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:evidence:export"}))
+        self.assertEqual(self.http.calls[0]["method"], "GET")
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/jobs/job-0000000000000001/evidence",
+        )
+        self.assertIsNone(self.http.calls[0]["body"])
+
     def test_monitor_delete_requires_exact_intent_bound_human_approval(self) -> None:
         run_id = uuid4()
         approval_id = uuid4()
