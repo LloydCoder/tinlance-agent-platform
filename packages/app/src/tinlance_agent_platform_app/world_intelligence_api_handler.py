@@ -199,4 +199,3 @@ class WorldIntelligenceMCPDispatcher:
             traceparent=request.traceparent,
         )
         return self._handler.handle(api_request)
-
