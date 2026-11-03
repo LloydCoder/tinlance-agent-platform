@@ -5,13 +5,11 @@ import unittest
 from collections.abc import Mapping
 from typing import Any
 
-
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_app.world_intelligence_api_handler import (
     WorldIntelligenceAPIHandler,
     WorldIntelligenceMCPDispatcher,
 )
-
 from tinlance_agent_platform_contracts import Principal
 from tinlance_agent_platform_mcp import (
     MCPProtocolService,
