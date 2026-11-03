@@ -81,6 +81,39 @@ strict export intent fingerprints, high-risk approval enforcement, idempotency, 
 and fail-closed transport errors. These are reference integration tests; they do not by themselves
 prove that a production deployment has been wired or deployed.
 
+
+## KMS-backed Platform service tokens
+
+The Platform identity package provides `KMSRS256Signer` and `PlatformServiceTokenIssuer`.
+The issuer implements the service-token protocol consumed by both `TWIHTTPTransport` and
+`WorldIntelligenceHTTPTransport`. It emits short-lived RS256 access tokens with the strict
+`typ=at+jwt` header and the claims required by `JWKSIdentityVerifier`: issuer, audience,
+subject, tenant, principal type, client ID, token ID, issued-at, expiry and delegated scope.
+World Intelligence calls additionally carry a signed `purpose` claim.
+
+The signer delegates RS256 signing to an asymmetric AWS KMS key. The key must use
+`SIGN_VERIFY`, an RSA key spec, and `RSASSA_PKCS1_V1_5_SHA_256`. The runtime identity needs
+only `kms:GetPublicKey` and `kms:Sign` on the specific key ARN. The private key is never
+exported. Publish `signer.jwks()` at `/.well-known/jwks.json` by passing the signer as the
+`jwks_provider` argument to the Platform HTTP boundary. The endpoint returns public RSA key
+parameters only, validates the document, and uses a short cache lifetime. Configure previous
+public key IDs through `verification_key_ids` during rotation so tokens signed by the retiring
+key remain verifiable during the overlap window.
+
+The canonical downstream audiences are `tinlance-web-intelligence` for TWI and
+`world-intelligence` for World Intelligence. These values must match each resource server's
+strict JWT verifier configuration exactly. Do not use a generic audience or accept arbitrary
+audiences supplied by a caller.
+
+This issuer is the **Platform-to-service** token-signing component. It does not implement
+interactive human sign-in, external identity-provider federation, tenant membership resolution,
+or policy evaluation. Those must happen before this issuer is called. The supplied tenant,
+subject and scopes must come from a verified Platform principal and an authorization decision;
+the issuer itself is not an authorization service. A real deployment still requires a trusted
+inbound identity provider, server-side tenant mapping, production revocation storage, key
+rotation operations and an HTTPS deployment of the JWKS endpoint. See
+`docs/adr/ADR-0042-kms-backed-platform-service-tokens.md`.
+
 ## Monitor and evidence-export boundaries
 
 Monitor operations are explicit requests only. TWI stores monitor definitions and bounded change observations; Agent OS owns recurrence. Monitor deletion requires its own twi:monitors:delete scope and a one-time approval bound to the exact tenant, subject, run, operation, resource and argument fingerprint. Pause/resume do not delete monitor data.
