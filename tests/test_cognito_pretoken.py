@@ -45,6 +45,7 @@ def active_membership(
     subject_id: str = SUBJECT_ID,
     tenant_id: str = "tenant-prod-01",
     status: str = "active",
+    capabilities: tuple[str, ...] = ("web.search", "web.fetch"),
 ) -> None:
     key = membership_key(user_pool_id, subject_id)
     client.items[key] = {
@@ -53,6 +54,7 @@ def active_membership(
         "subject_id": subject_id,
         "tenant_id": tenant_id,
         "status": status,
+        "capabilities": list(capabilities),
     }
 
 
@@ -72,13 +74,20 @@ def make_event(**overrides: Any) -> dict[str, Any]:
                 "custom:tenant_id": "attacker-controlled-tenant",
             },
             "clientMetadata": {"tenant_id": "attacker-controlled-tenant"},
-            "scopes": ["openid", "profile"],
+            "scopes": [
+                "openid",
+                "profile",
+                "tinlyt/web.search",
+                "tinlyt/web.monitor.delete",
+                "other-api/admin",
+                "aws.cognito.signin.user.admin",
+            ],
         },
         "response": {
             "claimsAndScopeOverrideDetails": {
                 "accessTokenGeneration": {
                     "claimsToAddOrOverride": {"existing_claim": "preserved"},
-                    "scopesToAdd": ["web.search"],
+                    "scopesToAdd": ["legacy.scope"],
                     "scopesToSuppress": ["unused.scope"],
                 },
                 "idTokenGeneration": {
@@ -167,8 +176,16 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
         result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
             "scopesToAdd"
         ]
-        == ["web.search"]
+        == ["tinlyt/web.fetch", "tinlyt/web.search"]
     )
+    assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
+        "scopesToSuppress"
+    ] == [
+        "aws.cognito.signin.user.admin",
+        "other-api/admin",
+        "tinlyt/web.monitor.delete",
+        "unused.scope",
+    ]
     assert (
         result["response"]["claimsAndScopeOverrideDetails"]["idTokenGeneration"][
             "claimsToAddOrOverride"
@@ -194,6 +211,9 @@ def test_pre_token_v2_accepts_aws_empty_override_array() -> None:
         "tenant_id": "tenant-prod-01",
         "principal_type": "user",
     }
+    assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
+        "scopesToAdd"
+    ] == ["tinlyt/web.fetch", "tinlyt/web.search"]
 
 
 def test_pre_token_v2_rejects_unapproved_app_client_before_membership_lookup() -> None:
@@ -259,7 +279,7 @@ def test_membership_resolver_rejects_invalid_or_inactive_membership(
         user_pool_id=USER_POOL_ID,
     )
     with pytest.raises(CognitoTenantMembershipError, match=expected):
-        resolver.resolve_active_tenant(USER_POOL_ID, SUBJECT_ID)
+        resolver.resolve_active_membership(USER_POOL_ID, SUBJECT_ID)
 
 
 def test_membership_resolver_rejects_records_for_different_subjects() -> None:
