@@ -1,3 +1,4 @@
+from .http import JWKSProvider, serve
 from .service import (
     AgentPlatformAPI,
     APIRequest,
@@ -16,4 +17,6 @@ __all__ = [
     "APIRequest",
     "APIResponse",
     "AgentPlatformAPI",
+    "JWKSProvider",
+    "serve",
 ]

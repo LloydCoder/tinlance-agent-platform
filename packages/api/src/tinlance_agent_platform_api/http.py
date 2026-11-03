@@ -36,6 +36,10 @@ class A2AHTTPService(Protocol):
     def card_response(self) -> MCPHTTPResponse: ...
 
 
+class JWKSProvider(Protocol):
+    def jwks(self) -> dict[str, list[dict[str, str]]]: ...
+
+
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
@@ -77,6 +81,7 @@ def serve(
     port: int = 0,
     mcp_service: MCPHTTPService | None = None,
     a2a_service: A2AHTTPService | None = None,
+    jwks_provider: JWKSProvider | None = None,
 ) -> ThreadingHTTPServer:
     """Start a local/reference HTTP server.
 
@@ -100,6 +105,48 @@ def serve(
             return False
 
         def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/.well-known/jwks.json":
+                if jwks_provider is None:
+                    self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                    return
+                try:
+                    document = jwks_provider.jwks()
+                    keys = document.get("keys")
+                    if (
+                        set(document) != {"keys"}
+                        or not isinstance(keys, list)
+                        or not keys
+                        or len(keys) > 16
+                        or any(
+                            not isinstance(key, dict)
+                            or set(key) != {"kty", "use", "alg", "kid", "n", "e"}
+                            or key.get("kty") != "RSA"
+                            or key.get("use") != "sig"
+                            or key.get("alg") != "RS256"
+                            or any(
+                                not isinstance(value, str) or not value for value in key.values()
+                            )
+                            for key in keys
+                        )
+                    ):
+                        raise ValueError("JWKS must contain only bounded public RS256 RSA keys")
+                    raw = json.dumps(document, separators=(",", ":"), sort_keys=True).encode(
+                        "utf-8"
+                    )
+                    if len(raw) > 64 * 1024:
+                        raise ValueError("JWKS document exceeds the response limit")
+                    self.send_response(HTTPStatus.OK)
+                    self.send_header("Content-Type", "application/jwk-set+json")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.send_header(
+                        "Cache-Control", "public, max-age=60, stale-while-revalidate=30"
+                    )
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.end_headers()
+                    self.wfile.write(raw)
+                except Exception:
+                    self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "jwks_unavailable"})
+                return
             if self.path != "/.well-known/agent-card.json" or a2a_service is None:
                 self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
