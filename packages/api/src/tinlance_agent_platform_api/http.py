@@ -122,18 +122,25 @@ def serve(
                             or key.get("kty") != "RSA"
                             or key.get("use") != "sig"
                             or key.get("alg") != "RS256"
-                            or any(not isinstance(value, str) or not value for value in key.values())
+                            or any(
+                                not isinstance(value, str) or not value
+                                for value in key.values()
+                            )
                             for key in keys
                         )
                     ):
                         raise ValueError("JWKS must contain only bounded public RS256 RSA keys")
-                    raw = json.dumps(document, separators=(",", ":"), sort_keys=True).encode("utf-8")
+                    raw = json.dumps(
+                        document, separators=(",", ":"), sort_keys=True
+                    ).encode("utf-8")
                     if len(raw) > 64 * 1024:
                         raise ValueError("JWKS document exceeds the response limit")
                     self.send_response(HTTPStatus.OK)
                     self.send_header("Content-Type", "application/jwk-set+json")
                     self.send_header("Content-Length", str(len(raw)))
-                    self.send_header("Cache-Control", "public, max-age=60, stale-while-revalidate=30")
+                    self.send_header(
+                        "Cache-Control", "public, max-age=60, stale-while-revalidate=30"
+                    )
                     self.send_header("X-Content-Type-Options", "nosniff")
                     self.end_headers()
                     self.wfile.write(raw)
