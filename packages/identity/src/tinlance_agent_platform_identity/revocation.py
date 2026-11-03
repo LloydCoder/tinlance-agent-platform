@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 import time
+from collections.abc import Mapping
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -27,9 +28,9 @@ class TokenRevocationChecker(Protocol):
 class DynamoDBClient(Protocol):
     """Subset of a boto3 DynamoDB resource client's auto-marshalling API."""
 
-    def get_item(self, **kwargs: Any) -> dict[str, Any]: ...
+    def get_item(self, **kwargs: Any) -> Mapping[str, object]: ...
 
-    def transact_write_items(self, **kwargs: Any) -> dict[str, Any]: ...
+    def transact_write_items(self, **kwargs: Any) -> Mapping[str, object]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,7 +164,11 @@ class DynamoDBTokenRevocationStore:
     family_retention_seconds: int = 31 * 24 * 60 * 60
 
     def __post_init__(self) -> None:
-        if not isinstance(self.table_name, str) or not self.table_name or self.table_name != self.table_name.strip():
+        if (
+            not isinstance(self.table_name, str)
+            or not self.table_name
+            or self.table_name != self.table_name.strip()
+        ):
             raise ValueError("DynamoDB revocation table name must be normalized and non-empty")
         if (
             isinstance(self.token_retention_seconds, bool)
@@ -265,7 +270,7 @@ class DynamoDBTokenRevocationStore:
         item = response.get("Item")
         if item is None:
             return False
-        if not isinstance(item, dict) or (
+        if not isinstance(item, Mapping) or (
             item.get("issuer") != issuer or item.get("token_id") != token_id
         ):
             raise RuntimeError("DynamoDB revocation record does not match its lookup key")
