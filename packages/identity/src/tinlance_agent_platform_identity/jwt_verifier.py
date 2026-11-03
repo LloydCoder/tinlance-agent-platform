@@ -107,11 +107,12 @@ class JWKSIdentityVerifier:
         ):
             raise ValueError("allowed client identifiers must be non-empty and require client IDs")
         if (
-            len(set(self.required_revocation_claims)) != len(self.required_revocation_claims)
+            not isinstance(self.required_revocation_claims, tuple)
             or any(
                 not isinstance(name, str) or not name or name != name.strip()
                 for name in self.required_revocation_claims
             )
+            or len(set(self.required_revocation_claims)) != len(self.required_revocation_claims)
         ):
             raise ValueError("required revocation claim names must be normalized and unique")
         if (
@@ -189,9 +190,11 @@ class JWKSIdentityVerifier:
             raise PermissionError("identity token use is not trusted")
         subject = self._required_string(claims, "sub")
         token_id = self._required_string(claims, "jti")
+        revocation_claims = set(self.required_revocation_claims)
+        if "origin_jti" in claims:
+            revocation_claims.add("origin_jti")
         revocation_ids = frozenset(
-            self._required_string(claims, name)
-            for name in self.required_revocation_claims
+            self._required_string(claims, name) for name in revocation_claims
         )
         tenant_id = self._tenant_id(claims)
         principal_type = self._required_string(claims, self.principal_type_claim)
