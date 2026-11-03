@@ -164,13 +164,19 @@ class PlatformServiceTokenIssuer:
         ):
             raise ValueError("Platform service-token issuer must be an HTTPS URL")
         if (
-            not client_id
+            not isinstance(client_id, str)
+            or not client_id
             or client_id != client_id.strip()
             or not _IDENTIFIER_RE.fullmatch(client_id)
         ):
             raise ValueError("Platform service-token client identifier is invalid")
-        if not allowed_audiences or any(
-            not item or item != item.strip() for item in allowed_audiences
+        if (
+            not isinstance(allowed_audiences, frozenset)
+            or not allowed_audiences
+            or any(
+                not isinstance(item, str) or not item or item != item.strip()
+                for item in allowed_audiences
+            )
         ):
             raise ValueError("an explicit normalized downstream audience allowlist is required")
         self._issuer = issuer
