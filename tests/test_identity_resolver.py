@@ -130,13 +130,44 @@ def send_request(
         return error.code, json.loads(error.read())
 
 
-def with_server(resolver: JWKSPrincipalResolver):
+def with_server(
+    resolver: JWKSPrincipalResolver,
+    *,
+    session_revoker: JWKSPrincipalResolver | None = None,
+):
     handler = EchoHandler()
-    server = serve(AgentPlatformAPI(handler), resolver, host="127.0.0.1", port=0)
+    server = serve(
+        AgentPlatformAPI(handler),
+        resolver,
+        host="127.0.0.1",
+        port=0,
+        session_revoker=session_revoker,
+    )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     endpoint = f"http://127.0.0.1:{server.server_address[1]}/v1/agent-platform"
     return handler, server, thread, endpoint
+
+
+
+def send_revoke_request(endpoint: str, token: str) -> tuple[int, dict[str, object]]:
+    revoke_endpoint = endpoint.rsplit("/", 1)[0] + "/session/revoke"
+    request = urllib.request.Request(
+        revoke_endpoint,
+        data=b"{}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-Tinlance-API-Version": "1.1",
+            "X-Request-ID": "request-session-revoke-001",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
 
 
 def test_resolver_maps_verified_identity_to_platform_principal(
@@ -254,3 +285,64 @@ def test_revoke_identity_persists_both_access_token_and_session_family_ids(
     store.revoke_identity(identity, reason="user signed out")
     assert store.is_revoked(ISSUER, "jti-a")
     assert store.is_revoked(ISSUER, "origin-jti-a")
+
+
+
+def test_session_revoke_endpoint_revokes_access_token_and_family_atomically(
+    signing_material: tuple[Any, Any], tmp_path: Path
+) -> None:
+    private_key, public_key = signing_material
+    store = SQLiteTokenRevocationStore(tmp_path / "revocations.db")
+    resolver = resolver_for(public_key, store)
+    handler, server, thread, endpoint = with_server(resolver, session_revoker=resolver)
+    token = make_token(private_key, origin_jti="origin-jti-a")
+    try:
+        status, body = send_revoke_request(endpoint, token)
+        assert status == 200
+        assert body == {"status": "revoked"}
+        assert store.is_revoked(ISSUER, "jti-a")
+        assert store.is_revoked(ISSUER, "origin-jti-a")
+
+        status, body = send_request(endpoint, token)
+        assert status == 401
+        assert body["error"] == "unauthorized"
+        assert handler.requests == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_session_revoke_endpoint_fails_closed_without_a_revocation_writer(
+    signing_material: tuple[Any, Any], tmp_path: Path
+) -> None:
+    private_key, public_key = signing_material
+    resolver = resolver_for(public_key, UnavailableRevocationStore())
+    handler, server, thread, endpoint = with_server(resolver, session_revoker=resolver)
+    try:
+        status, body = send_revoke_request(endpoint, make_token(private_key))
+        assert status == 503
+        assert body["error"] == "session_revocation_unavailable"
+        assert handler.requests == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_session_revoke_endpoint_rejects_invalid_identity(
+    signing_material: tuple[Any, Any], tmp_path: Path
+) -> None:
+    _, public_key = signing_material
+    attacker_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    resolver = resolver_for(public_key, SQLiteTokenRevocationStore(tmp_path / "revocations.db"))
+    handler, server, thread, endpoint = with_server(resolver, session_revoker=resolver)
+    try:
+        status, body = send_revoke_request(endpoint, make_token(attacker_key))
+        assert status == 401
+        assert body["error"] == "unauthorized"
+        assert handler.requests == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
