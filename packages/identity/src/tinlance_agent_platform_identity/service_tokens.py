@@ -208,14 +208,21 @@ class PlatformServiceTokenIssuer:
             not isinstance(scope, str) or not _SCOPE_RE.fullmatch(scope) for scope in scopes
         ):
             raise ValueError("downstream token scopes must be a non-empty set of normalized values")
-        if principal_type not in _ALLOWED_PRINCIPAL_TYPES:
+        if (
+            not isinstance(principal_type, str)
+            or principal_type not in _ALLOWED_PRINCIPAL_TYPES
+        ):
             raise ValueError("downstream token principal type is not supported")
         if purpose is not None and (
             not isinstance(purpose, str) or not _IDENTIFIER_RE.fullmatch(purpose)
         ):
             raise ValueError("downstream token purpose is invalid")
         if traceparent is not None and (
-            not isinstance(traceparent, str) or not _TRACEPARENT_RE.fullmatch(traceparent)
+            not isinstance(traceparent, str)
+            or not _TRACEPARENT_RE.fullmatch(traceparent)
+            or traceparent[:2] == "ff"
+            or traceparent[3:35] == "0" * 32
+            or traceparent[36:52] == "0" * 16
         ):
             raise ValueError("downstream token traceparent is invalid")
 
