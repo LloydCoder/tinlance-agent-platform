@@ -567,8 +567,7 @@ class TWIHTTPTransport:
             return f"/v1/monitors/{monitor_id}", None
         if tool_name == "twi_usage_read":
             if any(
-                key not in {"dimension", "period_start", "limit", "cursor"}
-                for key in arguments
+                key not in {"dimension", "period_start", "limit", "cursor"} for key in arguments
             ):
                 raise ValueError("usage query contains unsupported fields")
             dimension = arguments.get("dimension")
@@ -593,9 +592,7 @@ class TWIHTTPTransport:
                 raise ValueError("usage period start must include a timezone")
             if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
                 raise ValueError("usage page size is invalid")
-            if cursor is not None and (
-                not isinstance(cursor, str) or not 1 <= len(cursor) <= 1024
-            ):
+            if cursor is not None and (not isinstance(cursor, str) or not 1 <= len(cursor) <= 1024):
                 raise ValueError("usage cursor is invalid")
             query: dict[str, str] = {
                 "dimension": dimension,
