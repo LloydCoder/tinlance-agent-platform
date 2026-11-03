@@ -40,6 +40,8 @@ class JWKSIdentityVerifier:
     allowed_principal_types: frozenset[str] = _DEFAULT_PRINCIPAL_TYPES
     require_client_id: bool = True
     require_kid: bool = True
+    expected_token_use: str | None = None
+    allowed_client_ids: frozenset[str] | None = None
     jwks_timeout_seconds: float = 5.0
     key_provider: SigningKeyProvider | None = None
 
@@ -89,6 +91,21 @@ class JWKSIdentityVerifier:
             raise ValueError("expected token type must be normalized when configured")
         if not isinstance(self.require_client_id, bool) or not isinstance(self.require_kid, bool):
             raise ValueError("JWT strictness options must be boolean")
+        if self.expected_token_use is not None and (
+            not self.expected_token_use or self.expected_token_use != self.expected_token_use.strip()
+        ):
+            raise ValueError("expected token use must be normalized when configured")
+        if self.allowed_client_ids is not None and (
+            not self.allowed_client_ids
+            or any(
+                not isinstance(client_id, str)
+                or not client_id
+                or client_id != client_id.strip()
+                for client_id in self.allowed_client_ids
+            )
+            or not self.require_client_id
+        ):
+            raise ValueError("allowed client identifiers must be non-empty and require client IDs")
         if (
             not self.tenant_claims
             or len(set(self.tenant_claims)) != len(self.tenant_claims)
@@ -140,6 +157,8 @@ class JWKSIdentityVerifier:
             required = ["exp", "iat", "iss", "sub", "jti"]
             if self.require_client_id:
                 required.append("client_id")
+            if self.expected_token_use is not None:
+                required.append("token_use")
             claims = jwt.decode(
                 assertion,
                 signing_key,
@@ -154,6 +173,11 @@ class JWKSIdentityVerifier:
         except Exception as exc:
             raise PermissionError("identity assertion verification failed") from exc
 
+        if (
+            self.expected_token_use is not None
+            and claims.get("token_use") != self.expected_token_use
+        ):
+            raise PermissionError("identity token use is not trusted")
         subject = self._required_string(claims, "sub")
         token_id = self._required_string(claims, "jti")
         tenant_id = self._tenant_id(claims)
@@ -166,6 +190,8 @@ class JWKSIdentityVerifier:
             if client_id_value is not None or self.require_client_id
             else None
         )
+        if self.allowed_client_ids is not None and client_id not in self.allowed_client_ids:
+            raise PermissionError("identity client identifier is not trusted")
         issued_at = self._timestamp(claims, "iat")
         expires_at = self._timestamp(claims, "exp")
         nonce_value = claims.get("nonce")
