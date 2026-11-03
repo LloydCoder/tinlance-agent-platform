@@ -121,7 +121,7 @@ def test_platform_factory_routes_twi_through_policy_and_kms_signed_token() -> No
             operation="twi.jobs.create_search",
             payload={"query": "agentic security", "limit": 5},
             request_id=str(uuid4()),
-            idempotency_key="twi-search-0001",
+            idempotency_key="twi-search-000001",
             authenticated_principal=principal,
         )
     )
