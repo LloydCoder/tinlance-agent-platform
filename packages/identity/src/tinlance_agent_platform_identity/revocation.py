@@ -41,9 +41,7 @@ class SQLiteTokenRevocationStore:
                 )
                 """
             )
-            columns = {
-                row[1] for row in connection.execute("PRAGMA table_info(revoked_tokens)")
-            }
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(revoked_tokens)")}
             if "request_id" not in columns:
                 connection.execute("ALTER TABLE revoked_tokens ADD COLUMN request_id TEXT")
 
