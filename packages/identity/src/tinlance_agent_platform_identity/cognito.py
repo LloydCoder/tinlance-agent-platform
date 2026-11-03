@@ -84,8 +84,6 @@ def create_cognito_access_token_verifier(
         key_provider=key_provider,
     )
 
-
-
 def create_cognito_principal_resolver(
     *,
     revocation_checker: TokenRevocationChecker,
