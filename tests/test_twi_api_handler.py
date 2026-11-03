@@ -6,9 +6,8 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from tinlance_agent_platform_app.twi_api_handler import TWIAPIHandler
-
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
+from tinlance_agent_platform_app.twi_api_handler import TWIAPIHandler
 from tinlance_agent_platform_contracts import Principal
 from tinlance_agent_platform_mcp import (
     TWI_MCP_TOOL_DEFINITIONS,
@@ -34,6 +33,7 @@ class FakeTokenIssuer:
         request_id: str,
         traceparent: str | None,
         expires_in_seconds: int,
+        principal_type: str = "user",
     ) -> str:
         self.calls.append(
             {
@@ -44,6 +44,7 @@ class FakeTokenIssuer:
                 "request_id": request_id,
                 "traceparent": traceparent,
                 "expires_in_seconds": expires_in_seconds,
+                "principal_type": principal_type,
             }
         )
         return "minted-twi-audience-token"
@@ -160,6 +161,7 @@ class TWIAPIHandlerTests(unittest.TestCase):
         self.assertEqual(len(self.http.calls), 1)
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
+        self.assertEqual(self.issuer.calls[0]["principal_type"], "user")
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:search"}))
         self.assertEqual(
             self.http.calls[0]["headers"]["Authorization"],

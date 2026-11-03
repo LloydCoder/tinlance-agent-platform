@@ -40,6 +40,7 @@ class TWIServiceTokenIssuer(Protocol):
         request_id: str,
         traceparent: str | None,
         expires_in_seconds: int,
+        principal_type: str = "user",
     ) -> str: ...
 
 
@@ -439,6 +440,7 @@ class TWIHTTPTransport:
             request_id=scope.request_id,
             traceparent=scope.traceparent,
             expires_in_seconds=60,
+            principal_type=scope.principal_type,
         )
         if not token or token != token.strip() or any(character.isspace() for character in token):
             raise PermissionError("Platform token issuer returned an invalid downstream token")

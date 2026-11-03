@@ -45,6 +45,7 @@ class FakeTokenIssuer:
         request_id: str,
         traceparent: str | None,
         expires_in_seconds: int,
+        principal_type: str = "user",
     ) -> str:
         self.calls.append(
             {
@@ -55,6 +56,7 @@ class FakeTokenIssuer:
                 "request_id": request_id,
                 "traceparent": traceparent,
                 "expires_in_seconds": expires_in_seconds,
+                "principal_type": principal_type,
             }
         )
         return "platform-minted-twi-token"
@@ -275,6 +277,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         self.assertEqual(len(approvals.calls), 1)
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
+        self.assertEqual(self.issuer.calls[0]["principal_type"], "user")
         self.assertEqual(self.issuer.calls[0]["audience"], "tinlance-web-intelligence")
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:observations:export"}))
         request = self.http.calls[0]

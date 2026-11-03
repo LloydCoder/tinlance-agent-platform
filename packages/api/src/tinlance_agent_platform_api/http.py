@@ -275,8 +275,8 @@ def serve(
                     principal = resolver.resolve(token)
                 except PermissionError as exc:
                     raise AuthenticationError("bearer identity could not be authenticated") from exc
-                tenant_id = body.get("tenant_id")
-                subject_id = body.get("subject_id")
+                tenant_id = body.get("tenant_id", principal.tenant_id)
+                subject_id = body.get("subject_id", principal.subject_id)
                 operation = body.get("operation")
                 payload = body.get("payload", {})
                 if tenant_id != principal.tenant_id or subject_id != principal.subject_id:

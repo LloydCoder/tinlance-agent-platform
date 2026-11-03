@@ -124,6 +124,7 @@ class TWIAPIHandler:
             subject_id=request.subject_id,
             request_id=request.request_id,
             traceparent=traceparent,
+            principal_type=principal.principal_type,
         )
         capability_request = CapabilityRequest(
             action=spec.action,

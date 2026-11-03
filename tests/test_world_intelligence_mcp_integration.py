@@ -5,12 +5,11 @@ import unittest
 from collections.abc import Mapping
 from typing import Any
 
+from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_app.world_intelligence_api_handler import (
     WorldIntelligenceAPIHandler,
     WorldIntelligenceMCPDispatcher,
 )
-
-from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_contracts import Principal
 from tinlance_agent_platform_mcp import (
     MCPProtocolService,
@@ -45,6 +44,7 @@ class FakeTokenIssuer:
         request_id: str,
         traceparent: str | None,
         expires_in_seconds: int,
+        principal_type: str = "user",
     ) -> str:
         self.calls.append(
             {
@@ -56,6 +56,7 @@ class FakeTokenIssuer:
                 "request_id": request_id,
                 "traceparent": traceparent,
                 "expires_in_seconds": expires_in_seconds,
+                "principal_type": principal_type,
             }
         )
         return "platform-minted-world-intelligence-token"
@@ -153,6 +154,7 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
         self.assertEqual(result["items"], [{"id": "entity-1"}])
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
+        self.assertEqual(self.issuer.calls[0]["principal_type"], "user")
         self.assertEqual(self.issuer.calls[0]["audience"], "world-intelligence")
         self.assertEqual(self.issuer.calls[0]["purpose"], "account_research")
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"world-intelligence:query"}))
