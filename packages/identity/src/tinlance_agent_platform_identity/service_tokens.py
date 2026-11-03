@@ -10,8 +10,8 @@ import base64
 import hashlib
 import json
 import re
-from typing import Any, Protocol
 from collections.abc import Mapping
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
 
