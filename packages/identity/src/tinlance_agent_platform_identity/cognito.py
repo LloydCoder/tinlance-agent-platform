@@ -10,6 +10,8 @@ import re
 from urllib.parse import urlsplit
 
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
+from .resolver import JWKSPrincipalResolver
+from .revocation import TokenRevocationChecker
 
 _REGION = re.compile(r"^[a-z]{2}(?:-[a-z]+)+-[0-9]+$")
 _POOL_SUFFIX = re.compile(r"^[A-Za-z0-9]+$")
@@ -81,3 +83,29 @@ def create_cognito_access_token_verifier(
         jwks_timeout_seconds=jwks_timeout_seconds,
         key_provider=key_provider,
     )
+
+
+
+def create_cognito_principal_resolver(
+    *,
+    revocation_checker: TokenRevocationChecker,
+    region: str,
+    user_pool_id: str,
+    audience: str,
+    client_ids: tuple[str, ...],
+    tenant_claim: str = "tenant_id",
+    jwks_timeout_seconds: float = 5.0,
+    key_provider: SigningKeyProvider | None = None,
+) -> JWKSPrincipalResolver:
+    """Compose Cognito access-token verification with fail-closed revocation checks."""
+
+    verifier = create_cognito_access_token_verifier(
+        region=region,
+        user_pool_id=user_pool_id,
+        audience=audience,
+        client_ids=client_ids,
+        tenant_claim=tenant_claim,
+        jwks_timeout_seconds=jwks_timeout_seconds,
+        key_provider=key_provider,
+    )
+    return JWKSPrincipalResolver(verifier=verifier, revocation_checker=revocation_checker)
