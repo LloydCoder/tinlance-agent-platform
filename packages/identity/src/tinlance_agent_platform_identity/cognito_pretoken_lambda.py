@@ -11,8 +11,8 @@ from .cognito_pretoken import CognitoPreTokenGenerationV2Handler, build_cognito_
 def _configured_handler() -> CognitoPreTokenGenerationV2Handler:
     """Initialize and reuse the DynamoDB client across warm Lambda invocations."""
 
-    import boto3
-    from botocore.config import Config
+    import boto3  # type: ignore[import-not-found]
+    from botocore.config import Config  # type: ignore[import-not-found]
 
     region = os.environ["AWS_REGION"]
     sdk_config = Config(
