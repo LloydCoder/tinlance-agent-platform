@@ -138,8 +138,6 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
     assert event == original
     assert client.calls[0]["ConsistentRead"] is True
     assert client.calls[0]["TableName"] == TABLE_NAME
-    assert client.calls[0]["ConsistentRead"] is True
-    assert client.calls[0]["TableName"] == TABLE_NAME
 
 
 def test_pre_token_v2_accepts_aws_empty_override_array() -> None:
