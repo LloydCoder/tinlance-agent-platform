@@ -3,7 +3,11 @@
 from .cognito import create_cognito_access_token_verifier
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
-from .resolver import IdentityAuthenticationError, JWKSPrincipalResolver
+from .resolver import (
+    IdentityAuthenticationError,
+    IdentityRevocationUnavailable,
+    JWKSPrincipalResolver,
+)
 from .revocation import SQLiteTokenRevocationStore, TokenRevocationChecker
 from .service import validate_principal
 from .service_tokens import KMSRS256Signer, PlatformServiceTokenIssuer
@@ -19,6 +23,7 @@ __all__ = [
     "create_cognito_access_token_verifier",
     "SigningKeyProvider",
     "IdentityAuthenticationError",
+    "IdentityRevocationUnavailable",
     "JWKSPrincipalResolver",
     "SQLiteTokenRevocationStore",
     "TokenRevocationChecker",
