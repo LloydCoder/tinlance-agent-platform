@@ -332,8 +332,9 @@ def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region()
         )
 
 
-
-def test_cognito_principal_resolver_binds_verified_claims_and_enforces_revocation(tmp_path) -> None:
+def test_cognito_principal_resolver_binds_verified_claims_and_enforces_revocation(
+    tmp_path,
+) -> None:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     resolver = create_cognito_principal_resolver(
         region="eu-west-1",
