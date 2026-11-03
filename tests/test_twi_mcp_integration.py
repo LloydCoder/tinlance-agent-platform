@@ -454,6 +454,16 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
                 {"dimension": "search_requests_month", "period_start": "2026-10-01T00:00:00"},
                 scope,
             )
+        with self.assertRaisesRegex(ValueError, "unsupported fields"):
+            self.transport.call(
+                "twi_usage_read",
+                {
+                    "dimension": "search_requests_month",
+                    "period_start": "2026-10-01T00:00:00Z",
+                    "unexpected": "ignored-must-not-be-accepted",
+                },
+                scope,
+            )
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
 
