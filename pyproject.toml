@@ -94,6 +94,7 @@ known-first-party = [
   "tinlance_agent_platform_observability",
   "tinlance_agent_platform_evaluation",
   "tinlance_agent_platform_api",
+  "tinlance_agent_platform_app",
   "tinlance_agent_platform_multi_agent",
   "tinlance_agent_platform_operations",
   "tinlance_agent_platform_execution",
