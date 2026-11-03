@@ -26,7 +26,7 @@ class JWKSPrincipalResolver:
     verifier: IdentityVerifier
     revocation_checker: TokenRevocationChecker
 
-    def revoke_session(self, bearer_token: str) -> None:
+    def revoke_session(self, bearer_token: str, *, request_id: str) -> None:
         """Revoke the verified access token and its configured token-family IDs.
 
         This method intentionally does not reject an already-revoked token so
@@ -43,7 +43,7 @@ class JWKSPrincipalResolver:
                 "identity revocation storage does not support durable writes"
             )
         try:
-            writer(identity, reason="user_sign_out")
+            writer(identity, reason="user_sign_out", request_id=request_id)
         except Exception as exc:
             raise IdentityRevocationUnavailable(
                 "identity revocation could not be persisted"
