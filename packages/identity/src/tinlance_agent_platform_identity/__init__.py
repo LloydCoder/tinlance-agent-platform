@@ -1,6 +1,12 @@
 """Identity boundary."""
 
 from .cognito import create_cognito_access_token_verifier
+from .cognito_pretoken import (
+    CognitoPreTokenGenerationV2Handler,
+    CognitoTenantMembershipError,
+    DynamoDBTenantMembershipResolver,
+    build_cognito_pretoken_handler,
+)
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
 from .resolver import (
@@ -24,6 +30,10 @@ __all__ = [
     "validate_principal",
     "TokenSecurityContext",
     "JWKSIdentityVerifier",
+    "CognitoPreTokenGenerationV2Handler",
+    "CognitoTenantMembershipError",
+    "DynamoDBTenantMembershipResolver",
+    "build_cognito_pretoken_handler",
     "create_cognito_access_token_verifier",
     "SigningKeyProvider",
     "IdentityAuthenticationError",

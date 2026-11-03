@@ -255,7 +255,7 @@ def make_cognito_token(private_key: Any, **overrides: Any) -> str:
         "token_use": "access",
         "principal_type": "user",
         "cognito:groups": ["operator"],
-        "scope": "web.search web.fetch",
+        "scope": "openid profile tinlyt/web.search tinlyt/web.fetch",
     }
     omit_origin_jti = overrides.pop("_omit_origin_jti", False)
     claims.update(overrides)
@@ -349,3 +349,31 @@ def test_cognito_profile_rejects_malformed_origin_jti() -> None:
         verifier.verify(make_cognito_token(private_key, origin_jti=123))
     with pytest.raises(PermissionError, match="verification failed"):
         verifier.verify(make_cognito_token(private_key, _omit_origin_jti=True))
+
+
+def test_cognito_profile_normalizes_only_the_configured_resource_server_scopes() -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = create_cognito_access_token_verifier(
+        region="eu-west-1",
+        user_pool_id="eu-west-1_Abc123",
+        audience="https://api.tinlyt.tinlance.com",
+        client_ids=("tinlytwebclient123",),
+        key_provider=StaticKeyProvider(private_key.public_key()),
+    )
+    identity = verifier.verify(make_cognito_token(private_key))
+    assert identity.scopes == frozenset({"web.search", "web.fetch"})
+
+
+def test_cognito_profile_rejects_unprefixed_or_foreign_resource_scopes() -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = create_cognito_access_token_verifier(
+        region="eu-west-1",
+        user_pool_id="eu-west-1_Abc123",
+        audience="https://api.tinlyt.tinlance.com",
+        client_ids=("tinlytwebclient123",),
+        key_provider=StaticKeyProvider(private_key.public_key()),
+    )
+    with pytest.raises(PermissionError, match="scope"):
+        verifier.verify(make_cognito_token(private_key, scope="openid web.search"))
+    with pytest.raises(PermissionError, match="scope"):
+        verifier.verify(make_cognito_token(private_key, scope="openid other-api/web.search"))

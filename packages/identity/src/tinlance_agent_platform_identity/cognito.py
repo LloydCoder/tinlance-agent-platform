@@ -24,6 +24,7 @@ def create_cognito_access_token_verifier(
     audience: str,
     client_ids: tuple[str, ...],
     tenant_claim: str = "tenant_id",
+    resource_scope_prefix: str = "tinlyt/",
     jwks_timeout_seconds: float = 5.0,
     key_provider: SigningKeyProvider | None = None,
 ) -> JWKSIdentityVerifier:
@@ -72,6 +73,7 @@ def create_cognito_access_token_verifier(
         algorithms=("RS256",),
         expected_typ=None,
         tenant_claims=(tenant_claim,),
+        resource_scope_prefix=resource_scope_prefix,
         principal_type_claim="principal_type",
         roles_claim="cognito:groups",
         require_client_id=True,
