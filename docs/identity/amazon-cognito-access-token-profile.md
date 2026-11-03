@@ -13,7 +13,7 @@ The implementation is provider-neutral at the HTTP boundary. Configure `JWKSPrin
 - Managed login / authorization server: enabled.
 - Resource server binding: the SPA authorization request sends `resource=https://api.tinlyt.tinlance.com`. The access token `aud` must equal this exact resource identifier.
 - App client: allow only the production and explicitly approved preview client IDs. Do not accept arbitrary app clients.
-- Token revocation: enabled so Cognito issues `jti` / `origin_jti` revocation identifiers.
+- Token revocation: enabled so Cognito issues `jti` and `origin_jti` revocation identifiers. Platform checks both identifiers on every authenticated request.
 - Access-token lifetime: short (recommended 15 minutes); refresh-token rotation enabled.
 - Signing: RS256; JWKS retrieved only from the exact user-pool issuer URL.
 
@@ -28,7 +28,8 @@ The verifier requires:
 | `token_use` | `access` |
 | `client_id` | Member of the configured app-client allowlist |
 | `sub` | Cognito immutable user subject |
-| `jti` | Token identifier, with revocation enabled |
+| `jti` | Per-access-token identifier; checked by the Platform revocation store |
+| `origin_jti` | Refresh-token-family identifier; checked by the Platform revocation store when present |
 | `tenant_id` | Added by the Pre Token Generation V2 trigger from an admin-controlled tenant assignment |
 | `principal_type` | Constant `user`, set by the trigger |
 | `cognito:groups` | Admin-managed group membership; maps to Platform roles |
@@ -39,6 +40,12 @@ Never derive `tenant_id`, roles, or Platform scopes from browser request fields,
 ## Pre Token Generation V2 contract
 
 The V2 trigger must add `tenant_id` and `principal_type=user` to the **access token**. It may add approved roles/scopes only from trusted server-side membership and entitlement data. The trigger must fail closed when tenant membership is missing, ambiguous, disabled, or unavailable. Do not trust client metadata or accept a tenant ID supplied by the SPA.
+
+## Revocation and sign-out
+
+Cognito revocation and the Platform API's local JWT validation are separate enforcement points. When a user signs out or an administrator revokes a session, the trusted backend must persist the verified identity's `jti` and `origin_jti` in the Platform revocation store before completing the sign-out response. The reference `SQLiteTokenRevocationStore.revoke_identity(identity, reason=...)` writes both identifiers atomically; a production shared store must provide equivalent atomic behavior. The backend should also invoke Cognito's server-side token revocation operation using the appropriate refresh token. Never send refresh tokens to browser logs or persist them in the SPA. `JWKSPrincipalResolver` checks both identifiers and fails closed if the revocation store is unavailable.
+
+The SPA's local “Clear session” action only removes the in-memory access token; it does not by itself revoke the token or end the Cognito managed-login session. A production logout action must call the authenticated backend revocation workflow and then complete the Cognito logout redirect.
 
 ## Runtime composition
 
