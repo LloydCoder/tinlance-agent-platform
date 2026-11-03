@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_api.service import AgentPlatformAPI, APIRequest, APIResponse
 from tinlance_agent_platform_identity import (
+    DynamoDBTokenRevocationStore,
     IdentityAuthenticationError,
     JWKSIdentityVerifier,
     JWKSPrincipalResolver,
@@ -371,3 +372,125 @@ def test_revocation_store_adds_request_id_column_to_existing_schema(tmp_path: Pa
     with sqlite3.connect(path) as connection:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(revoked_tokens)")}
     assert "request_id" in columns
+
+
+class FakeDynamoDBClient:
+    def __init__(self) -> None:
+        self.items: dict[str, dict[str, object]] = {}
+        self.transactions: list[list[dict[str, object]]] = []
+        self.fail_transaction = False
+        self.fail_read = False
+        self.last_read_consistent: bool | None = None
+
+    def transact_write_items(self, **kwargs: Any) -> dict[str, object]:
+        if self.fail_transaction:
+            raise OSError("DynamoDB transaction unavailable")
+        actions = kwargs["TransactItems"]
+        pending = dict(self.items)
+        for action in actions:
+            put = action["Put"]
+            item = put["Item"]
+            pending[str(item["revocation_key"])] = dict(item)
+        self.items = pending
+        self.transactions.append(list(actions))
+        return {}
+
+    def get_item(self, **kwargs: Any) -> dict[str, object]:
+        if self.fail_read:
+            raise OSError("DynamoDB read unavailable")
+        self.last_read_consistent = kwargs["ConsistentRead"]
+        key = kwargs["Key"]["revocation_key"]
+        item = self.items.get(str(key))
+        return {"Item": dict(item)} if item is not None else {}
+
+
+def test_dynamodb_revocation_store_atomically_writes_token_and_family_ids(
+    signing_material: tuple[Any, Any],
+) -> None:
+    private_key, public_key = signing_material
+    verifier = JWKSIdentityVerifier(
+        issuer=ISSUER,
+        audience=AUDIENCE,
+        jwks_url="https://issuer.example.test/.well-known/jwks.json",
+        key_provider=StaticKeyProvider(public_key),
+    )
+    identity = verifier.verify(make_token(private_key, origin_jti="origin-jti-dynamodb"))
+    client = FakeDynamoDBClient()
+    store = DynamoDBTokenRevocationStore(
+        client,
+        table_name="tinlyt-token-revocations",
+        token_retention_seconds=600,
+        family_retention_seconds=31 * 24 * 60 * 60,
+    )
+
+    identifiers = store.revoke_identity(
+        identity,
+        reason="user signed out",
+        request_id="request-dynamodb-revoke-001",
+    )
+
+    assert identifiers == ("jti-a", "origin-jti-dynamodb")
+    assert len(client.transactions) == 1
+    assert len(client.transactions[0]) == 2
+    assert store.is_revoked(ISSUER, "jti-a")
+    assert store.is_revoked(ISSUER, "origin-jti-dynamodb")
+    assert client.last_read_consistent is True
+    token_item = next(item for item in client.items.values() if item["token_id"] == "jti-a")
+    family_item = next(
+        item for item in client.items.values() if item["token_id"] == "origin-jti-dynamodb"
+    )
+    assert token_item["request_id"] == "request-dynamodb-revoke-001"
+    assert family_item["request_id"] == "request-dynamodb-revoke-001"
+    assert int(family_item["expires_at"]) > int(token_item["expires_at"])
+
+
+def test_dynamodb_revocation_store_expired_ttl_records_are_not_active() -> None:
+    client = FakeDynamoDBClient()
+    store = DynamoDBTokenRevocationStore(client, table_name="tinlyt-token-revocations")
+    key = store._revocation_key(ISSUER, "expired-jti")
+    client.items[key] = {
+        "revocation_key": key,
+        "issuer": ISSUER,
+        "token_id": "expired-jti",
+        "expires_at": 1,
+    }
+    assert not store.is_revoked(ISSUER, "expired-jti")
+
+
+def test_dynamodb_revocation_store_fails_closed_on_read_or_transaction_errors(
+    signing_material: tuple[Any, Any],
+) -> None:
+    private_key, public_key = signing_material
+    verifier = JWKSIdentityVerifier(
+        issuer=ISSUER,
+        audience=AUDIENCE,
+        jwks_url="https://issuer.example.test/.well-known/jwks.json",
+        key_provider=StaticKeyProvider(public_key),
+    )
+    identity = verifier.verify(make_token(private_key, origin_jti="origin-jti-dynamodb"))
+    client = FakeDynamoDBClient()
+    store = DynamoDBTokenRevocationStore(client, table_name="tinlyt-token-revocations")
+
+    client.fail_transaction = True
+    with pytest.raises(OSError, match="transaction unavailable"):
+        store.revoke_identity(identity, reason="user signed out")
+    assert client.items == {}
+
+    client.fail_transaction = False
+    store.revoke_identity(identity, reason="user signed out")
+    client.fail_read = True
+    with pytest.raises(OSError, match="read unavailable"):
+        store.is_revoked(ISSUER, "jti-a")
+
+
+def test_dynamodb_revocation_store_rejects_invalid_configuration() -> None:
+    client = FakeDynamoDBClient()
+    with pytest.raises(ValueError, match="table"):
+        DynamoDBTokenRevocationStore(client, table_name=" ")
+    with pytest.raises(ValueError, match="retention"):
+        DynamoDBTokenRevocationStore(
+            client,
+            table_name="tinlyt-token-revocations",
+            token_retention_seconds=600,
+            family_retention_seconds=60,
+        )
