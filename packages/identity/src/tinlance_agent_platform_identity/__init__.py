@@ -1,5 +1,10 @@
 """Identity boundary."""
 
+from .cognito_pretoken import (
+    CognitoPreTokenGenerationV2Handler,
+    CognitoTenantMembershipError,
+    DynamoDBTenantMembershipResolver,
+)
 from .cognito import create_cognito_access_token_verifier
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
