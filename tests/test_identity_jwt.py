@@ -7,7 +7,10 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from tinlance_agent_platform_identity import JWKSIdentityVerifier
+from tinlance_agent_platform_identity import (
+    JWKSIdentityVerifier,
+    create_cognito_access_token_verifier,
+)
 
 ISSUER = "https://issuer.example.test/"
 AUDIENCE = "tinlance-platform"
@@ -235,3 +238,92 @@ def test_clock_leeway_is_applied_consistently_to_expiry(
     )
     with pytest.raises(PermissionError):
         service.verify(outside_leeway)
+
+def make_cognito_token(private_key: Any, **overrides: Any) -> str:
+    now = datetime.now(UTC)
+    claims = {
+        "iss": "https://cognito-idp.eu-west-1.amazonaws.com/eu-west-1_Abc123",
+        "sub": "cognito-user-123",
+        "aud": "https://api.tinlyt.tinlance.com",
+        "jti": "cognito-token-123",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=5)).timestamp()),
+        "tenant_id": "tenant-123",
+        "client_id": "tinlyt-web-client",
+        "token_use": "access",
+        "principal_type": "user",
+        "cognito:groups": ["operator"],
+        "scope": "web.search web.fetch",
+    }
+    claims.update(overrides)
+    return jwt.encode(
+        claims,
+        private_key,
+        algorithm="RS256",
+        headers={"kid": "cognito-key"},
+    )
+
+
+def test_cognito_access_token_profile_verifies_resource_bound_user_access_token() -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = create_cognito_access_token_verifier(
+        region="eu-west-1",
+        user_pool_id="eu-west-1_Abc123",
+        audience="https://api.tinlyt.tinlance.com",
+        client_ids=("tinlyt-web-client",),
+        key_provider=StaticKeyProvider(private_key.public_key()),
+    )
+    identity = verifier.verify(make_cognito_token(private_key))
+    assert identity.subject_id == "cognito-user-123"
+    assert identity.tenant_id == "tenant-123"
+    assert identity.client_id == "tinlyt-web-client"
+    assert identity.principal_type == "user"
+    assert identity.roles == frozenset({"operator"})
+    assert identity.scopes == frozenset({"web.search", "web.fetch"})
+
+
+def test_cognito_profile_rejects_id_tokens_and_unapproved_app_clients() -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = create_cognito_access_token_verifier(
+        region="eu-west-1",
+        user_pool_id="eu-west-1_Abc123",
+        audience="https://api.tinlyt.tinlance.com",
+        client_ids=("tinlyt-web-client",),
+        key_provider=StaticKeyProvider(private_key.public_key()),
+    )
+    with pytest.raises(PermissionError, match="token use"):
+        verifier.verify(make_cognito_token(private_key, token_use="id"))
+    with pytest.raises(PermissionError, match="client identifier"):
+        verifier.verify(make_cognito_token(private_key, client_id="other-client"))
+
+
+def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region() -> None:
+    with pytest.raises(ValueError, match="region"):
+        create_cognito_access_token_verifier(
+            region="invalid-region",
+            user_pool_id="invalid-region_Abc123",
+            audience="https://api.tinlyt.tinlance.com",
+            client_ids=("tinlyt-web-client",),
+        )
+    with pytest.raises(ValueError, match="user pool"):
+        create_cognito_access_token_verifier(
+            region="eu-west-1",
+            user_pool_id="us-east-1_Abc123",
+            audience="https://api.tinlyt.tinlance.com",
+            client_ids=("tinlyt-web-client",),
+        )
+    with pytest.raises(ValueError, match="HTTPS resource"):
+        create_cognito_access_token_verifier(
+            region="eu-west-1",
+            user_pool_id="eu-west-1_Abc123",
+            audience="http://api.tinlyt.tinlance.com",
+            client_ids=("tinlyt-web-client",),
+        )
+    with pytest.raises(ValueError, match="client"):
+        create_cognito_access_token_verifier(
+            region="eu-west-1",
+            user_pool_id="eu-west-1_Abc123",
+            audience="https://api.tinlyt.tinlance.com",
+            client_ids=(),
+        )
+
