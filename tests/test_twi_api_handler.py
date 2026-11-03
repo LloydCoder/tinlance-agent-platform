@@ -18,6 +18,7 @@ from tinlance_agent_platform_mcp import (
     register_twi_tools,
 )
 
+
 class FakeTokenIssuer:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
