@@ -257,7 +257,10 @@ def make_cognito_token(private_key: Any, **overrides: Any) -> str:
         "cognito:groups": ["operator"],
         "scope": "web.search web.fetch",
     }
+    omit_origin_jti = overrides.pop("_omit_origin_jti", False)
     claims.update(overrides)
+    if omit_origin_jti:
+        claims.pop("origin_jti", None)
     return jwt.encode(
         claims,
         private_key,
@@ -344,3 +347,5 @@ def test_cognito_profile_rejects_malformed_origin_jti() -> None:
         verifier.verify(make_cognito_token(private_key, origin_jti=""))
     with pytest.raises(PermissionError, match="origin_jti"):
         verifier.verify(make_cognito_token(private_key, origin_jti=123))
+    with pytest.raises(PermissionError, match="origin_jti"):
+        verifier.verify(make_cognito_token(private_key, _omit_origin_jti=True))
