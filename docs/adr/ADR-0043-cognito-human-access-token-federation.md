@@ -37,8 +37,9 @@ for Platform-issued service tokens and other providers.
 
 ## Required Cognito configuration
 
-1. Use a dedicated Tinlyt user pool in the selected AWS Region. Do not reuse the ThreatFade
-   Keycloak realm or another product's identity tenant.
+1. Use a dedicated Tinlyt user pool in the selected AWS Region on the Cognito Essentials or Plus
+   feature plan. The V2 Pre Token Generation event for access-token claim customization requires
+   Essentials or Plus. Do not reuse the ThreatFade Keycloak realm or another product's identity tenant.
 2. Use Cognito managed login with authorization-code grant and PKCE S256. Do not enable implicit
    grant or a client secret in the browser application.
 3. Configure the app client with only the required callback/logout URLs, scopes and authorization
@@ -46,7 +47,7 @@ for Platform-issued service tokens and other providers.
 4. Configure the OAuth resource identifier as the exact HTTPS Platform API resource, for example
    https://api.tinlyt.tinlance.com. The browser must request that exact resource parameter and
    the Platform verifier must validate the resulting aud against the same exact string.
-5. Configure a Pre Token Generation V2 trigger to add tenant_id and the constant
+5. Configure a Pre Token Generation V2 trigger (Essentials or Plus) to add tenant_id and the constant
    principal_type=user to access tokens. The trigger must derive tenant membership from a
    server-controlled membership source keyed by the authenticated Cognito sub. It must not
    trust browser input, OAuth clientMetadata, mutable user attributes, email domains, or
@@ -85,6 +86,16 @@ across invocations in a way that survives revocation or membership changes.
 - Do not create AWS resources until the current credit balance, expected monthly spend and a
   least-privilege deployment role have been verified.
 
+## Cost considerations
+
+Cognito Essentials currently includes 10,000 direct/social monthly active users (MAUs) per AWS
+account or organization in its ongoing free tier; usage above that threshold is billed per MAU.
+Plus has no equivalent 10,000-MAU free tier. SMS MFA and verification email are separately billed,
+and Lambda/DynamoDB usage for the membership lookup is also separate. The exact Region, tier,
+email/SMS configuration and expected MAU volume must be entered into AWS Pricing Calculator
+before provisioning. Do not select Plus or enable paid messaging for the initial beta without an
+explicit spend approval.
+
 ## Consequences
 
 The profile is provider-specific configuration, not a second authorization system. The Platform
@@ -98,5 +109,7 @@ domain, app client, Lambda trigger, membership table, DNS record or production A
 - Cognito resource binding: https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-define-resource-servers.html
 - Cognito authorization endpoint: https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html
 - Cognito Pre Token Generation trigger: https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-lambda-pre-token-generation.html
+- Cognito Essentials features and access-token customization: https://docs.aws.amazon.com/cognito/latest/developerguide/feature-plans-features-essentials.html
+- Cognito pricing: https://aws.amazon.com/cognito/pricing/
 - Cognito user-pool security best practices: https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-security-best-practices.html
 - RFC 8707: https://www.rfc-editor.org/rfc/rfc8707.html
