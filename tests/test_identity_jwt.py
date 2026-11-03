@@ -351,7 +351,6 @@ def test_cognito_profile_rejects_malformed_origin_jti() -> None:
         verifier.verify(make_cognito_token(private_key, _omit_origin_jti=True))
 
 
-
 def test_cognito_profile_normalizes_only_the_configured_resource_server_scopes() -> None:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     verifier = create_cognito_access_token_verifier(
