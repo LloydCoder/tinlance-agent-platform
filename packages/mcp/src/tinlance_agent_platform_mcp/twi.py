@@ -10,9 +10,10 @@ from __future__ import annotations
 import base64
 import ipaddress
 import json
-from datetime import datetime
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from hashlib import sha256
 from typing import Any, Protocol
 from urllib.error import HTTPError
@@ -569,7 +570,9 @@ class TWIHTTPTransport:
             period_start = arguments.get("period_start")
             limit = arguments.get("limit", 100)
             cursor = arguments.get("cursor")
-            if not isinstance(dimension, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", dimension):
+            if not isinstance(dimension, str) or not re.fullmatch(
+                r"[A-Za-z0-9_.:-]{1,80}", dimension
+            ):
                 raise ValueError("usage dimension is invalid")
             if not isinstance(period_start, str) or len(period_start) > 64:
                 raise ValueError("usage period start is invalid")
