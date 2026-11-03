@@ -149,7 +149,6 @@ def with_server(
     return handler, server, thread, endpoint
 
 
-
 def send_revoke_request(endpoint: str, token: str) -> tuple[int, dict[str, object]]:
     revoke_endpoint = endpoint.rsplit("/", 1)[0] + "/session/revoke"
     request = urllib.request.Request(
@@ -285,7 +284,6 @@ def test_revoke_identity_persists_both_access_token_and_session_family_ids(
     store.revoke_identity(identity, reason="user signed out")
     assert store.is_revoked(ISSUER, "jti-a")
     assert store.is_revoked(ISSUER, "origin-jti-a")
-
 
 
 def test_session_revoke_endpoint_revokes_access_token_and_family_atomically(
