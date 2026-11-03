@@ -10,15 +10,17 @@ from __future__ import annotations
 import base64
 import ipaddress
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from hashlib import sha256
 from typing import Any, Protocol
 from urllib.error import HTTPError
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from tinlance_agent_platform_contracts import RiskTier
+from tinlance_agent_platform_contracts import DataClass, RiskTier
 
 from .gateway import MCPTool, MCPToolGateway, ToolScope
 from .protocol import MCPToolDefinition
@@ -124,6 +126,7 @@ class _ToolSpec:
     idempotency_argument: str | None = None
     risk: RiskTier = RiskTier.LOW
     requires_approval: bool = False
+    data_class: DataClass = DataClass.PUBLIC
 
 
 _TOOL_SPECS: dict[str, _ToolSpec] = {
@@ -262,6 +265,15 @@ _TOOL_SPECS: dict[str, _ToolSpec] = {
         risk=RiskTier.HIGH,
         requires_approval=True,
     ),
+    "twi_usage_read": _ToolSpec(
+        capability="web.usage.read",
+        action="read",
+        resource_pattern="twi://usage/*",
+        required_scope="twi:usage:read",
+        method="GET",
+        route="/v1/usage",
+        data_class=DataClass.CONFIDENTIAL,
+    ),
 }
 
 
@@ -351,6 +363,11 @@ TWI_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = tuple(
             "twi_monitor_delete",
             "Redact and tombstone a monitor after bound human approval.",
             _TOOL_SPECS["twi_monitor_delete"],
+        ),
+        (
+            "twi_usage_read",
+            "Read tenant-scoped usage facts and plan entitlements for one period.",
+            _TOOL_SPECS["twi_usage_read"],
         ),
     )
 )
@@ -548,6 +565,43 @@ class TWIHTTPTransport:
         if tool_name == "twi_monitor_delete":
             monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
             return f"/v1/monitors/{monitor_id}", None
+        if tool_name == "twi_usage_read":
+            if any(
+                key not in {"dimension", "period_start", "limit", "cursor"} for key in arguments
+            ):
+                raise ValueError("usage query contains unsupported fields")
+            dimension = arguments.get("dimension")
+            period_start = arguments.get("period_start")
+            limit = arguments.get("limit", 100)
+            cursor = arguments.get("cursor")
+            if not isinstance(dimension, str) or not re.fullmatch(
+                r"[A-Za-z0-9_.:-]{1,80}", dimension
+            ):
+                raise ValueError("usage dimension is invalid")
+            if (
+                not isinstance(period_start, str)
+                or period_start != period_start.strip()
+                or len(period_start) > 64
+            ):
+                raise ValueError("usage period start is invalid")
+            try:
+                parsed_period = datetime.fromisoformat(period_start.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("usage period start is invalid") from exc
+            if parsed_period.tzinfo is None:
+                raise ValueError("usage period start must include a timezone")
+            if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
+                raise ValueError("usage page size is invalid")
+            if cursor is not None and (not isinstance(cursor, str) or not 1 <= len(cursor) <= 1024):
+                raise ValueError("usage cursor is invalid")
+            query: dict[str, str] = {
+                "dimension": dimension,
+                "period_start": period_start,
+                "limit": str(limit),
+            }
+            if cursor is not None:
+                query["cursor"] = cursor
+            return f"/v1/usage?{urlencode(query)}", None
         raise LookupError("TWI tool is not registered")
 
 
@@ -694,6 +748,17 @@ _TWI_MONITOR_RUN_SCHEMA: dict[str, object] = {
         "idempotency_key": {"type": "string", "minLength": 16, "maxLength": 256},
     },
 }
+_TWI_USAGE_READ_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["dimension", "period_start"],
+    "properties": {
+        "dimension": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,80}$"},
+        "period_start": {"type": "string", "format": "date-time", "maxLength": 64},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100},
+        "cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+    },
+}
 _TWI_MONITOR_DELETE_SCHEMA: dict[str, object] = {
     "type": "object",
     "additionalProperties": False,
@@ -833,6 +898,14 @@ TWI_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = (
         consequential=True,
         destructive=True,
         idempotency_argument="idempotency_key",
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        "twi_usage_read",
+        "Read tenant-scoped usage facts and plan entitlements for one period.",
+        "twi.usage.read",
+        _TWI_USAGE_READ_SCHEMA,
+        read_only=True,
         open_world=False,
     ),
 )

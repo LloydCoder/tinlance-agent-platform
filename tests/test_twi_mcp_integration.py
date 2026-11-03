@@ -26,6 +26,7 @@ from tinlance_agent_platform_mcp import (
     TWITransportError,
     register_twi_tools,
 )
+from tinlance_agent_platform_mcp.twi import twi_tool_spec
 
 TRACEPARENT = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
 EXPORT_CAPABILITY = "world-intelligence.source-evidence.export"
@@ -222,7 +223,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         self.assertTrue(export.requires_approval)
         self.assertEqual(export.risk, RiskTier.HIGH)
         self.assertEqual(export.idempotency_argument, "idempotency_key")
-        self.assertEqual(len(TWI_TOOL_REGISTRATIONS), 15)
+        self.assertEqual(len(TWI_TOOL_REGISTRATIONS), 16)
         self.assertEqual(
             {tool.name for tool in TWI_TOOL_REGISTRATIONS},
             {
@@ -241,6 +242,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
                 "twi_monitor_pause",
                 "twi_monitor_resume",
                 "twi_monitor_delete",
+                "twi_usage_read",
             },
         )
 
@@ -399,6 +401,71 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             "https://twi.internal/v1/jobs/job-0000000000000001/evidence",
         )
         self.assertEqual(self.http.calls[0]["method"], "GET")
+
+    def test_usage_read_uses_tenant_scoped_query_route_and_confidential_scope(self) -> None:
+        self.http.response = TWIHTTPResponse(
+            200,
+            {"content-type": "application/json"},
+            b'{"schema_version":1,"dimension":"search_requests_month","period_start":"2026-10-01T00:00:00Z","used":12,"quota_limit":100,"remaining":88,"plan_id":"starter","plan_version":1,"events":[],"returned":0,"has_more":false,"next_cursor":null}',
+        )
+        result = self.transport.call(
+            "twi_usage_read",
+            {
+                "dimension": "search_requests_month",
+                "period_start": "2026-10-01T00:00:00Z",
+                "limit": 25,
+                "cursor": "opaque-cursor-value",
+            },
+            ToolScope(
+                tenant_id="tenant-a",
+                capability="web.usage.read",
+                resource="twi://usage/*",
+                subject_id="subject-a",
+                request_id="twi-usage-request-0001",
+            ),
+        )
+        self.assertEqual(result["used"], 12)
+        self.assertIs(twi_tool_spec("twi_usage_read").data_class, DataClass.CONFIDENTIAL)
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/usage?dimension=search_requests_month&period_start=2026-10-01T00%3A00%3A00Z&limit=25&cursor=opaque-cursor-value",
+        )
+        self.assertEqual(self.http.calls[0]["method"], "GET")
+        self.assertIsNone(self.http.calls[0]["body"])
+        self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:usage:read"}))
+
+    def test_usage_read_rejects_unbounded_or_timezone_free_query_before_network(self) -> None:
+        scope = ToolScope(
+            tenant_id="tenant-a",
+            capability="web.usage.read",
+            resource="twi://usage/*",
+            subject_id="subject-a",
+            request_id="twi-usage-request-0002",
+        )
+        with self.assertRaisesRegex(ValueError, "usage dimension"):
+            self.transport.call(
+                "twi_usage_read",
+                {"dimension": "invalid dimension", "period_start": "2026-10-01T00:00:00Z"},
+                scope,
+            )
+        with self.assertRaisesRegex(ValueError, "timezone"):
+            self.transport.call(
+                "twi_usage_read",
+                {"dimension": "search_requests_month", "period_start": "2026-10-01T00:00:00"},
+                scope,
+            )
+        with self.assertRaisesRegex(ValueError, "unsupported fields"):
+            self.transport.call(
+                "twi_usage_read",
+                {
+                    "dimension": "search_requests_month",
+                    "period_start": "2026-10-01T00:00:00Z",
+                    "unexpected": "ignored-must-not-be-accepted",
+                },
+                scope,
+            )
+        self.assertEqual(self.http.calls, [])
+        self.assertEqual(self.issuer.calls, [])
 
     def test_monitor_operations_map_to_tenant_scoped_api_routes(self) -> None:
         cases = (

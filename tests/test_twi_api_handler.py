@@ -312,6 +312,31 @@ class TWIAPIHandlerTests(unittest.TestCase):
         )
         self.assertIsNone(self.http.calls[0]["body"])
 
+    def test_usage_read_operation_uses_confidential_platform_scope_and_twi_token(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-a",
+            operation="twi.usage.read",
+            payload={
+                "dimension": "search_requests_month",
+                "period_start": "2026-10-01T00:00:00Z",
+                "limit": 25,
+                "cursor": "opaque-cursor-value",
+            },
+            request_id="platform-twi-usage-0001",
+            trace_id="0123456789abcdef0123456789abcdef",
+            authenticated_principal=_principal("web.usage.read"),
+        )
+        response = self.handler.handle(request)
+        self.assertEqual(response.status, "success")
+        self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:usage:read"}))
+        self.assertEqual(
+            self.http.calls[0]["url"],
+            "https://twi.internal/v1/usage?dimension=search_requests_month&period_start=2026-10-01T00%3A00%3A00Z&limit=25&cursor=opaque-cursor-value",
+        )
+        self.assertEqual(self.http.calls[0]["method"], "GET")
+        self.assertIsNone(self.http.calls[0]["body"])
+
     def test_monitor_delete_requires_exact_intent_bound_human_approval(self) -> None:
         run_id = uuid4()
         approval_id = uuid4()
@@ -375,8 +400,12 @@ class TWIAPIHandlerTests(unittest.TestCase):
                 "twi_monitor_pause",
                 "twi_monitor_resume",
                 "twi_monitor_delete",
+                "twi_usage_read",
             },
         )
+        usage = next(tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_usage_read")
+        self.assertTrue(usage.read_only)
+        self.assertFalse(usage.open_world)
         delete = next(
             tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_monitor_delete"
         )

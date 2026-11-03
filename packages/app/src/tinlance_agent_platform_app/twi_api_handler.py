@@ -15,7 +15,6 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
-    DataClass,
     Principal,
     RequestContext,
     Reversibility,
@@ -136,7 +135,7 @@ class TWIAPIHandler:
                 if spec.requires_approval
                 else Reversibility.REVERSIBLE
             ),
-            data_class=DataClass.PUBLIC,
+            data_class=spec.data_class,
             blast_radius="single",
         )
         try:
