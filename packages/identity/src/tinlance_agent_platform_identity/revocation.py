@@ -182,7 +182,7 @@ class DynamoDBTokenRevocationStore:
 
     @staticmethod
     def _revocation_key(issuer: str, token_id: str) -> str:
-        value = f"{issuer}\0{token_id}".encode("utf-8")
+        value = f"{issuer}\0{token_id}".encode()
         return hashlib.sha256(value).hexdigest()
 
     @staticmethod
