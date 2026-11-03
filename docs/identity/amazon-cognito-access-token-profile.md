@@ -13,8 +13,8 @@ The implementation is provider-neutral at the HTTP boundary. Configure `JWKSPrin
 - Managed login / authorization server: enabled.
 - Resource server binding: the SPA authorization request sends `resource=https://api.tinlyt.tinlance.com`. The access token `aud` must equal this exact resource identifier.
 - App client: allow only the production and explicitly approved preview client IDs. Do not accept arbitrary app clients.
-- Token revocation: enabled so Cognito issues `jti` / `origin_jti` revocation identifiers.
-- Access-token lifetime: short (recommended 15 minutes); refresh-token rotation enabled.
+- Token revocation: enabled (new app clients default to enabled); access tokens include `jti` and `origin_jti` for server-side revocation records.
+- Access-token lifetime: configure to the shortest operationally acceptable value. The current browser client keeps the access token in memory and discards the refresh token returned by Cognito; users reauthenticate through managed login when the access token expires. Do not add browser refresh-token persistence. If persistent sessions are later required, implement a backend-for-frontend with server-side refresh-token storage and rotation.
 - Signing: RS256; JWKS retrieved only from the exact user-pool issuer URL.
 
 ## Trusted claims
@@ -38,7 +38,7 @@ Never derive `tenant_id`, roles, or Platform scopes from browser request fields,
 
 ## Pre Token Generation V2 contract
 
-The V2 trigger must add `tenant_id` and `principal_type=user` to the **access token**. It may add approved roles/scopes only from trusted server-side membership and entitlement data. The trigger must fail closed when tenant membership is missing, ambiguous, disabled, or unavailable. Do not trust client metadata or accept a tenant ID supplied by the SPA.
+The V2 trigger must add `tenant_id` and `principal_type=user` to the **access token**. It may add approved roles/scopes only from trusted server-side membership and entitlement data. The SPA intentionally ignores and does not persist the refresh token in Cognito's authorization-code response; the Platform stores its own access-token revocation records. The trigger must fail closed when tenant membership is missing, ambiguous, disabled, or unavailable. Do not trust client metadata or accept a tenant ID supplied by the SPA.
 
 ## Runtime composition
 
