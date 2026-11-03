@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from .federation import VerifiedAgentIdentity
+
 
 class TokenRevocationChecker(Protocol):
     def is_revoked(self, issuer: str, token_id: str) -> bool: ...
@@ -79,6 +81,38 @@ class SQLiteTokenRevocationStore:
                 (issuer, token_id, timestamp.astimezone(UTC).isoformat(), reason),
             )
             return cursor.rowcount == 1
+
+    def revoke_identity(
+        self,
+        identity: VerifiedAgentIdentity,
+        *,
+        reason: str,
+        revoked_at: datetime | None = None,
+    ) -> tuple[str, ...]:
+        """Atomically revoke one JWT and every configured token-family identifier."""
+
+        identifiers = tuple(sorted({identity.token_id, *identity.revocation_ids}))
+        for identifier in identifiers:
+            self._validate_identity(identity.issuer, identifier)
+        if not reason or reason != reason.strip():
+            raise ValueError("revocation reason must be normalized and non-empty")
+        timestamp = revoked_at or datetime.now(UTC)
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise ValueError("revocation timestamp must be timezone-aware")
+        revoked_at_value = timestamp.astimezone(UTC).isoformat()
+        with closing(self._connect()) as connection, connection:
+            connection.executemany(
+                """
+                INSERT INTO revoked_tokens (issuer, token_id, revoked_at, reason)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (issuer, token_id) DO NOTHING
+                """,
+                [
+                    (identity.issuer, identifier, revoked_at_value, reason)
+                    for identifier in identifiers
+                ],
+            )
+        return identifiers
 
     def is_revoked(self, issuer: str, token_id: str) -> bool:
         self._validate_identity(issuer, token_id)

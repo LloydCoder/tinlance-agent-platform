@@ -26,6 +26,7 @@ class VerifiedAgentIdentity:
     client_id: str | None = None
     principal_type: str = "federated"
     roles: frozenset[str] = frozenset()
+    revocation_ids: frozenset[str] = frozenset()
 
     def validate(
         self,
@@ -76,6 +77,14 @@ class VerifiedAgentIdentity:
             raise PermissionError("identity scopes must be normalized")
         if any(not role or role != role.strip() for role in self.roles):
             raise PermissionError("identity roles must be normalized")
+        if any(
+            not isinstance(revocation_id, str)
+            or not revocation_id
+            or revocation_id != revocation_id.strip()
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in revocation_id)
+            for revocation_id in self.revocation_ids
+        ):
+            raise PermissionError("identity revocation identifiers must be normalized")
         if expected_nonce is not None and self.nonce != expected_nonce:
             raise PermissionError("identity nonce does not match")
 

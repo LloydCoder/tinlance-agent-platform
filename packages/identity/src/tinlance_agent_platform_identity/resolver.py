@@ -28,14 +28,16 @@ class JWKSPrincipalResolver:
         except Exception as exc:
             raise IdentityAuthenticationError("identity assertion verification failed") from exc
 
-        try:
-            revoked = self.revocation_checker.is_revoked(identity.issuer, identity.token_id)
-        except Exception as exc:
-            raise IdentityAuthenticationError(
-                "identity token revocation status is unavailable"
-            ) from exc
-        if revoked:
-            raise IdentityAuthenticationError("identity token has been revoked")
+        revocation_ids = sorted({identity.token_id, *identity.revocation_ids})
+        for revocation_id in revocation_ids:
+            try:
+                revoked = self.revocation_checker.is_revoked(identity.issuer, revocation_id)
+            except Exception as exc:
+                raise IdentityAuthenticationError(
+                    "identity token revocation status is unavailable"
+                ) from exc
+            if revoked:
+                raise IdentityAuthenticationError("identity token has been revoked")
 
         try:
             principal = Principal(
