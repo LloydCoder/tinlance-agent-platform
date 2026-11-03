@@ -307,7 +307,10 @@ class JWKSIdentityVerifier:
             if (
                 not resource_scope
                 or not resource_scope[0].isalnum()
-                or any(not (character.isalnum() or character in "._:-") for character in resource_scope)
+                or any(
+                    not (character.isalnum() or character in "._:-")
+                    for character in resource_scope
+                )
             ):
                 raise PermissionError("identity resource scope is malformed")
             normalized.append(resource_scope)
