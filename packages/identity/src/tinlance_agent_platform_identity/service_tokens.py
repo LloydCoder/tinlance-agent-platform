@@ -151,6 +151,8 @@ class PlatformServiceTokenIssuer:
         allowed_audiences: frozenset[str],
         signer: KMSRS256Signer,
     ) -> None:
+        if not isinstance(issuer, str):
+            raise ValueError("Platform service-token issuer must be a string")
         parsed = urlsplit(issuer)
         if (
             parsed.scheme != "https"
@@ -196,7 +198,7 @@ class PlatformServiceTokenIssuer:
         ):
             if not isinstance(value, str) or not _IDENTIFIER_RE.fullmatch(value):
                 raise ValueError(f"Platform service-token {name} is invalid")
-        if audience not in self._allowed_audiences:
+        if not isinstance(audience, str) or audience not in self._allowed_audiences:
             raise PermissionError("downstream token audience is not allowlisted")
         if (
             isinstance(expires_in_seconds, bool)
