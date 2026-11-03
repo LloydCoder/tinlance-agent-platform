@@ -162,6 +162,7 @@ class TWIAPIHandlerTests(unittest.TestCase):
         self.assertEqual(len(self.http.calls), 1)
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
+        self.assertEqual(self.issuer.calls[0]["principal_type"], "user")
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:search"}))
         self.assertEqual(
             self.http.calls[0]["headers"]["Authorization"],
