@@ -441,7 +441,11 @@ def test_dynamodb_revocation_store_atomically_writes_token_and_family_ids(
     )
     assert token_item["request_id"] == "request-dynamodb-revoke-001"
     assert family_item["request_id"] == "request-dynamodb-revoke-001"
-    assert int(family_item["expires_at"]) > int(token_item["expires_at"])
+    token_expiry = token_item["expires_at"]
+    family_expiry = family_item["expires_at"]
+    assert isinstance(token_expiry, int)
+    assert isinstance(family_expiry, int)
+    assert family_expiry > token_expiry
 
 
 def test_dynamodb_revocation_store_expired_ttl_records_are_not_active() -> None:
