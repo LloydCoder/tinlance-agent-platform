@@ -238,13 +238,16 @@ class DynamoDBTokenRevocationStore:
         family_expires_at = revoked_at_epoch + self.family_retention_seconds
         actions: list[dict[str, Any]] = []
         for identifier in identifiers:
+            expires_at = (
+                token_expires_at if identifier == identity.token_id else family_expires_at
+            )
             item: dict[str, Any] = {
                 "revocation_key": self._revocation_key(identity.issuer, identifier),
                 "issuer": identity.issuer,
                 "token_id": identifier,
                 "revoked_at": timestamp.astimezone(UTC).isoformat(),
                 "reason": reason,
-                "expires_at": token_expires_at if identifier == identity.token_id else family_expires_at,
+                "expires_at": expires_at,
             }
             if request_id is not None:
                 item["request_id"] = request_id
