@@ -240,7 +240,6 @@ def test_clock_leeway_is_applied_consistently_to_expiry(
         service.verify(outside_leeway)
 
 
-
 def make_cognito_token(private_key: Any, **overrides: Any) -> str:
     now = datetime.now(UTC)
     claims = {
