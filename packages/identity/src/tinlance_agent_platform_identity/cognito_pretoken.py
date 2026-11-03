@@ -118,7 +118,11 @@ class CognitoPreTokenGenerationV2Handler:
         result = copy.deepcopy(dict(event))
         if result.get("version") != "2":
             raise CognitoTenantMembershipError("Cognito Pre Token Generation event version must be 2")
-        if result.get("triggerSource") not in _ALLOWED_USER_TRIGGER_SOURCES:
+        trigger_source = result.get("triggerSource")
+        if (
+            not isinstance(trigger_source, str)
+            or trigger_source not in _ALLOWED_USER_TRIGGER_SOURCES
+        ):
             raise CognitoTenantMembershipError("Cognito trigger source is not a supported human-user flow")
         if result.get("userPoolId") != self.user_pool_id:
             raise CognitoTenantMembershipError("Cognito trigger user pool is not trusted")
