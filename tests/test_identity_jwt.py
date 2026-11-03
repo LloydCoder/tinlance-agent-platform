@@ -10,6 +10,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from tinlance_agent_platform_identity import (
     JWKSIdentityVerifier,
     create_cognito_access_token_verifier,
+    create_cognito_principal_resolver,
+    IdentityAuthenticationError,
+    SQLiteTokenRevocationStore,
 )
 
 ISSUER = "https://issuer.example.test/"
@@ -327,3 +330,26 @@ def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region()
             audience="https://api.tinlyt.tinlance.com",
             client_ids=(),
         )
+
+
+
+def test_cognito_principal_resolver_binds_verified_claims_and_enforces_revocation(tmp_path) -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    resolver = create_cognito_principal_resolver(
+        region="eu-west-1",
+        user_pool_id="eu-west-1_Abc123",
+        audience="https://api.tinlyt.tinlance.com",
+        client_ids=("tinlytwebclient123",),
+        key_provider=StaticKeyProvider(private_key.public_key()),
+        revocation_checker=SQLiteTokenRevocationStore(tmp_path / "revocations.sqlite3"),
+    )
+    token = make_cognito_token(private_key)
+    principal = resolver.resolve(token)
+    assert principal.subject_id == "cognito-user-123"
+    assert principal.tenant_id == "tenant-123"
+    assert principal.principal_type == "user"
+    assert principal.scopes == frozenset({"web.search", "web.fetch"})
+
+    resolver.revoke_session(token, request_id="tinlyt-signout-123")
+    with pytest.raises(IdentityAuthenticationError, match="revoked"):
+        resolver.resolve(token)
