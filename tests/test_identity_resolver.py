@@ -225,3 +225,33 @@ def test_identity_resolver_rejects_invalid_signature(
     resolver = resolver_for(public_key, SQLiteTokenRevocationStore(tmp_path / "revocations.db"))
     with pytest.raises(IdentityAuthenticationError):
         resolver.resolve(make_token(attacker_key))
+
+
+
+def test_cognito_origin_jti_revokes_every_access_token_in_the_session_family(
+    signing_material: tuple[Any, Any], tmp_path: Path
+) -> None:
+    private_key, public_key = signing_material
+    path = tmp_path / "revocations.db"
+    store = SQLiteTokenRevocationStore(path)
+    assert store.revoke(ISSUER, "origin-jti-a", reason="user signed out")
+    resolver = resolver_for(public_key, store)
+    with pytest.raises(IdentityAuthenticationError, match="revoked"):
+        resolver.resolve(make_token(private_key, origin_jti="origin-jti-a"))
+
+
+def test_revoke_identity_persists_both_access_token_and_session_family_ids(
+    signing_material: tuple[Any, Any], tmp_path: Path
+) -> None:
+    private_key, public_key = signing_material
+    store = SQLiteTokenRevocationStore(tmp_path / "revocations.db")
+    verifier = JWKSIdentityVerifier(
+        issuer=ISSUER,
+        audience=AUDIENCE,
+        jwks_url="https://issuer.example.test/.well-known/jwks.json",
+        key_provider=StaticKeyProvider(public_key),
+    )
+    identity = verifier.verify(make_token(private_key, origin_jti="origin-jti-a"))
+    store.revoke_identity(identity, reason="user signed out")
+    assert store.is_revoked(ISSUER, "jti-a")
+    assert store.is_revoked(ISSUER, "origin-jti-a")
