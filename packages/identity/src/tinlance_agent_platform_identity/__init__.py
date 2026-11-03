@@ -8,7 +8,11 @@ from .resolver import (
     IdentityRevocationUnavailable,
     JWKSPrincipalResolver,
 )
-from .revocation import SQLiteTokenRevocationStore, TokenRevocationChecker
+from .revocation import (
+    DynamoDBTokenRevocationStore,
+    SQLiteTokenRevocationStore,
+    TokenRevocationChecker,
+)
 from .service import validate_principal
 from .service_tokens import KMSRS256Signer, PlatformServiceTokenIssuer
 from .token_security import TokenSecurityContext
@@ -26,6 +30,7 @@ __all__ = [
     "IdentityRevocationUnavailable",
     "JWKSPrincipalResolver",
     "SQLiteTokenRevocationStore",
+    "DynamoDBTokenRevocationStore",
     "TokenRevocationChecker",
     "KMSRS256Signer",
     "PlatformServiceTokenIssuer",
