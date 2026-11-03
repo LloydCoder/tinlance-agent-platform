@@ -41,7 +41,7 @@ class JWKSProvider(Protocol):
 
 
 class SessionRevoker(Protocol):
-    def revoke_session(self, bearer_token: str) -> None: ...
+    def revoke_session(self, bearer_token: str, *, request_id: str) -> None: ...
 
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
@@ -193,7 +193,7 @@ def serve(
                     self._respond(HTTPStatus.UPGRADE_REQUIRED, {"error": "api_version_required"})
                     return
                 try:
-                    _request_id(self.headers.get("X-Request-ID"))
+                    request_id = _request_id(self.headers.get("X-Request-ID"))
                     raw = self.rfile.read(length)
                     if len(raw) != length:
                         raise ValueError("request body is truncated")
@@ -202,7 +202,7 @@ def serve(
                         raise ValueError("session revocation body must be an empty JSON object")
                     token = _bearer(self.headers.get("Authorization"))
                     try:
-                        session_revoker.revoke_session(token)
+                        session_revoker.revoke_session(token, request_id=request_id)
                     except PermissionError as exc:
                         raise AuthenticationError(
                             "bearer identity could not be authenticated"
