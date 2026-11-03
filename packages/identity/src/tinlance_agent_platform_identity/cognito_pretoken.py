@@ -198,3 +198,51 @@ class CognitoPreTokenGenerationV2Handler:
         response["claimsAndScopeOverrideDetails"] = details
         result["response"] = response
         return result
+
+
+
+def build_cognito_pretoken_handler(
+    environment: Mapping[str, str],
+    dynamodb_client: DynamoDBMembershipClient,
+) -> CognitoPreTokenGenerationV2Handler:
+    """Build the V2 trigger from explicit environment configuration and an SDK client."""
+
+    required = (
+        "AWS_REGION",
+        "COGNITO_USER_POOL_ID",
+        "COGNITO_APP_CLIENT_IDS",
+        "TENANT_MEMBERSHIP_TABLE",
+    )
+    values = {name: environment.get(name) for name in required}
+    if any(not isinstance(value, str) or not value for value in values.values()):
+        raise ValueError("Cognito Pre Token Generation environment configuration is incomplete")
+
+    region = values["AWS_REGION"]
+    user_pool_id = values["COGNITO_USER_POOL_ID"]
+    raw_client_ids = values["COGNITO_APP_CLIENT_IDS"]
+    table_name = values["TENANT_MEMBERSHIP_TABLE"]
+    assert isinstance(region, str)
+    assert isinstance(user_pool_id, str)
+    assert isinstance(raw_client_ids, str)
+    assert isinstance(table_name, str)
+
+    if user_pool_id.split("_", 1)[0] != region:
+        raise ValueError("Cognito user pool region does not match AWS_REGION")
+    client_ids = tuple(raw_client_ids.split(","))
+    if (
+        not client_ids
+        or any(not client_id or client_id != client_id.strip() for client_id in client_ids)
+        or len(set(client_ids)) != len(client_ids)
+    ):
+        raise ValueError("Cognito app client configuration is invalid")
+
+    resolver = DynamoDBTenantMembershipResolver(
+        dynamodb_client,
+        table_name=table_name,
+        user_pool_id=user_pool_id,
+    )
+    return CognitoPreTokenGenerationV2Handler(
+        resolver,
+        user_pool_id=user_pool_id,
+        allowed_client_ids=frozenset(client_ids),
+    )
