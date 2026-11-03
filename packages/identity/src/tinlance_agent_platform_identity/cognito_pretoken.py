@@ -25,6 +25,7 @@ class TenantMembershipResolver(Protocol):
 _USER_POOL_ID = re.compile(r"^[a-z]{2}(?:-[a-z]+)+-[0-9]+_[A-Za-z0-9]+$")
 _SUBJECT_ID = re.compile(r"^[A-Za-z0-9-]{1,128}$")
 _TENANT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+_CLIENT_ID = re.compile(r"^[A-Za-z0-9]{1,128}$")
 _TABLE_NAME = re.compile(r"^[A-Za-z0-9_.-]{3,255}$")
 _ALLOWED_USER_TRIGGER_SOURCES = frozenset(
     {
@@ -105,8 +106,7 @@ class CognitoPreTokenGenerationV2Handler:
             or not self.allowed_client_ids
             or any(
                 not isinstance(client_id, str)
-                or not client_id
-                or not client_id.isalnum()
+                or not _CLIENT_ID.fullmatch(client_id)
                 for client_id in self.allowed_client_ids
             )
         ):
@@ -122,6 +122,9 @@ class CognitoPreTokenGenerationV2Handler:
             raise CognitoTenantMembershipError("Cognito trigger source is not a supported human-user flow")
         if result.get("userPoolId") != self.user_pool_id:
             raise CognitoTenantMembershipError("Cognito trigger user pool is not trusted")
+        expected_region = self.user_pool_id.split("_", 1)[0]
+        if result.get("region") != expected_region:
+            raise CognitoTenantMembershipError("Cognito trigger region does not match the user pool")
 
         caller_context = result.get("callerContext")
         if not isinstance(caller_context, Mapping):
@@ -161,7 +164,7 @@ class CognitoPreTokenGenerationV2Handler:
             raise CognitoTenantMembershipError("Cognito trigger response is malformed")
 
         details_value = response.get("claimsAndScopeOverrideDetails")
-        if details_value is None:
+        if details_value is None or details_value == []:
             details: dict[str, object] = {}
         elif isinstance(details_value, Mapping):
             details = dict(details_value)
