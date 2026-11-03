@@ -92,7 +92,8 @@ class JWKSIdentityVerifier:
         if not isinstance(self.require_client_id, bool) or not isinstance(self.require_kid, bool):
             raise ValueError("JWT strictness options must be boolean")
         if self.expected_token_use is not None and (
-            not self.expected_token_use or self.expected_token_use != self.expected_token_use.strip()
+            not self.expected_token_use
+            or self.expected_token_use != self.expected_token_use.strip()
         ):
             raise ValueError("expected token use must be normalized when configured")
         if self.allowed_client_ids is not None and (
