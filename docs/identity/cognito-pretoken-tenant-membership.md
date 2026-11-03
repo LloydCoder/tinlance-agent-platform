@@ -73,6 +73,7 @@ pip install '.[aws-runtime]'
 import os
 
 import boto3
+from botocore.config import Config
 
 from tinlance_agent_platform_identity import (
     CognitoPreTokenGenerationV2Handler,
@@ -86,7 +87,12 @@ allowed_client_ids = frozenset(
 )
 table_name = os.environ["TENANT_MEMBERSHIP_TABLE"]
 
-dynamodb = boto3.resource("dynamodb", region_name=region)
+sdk_config = Config(
+    connect_timeout=1,
+    read_timeout=1,
+    retries={"mode": "standard", "total_max_attempts": 2},
+)
+dynamodb = boto3.resource("dynamodb", region_name=region, config=sdk_config)
 membership_resolver = DynamoDBTenantMembershipResolver(
     dynamodb.meta.client,
     table_name=table_name,
