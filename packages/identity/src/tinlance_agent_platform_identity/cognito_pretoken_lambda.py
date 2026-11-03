@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
-from functools import lru_cache
 from collections.abc import Mapping
+from functools import lru_cache
 
 from .cognito_pretoken import CognitoPreTokenGenerationV2Handler, build_cognito_pretoken_handler
 
@@ -26,8 +26,11 @@ def _configured_handler() -> CognitoPreTokenGenerationV2Handler:
     return build_cognito_pretoken_handler(os.environ, dynamodb.meta.client)
 
 
+_HANDLER = _configured_handler()
+
+
 def lambda_handler(event: Mapping[str, object], context: object) -> dict[str, object]:
     """Cognito Pre Token Generation V2 Lambda handler."""
 
     del context
-    return _configured_handler().handle(event)
+    return _HANDLER.handle(event)
