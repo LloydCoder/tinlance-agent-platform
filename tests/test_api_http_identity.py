@@ -4,6 +4,7 @@ import http.client
 import json
 import threading
 from dataclasses import dataclass
+from http.server import ThreadingHTTPServer
 from uuid import uuid4
 
 from tinlance_agent_platform_api.http import API_VERSION, serve
@@ -38,10 +39,10 @@ class API:
 
 
 def post(
-    server: object,
+    server: ThreadingHTTPServer,
     payload: dict[str, object],
 ) -> tuple[int, dict[str, object]]:
-    address = getattr(server, "server_address")
+    address = server.server_address
     connection = http.client.HTTPConnection("127.0.0.1", address[1], timeout=3)
     try:
         connection.request(
@@ -89,7 +90,7 @@ def test_platform_http_derives_tenant_and_subject_from_verified_principal() -> N
         thread.join(timeout=2)
 
 
-def test_platform_http_rejects_client_supplied_identity_that_differs_from_verified_principal() -> None:
+def test_platform_http_rejects_mismatched_client_identity() -> None:
     api = API()
     server = serve(api, Resolver(), host="127.0.0.1", port=0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
