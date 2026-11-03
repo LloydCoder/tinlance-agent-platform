@@ -7,8 +7,8 @@ registered with a mandatory approval gate and a required idempotency key.
 
 from __future__ import annotations
 
-import ipaddress
 import base64
+import ipaddress
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
