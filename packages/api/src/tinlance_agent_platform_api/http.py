@@ -113,7 +113,8 @@ def serve(
                     document = jwks_provider.jwks()
                     keys = document.get("keys")
                     if (
-                        not isinstance(keys, list)
+                        set(document) != {"keys"}
+                        or not isinstance(keys, list)
                         or not keys
                         or len(keys) > 16
                         or any(
