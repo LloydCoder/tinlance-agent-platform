@@ -80,6 +80,7 @@ def create_cognito_access_token_verifier(
         require_kid=True,
         expected_token_use="access",
         allowed_client_ids=frozenset(client_ids),
+        required_revocation_claims=("origin_jti",),
         jwks_timeout_seconds=jwks_timeout_seconds,
         key_provider=key_provider,
     )
