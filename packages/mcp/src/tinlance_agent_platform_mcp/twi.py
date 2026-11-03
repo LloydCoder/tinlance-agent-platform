@@ -8,6 +8,7 @@ registered with a mandatory approval gate and a required idempotency key.
 from __future__ import annotations
 
 import ipaddress
+import base64
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -483,6 +484,13 @@ class TWIHTTPTransport:
             raise TWITransportError(response.status_code) from exc
         if not isinstance(decoded, dict):
             raise TWITransportError(response.status_code)
+        if tool_name == "twi_evidence_export":
+            if content_type != "application/vnd.tinlance.twi-evidence+json":
+                raise TWITransportError(response.status_code)
+            return {
+                "evidence_package": decoded,
+                "response_bytes_base64": base64.b64encode(response.body).decode("ascii"),
+            }
         return decoded
 
     @staticmethod
