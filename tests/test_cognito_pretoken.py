@@ -180,6 +180,8 @@ def test_pre_token_v2_rejects_wrong_pool_or_event_version() -> None:
         handler.handle(make_event(version="1"))
     with pytest.raises(CognitoTenantMembershipError, match="trigger source"):
         handler.handle(make_event(triggerSource="TokenGeneration_ClientCredentials"))
+    with pytest.raises(CognitoTenantMembershipError, match="trigger source"):
+        handler.handle(make_event(triggerSource=[]))
     assert client.calls == []
 
 
