@@ -20,7 +20,7 @@ from tinlance_agent_platform_identity.service_tokens import (
 )
 
 ISSUER = "https://identity.tinlance.com/"
-TWI_AUDIENCE = "https://api.tinlyt.tinlance.com"
+TWI_AUDIENCE = "tinlance-web-intelligence"
 WI_AUDIENCE = "world-intelligence"
 KMS_KEY_ID = "arn:aws:kms:eu-west-1:123456789012:key/11111111-2222-3333-4444-555555555555"
 
