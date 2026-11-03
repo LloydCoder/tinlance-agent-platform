@@ -117,18 +117,24 @@ class CognitoPreTokenGenerationV2Handler:
             raise CognitoTenantMembershipError("Cognito trigger event must be an object")
         result = copy.deepcopy(dict(event))
         if result.get("version") != "2":
-            raise CognitoTenantMembershipError("Cognito Pre Token Generation event version must be 2")
+            raise CognitoTenantMembershipError(
+                "Cognito Pre Token Generation event version must be 2"
+            )
         trigger_source = result.get("triggerSource")
         if (
             not isinstance(trigger_source, str)
             or trigger_source not in _ALLOWED_USER_TRIGGER_SOURCES
         ):
-            raise CognitoTenantMembershipError("Cognito trigger source is not a supported human-user flow")
+            raise CognitoTenantMembershipError(
+                "Cognito trigger source is not a supported human-user flow"
+            )
         if result.get("userPoolId") != self.user_pool_id:
             raise CognitoTenantMembershipError("Cognito trigger user pool is not trusted")
         expected_region = self.user_pool_id.split("_", 1)[0]
         if result.get("region") != expected_region:
-            raise CognitoTenantMembershipError("Cognito trigger region does not match the user pool")
+            raise CognitoTenantMembershipError(
+                "Cognito trigger region does not match the user pool"
+            )
 
         caller_context = result.get("callerContext")
         if not isinstance(caller_context, Mapping):
@@ -157,7 +163,9 @@ class CognitoPreTokenGenerationV2Handler:
         except Exception as exc:
             raise CognitoTenantMembershipError("trusted tenant membership lookup failed") from exc
         if not isinstance(tenant_id, str) or not _TENANT_ID.fullmatch(tenant_id):
-            raise CognitoTenantMembershipError("trusted tenant membership returned an invalid tenant ID")
+            raise CognitoTenantMembershipError(
+                "trusted tenant membership returned an invalid tenant ID"
+            )
 
         response_value = result.get("response")
         if response_value is None:
@@ -173,7 +181,9 @@ class CognitoPreTokenGenerationV2Handler:
         elif isinstance(details_value, Mapping):
             details = dict(details_value)
         else:
-            raise CognitoTenantMembershipError("Cognito claims-and-scope override response is malformed")
+            raise CognitoTenantMembershipError(
+                "Cognito claims-and-scope override response is malformed"
+            )
 
         access_value = details.get("accessTokenGeneration")
         if access_value is None:
@@ -181,7 +191,9 @@ class CognitoPreTokenGenerationV2Handler:
         elif isinstance(access_value, Mapping):
             access = dict(access_value)
         else:
-            raise CognitoTenantMembershipError("Cognito access-token override response is malformed")
+            raise CognitoTenantMembershipError(
+                "Cognito access-token override response is malformed"
+            )
 
         claims_value = access.get("claimsToAddOrOverride")
         if claims_value is None:
