@@ -25,8 +25,8 @@ from tinlance_agent_platform_mcp import (
     TWIHTTPTransport,
     TWITransportError,
     register_twi_tools,
-    twi_tool_spec,
 )
+from tinlance_agent_platform_mcp.twi import twi_tool_spec
 
 TRACEPARENT = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
 EXPORT_CAPABILITY = "world-intelligence.source-evidence.export"
