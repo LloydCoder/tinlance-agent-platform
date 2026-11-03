@@ -95,10 +95,13 @@ across invocations in a way that survives revocation or membership changes.
 Cognito Essentials currently includes 10,000 direct/social monthly active users (MAUs) per AWS
 account or organization in its ongoing free tier; usage above that threshold is billed per MAU.
 Plus has no equivalent 10,000-MAU free tier. SMS MFA and verification email are separately billed,
-and Lambda/DynamoDB usage for the membership lookup is also separate. The exact Region, tier,
-email/SMS configuration and expected MAU volume must be entered into AWS Pricing Calculator
-before provisioning. Do not select Plus or enable paid messaging for the initial beta without an
-explicit spend approval.
+and Lambda/DynamoDB usage for the membership lookup is also separate. AWS's pricing page lists
+access-token customization as an Essentials feature, while the developer guide separately warns
+that V2 access-token customization can incur additional costs. Treat that as a pricing ambiguity:
+confirm the applicable charge for the selected feature plan and account in AWS Pricing Calculator
+or with AWS before enabling the trigger. The exact Region, tier, email/SMS configuration and
+expected MAU volume must be included in the estimate. Do not select Plus or enable paid messaging
+for the initial beta without explicit spend approval.
 
 ## Consequences
 
