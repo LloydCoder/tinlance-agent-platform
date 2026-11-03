@@ -55,7 +55,10 @@ def create_cognito_access_token_verifier(
         not isinstance(client_ids, tuple)
         or not client_ids
         or len(set(client_ids)) != len(client_ids)
-        or any(not isinstance(client_id, str) or not _CLIENT_ID.fullmatch(client_id) for client_id in client_ids)
+        or any(
+            not isinstance(client_id, str) or not _CLIENT_ID.fullmatch(client_id)
+            for client_id in client_ids
+        )
     ):
         raise ValueError("Cognito app client allowlist must contain unique valid client IDs")
     if not isinstance(tenant_claim, str) or not _CLAIM_NAME.fullmatch(tenant_claim):
