@@ -1,4 +1,4 @@
-from .http import JWKSProvider, serve
+from .http import JWKSProvider, SessionRevoker, serve
 from .service import (
     AgentPlatformAPI,
     APIRequest,
@@ -18,5 +18,6 @@ __all__ = [
     "APIResponse",
     "AgentPlatformAPI",
     "JWKSProvider",
+    "SessionRevoker",
     "serve",
 ]
