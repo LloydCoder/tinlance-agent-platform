@@ -148,7 +148,6 @@ class SQLiteTokenRevocationStore:
         return row is not None
 
 
-
 @dataclass(frozen=True, slots=True)
 class DynamoDBTokenRevocationStore:
     """Shared, atomic token-family revocation backed by a DynamoDB table.
@@ -245,11 +244,7 @@ class DynamoDBTokenRevocationStore:
                 "token_id": identifier,
                 "revoked_at": timestamp.astimezone(UTC).isoformat(),
                 "reason": reason,
-                "expires_at": (
-                    token_expires_at
-                    if identifier == identity.token_id
-                    else family_expires_at
-                ),
+                "expires_at": token_expires_at if identifier == identity.token_id else family_expires_at,
             }
             if request_id is not None:
                 item["request_id"] = request_id
@@ -275,9 +270,6 @@ class DynamoDBTokenRevocationStore:
         ):
             raise RuntimeError("DynamoDB revocation record does not match its lookup key")
         expires_at = item.get("expires_at")
-        if (
-            isinstance(expires_at, bool)
-            or not isinstance(expires_at, (int, float, Decimal))
-        ):
+        if isinstance(expires_at, bool) or not isinstance(expires_at, (int, float, Decimal)):
             raise RuntimeError("DynamoDB revocation record has an invalid TTL")
         return int(expires_at) > int(time.time())
