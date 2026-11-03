@@ -212,14 +212,13 @@ class PlatformServiceTokenIssuer:
             or not 1 <= expires_in_seconds <= 300
         ):
             raise ValueError("downstream token lifetime must be between 1 and 300 seconds")
-        if not isinstance(scopes, frozenset) or not scopes or any(
-            not isinstance(scope, str) or not _SCOPE_RE.fullmatch(scope) for scope in scopes
+        if (
+            not isinstance(scopes, frozenset)
+            or not scopes
+            or any(not isinstance(scope, str) or not _SCOPE_RE.fullmatch(scope) for scope in scopes)
         ):
             raise ValueError("downstream token scopes must be a non-empty set of normalized values")
-        if (
-            not isinstance(principal_type, str)
-            or principal_type not in _ALLOWED_PRINCIPAL_TYPES
-        ):
+        if not isinstance(principal_type, str) or principal_type not in _ALLOWED_PRINCIPAL_TYPES:
             raise ValueError("downstream token principal type is not supported")
         if purpose is not None and (
             not isinstance(purpose, str) or not _IDENTIFIER_RE.fullmatch(purpose)
