@@ -90,9 +90,7 @@ def make_event(**overrides: Any) -> dict[str, Any]:
                     "scopesToAdd": ["legacy.scope"],
                     "scopesToSuppress": ["unused.scope"],
                 },
-                "idTokenGeneration": {
-                    "claimsToAddOrOverride": {"display_name": "Existing Value"}
-                },
+                "idTokenGeneration": {"claimsToAddOrOverride": {"display_name": "Existing Value"}},
             }
         },
     }
@@ -172,12 +170,9 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
         "tenant_id": "tinlyt-customer-tenant",
         "principal_type": "user",
     }
-    assert (
-        result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
-            "scopesToAdd"
-        ]
-        == ["tinlyt/web.fetch", "tinlyt/web.search"]
-    )
+    assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
+        "scopesToAdd"
+    ] == ["tinlyt/web.fetch", "tinlyt/web.search"]
     assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
         "scopesToSuppress"
     ] == [
@@ -186,12 +181,9 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
         "tinlyt/web.monitor.delete",
         "unused.scope",
     ]
-    assert (
-        result["response"]["claimsAndScopeOverrideDetails"]["idTokenGeneration"][
-            "claimsToAddOrOverride"
-        ]
-        == {"display_name": "Existing Value"}
-    )
+    assert result["response"]["claimsAndScopeOverrideDetails"]["idTokenGeneration"][
+        "claimsToAddOrOverride"
+    ] == {"display_name": "Existing Value"}
     assert event == original
     assert client.calls[0]["ConsistentRead"] is True
     assert client.calls[0]["TableName"] == TABLE_NAME
@@ -279,7 +271,7 @@ def test_membership_resolver_rejects_invalid_or_inactive_membership(
         user_pool_id=USER_POOL_ID,
     )
     with pytest.raises(CognitoTenantMembershipError, match=expected):
-        resolver.resolve_active_membership(USER_POOL_ID, SUBJECT_ID)
+        resolver.resolve_active_tenant(USER_POOL_ID, SUBJECT_ID)
 
 
 def test_membership_resolver_rejects_records_for_different_subjects() -> None:
@@ -306,8 +298,6 @@ def test_pre_token_v2_fails_closed_when_membership_store_is_unavailable() -> Non
 def test_pre_token_v2_rejects_malformed_response_overrides() -> None:
     client = FakeMembershipClient()
     active_membership(client)
-    event = make_event(
-        response={"claimsAndScopeOverrideDetails": "malformed"}
-    )
+    event = make_event(response={"claimsAndScopeOverrideDetails": "malformed"})
     with pytest.raises(CognitoTenantMembershipError, match="response"):
         make_handler(client).handle(event)
