@@ -81,10 +81,7 @@ class VerifiedAgentIdentity:
             not isinstance(revocation_id, str)
             or not revocation_id
             or revocation_id != revocation_id.strip()
-            or any(
-                ord(character) < 0x21 or ord(character) == 0x7F
-                for character in revocation_id
-            )
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in revocation_id)
             for revocation_id in self.revocation_ids
         ):
             raise PermissionError("identity revocation identifiers must be normalized")
