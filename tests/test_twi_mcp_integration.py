@@ -277,6 +277,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         self.assertEqual(len(approvals.calls), 1)
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
+        self.assertEqual(self.issuer.calls[0]["principal_type"], "user")
         self.assertEqual(self.issuer.calls[0]["audience"], "tinlance-web-intelligence")
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:observations:export"}))
         request = self.http.calls[0]
