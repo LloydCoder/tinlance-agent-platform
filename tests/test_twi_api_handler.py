@@ -400,8 +400,14 @@ class TWIAPIHandlerTests(unittest.TestCase):
                 "twi_monitor_pause",
                 "twi_monitor_resume",
                 "twi_monitor_delete",
+                "twi_usage_read",
             },
         )
+        usage = next(
+            tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_usage_read"
+        )
+        self.assertTrue(usage.read_only)
+        self.assertFalse(usage.open_world)
         delete = next(
             tool for tool in TWI_MCP_TOOL_DEFINITIONS if tool.name == "twi_monitor_delete"
         )
