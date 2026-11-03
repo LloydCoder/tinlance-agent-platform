@@ -300,7 +300,7 @@ def test_cognito_profile_rejects_id_tokens_and_unapproved_app_clients() -> None:
         verifier.verify(make_cognito_token(private_key, token_use="id"))
     with pytest.raises(PermissionError, match="client identifier"):
         verifier.verify(make_cognito_token(private_key, client_id="otherclient123"))
-    with pytest.raises(PermissionError, match="verification failed"):
+    with pytest.raises(PermissionError, match="origin_jti"):
         verifier.verify(make_cognito_token(private_key, origin_jti=None))
 
 
