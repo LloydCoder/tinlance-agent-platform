@@ -179,6 +179,11 @@ class JWKSIdentityVerifier:
             raise PermissionError("identity token use is not trusted")
         subject = self._required_string(claims, "sub")
         token_id = self._required_string(claims, "jti")
+        revocation_ids = (
+            frozenset({self._required_string(claims, "origin_jti")})
+            if "origin_jti" in claims
+            else frozenset()
+        )
         tenant_id = self._tenant_id(claims)
         principal_type = self._required_string(claims, self.principal_type_claim)
         if principal_type not in self.allowed_principal_types:
@@ -215,6 +220,7 @@ class JWKSIdentityVerifier:
             client_id=client_id,
             principal_type=principal_type,
             roles=roles,
+            revocation_ids=revocation_ids,
         )
         identity.validate(
             expected_issuer=self.issuer,
