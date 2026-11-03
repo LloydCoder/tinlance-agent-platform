@@ -250,6 +250,7 @@ def make_cognito_token(private_key: Any, **overrides: Any) -> str:
         "sub": "cognito-user-123",
         "aud": "https://api.tinlyt.tinlance.com",
         "jti": "cognito-token-123",
+        "origin_jti": "cognito-refresh-family-123",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
         "tenant_id": "tenant-123",
@@ -299,6 +300,8 @@ def test_cognito_profile_rejects_id_tokens_and_unapproved_app_clients() -> None:
         verifier.verify(make_cognito_token(private_key, token_use="id"))
     with pytest.raises(PermissionError, match="client identifier"):
         verifier.verify(make_cognito_token(private_key, client_id="otherclient123"))
+    with pytest.raises(PermissionError, match="verification failed"):
+        verifier.verify(make_cognito_token(private_key, origin_jti=None))
 
 
 def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region() -> None:
