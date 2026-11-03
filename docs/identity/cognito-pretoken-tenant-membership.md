@@ -69,49 +69,21 @@ function so warm invocations reuse the client:
 pip install '.[aws-runtime]'
 ```
 
-```python
-import os
+```text
+Lambda handler:
+tinlance_agent_platform_identity.cognito_pretoken_lambda.lambda_handler
 
-import boto3
-from botocore.config import Config
-
-from tinlance_agent_platform_identity import (
-    CognitoPreTokenGenerationV2Handler,
-    DynamoDBTenantMembershipResolver,
-)
-
-region = os.environ["AWS_REGION"]
-user_pool_id = os.environ["COGNITO_USER_POOL_ID"]
-allowed_client_ids = frozenset(
-    value for value in os.environ["COGNITO_APP_CLIENT_IDS"].split(",") if value
-)
-table_name = os.environ["TENANT_MEMBERSHIP_TABLE"]
-
-sdk_config = Config(
-    connect_timeout=1,
-    read_timeout=1,
-    retries={"mode": "standard", "total_max_attempts": 2},
-)
-dynamodb = boto3.resource("dynamodb", region_name=region, config=sdk_config)
-membership_resolver = DynamoDBTenantMembershipResolver(
-    dynamodb.meta.client,
-    table_name=table_name,
-    user_pool_id=user_pool_id,
-)
-pre_token_handler = CognitoPreTokenGenerationV2Handler(
-    membership_resolver,
-    user_pool_id=user_pool_id,
-    allowed_client_ids=allowed_client_ids,
-)
-
-
-def lambda_handler(event, context):
-    return pre_token_handler.handle(event)
+Required environment variables:
+AWS_REGION=eu-west-1
+COGNITO_USER_POOL_ID=eu-west-1_ExamplePool
+COGNITO_APP_CLIENT_IDS=ExampleClientId
+TENANT_MEMBERSHIP_TABLE=tinlyt-user-tenant-memberships
 ```
 
-The DynamoDB resource's `meta.client` uses boto3's resource marshalling handlers. The function
-performs one strongly consistent `GetItem` per token issuance and does not cache tenant
-membership across invocations, so administrative revocation takes effect on the next issuance.
+The Lambda entrypoint initializes the boto3 DynamoDB resource once at cold start with bounded
+connection/read timeouts and a small retry budget. It uses the resource's auto-marshalling client,
+performs one strongly consistent `GetItem` per token issuance and does not cache tenant membership
+across invocations, so administrative revocation takes effect on the next issuance.
 
 ## Least-privilege IAM
 
