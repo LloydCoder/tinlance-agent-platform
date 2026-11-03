@@ -300,16 +300,13 @@ class JWKSIdentityVerifier:
             if scope in standard_scopes:
                 continue
             if not scope.startswith(prefix):
-                raise PermissionError(
-                    "identity scope is outside the configured resource server"
-                )
+                raise PermissionError("identity scope is outside the configured resource server")
             resource_scope = scope[len(prefix) :]
             if (
                 not resource_scope
                 or not resource_scope[0].isalnum()
                 or any(
-                    not (character.isalnum() or character in "._:-")
-                    for character in resource_scope
+                    not (character.isalnum() or character in "._:-") for character in resource_scope
                 )
             ):
                 raise PermissionError("identity resource scope is malformed")
