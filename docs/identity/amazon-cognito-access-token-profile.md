@@ -29,7 +29,7 @@ The verifier requires:
 | `client_id` | Member of the configured app-client allowlist |
 | `sub` | Cognito immutable user subject |
 | `jti` | Per-access-token identifier; checked by the Platform revocation store |
-| `origin_jti` | Refresh-token-family identifier; checked by the Platform revocation store when present |
+| `origin_jti` | Required refresh-token-family identifier; checked by the Platform revocation store |
 | `tenant_id` | Added by the Pre Token Generation V2 trigger from an admin-controlled tenant assignment |
 | `principal_type` | Constant `user`, set by the trigger |
 | `cognito:groups` | Admin-managed group membership; maps to Platform roles |
