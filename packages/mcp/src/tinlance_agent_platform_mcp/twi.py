@@ -566,6 +566,11 @@ class TWIHTTPTransport:
             monitor_id = quote(str(arguments.get("monitor_id", "")), safe="")
             return f"/v1/monitors/{monitor_id}", None
         if tool_name == "twi_usage_read":
+            if any(
+                key not in {"dimension", "period_start", "limit", "cursor"}
+                for key in arguments
+            ):
+                raise ValueError("usage query contains unsupported fields")
             dimension = arguments.get("dimension")
             period_start = arguments.get("period_start")
             limit = arguments.get("limit", 100)
@@ -574,7 +579,11 @@ class TWIHTTPTransport:
                 r"[A-Za-z0-9_.:-]{1,80}", dimension
             ):
                 raise ValueError("usage dimension is invalid")
-            if not isinstance(period_start, str) or len(period_start) > 64:
+            if (
+                not isinstance(period_start, str)
+                or period_start != period_start.strip()
+                or len(period_start) > 64
+            ):
                 raise ValueError("usage period start is invalid")
             try:
                 parsed_period = datetime.fromisoformat(period_start.replace("Z", "+00:00"))
