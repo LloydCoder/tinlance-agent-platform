@@ -18,7 +18,6 @@ from uuid import uuid4
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
-
 _ALLOWED_PRINCIPAL_TYPES = frozenset({"user", "service", "agent", "workload"})
 _ALLOWED_KMS_KEY_SPECS = frozenset({"RSA_2048", "RSA_3072", "RSA_4096"})
 _KMS_SIGNING_ALGORITHM = "RSASSA_PKCS1_V1_5_SHA_256"
