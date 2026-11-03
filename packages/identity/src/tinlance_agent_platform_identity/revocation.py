@@ -36,10 +36,16 @@ class SQLiteTokenRevocationStore:
                     token_id TEXT NOT NULL,
                     revoked_at TEXT NOT NULL,
                     reason TEXT NOT NULL,
+                    request_id TEXT,
                     PRIMARY KEY (issuer, token_id)
                 )
                 """
             )
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(revoked_tokens)")
+            }
+            if "request_id" not in columns:
+                connection.execute("ALTER TABLE revoked_tokens ADD COLUMN request_id TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(str(self.path), timeout=5.0)
@@ -88,6 +94,7 @@ class SQLiteTokenRevocationStore:
         *,
         reason: str,
         revoked_at: datetime | None = None,
+        request_id: str | None = None,
     ) -> tuple[str, ...]:
         """Atomically revoke one JWT and every configured token-family identifier."""
 
@@ -96,6 +103,13 @@ class SQLiteTokenRevocationStore:
             self._validate_identity(identity.issuer, identifier)
         if not reason or reason != reason.strip():
             raise ValueError("revocation reason must be normalized and non-empty")
+        if request_id is not None and (
+            not request_id
+            or request_id != request_id.strip()
+            or len(request_id) > 256
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in request_id)
+        ):
+            raise ValueError("revocation request ID must be normalized when provided")
         timestamp = revoked_at or datetime.now(UTC)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError("revocation timestamp must be timezone-aware")
@@ -103,12 +117,12 @@ class SQLiteTokenRevocationStore:
         with closing(self._connect()) as connection, connection:
             connection.executemany(
                 """
-                INSERT INTO revoked_tokens (issuer, token_id, revoked_at, reason)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO revoked_tokens (issuer, token_id, revoked_at, reason, request_id)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (issuer, token_id) DO NOTHING
                 """,
                 [
-                    (identity.issuer, identifier, revoked_at_value, reason)
+                    (identity.issuer, identifier, revoked_at_value, reason, request_id)
                     for identifier in identifiers
                 ],
             )
