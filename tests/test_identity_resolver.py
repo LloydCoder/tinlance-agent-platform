@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import threading
 import urllib.error
 import urllib.request
@@ -290,7 +291,8 @@ def test_session_revoke_endpoint_revokes_access_token_and_family_atomically(
     signing_material: tuple[Any, Any], tmp_path: Path
 ) -> None:
     private_key, public_key = signing_material
-    store = SQLiteTokenRevocationStore(tmp_path / "revocations.db")
+    path = tmp_path / "revocations.db"
+    store = SQLiteTokenRevocationStore(path)
     resolver = resolver_for(public_key, store)
     handler, server, thread, endpoint = with_server(resolver, session_revoker=resolver)
     token = make_token(private_key, origin_jti="origin-jti-a")
@@ -300,6 +302,11 @@ def test_session_revoke_endpoint_revokes_access_token_and_family_atomically(
         assert body == {"status": "revoked"}
         assert store.is_revoked(ISSUER, "jti-a")
         assert store.is_revoked(ISSUER, "origin-jti-a")
+        with sqlite3.connect(path) as connection:
+            request_ids = connection.execute(
+                "SELECT DISTINCT request_id FROM revoked_tokens"
+            ).fetchall()
+        assert request_ids == [("request-session-revoke-001",)]
 
         status, body = send_request(endpoint, token)
         assert status == 401
