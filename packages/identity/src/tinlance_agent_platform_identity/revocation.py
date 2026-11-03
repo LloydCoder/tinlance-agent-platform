@@ -7,18 +7,29 @@ host; it is not a substitute for a multi-instance production revocation service.
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
+import time
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from .federation import VerifiedAgentIdentity
 
 
 class TokenRevocationChecker(Protocol):
     def is_revoked(self, issuer: str, token_id: str) -> bool: ...
+
+
+class DynamoDBClient(Protocol):
+    """Subset of a boto3 DynamoDB resource client's auto-marshalling API."""
+
+    def get_item(self, **kwargs: Any) -> dict[str, Any]: ...
+
+    def transact_write_items(self, **kwargs: Any) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,3 +145,134 @@ class SQLiteTokenRevocationStore:
                 (issuer, token_id),
             ).fetchone()
         return row is not None
+
+
+
+@dataclass(frozen=True, slots=True)
+class DynamoDBTokenRevocationStore:
+    """Shared, atomic token-family revocation backed by a DynamoDB table.
+
+    Pass the auto-marshalling client from boto3.resource("dynamodb").meta.client.
+    The table must use a string partition key named revocation_key and have TTL
+    enabled on the numeric expires_at attribute.
+    """
+
+    client: DynamoDBClient
+    table_name: str
+    token_retention_seconds: int = 600
+    family_retention_seconds: int = 31 * 24 * 60 * 60
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.table_name, str) or not self.table_name or self.table_name != self.table_name.strip():
+            raise ValueError("DynamoDB revocation table name must be normalized and non-empty")
+        if (
+            isinstance(self.token_retention_seconds, bool)
+            or not isinstance(self.token_retention_seconds, int)
+            or self.token_retention_seconds <= 0
+            or isinstance(self.family_retention_seconds, bool)
+            or not isinstance(self.family_retention_seconds, int)
+            or self.family_retention_seconds < self.token_retention_seconds
+        ):
+            raise ValueError("DynamoDB revocation retention periods are invalid")
+
+    @staticmethod
+    def _revocation_key(issuer: str, token_id: str) -> str:
+        value = f"{issuer}\0{token_id}".encode("utf-8")
+        return hashlib.sha256(value).hexdigest()
+
+    @staticmethod
+    def _validate_identity(issuer: str, token_id: str) -> None:
+        if (
+            not isinstance(issuer, str)
+            or not issuer
+            or issuer != issuer.strip()
+            or not issuer.startswith("https://")
+            or not isinstance(token_id, str)
+            or not token_id
+            or token_id != token_id.strip()
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in token_id)
+        ):
+            raise ValueError("revocation identity must contain normalized issuer and token ID")
+
+    def revoke_identity(
+        self,
+        identity: VerifiedAgentIdentity,
+        *,
+        reason: str,
+        revoked_at: datetime | None = None,
+        request_id: str | None = None,
+    ) -> tuple[str, ...]:
+        """Atomically revoke one access token and all configured family IDs."""
+
+        identifiers = tuple(sorted({identity.token_id, *identity.revocation_ids}))
+        if not identifiers or len(identifiers) > 100:
+            raise ValueError("DynamoDB revocation transaction must contain 1 to 100 identifiers")
+        for identifier in identifiers:
+            self._validate_identity(identity.issuer, identifier)
+        if not isinstance(reason, str) or not reason or reason != reason.strip():
+            raise ValueError("revocation reason must be normalized and non-empty")
+        if request_id is not None and (
+            not isinstance(request_id, str)
+            or not request_id
+            or request_id != request_id.strip()
+            or len(request_id) > 256
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in request_id)
+        ):
+            raise ValueError("revocation request ID must be normalized when provided")
+        timestamp = revoked_at or datetime.now(UTC)
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise ValueError("revocation timestamp must be timezone-aware")
+        if (
+            identity.expires_at.tzinfo is None
+            or identity.expires_at.utcoffset() is None
+            or identity.expires_at <= timestamp
+        ):
+            raise ValueError("identity expiry must be timezone-aware and after revocation time")
+
+        revoked_at_epoch = int(timestamp.astimezone(UTC).timestamp())
+        token_expires_at = int(identity.expires_at.timestamp()) + self.token_retention_seconds
+        family_expires_at = revoked_at_epoch + self.family_retention_seconds
+        actions: list[dict[str, Any]] = []
+        for identifier in identifiers:
+            item: dict[str, Any] = {
+                "revocation_key": self._revocation_key(identity.issuer, identifier),
+                "issuer": identity.issuer,
+                "token_id": identifier,
+                "revoked_at": timestamp.astimezone(UTC).isoformat(),
+                "reason": reason,
+                "expires_at": (
+                    token_expires_at
+                    if identifier == identity.token_id
+                    else family_expires_at
+                ),
+            }
+            if request_id is not None:
+                item["request_id"] = request_id
+            actions.append({"Put": {"TableName": self.table_name, "Item": item}})
+
+        self.client.transact_write_items(TransactItems=actions)
+        return identifiers
+
+    def is_revoked(self, issuer: str, token_id: str) -> bool:
+        """Read revocation state consistently; malformed records fail closed."""
+
+        self._validate_identity(issuer, token_id)
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={"revocation_key": self._revocation_key(issuer, token_id)},
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        if item is None:
+            return False
+        if not isinstance(item, dict) or (
+            item.get("issuer") != issuer or item.get("token_id") != token_id
+        ):
+            raise RuntimeError("DynamoDB revocation record does not match its lookup key")
+        expires_at = item.get("expires_at")
+        if (
+            isinstance(expires_at, bool)
+            or not isinstance(expires_at, (int, float, Decimal))
+        ):
+            raise RuntimeError("DynamoDB revocation record has an invalid TTL")
+        return int(expires_at) > int(time.time())
