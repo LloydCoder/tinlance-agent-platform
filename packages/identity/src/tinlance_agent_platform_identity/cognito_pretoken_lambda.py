@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from functools import lru_cache
 
 from .cognito_pretoken import CognitoPreTokenGenerationV2Handler, build_cognito_pretoken_handler
 
 
-@lru_cache(maxsize=1)
 def _configured_handler() -> CognitoPreTokenGenerationV2Handler:
     """Initialize and reuse the DynamoDB client across warm Lambda invocations."""
 
