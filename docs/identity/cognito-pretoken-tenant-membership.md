@@ -87,9 +87,11 @@ across invocations, so administrative revocation takes effect on the next issuan
 
 ## Least-privilege IAM
 
-The Lambda execution role needs only `dynamodb:GetItem` on the exact membership table ARN.
-It must not have `PutItem`, `UpdateItem`, `DeleteItem`, `Scan`, `Query`, `TransactWriteItems`,
-or wildcard DynamoDB permissions. Membership provisioning belongs to a separate administrative
+The Lambda execution role's DynamoDB data-plane permission is only `dynamodb:GetItem` on the
+exact membership table ARN. It must not have `PutItem`, `UpdateItem`, `DeleteItem`, `Scan`, `Query`,
+`TransactWriteItems`, or wildcard DynamoDB permissions. The role also needs CloudWatch Logs write
+permissions scoped to this function's log group; pre-create the log group so the runtime role does
+not need `logs:CreateLogGroup`. Membership provisioning belongs to a separate administrative
 control plane with a separate role and audit trail.
 
 ## Failure and security behavior
