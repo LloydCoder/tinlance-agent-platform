@@ -40,6 +40,10 @@ class JWKSProvider(Protocol):
     def jwks(self) -> dict[str, list[dict[str, str]]]: ...
 
 
+class SessionRevoker(Protocol):
+    def revoke_session(self, bearer_token: str) -> None: ...
+
+
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
@@ -82,6 +86,7 @@ def serve(
     mcp_service: MCPHTTPService | None = None,
     a2a_service: A2AHTTPService | None = None,
     jwks_provider: JWKSProvider | None = None,
+    session_revoker: SessionRevoker | None = None,
 ) -> ThreadingHTTPServer:
     """Start a local/reference HTTP server.
 
@@ -156,6 +161,64 @@ def serve(
                 self._respond(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "a2a_card_error"})
 
         def do_POST(self) -> None:  # noqa: N802
+            if self.path == "/v1/session/revoke":
+                if self._reject_ambiguous_headers(
+                    (
+                        "Content-Length",
+                        "Content-Type",
+                        "Authorization",
+                        "X-Tinlance-API-Version",
+                        "X-Request-ID",
+                    )
+                ):
+                    return
+                if session_revoker is None:
+                    self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", ""))
+                except ValueError:
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_content_length"})
+                    return
+                if length < 0 or length > 1024:
+                    self._respond(
+                        HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                        {"error": "request_too_large"},
+                    )
+                    return
+                if "application/json" not in self.headers.get("Content-Type", "").lower():
+                    self._respond(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_required"})
+                    return
+                if self.headers.get("X-Tinlance-API-Version") != API_VERSION:
+                    self._respond(HTTPStatus.UPGRADE_REQUIRED, {"error": "api_version_required"})
+                    return
+                try:
+                    _request_id(self.headers.get("X-Request-ID"))
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("request body is truncated")
+                    body = json.loads(raw.decode("utf-8"))
+                    if not isinstance(body, dict) or body:
+                        raise ValueError("session revocation body must be an empty JSON object")
+                    token = _bearer(self.headers.get("Authorization"))
+                    try:
+                        session_revoker.revoke_session(token)
+                    except PermissionError as exc:
+                        raise AuthenticationError(
+                            "bearer identity could not be authenticated"
+                        ) from exc
+                    except Exception:
+                        self._respond(
+                            HTTPStatus.SERVICE_UNAVAILABLE,
+                            {"error": "session_revocation_unavailable"},
+                        )
+                        return
+                    self._respond(HTTPStatus.OK, {"status": "revoked"})
+                except AuthenticationError:
+                    self._respond(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+                except (ValueError, KeyError):
+                    self._respond(HTTPStatus.BAD_REQUEST, {"error": "invalid_request"})
+                return
             if self.path == "/a2a":
                 if self._reject_ambiguous_headers(
                     (
