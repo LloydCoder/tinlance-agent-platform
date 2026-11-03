@@ -155,6 +155,7 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
         self.assertEqual(result["items"], [{"id": "entity-1"}])
         self.assertEqual(self.issuer.calls[0]["tenant_id"], "tenant-a")
         self.assertEqual(self.issuer.calls[0]["subject_id"], "subject-a")
+        self.assertEqual(self.issuer.calls[0]["principal_type"], "user")
         self.assertEqual(self.issuer.calls[0]["audience"], "world-intelligence")
         self.assertEqual(self.issuer.calls[0]["purpose"], "account_research")
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"world-intelligence:query"}))
