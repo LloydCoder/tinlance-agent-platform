@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tinlance_agent_platform_api.service import APIHandler, AgentPlatformAPI
+from tinlance_agent_platform_api.service import AgentPlatformAPI, APIHandler
 from tinlance_agent_platform_identity.service_tokens import (
     KMSClient,
     KMSRS256Signer,
