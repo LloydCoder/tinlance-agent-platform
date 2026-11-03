@@ -10,10 +10,13 @@ import base64
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+import time
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
 
 _ALLOWED_PRINCIPAL_TYPES = frozenset({"user", "service", "agent", "workload"})
@@ -27,7 +30,7 @@ _SCOPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$")
 class KMSClient(Protocol):
     """Minimal boto3-compatible AWS KMS client surface."""
 
-    def get_public_key(self, *, KeyId: str) -> Mapping[str, Any]: ...
+    def get_public_key(self, *, KeyId: str) -> dict[str, Any]: ...
 
     def sign(
         self,
@@ -36,7 +39,7 @@ class KMSClient(Protocol):
         Message: bytes,
         MessageType: str,
         SigningAlgorithm: str,
-    ) -> Mapping[str, Any]: ...
+    ) -> dict[str, Any]: ...
 
 
 def _b64url(value: bytes) -> str:
@@ -83,9 +86,6 @@ class KMSRS256Signer:
             der = response.get("PublicKey")
             if not isinstance(der, bytes) or not der:
                 raise ValueError("AWS KMS did not return public key material")
-            from cryptography.hazmat.primitives import serialization
-            from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-
             try:
                 public_key = serialization.load_der_public_key(der)
             except (TypeError, ValueError) as exc:
@@ -233,8 +233,6 @@ class PlatformServiceTokenIssuer:
             or traceparent[36:52] == "0" * 16
         ):
             raise ValueError("downstream token traceparent is invalid")
-
-        import time
 
         issued_at = int(time.time())
         claims: dict[str, object] = {
