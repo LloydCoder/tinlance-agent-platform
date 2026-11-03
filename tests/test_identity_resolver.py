@@ -227,7 +227,6 @@ def test_identity_resolver_rejects_invalid_signature(
         resolver.resolve(make_token(attacker_key))
 
 
-
 def test_cognito_origin_jti_revokes_every_access_token_in_the_session_family(
     signing_material: tuple[Any, Any], tmp_path: Path
 ) -> None:
