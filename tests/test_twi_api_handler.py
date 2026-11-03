@@ -72,6 +72,12 @@ class FakeHTTPClient:
                 "timeout_seconds": timeout_seconds,
             }
         )
+        if url.endswith("/evidence"):
+            return TWIHTTPResponse(
+                200,
+                {"content-type": "application/vnd.tinlance.twi-evidence+json"},
+                b'{"schema_version":"1.0.0","content_sha256":"' + b"a" * 64 + b'"}',
+            )
         return TWIHTTPResponse(
             202,
             {"content-type": "application/json"},

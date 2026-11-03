@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import unittest
 from collections.abc import Mapping
@@ -388,7 +389,11 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
                 request_id="twi-request-0002",
             ),
         )
-        self.assertEqual(result["schema_version"], "1.0.0")
+        self.assertEqual(result["evidence_package"]["schema_version"], "1.0.0")
+        self.assertEqual(
+            base64.b64decode(result["response_bytes_base64"], validate=True),
+            self.http.response.body,
+        )
         self.assertEqual(
             self.http.calls[0]["url"],
             "https://twi.internal/v1/jobs/job-0000000000000001/evidence",
