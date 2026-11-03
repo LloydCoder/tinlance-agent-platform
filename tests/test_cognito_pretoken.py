@@ -45,7 +45,6 @@ def active_membership(
     subject_id: str = SUBJECT_ID,
     tenant_id: str = "tenant-prod-01",
     status: str = "active",
-    capabilities: tuple[str, ...] = ("web.search", "web.fetch"),
 ) -> None:
     key = membership_key(user_pool_id, subject_id)
     client.items[key] = {
@@ -54,7 +53,6 @@ def active_membership(
         "subject_id": subject_id,
         "tenant_id": tenant_id,
         "status": status,
-        "capabilities": list(capabilities),
     }
 
 
@@ -172,15 +170,10 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
     }
     assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
         "scopesToAdd"
-    ] == ["tinlyt/web.fetch", "tinlyt/web.search"]
+    ] == ["legacy.scope"]
     assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
         "scopesToSuppress"
-    ] == [
-        "aws.cognito.signin.user.admin",
-        "other-api/admin",
-        "tinlyt/web.monitor.delete",
-        "unused.scope",
-    ]
+    ] == ["unused.scope"]
     assert result["response"]["claimsAndScopeOverrideDetails"]["idTokenGeneration"][
         "claimsToAddOrOverride"
     ] == {"display_name": "Existing Value"}
@@ -203,9 +196,12 @@ def test_pre_token_v2_accepts_aws_empty_override_array() -> None:
         "tenant_id": "tenant-prod-01",
         "principal_type": "user",
     }
-    assert result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
-        "scopesToAdd"
-    ] == ["tinlyt/web.fetch", "tinlyt/web.search"]
+    assert "scopesToAdd" not in result["response"]["claimsAndScopeOverrideDetails"][
+        "accessTokenGeneration"
+    ]
+    assert "scopesToSuppress" not in result["response"]["claimsAndScopeOverrideDetails"][
+        "accessTokenGeneration"
+    ]
 
 
 def test_pre_token_v2_rejects_unapproved_app_client_before_membership_lookup() -> None:
