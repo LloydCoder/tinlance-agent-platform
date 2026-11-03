@@ -10,6 +10,7 @@ from tinlance_agent_platform_identity import (
     CognitoPreTokenGenerationV2Handler,
     CognitoTenantMembershipError,
     DynamoDBTenantMembershipResolver,
+    build_cognito_pretoken_handler,
 )
 
 USER_POOL_ID = "eu-west-1_Abc123"
@@ -104,6 +105,45 @@ def make_handler(
         user_pool_id=USER_POOL_ID,
         allowed_client_ids=frozenset({CLIENT_ID}),
     )
+
+
+def test_runtime_builder_binds_region_pool_client_allowlist_and_table() -> None:
+    client = FakeMembershipClient()
+    active_membership(client)
+    handler = build_cognito_pretoken_handler(
+        {
+            "AWS_REGION": "eu-west-1",
+            "COGNITO_USER_POOL_ID": USER_POOL_ID,
+            "COGNITO_APP_CLIENT_IDS": CLIENT_ID,
+            "TENANT_MEMBERSHIP_TABLE": TABLE_NAME,
+        },
+        client,
+    )
+
+    result = handler.handle(make_event())
+
+    claims = result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
+        "claimsToAddOrOverride"
+    ]
+    assert claims["tenant_id"] == "tenant-prod-01"
+    assert claims["principal_type"] == "user"
+
+
+def test_runtime_builder_rejects_region_mismatch_and_duplicate_clients() -> None:
+    client = FakeMembershipClient()
+    environment = {
+        "AWS_REGION": "us-east-1",
+        "COGNITO_USER_POOL_ID": USER_POOL_ID,
+        "COGNITO_APP_CLIENT_IDS": CLIENT_ID,
+        "TENANT_MEMBERSHIP_TABLE": TABLE_NAME,
+    }
+    with pytest.raises(ValueError, match="region"):
+        build_cognito_pretoken_handler(environment, client)
+
+    environment["AWS_REGION"] = "eu-west-1"
+    environment["COGNITO_APP_CLIENT_IDS"] = f"{CLIENT_ID},{CLIENT_ID}"
+    with pytest.raises(ValueError, match="app client"):
+        build_cognito_pretoken_handler(environment, client)
 
 
 def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_overrides() -> None:
