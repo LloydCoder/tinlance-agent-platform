@@ -227,7 +227,7 @@ def test_pre_token_v2_rejects_malformed_response_overrides() -> None:
     client = FakeMembershipClient()
     active_membership(client)
     event = make_event(
-        response={"claimsAndScopeOverrideDetails": {"accessTokenGeneration": None}}
+        response={"claimsAndScopeOverrideDetails": "malformed"}
     )
     with pytest.raises(CognitoTenantMembershipError, match="response"):
         make_handler(client).handle(event)
