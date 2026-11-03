@@ -17,4 +17,6 @@ __all__ = [
     "APIRequest",
     "APIResponse",
     "AgentPlatformAPI",
+    "JWKSProvider",
+    "serve",
 ]
