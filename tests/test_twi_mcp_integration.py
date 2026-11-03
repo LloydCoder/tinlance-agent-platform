@@ -45,6 +45,7 @@ class FakeTokenIssuer:
         request_id: str,
         traceparent: str | None,
         expires_in_seconds: int,
+        principal_type: str = "user",
     ) -> str:
         self.calls.append(
             {
@@ -55,6 +56,7 @@ class FakeTokenIssuer:
                 "request_id": request_id,
                 "traceparent": traceparent,
                 "expires_in_seconds": expires_in_seconds,
+                "principal_type": principal_type,
             }
         )
         return "platform-minted-twi-token"
