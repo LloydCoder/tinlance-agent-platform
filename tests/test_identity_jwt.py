@@ -250,7 +250,7 @@ def make_cognito_token(private_key: Any, **overrides: Any) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
         "tenant_id": "tenant-123",
-        "client_id": "tinlyt-web-client",
+        "client_id": "tinlytwebclient123",
         "token_use": "access",
         "principal_type": "user",
         "cognito:groups": ["operator"],
@@ -271,13 +271,13 @@ def test_cognito_access_token_profile_verifies_resource_bound_user_access_token(
         region="eu-west-1",
         user_pool_id="eu-west-1_Abc123",
         audience="https://api.tinlyt.tinlance.com",
-        client_ids=("tinlyt-web-client",),
+        client_ids=("tinlytwebclient123",),
         key_provider=StaticKeyProvider(private_key.public_key()),
     )
     identity = verifier.verify(make_cognito_token(private_key))
     assert identity.subject_id == "cognito-user-123"
     assert identity.tenant_id == "tenant-123"
-    assert identity.client_id == "tinlyt-web-client"
+    assert identity.client_id == "tinlytwebclient123"
     assert identity.principal_type == "user"
     assert identity.roles == frozenset({"operator"})
     assert identity.scopes == frozenset({"web.search", "web.fetch"})
@@ -289,13 +289,13 @@ def test_cognito_profile_rejects_id_tokens_and_unapproved_app_clients() -> None:
         region="eu-west-1",
         user_pool_id="eu-west-1_Abc123",
         audience="https://api.tinlyt.tinlance.com",
-        client_ids=("tinlyt-web-client",),
+        client_ids=("tinlytwebclient123",),
         key_provider=StaticKeyProvider(private_key.public_key()),
     )
     with pytest.raises(PermissionError, match="token use"):
         verifier.verify(make_cognito_token(private_key, token_use="id"))
     with pytest.raises(PermissionError, match="client identifier"):
-        verifier.verify(make_cognito_token(private_key, client_id="other-client"))
+        verifier.verify(make_cognito_token(private_key, client_id="otherclient123"))
 
 
 def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region() -> None:
@@ -304,21 +304,21 @@ def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region()
             region="invalid-region",
             user_pool_id="invalid-region_Abc123",
             audience="https://api.tinlyt.tinlance.com",
-            client_ids=("tinlyt-web-client",),
+            client_ids=("tinlytwebclient123",),
         )
     with pytest.raises(ValueError, match="user pool"):
         create_cognito_access_token_verifier(
             region="eu-west-1",
             user_pool_id="us-east-1_Abc123",
             audience="https://api.tinlyt.tinlance.com",
-            client_ids=("tinlyt-web-client",),
+            client_ids=("tinlytwebclient123",),
         )
     with pytest.raises(ValueError, match="HTTPS resource"):
         create_cognito_access_token_verifier(
             region="eu-west-1",
             user_pool_id="eu-west-1_Abc123",
             audience="http://api.tinlyt.tinlance.com",
-            client_ids=("tinlyt-web-client",),
+            client_ids=("tinlytwebclient123",),
         )
     with pytest.raises(ValueError, match="client"):
         create_cognito_access_token_verifier(
