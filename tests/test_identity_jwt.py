@@ -331,7 +331,6 @@ def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region()
         )
 
 
-
 def test_cognito_profile_rejects_malformed_origin_jti() -> None:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     verifier = create_cognito_access_token_verifier(
