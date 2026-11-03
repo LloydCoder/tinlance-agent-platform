@@ -140,6 +140,22 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
     assert client.calls[0]["TableName"] == TABLE_NAME
 
 
+def test_pre_token_v2_accepts_aws_empty_override_array() -> None:
+    client = FakeMembershipClient()
+    active_membership(client)
+    event = make_event(response={"claimsAndScopeOverrideDetails": []})
+
+    result = make_handler(client).handle(event)
+
+    claims = result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"][
+        "claimsToAddOrOverride"
+    ]
+    assert claims == {
+        "tenant_id": "tenant-prod-01",
+        "principal_type": "user",
+    }
+
+
 def test_pre_token_v2_rejects_unapproved_app_client_before_membership_lookup() -> None:
     client = FakeMembershipClient()
     active_membership(client)
