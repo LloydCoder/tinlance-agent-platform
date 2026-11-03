@@ -25,6 +25,7 @@ from tinlance_agent_platform_mcp import (
     TWIHTTPTransport,
     TWITransportError,
     register_twi_tools,
+    twi_tool_spec,
 )
 
 TRACEPARENT = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
@@ -424,6 +425,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             ),
         )
         self.assertEqual(result["used"], 12)
+        self.assertIs(twi_tool_spec("twi_usage_read").data_class, DataClass.CONFIDENTIAL)
         self.assertEqual(
             self.http.calls[0]["url"],
             "https://twi.internal/v1/usage?dimension=search_requests_month&period_start=2026-10-01T00%3A00%3A00Z&limit=25&cursor=opaque-cursor-value",
