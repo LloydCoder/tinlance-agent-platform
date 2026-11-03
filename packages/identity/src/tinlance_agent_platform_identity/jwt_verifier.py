@@ -43,6 +43,7 @@ class JWKSIdentityVerifier:
     expected_token_use: str | None = None
     allowed_client_ids: frozenset[str] | None = None
     required_revocation_claims: tuple[str, ...] = ()
+    resource_scope_prefix: str | None = None
     jwks_timeout_seconds: float = 5.0
     key_provider: SigningKeyProvider | None = None
 
@@ -115,6 +116,14 @@ class JWKSIdentityVerifier:
             or len(set(self.required_revocation_claims)) != len(self.required_revocation_claims)
         ):
             raise ValueError("required revocation claim names must be normalized and unique")
+        if self.resource_scope_prefix is not None and (
+            not isinstance(self.resource_scope_prefix, str)
+            or not self.resource_scope_prefix
+            or self.resource_scope_prefix != self.resource_scope_prefix.strip()
+            or not self.resource_scope_prefix.endswith("/")
+            or any(character.isspace() for character in self.resource_scope_prefix)
+        ):
+            raise ValueError("identity resource scope prefix must be a normalized path prefix")
         if (
             not self.tenant_claims
             or len(set(self.tenant_claims)) != len(self.tenant_claims)
@@ -217,7 +226,7 @@ class JWKSIdentityVerifier:
             raise PermissionError("identity nonce is malformed")
         if expected_nonce is not None and nonce_value != expected_nonce:
             raise PermissionError("identity token nonce does not match")
-        scopes = frozenset(self._scopes(claims))
+        scopes = frozenset(self._normalized_scopes(claims))
         roles = frozenset(self._roles(claims))
         identity = VerifiedAgentIdentity(
             subject_id=subject,
@@ -278,6 +287,31 @@ class JWKSIdentityVerifier:
             raise PermissionError(
                 f"identity claim {name!r} is outside the supported range"
             ) from exc
+
+    def _normalized_scopes(self, claims: dict[str, Any]) -> tuple[str, ...]:
+        scopes = self._scopes(claims)
+        prefix = self.resource_scope_prefix
+        if prefix is None:
+            return scopes
+
+        standard_scopes = frozenset({"openid", "profile", "email", "address", "phone"})
+        normalized: list[str] = []
+        for scope in scopes:
+            if scope in standard_scopes:
+                continue
+            if not scope.startswith(prefix):
+                raise PermissionError(
+                    "identity scope is outside the configured resource server"
+                )
+            resource_scope = scope[len(prefix) :]
+            if (
+                not resource_scope
+                or not resource_scope[0].isalnum()
+                or any(not (character.isalnum() or character in "._:-") for character in resource_scope)
+            ):
+                raise PermissionError("identity resource scope is malformed")
+            normalized.append(resource_scope)
+        return tuple(sorted(set(normalized)))
 
     @staticmethod
     def _scopes(claims: dict[str, Any]) -> tuple[str, ...]:
