@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
-from datetime import UTC, datetime
+import json
+import threading
+import urllib.request
 from typing import Any
 
 import jwt
@@ -10,6 +12,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
 
+from tinlance_agent_platform_api.http import serve
+from tinlance_agent_platform_api.service import AgentPlatformAPI, APIResponse
 from tinlance_agent_platform_identity.service_tokens import (
     KMSRS256Signer,
     PlatformServiceTokenIssuer,
@@ -197,3 +201,31 @@ def test_issuer_requires_https_and_explicit_audience_allowlist(
             allowed_audiences=frozenset(),
             signer=signer,
         )
+
+
+class UnusedAPIHandler:
+    def handle(self, request: Any) -> APIResponse:
+        raise AssertionError("JWKS reads must not dispatch application operations")
+
+
+def test_http_boundary_publishes_only_public_kms_jwks(
+    configured_issuer: tuple[PlatformServiceTokenIssuer, FakeKMS, KMSRS256Signer],
+) -> None:
+    _, _, signer = configured_issuer
+    server = serve(AgentPlatformAPI(UnusedAPIHandler()), object(), jwks_provider=signer)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/.well-known/jwks.json"
+        with urllib.request.urlopen(url, timeout=3) as response:
+            document = json.loads(response.read())
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "application/jwk-set+json"
+            assert "max-age=60" in response.headers["Cache-Control"]
+        assert len(document["keys"]) == 1
+        assert set(document["keys"][0]) == {"kty", "use", "alg", "kid", "n", "e"}
+        assert not {"d", "p", "q", "dp", "dq", "qi"}.intersection(document["keys"][0])
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
