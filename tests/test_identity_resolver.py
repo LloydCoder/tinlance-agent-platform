@@ -353,7 +353,6 @@ def test_session_revoke_endpoint_rejects_invalid_identity(
         thread.join(timeout=2)
 
 
-
 def test_revocation_store_adds_request_id_column_to_existing_schema(tmp_path: Path) -> None:
     path = tmp_path / "legacy-revocations.db"
     with sqlite3.connect(path) as connection:
@@ -370,7 +369,5 @@ def test_revocation_store_adds_request_id_column_to_existing_schema(tmp_path: Pa
         )
     SQLiteTokenRevocationStore(path)
     with sqlite3.connect(path) as connection:
-        columns = {
-            row[1] for row in connection.execute("PRAGMA table_info(revoked_tokens)")
-        }
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(revoked_tokens)")}
     assert "request_id" in columns
