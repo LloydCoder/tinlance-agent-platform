@@ -174,6 +174,8 @@ def test_pre_token_v2_rejects_wrong_pool_or_event_version() -> None:
 
     with pytest.raises(CognitoTenantMembershipError, match="user pool"):
         handler.handle(make_event(userPoolId="us-east-1_OtherPool"))
+    with pytest.raises(CognitoTenantMembershipError, match="region"):
+        handler.handle(make_event(region="us-east-1"))
     with pytest.raises(CognitoTenantMembershipError, match="version"):
         handler.handle(make_event(version="1"))
     with pytest.raises(CognitoTenantMembershipError, match="trigger source"):
