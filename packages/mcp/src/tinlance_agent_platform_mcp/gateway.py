@@ -38,10 +38,13 @@ class ToolScope:
     subject_id: str | None = None
     request_id: str | None = None
     traceparent: str | None = None
+    principal_type: str = "user"
 
     def __post_init__(self) -> None:
         if not all((self.tenant_id, self.capability, self.resource)):
             raise ValueError("complete tool scope is required")
+        if self.principal_type not in {"user", "service", "agent", "workload"}:
+            raise ValueError("tool scope principal type is not supported")
         if any(
             value != value.strip()
             for value in (
