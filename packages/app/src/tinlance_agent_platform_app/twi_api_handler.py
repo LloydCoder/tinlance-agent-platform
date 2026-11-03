@@ -136,7 +136,7 @@ class TWIAPIHandler:
                 if spec.requires_approval
                 else Reversibility.REVERSIBLE
             ),
-            data_class=DataClass.PUBLIC,
+            data_class=spec.data_class,
             blast_radius="single",
         )
         try:
