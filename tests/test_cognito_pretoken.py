@@ -196,12 +196,14 @@ def test_pre_token_v2_accepts_aws_empty_override_array() -> None:
         "tenant_id": "tenant-prod-01",
         "principal_type": "user",
     }
-    assert "scopesToAdd" not in result["response"]["claimsAndScopeOverrideDetails"][
-        "accessTokenGeneration"
-    ]
-    assert "scopesToSuppress" not in result["response"]["claimsAndScopeOverrideDetails"][
-        "accessTokenGeneration"
-    ]
+    assert (
+        "scopesToAdd"
+        not in result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"]
+    )
+    assert (
+        "scopesToSuppress"
+        not in result["response"]["claimsAndScopeOverrideDetails"]["accessTokenGeneration"]
+    )
 
 
 def test_pre_token_v2_rejects_unapproved_app_client_before_membership_lookup() -> None:
