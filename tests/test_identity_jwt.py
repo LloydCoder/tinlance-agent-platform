@@ -8,11 +8,11 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tinlance_agent_platform_identity import (
+    IdentityAuthenticationError,
     JWKSIdentityVerifier,
+    SQLiteTokenRevocationStore,
     create_cognito_access_token_verifier,
     create_cognito_principal_resolver,
-    IdentityAuthenticationError,
-    SQLiteTokenRevocationStore,
 )
 
 ISSUER = "https://issuer.example.test/"
