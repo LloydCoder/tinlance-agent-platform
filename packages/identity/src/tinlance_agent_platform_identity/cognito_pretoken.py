@@ -105,8 +105,7 @@ class CognitoPreTokenGenerationV2Handler:
             not isinstance(self.allowed_client_ids, frozenset)
             or not self.allowed_client_ids
             or any(
-                not isinstance(client_id, str)
-                or not _CLIENT_ID.fullmatch(client_id)
+                not isinstance(client_id, str) or not _CLIENT_ID.fullmatch(client_id)
                 for client_id in self.allowed_client_ids
             )
         ):
@@ -210,7 +209,6 @@ class CognitoPreTokenGenerationV2Handler:
         response["claimsAndScopeOverrideDetails"] = details
         result["response"] = response
         return result
-
 
 
 def build_cognito_pretoken_handler(
