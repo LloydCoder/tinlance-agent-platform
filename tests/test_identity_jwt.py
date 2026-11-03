@@ -247,6 +247,7 @@ def make_cognito_token(private_key: Any, **overrides: Any) -> str:
         "sub": "cognito-user-123",
         "aud": "https://api.tinlyt.tinlance.com",
         "jti": "cognito-token-123",
+        "origin_jti": "cognito-session-123",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
         "tenant_id": "tenant-123",
@@ -281,6 +282,7 @@ def test_cognito_access_token_profile_verifies_resource_bound_user_access_token(
     assert identity.principal_type == "user"
     assert identity.roles == frozenset({"operator"})
     assert identity.scopes == frozenset({"web.search", "web.fetch"})
+    assert identity.revocation_ids == frozenset({"cognito-session-123"})
 
 
 def test_cognito_profile_rejects_id_tokens_and_unapproved_app_clients() -> None:
@@ -327,3 +329,19 @@ def test_cognito_profile_requires_resource_audience_and_exact_user_pool_region()
             audience="https://api.tinlyt.tinlance.com",
             client_ids=(),
         )
+
+
+
+def test_cognito_profile_rejects_malformed_origin_jti() -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = create_cognito_access_token_verifier(
+        region="eu-west-1",
+        user_pool_id="eu-west-1_Abc123",
+        audience="https://api.tinlyt.tinlance.com",
+        client_ids=("tinlytwebclient123",),
+        key_provider=StaticKeyProvider(private_key.public_key()),
+    )
+    with pytest.raises(PermissionError, match="origin_jti"):
+        verifier.verify(make_cognito_token(private_key, origin_jti=""))
+    with pytest.raises(PermissionError, match="origin_jti"):
+        verifier.verify(make_cognito_token(private_key, origin_jti=123))
