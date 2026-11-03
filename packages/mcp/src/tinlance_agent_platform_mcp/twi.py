@@ -754,7 +754,7 @@ _TWI_USAGE_READ_SCHEMA: dict[str, object] = {
     "required": ["dimension", "period_start"],
     "properties": {
         "dimension": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,80}$"},
-        "period_start": {"type": "string", "format": "date-time", "maxLength": 64},
+        "period_start": {"type": "string", "format": "date-time", "maxLength": 40},
         "limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100},
         "cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
     },
