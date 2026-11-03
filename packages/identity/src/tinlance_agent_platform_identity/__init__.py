@@ -4,6 +4,7 @@ from .cognito_pretoken import (
     CognitoPreTokenGenerationV2Handler,
     CognitoTenantMembershipError,
     DynamoDBTenantMembershipResolver,
+    build_cognito_pretoken_handler,
 )
 from .cognito import create_cognito_access_token_verifier
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
@@ -32,6 +33,7 @@ __all__ = [
     "CognitoPreTokenGenerationV2Handler",
     "CognitoTenantMembershipError",
     "DynamoDBTenantMembershipResolver",
+    "build_cognito_pretoken_handler",
     "create_cognito_access_token_verifier",
     "SigningKeyProvider",
     "IdentityAuthenticationError",
