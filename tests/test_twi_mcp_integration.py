@@ -26,7 +26,7 @@ from tinlance_agent_platform_mcp import (
     TWITransportError,
     register_twi_tools,
 )
-from tinlance_agent_platform_mcp.twi import twi_tool_spec
+from tinlance_agent_platform_mcp.twi import TWI_MCP_TOOL_DEFINITIONS, twi_tool_spec
 
 TRACEPARENT = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
 EXPORT_CAPABILITY = "world-intelligence.source-evidence.export"
@@ -593,3 +593,12 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_usage_read_schema_matches_twi_api_period_start_bound() -> None:
+    definition = next(
+        item for item in TWI_MCP_TOOL_DEFINITIONS if item.name == "twi_usage_read"
+    )
+    properties = definition.input_schema["properties"]
+    assert properties["period_start"]["format"] == "date-time"
+    assert properties["period_start"]["maxLength"] == 40
