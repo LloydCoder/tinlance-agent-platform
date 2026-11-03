@@ -72,6 +72,10 @@ across invocations in a way that survives revocation or membership changes.
 
 - The browser is a public OAuth client: authorization code + PKCE S256, exact redirect URI
   allowlist, unpredictable state, OIDC nonce where applicable, and no embedded client secret.
+- Cognito returns a refresh token with authorization-code grants. The current SPA deliberately
+  discards it and keeps only the short-lived access token in memory. Session continuation uses
+  managed-login reauthentication; persistent refresh-token sessions require a separate BFF with
+  server-side encrypted token storage and rotation, not browser storage.
 - The Platform API accepts access tokens only. It must reject ID tokens, tokens from other pools,
   other app clients, other resource audiences, expired tokens, malformed claims and unknown keys.
 - Tenant and subject are taken exclusively from the verified token principal. Browser JSON fields
