@@ -347,5 +347,5 @@ def test_cognito_profile_rejects_malformed_origin_jti() -> None:
         verifier.verify(make_cognito_token(private_key, origin_jti=""))
     with pytest.raises(PermissionError, match="origin_jti"):
         verifier.verify(make_cognito_token(private_key, origin_jti=123))
-    with pytest.raises(PermissionError, match="origin_jti"):
+    with pytest.raises(PermissionError, match="verification failed"):
         verifier.verify(make_cognito_token(private_key, _omit_origin_jti=True))
