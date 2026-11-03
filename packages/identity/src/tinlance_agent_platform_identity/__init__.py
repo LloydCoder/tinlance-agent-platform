@@ -1,6 +1,9 @@
 """Identity boundary."""
 
-from .cognito import create_cognito_access_token_verifier
+from .cognito import (
+    create_cognito_access_token_verifier,
+    create_cognito_principal_resolver,
+)
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
 from .resolver import IdentityAuthenticationError, JWKSPrincipalResolver
@@ -17,6 +20,7 @@ __all__ = [
     "TokenSecurityContext",
     "JWKSIdentityVerifier",
     "create_cognito_access_token_verifier",
+    "create_cognito_principal_resolver",
     "SigningKeyProvider",
     "IdentityAuthenticationError",
     "JWKSPrincipalResolver",
