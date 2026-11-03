@@ -99,9 +99,7 @@ class JWKSIdentityVerifier:
         if self.allowed_client_ids is not None and (
             not self.allowed_client_ids
             or any(
-                not isinstance(client_id, str)
-                or not client_id
-                or client_id != client_id.strip()
+                not isinstance(client_id, str) or not client_id or client_id != client_id.strip()
                 for client_id in self.allowed_client_ids
             )
             or not self.require_client_id
