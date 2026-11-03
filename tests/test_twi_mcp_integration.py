@@ -434,6 +434,29 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         self.assertIsNone(self.http.calls[0]["body"])
         self.assertEqual(self.issuer.calls[0]["scopes"], frozenset({"twi:usage:read"}))
 
+    def test_usage_read_rejects_unbounded_or_timezone_free_query_before_network(self) -> None:
+        scope = ToolScope(
+            tenant_id="tenant-a",
+            capability="web.usage.read",
+            resource="twi://usage/*",
+            subject_id="subject-a",
+            request_id="twi-usage-request-0002",
+        )
+        with self.assertRaisesRegex(ValueError, "usage dimension"):
+            self.transport.call(
+                "twi_usage_read",
+                {"dimension": "invalid dimension", "period_start": "2026-10-01T00:00:00Z"},
+                scope,
+            )
+        with self.assertRaisesRegex(ValueError, "timezone"):
+            self.transport.call(
+                "twi_usage_read",
+                {"dimension": "search_requests_month", "period_start": "2026-10-01T00:00:00"},
+                scope,
+            )
+        self.assertEqual(self.http.calls, [])
+        self.assertEqual(self.issuer.calls, [])
+
     def test_monitor_operations_map_to_tenant_scoped_api_routes(self) -> None:
         cases = (
             (
