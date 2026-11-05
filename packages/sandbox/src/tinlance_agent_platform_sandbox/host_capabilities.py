@@ -21,7 +21,8 @@ class HostCapabilities:
     kvm_accessible: bool
     user_namespaces: bool
     cgroup_v2: bool
-    seccomp: bool
+    seccomp_filter_supported: bool
+    seccomp_active: bool
     apparmor: bool
     microvm_ready: bool
     microvm_blockers: tuple[str, ...]
@@ -78,9 +79,19 @@ def probe_host_capabilities(
 
     cgroup_v2 = (sysfs / "fs/cgroup/cgroup.controllers").is_file()
     status = _read_text(proc / "self/status")
-    seccomp = any(
-        line.strip() == "Seccomp:\t2"
+    seccomp_active = any(
+        line.startswith("Seccomp:") and line.split(":", 1)[1].strip() in {"1", "2"}
         for line in status.splitlines()
+    )
+    seccomp_actions = set(
+        _read_text(proc / "sys/kernel/seccomp/actions_avail").split()
+    )
+    kernel_config = _read_text(
+        root / "boot" / f"config-{kernel_release or platform.release()}"
+    )
+    seccomp_filter_supported = (
+        {"errno", "allow"}.issubset(seccomp_actions)
+        or "CONFIG_SECCOMP_FILTER=y" in kernel_config
     )
     apparmor = _read_text(
         sysfs / "module/apparmor/parameters/enabled"
@@ -99,13 +110,17 @@ def probe_host_capabilities(
         microvm_blockers.append(
             f"unsupported microVM host architecture: {machine}"
         )
+    if not cgroup_v2:
+        microvm_blockers.append("cgroup v2 is unavailable")
+    if not seccomp_filter_supported:
+        microvm_blockers.append("kernel seccomp filter support is unavailable")
 
     container_blockers: list[str] = []
     if not user_namespaces:
         container_blockers.append("unprivileged user namespaces are unavailable")
     if not cgroup_v2:
         container_blockers.append("cgroup v2 is unavailable")
-    if not seccomp:
+    if not seccomp_filter_supported:
         container_blockers.append("seccomp filtering is unavailable")
 
     binary_names = (
@@ -126,7 +141,8 @@ def probe_host_capabilities(
         kvm_accessible=kvm_accessible,
         user_namespaces=user_namespaces,
         cgroup_v2=cgroup_v2,
-        seccomp=seccomp,
+        seccomp_filter_supported=seccomp_filter_supported,
+        seccomp_active=seccomp_active,
         apparmor=apparmor,
         microvm_ready=not microvm_blockers,
         microvm_blockers=tuple(microvm_blockers),
