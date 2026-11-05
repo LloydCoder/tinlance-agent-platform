@@ -80,6 +80,7 @@ def test_container_sandbox_requires_userns_cgroup_v2_and_seccomp(tmp_path: Path)
     write_probe_fixture(tmp_path)
     (tmp_path / "proc/sys/user/max_user_namespaces").write_text("0\n", encoding="utf-8")
     (tmp_path / "proc/self/status").write_text("Name:\tpython\nSeccomp:\t0\n", encoding="utf-8")
+    (tmp_path / "proc/sys/kernel/seccomp/actions_avail").unlink()
     (tmp_path / "sys/fs/cgroup/cgroup.controllers").unlink()
 
     result = probe_host_capabilities(
