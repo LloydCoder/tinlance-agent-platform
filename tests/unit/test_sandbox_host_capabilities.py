@@ -9,6 +9,7 @@ from tinlance_agent_platform_sandbox.host_capabilities import probe_host_capabil
 def write_probe_fixture(root: Path, *, kvm: bool = False) -> None:
     (root / "proc/sys/user").mkdir(parents=True)
     (root / "proc/self").mkdir(parents=True)
+    (root / "proc/sys/kernel/seccomp").mkdir(parents=True)
     (root / "sys/fs/cgroup").mkdir(parents=True)
     (root / "sys/module/apparmor/parameters").mkdir(parents=True)
     (root / "dev").mkdir(parents=True)
@@ -38,6 +39,8 @@ def test_microvm_readiness_requires_accessible_kvm_device(tmp_path: Path) -> Non
     assert result.microvm_ready is False
     assert result.microvm_blockers == ("KVM device is unavailable",)
     assert result.container_sandbox_ready is True
+    assert result.seccomp_filter_supported is True
+    assert result.seccomp_active is True
 
 
 def test_microvm_readiness_requires_device_permissions(tmp_path: Path) -> None:
@@ -85,6 +88,8 @@ def test_container_sandbox_requires_userns_cgroup_v2_and_seccomp(tmp_path: Path)
     )
 
     assert result.container_sandbox_ready is False
+    assert result.seccomp_filter_supported is False
+    assert result.seccomp_active is False
     assert set(result.container_sandbox_blockers) == {
         "unprivileged user namespaces are unavailable",
         "cgroup v2 is unavailable",
