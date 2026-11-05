@@ -36,8 +36,35 @@ jobs:
         run: pytest -q tests/unit/test_sandbox_host_capabilities.py
       - name: Probe runner without changing host state
         run: sudo "$(which python)" scripts/probe_persistent_computer_host.py --output artifacts/persistent-computer-host.json && sudo chmod 644 artifacts/persistent-computer-host.json
+      - name: Install and smoke-test pinned Firecracker VMM
+        if: success()
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/firecracker-release artifacts
+          curl --fail --silent --show-error --location \
+            https://github.com/firecracker-microvm/firecracker/releases/download/v1.17.0/firecracker-v1.17.0-x86_64.tgz \
+            --output /tmp/firecracker-v1.17.0-x86_64.tgz
+          echo "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558  /tmp/firecracker-v1.17.0-x86_64.tgz" | sha256sum --check
+          tar -xzf /tmp/firecracker-v1.17.0-x86_64.tgz -C /tmp/firecracker-release
+          firecracker_bin="$(find /tmp/firecracker-release -type f -name 'firecracker-v1.17.0-x86_64' -print -quit)"
+          jailer_bin="$(find /tmp/firecracker-release -type f -name 'jailer-v1.17.0-x86_64' -print -quit)"
+          test -n "$firecracker_bin"
+          test -n "$jailer_bin"
+          sudo install -m 0755 "$firecracker_bin" /usr/local/bin/firecracker
+          sudo install -m 0755 "$jailer_bin" /usr/local/bin/jailer
+          /usr/local/bin/firecracker --version
+          sudo rm -f /tmp/firecracker-api.sock
+          sudo /usr/local/bin/firecracker --api-sock /tmp/firecracker-api.sock > artifacts/firecracker-vmm.log 2>&1 &
+          for attempt in $(seq 1 50); do
+            if [ -S /tmp/firecracker-api.sock ]; then break; fi
+            sleep 0.1
+          done
+          test -S /tmp/firecracker-api.sock
+          curl --fail --silent --show-error --unix-socket /tmp/firecracker-api.sock http://localhost/version > artifacts/firecracker-version.json
+          grep -Fq '"firecracker_version":"1.17.0"' artifacts/firecracker-version.json
+          sudo pkill -x firecracker || true
       - name: Record feasibility result
-        if: always()
+        if: always() && hashFiles('artifacts/persistent-computer-host.json') != ''
         run: |
           python - <<'PY'
           import json
@@ -56,15 +83,17 @@ jobs:
           ]
           if report["microvm_blockers"]:
               lines.append("- MicroVM blockers: " + "; ".join(report["microvm_blockers"]))
+          if Path("artifacts/firecracker-version.json").exists():
+              lines.append("- Firecracker VMM API smoke: PASS (v1.17.0)")
           Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]).write_text(
               "\n".join(lines) + "\n", encoding="utf-8"
           )
           PY
       - name: Upload host feasibility evidence
-        if: always()
+        if: always() && hashFiles('artifacts/persistent-computer-host.json') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: persistent-computer-host-feasibility-${{ github.run_id }}
-          path: artifacts/persistent-computer-host.json
+          path: artifacts/
           if-no-files-found: error
           retention-days: 90
