@@ -50,6 +50,7 @@ jobs:
               f"- KVM device accessible: {report['kvm_accessible']}",
               f"- MicroVM ready: {report['microvm_ready']}",
               f"- Container sandbox ready: {report['container_sandbox_ready']}",
+              f"- Kernel seccomp filter support: {report['seccomp_filter_supported']}",
               f"- Architecture: {report['architecture']}",
               f"- Kernel: {report['kernel_release']}",
           ]
