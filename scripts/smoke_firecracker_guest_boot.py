@@ -182,9 +182,7 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
             and (fields[0] == "tinlance" or fields[2] == "65532")
             and (fields[0] != "tinlance" or fields[2] != "65532")
         ):
-            raise ValueError(
-                "GID 65532 is already assigned to a different guest group"
-            )
+            raise ValueError("GID 65532 is already assigned to a different guest group")
     if not any(line.startswith("tinlance:") for line in group_lines):
         group_lines.append("tinlance:x:65532:")
         group_path.write_text("\n".join(group_lines) + "\n", encoding="utf-8")
