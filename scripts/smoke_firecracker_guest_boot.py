@@ -158,6 +158,7 @@ echo TINLANCE_GUEST_READY
 exec /usr/bin/sleep 60
 """
 
+
 def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -> None:
     _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
