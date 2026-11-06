@@ -169,4 +169,3 @@ def test_docker_command_w2_profile_keeps_all_outer_security_controls() -> None:
         "--pids-limit=128",
     ):
         assert option in command
-
