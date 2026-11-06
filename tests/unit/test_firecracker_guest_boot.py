@@ -306,6 +306,7 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_PYTHON_VERSION=Python",
         "TINLANCE_W2_NODE_VERSION=v",
         "TINLANCE_W2_NPM_VERSION=",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
@@ -416,6 +417,7 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_PYTHON_VERSION=",
         "TINLANCE_W2_NODE_VERSION=",
         "TINLANCE_W2_NPM_VERSION=",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
