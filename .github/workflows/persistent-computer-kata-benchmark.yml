@@ -7,6 +7,8 @@ on:
       - ".github/workflows/persistent-computer-kata-benchmark.yml"
       - "scripts/benchmark_gvisor.py"
       - "tests/unit/test_gvisor_benchmark.py"
+      - "tests/unit/test_w2_developer_workspace.py"
+      - "tests/fixtures/w2-developer-workspace/**"
       - "pyproject.toml"
   workflow_dispatch:
 
@@ -34,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test]"
       - name: Test shared OCI benchmark contract
-        run: pytest -q tests/unit/test_gvisor_benchmark.py
+        run: pytest -q tests/unit/test_gvisor_benchmark.py tests/unit/test_w2_developer_workspace.py
       - name: Verify KVM prerequisites
         run: |
           test -c /dev/kvm
@@ -96,6 +98,22 @@ jobs:
             *) echo "Image digest was not returned: $image_digest"; exit 1 ;;
           esac
           echo "image_digest=$image_digest" >> "$GITHUB_OUTPUT"
+      - name: Build pinned W2 developer-workspace image
+        id: workspace
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg BASE_IMAGE='${{ steps.image.outputs.image_digest }}' \
+            --file tests/fixtures/w2-developer-workspace/Dockerfile \
+            --tag tinlance-w2-developer-workspace:ci \
+            tests/fixtures/w2-developer-workspace
+          image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:ci)"
+          case "$image_id" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
+          esac
+          echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
+          echo "W2 developer workspace image: $image_id"
       - name: Prove Kata launches a separate guest kernel
         run: |
           host_kernel="$(uname -r)"
@@ -114,10 +132,10 @@ jobs:
             --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
             --candidate kata-qemu-runtime-rs \
             --output artifacts/kata-w1.json
-      - name: Run 30 restricted Kata W2 host-surface workloads
+      - name: Run 30 restricted Kata W2 developer-workspace workloads
         run: |
           python scripts/benchmark_gvisor.py \
-            --image-digest '${{ steps.image.outputs.image_digest }}' \
+            --image-digest '${{ steps.workspace.outputs.image_id }}' \
             --runs 30 \
             --runtime-name kata \
             --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
