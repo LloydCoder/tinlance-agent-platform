@@ -290,9 +290,6 @@ def verify_guest_boot_markers(
         "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
         "guest_ready": GUEST_READY_MARKER,
     }
-    missing = [name for name, marker in required.items() if marker not in log_text]
-    if missing:
-        raise ValueError(f"guest isolation markers are missing: {missing}")
     if profile == "W2":
         required.update(
             {
@@ -307,6 +304,9 @@ def verify_guest_boot_markers(
                 "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
             }
         )
+    missing = [name for name, marker in required.items() if marker not in log_text]
+    if missing:
+        raise ValueError(f"guest isolation markers are missing: {missing}")
     return {name: True for name in required}
 
 
