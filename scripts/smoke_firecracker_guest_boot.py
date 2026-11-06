@@ -180,10 +180,7 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
     _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
     init_path.parent.mkdir(parents=True, exist_ok=True)
-    init_path.write_text(
-        "#!/bin/sh\necho TINLANCE_GUEST_READY\nexec /usr/bin/sleep 60\n",
-        encoding="utf-8",
-    )
+    init_path.write_text(guest_init_script(), encoding="utf-8")
     init_path.chmod(0o755)
     dev_dir = extract_dir / "dev"
     dev_dir.mkdir(parents=True, exist_ok=True)
