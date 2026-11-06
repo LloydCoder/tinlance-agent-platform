@@ -13,17 +13,13 @@ def write_probe_fixture(root: Path, *, kvm: bool = False) -> None:
     (root / "sys/fs/cgroup").mkdir(parents=True)
     (root / "sys/module/apparmor/parameters").mkdir(parents=True)
     (root / "dev").mkdir(parents=True)
-    (root / "proc/cpuinfo").write_text(
-        "processor: 0\nflags: fpu vmx sse4_2\n", encoding="utf-8"
-    )
+    (root / "proc/cpuinfo").write_text("processor: 0\nflags: fpu vmx sse4_2\n", encoding="utf-8")
     (root / "proc/sys/user/max_user_namespaces").write_text("65536\n", encoding="utf-8")
     (root / "proc/self/status").write_text("Name:\tpython\nSeccomp:\t2\n", encoding="utf-8")
     (root / "proc/sys/kernel/seccomp/actions_avail").write_text(
         "kill_process kill_thread trap errno user_notif trace log allow\n", encoding="utf-8"
     )
-    (root / "sys/fs/cgroup/cgroup.controllers").write_text(
-        "cpu memory pids io\n", encoding="utf-8"
-    )
+    (root / "sys/fs/cgroup/cgroup.controllers").write_text("cpu memory pids io\n", encoding="utf-8")
     (root / "sys/module/apparmor/parameters/enabled").write_text("Y\n", encoding="utf-8")
     if kvm:
         (root / "dev/kvm").touch()
