@@ -123,6 +123,7 @@ jobs:
               f"Kernel SHA-256={report['guest_kernel_sha256']}; "
               f"rootfs SHA-256={report['guest_rootfs_ext4_sha256']}"
           )
+          print(f"Guest isolation checks: {report['guest_isolation_checks']}")
           print("Direct VMM smoke only: jailer/production isolation not certified.")
           PY
 
