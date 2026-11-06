@@ -741,7 +741,7 @@ def main() -> int:
             ),
             "guest_isolation_checks": guest_isolation_samples,
             "guest_workload": {
-                "profile": f"{args.profile}-" + ("minimal-agent" if args.profile == "W1" else "host-surface-probes"),
+                "profile": "W1-minimal-agent" if args.profile == "W1" else "W2-host-surface-probes",
                 "network": "none",
                 "rootfs_read_only": True,
                 "uid": 65532,
