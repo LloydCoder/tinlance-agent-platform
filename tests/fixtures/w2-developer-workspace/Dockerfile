@@ -6,7 +6,7 @@ ARG APT_SNAPSHOT
 RUN DEBIAN_FRONTEND=noninteractive apt-get --snapshot="${APT_SNAPSHOT}" update \
     && DEBIAN_FRONTEND=noninteractive apt-get --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends git python3 nodejs npm ca-certificates util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --chown=0:0 . /opt/tinlance-fixture/
