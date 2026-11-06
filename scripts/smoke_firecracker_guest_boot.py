@@ -231,6 +231,14 @@ exec /usr/bin/sleep 60
 """
     if profile == "W2":
         script = script.replace(
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp",
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp\\n"
+            "mkdir -p /workspace\\n"
+            "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
+            "noexec,nosuid,nodev tmpfs /workspace\\n"
+            "echo TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        )
+        script = script.replace(
             "setpriv --reuid=65532 --regid=65532 --clear-groups",
             "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups",
         )
@@ -243,11 +251,16 @@ exec /usr/bin/sleep 60
     test ! -r /etc/shadow
     echo TINLANCE_W2_SENSITIVE_FILES_DENIED
     test ! -e /dev/kvm
+    test ! -e /dev/mem
+    test ! -e /dev/vhost-net
+    test ! -e /dev/fuse
     echo TINLANCE_W2_HOST_DEVICES_ABSENT
     test ! -S /run/docker.sock
     test ! -S /var/run/docker.sock
     test ! -S /run/containerd/containerd.sock
     test ! -S /run/podman/podman.sock
+    test ! -S /run/crio/crio.sock
+    test ! -S /run/buildkit/buildkitd.sock
     echo TINLANCE_W2_HOST_SOCKETS_ABSENT
     if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
         echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
@@ -263,11 +276,26 @@ exec /usr/bin/sleep 60
     test ! -w /proc/sys/kernel/hostname
     echo TINLANCE_W2_PROC_SYS_READONLY
     echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
+    export HOME=/tmp
+    export npm_config_cache=/tmp/npm-cache
+    command -v git >/dev/null 2>&1
+    command -v python3 >/dev/null 2>&1
+    command -v node >/dev/null 2>&1
+    command -v npm >/dev/null 2>&1
+    test -x /opt/tinlance-fixture/run-workspace.sh
+    if /opt/tinlance-fixture/run-workspace.sh; then
+        :
+    else
+        echo TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED
+        exit 83
+    fi
 """
         script = script.replace(
-            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
-            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\\n",
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\\n" + probes,
         )
+        if "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED" not in script:
+            raise RuntimeError("W2 guest init did not configure a workspace tmpfs")
     return script
 
 
@@ -313,6 +341,8 @@ def verify_guest_boot_markers(
                 "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
                 "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
                 "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+                "workspace_tmpfs_mounted": "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+                "developer_workspace_passed": "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
             }
         )
     missing = [name for name, marker in required.items() if marker not in log_text]
