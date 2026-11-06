@@ -72,6 +72,7 @@ jobs:
           for test in database/tests/*.sql; do
             psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$test"
           done
+  # Phase 2 KVM evidence runs only on the dedicated guest-isolation PR branch.
   persistent-computer-kvm-smoke:
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'feat/phase2-guest-isolation-probes-v2')
     name: Persistent computer guest and jailer smoke
