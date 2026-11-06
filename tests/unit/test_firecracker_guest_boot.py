@@ -158,3 +158,37 @@ def test_summarize_boot_times_reports_p95_and_p99_with_thirty_samples() -> None:
     assert report["sample_count"] == 30
     assert report["p95_boot_time_ms"] == 29.0
     assert report["p99_boot_time_ms"] == 30.0
+
+
+def test_guest_boot_marker_verifier_accepts_read_only_no_nic_evidence() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    evidence = verify_guest_boot_markers(
+        "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\nTINLANCE_GUEST_READY"
+    )
+    assert evidence == {
+        "rootfs_read_only_confirmed": True,
+        "no_non_loopback_network_interfaces": True,
+        "guest_ready": True,
+    }
+
+
+def test_guest_boot_marker_verifier_rejects_writable_rootfs() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(PermissionError, match="accepted a write"):
+        verify_guest_boot_markers("TINLANCE_ROOTFS_WRITE_UNEXPECTED\nTINLANCE_GUEST_READY")
+
+
+def test_guest_boot_marker_verifier_rejects_non_loopback_network_interface() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(PermissionError, match="non-loopback"):
+        verify_guest_boot_markers("TINLANCE_NETWORK_INTERFACE_UNEXPECTED\nTINLANCE_GUEST_READY")
+
+
+def test_guest_boot_marker_verifier_rejects_missing_isolation_evidence() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(ValueError, match="markers are missing"):
+        verify_guest_boot_markers("TINLANCE_GUEST_READY")
