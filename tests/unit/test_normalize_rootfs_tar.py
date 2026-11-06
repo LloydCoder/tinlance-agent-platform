@@ -20,11 +20,11 @@ def _write_archive(
     with tarfile.open(path, "w") as archive:
         for kind, name, value in entries:
             member = tarfile.TarInfo(name)
-            member.uid = 1234
-            member.gid = 5678
+            member.uid = uid
+            member.gid = gid
             member.uname = "builder"
             member.gname = "builders"
-            member.mtime = 1_700_000_000
+            member.mtime = mtime
             if kind == "directory":
                 member.type = tarfile.DIRTYPE
                 member.mode = 0o755
@@ -61,8 +61,14 @@ def test_normalizer_produces_identical_rootfs_for_order_owner_and_timestamp_vari
         ("file", "etc/machine-id", b"machine-one"),
         ("file", "var/log/dpkg.log", b"built at 10:00"),
     ]
-    _write_archive(first, first_entries)
-    _write_archive(second, list(reversed(first_entries)))
+    _write_archive(first, first_entries, uid=1234, gid=5678, mtime=1_700_000_000)
+    _write_archive(
+        second,
+        list(reversed(first_entries)),
+        uid=9999,
+        gid=8888,
+        mtime=1_800_000_000,
+    )
 
     normalized_first = tmp_path / "first.normalized.tar"
     normalized_second = tmp_path / "second.normalized.tar"
@@ -75,13 +81,21 @@ def test_normalizer_produces_identical_rootfs_for_order_owner_and_timestamp_vari
 
     with tarfile.open(normalized_first, "r:") as archive:
         members = archive.getmembers()
-        order = [\n            (0 if member.isdir() else 1 if member.isfile() else 2 if member.issym() else 3, member.name)\n            for member in members\n        ]\n        assert order == sorted(order)
+        order = [
+            (
+                0 if member.isdir() else 1 if member.isfile() else 2 if member.issym() else 3,
+                member.name,
+            )
+            for member in members
+        ]
+        assert order == sorted(order)
         assert all(member.uid == 0 and member.gid == 0 for member in members)
         assert all(member.mtime == SOURCE_DATE_EPOCH for member in members)
         assert "etc/machine-id" not in archive.getnames()
         assert "var/log/dpkg.log" not in archive.getnames()
         assert ".hidden" in archive.getnames()
-        assert archive.extractfile("etc/issue").read() == b"Ubuntu 24.04"
+        issue = archive.extractfile("etc/issue")
+        assert issue is not None and issue.read() == b"Ubuntu 24.04"
         assert archive.getmember("usr/local-tool").linkname == "/usr/bin/tool"
 
 
