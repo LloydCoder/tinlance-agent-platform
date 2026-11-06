@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.smoke_firecracker_guest_boot import (
     parse_latest_artifact_prefix,
     select_latest_versioned_key,
