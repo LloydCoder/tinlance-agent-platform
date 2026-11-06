@@ -355,6 +355,23 @@ def test_guest_init_w2_script_is_valid_posix_shell() -> None:
     assert result.returncode == 0, result.stderr
 
 
+def test_firecracker_machine_profile_matches_w1_and_w2_resource_contracts() -> None:
+    from scripts.smoke_firecracker_guest_boot import machine_config_for_profile
+
+    assert machine_config_for_profile("W1") == {
+        "vcpu_count": 1,
+        "mem_size_mib": 512,
+        "smt": False,
+    }
+    assert machine_config_for_profile("W2") == {
+        "vcpu_count": 2,
+        "mem_size_mib": 2048,
+        "smt": False,
+    }
+    with pytest.raises(ValueError, match="profile"):
+        machine_config_for_profile("W3")
+
+
 def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
     from scripts.smoke_firecracker_guest_boot import guest_init_script
 
