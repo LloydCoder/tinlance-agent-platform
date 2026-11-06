@@ -138,6 +138,7 @@ jobs:
           )
           print(f"Process isolation: {report['process_isolation']}")
           print(f"Cgroup limits: {report['cgroup_limits']}")
+          print(f"Guest isolation checks: {report['guest_isolation_checks']}")
           print("Jailer smoke only: production isolation is not certified.")
           PY
 
