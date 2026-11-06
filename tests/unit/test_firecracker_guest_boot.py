@@ -271,6 +271,7 @@ def test_guest_init_w2_enforces_no_new_privileges_and_host_surface_denials() -> 
         "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
         "TINLANCE_W2_SENSITIVE_FILES_DENIED",
         "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
         "TINLANCE_W2_HOST_SOCKETS_ABSENT",
         "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
@@ -293,6 +294,7 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
         "TINLANCE_W2_SENSITIVE_FILES_DENIED",
         "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
         "TINLANCE_W2_HOST_SOCKETS_ABSENT",
         "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
@@ -309,6 +311,16 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
     assert evidence["host_surface_probes_passed"] is True
     assert evidence["no_new_privileges"] is True
+
+
+def test_guest_init_w2_distinguishes_guest_memory_device_from_host_devices() -> None:
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    script = guest_init_script("W2")
+    assert "for host_device in /dev/kvm /dev/vhost-net; do" in script
+    assert "if [ -e /dev/mem ] && [ -r /dev/mem ]; then" in script
+    assert "TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED" in script
+    assert "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED" in script
 
 
 def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
@@ -384,6 +396,7 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
         "TINLANCE_W2_SENSITIVE_FILES_DENIED",
         "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
         "TINLANCE_W2_HOST_SOCKETS_ABSENT",
         "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
