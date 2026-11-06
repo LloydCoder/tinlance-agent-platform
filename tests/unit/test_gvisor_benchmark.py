@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from scripts.benchmark_gvisor import (
+    _capture,
     build_docker_command,
     percentile_nearest_rank,
     summarize_samples,
 )
+
+
+def test_capture_reports_stderr_for_failed_runtime_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failed_run(*args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(returncode=128, stdout="", stderr="fatal: fixture clone failed")
+
+    monkeypatch.setattr("scripts.benchmark_gvisor.subprocess.run", failed_run)
+    with pytest.raises(RuntimeError, match="fatal: fixture clone failed"):
+        _capture(["docker", "run", "fixture"])
 
 
 def test_percentile_nearest_rank_is_deterministic_for_three_samples() -> None:
