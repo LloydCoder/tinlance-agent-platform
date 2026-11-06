@@ -276,7 +276,8 @@ def verify_guest_boot_markers(
         raise ValueError("profile must be W1 or W2")
     for marker in GUEST_W2_UNEXPECTED_MARKERS:
         if marker in log_text:
-            raise PermissionError(f"guest host-surface boundary violated: {marker}")
+            detail = marker.removeprefix("TINLANCE_W2_").removesuffix("_UNEXPECTED").lower().replace("_", " ")
+            raise PermissionError(f"guest host-surface boundary violated: {detail}")
     if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
         raise PermissionError("guest root filesystem unexpectedly accepted a write")
     if GUEST_NIC_UNEXPECTED_MARKER in log_text:
