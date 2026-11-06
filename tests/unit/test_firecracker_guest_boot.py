@@ -98,9 +98,7 @@ def test_load_guest_asset_manifest_rejects_key_outside_pinned_prefix(tmp_path: P
         Path(__file__).resolve().parents[1] / "fixtures" / "firecracker-guest-assets.json"
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["kernel_key"] = (
-        manifest["artifact_prefix"] + "x86_64/../vmlinux-6.18.56"
-    )
+    manifest["kernel_key"] = manifest["artifact_prefix"] + "x86_64/../vmlinux-6.18.56"
     tampered_path = tmp_path / "tampered-assets.json"
     tampered_path.write_text(json.dumps(manifest), encoding="utf-8")
 
