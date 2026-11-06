@@ -391,6 +391,10 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_NODE_TESTS_OK",
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+        "TINLANCE_W2_GIT_VERSION=",
+        "TINLANCE_W2_PYTHON_VERSION=",
+        "TINLANCE_W2_NODE_VERSION=",
+        "TINLANCE_W2_NPM_VERSION=",
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
