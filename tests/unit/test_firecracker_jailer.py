@@ -125,6 +125,7 @@ CapEff:\t0000000000000000
             process_pid_namespace="pid:[4026532445]",
             expected_chroot_identity="8:12345",
             process_root_identity="8:12345",
+            thread_seccomp_modes=[2, 2],
         )
 
 
@@ -148,6 +149,7 @@ CapEff:\t0000000000000000
             process_pid_namespace="pid:[4026532445]",
             expected_chroot_identity="8:12345",
             process_root_identity="8:12345",
+            thread_seccomp_modes=[2, 2],
         )
 
 
@@ -171,6 +173,7 @@ CapEff:\t0000000000000000
             process_pid_namespace="pid:[4026532445]",
             expected_chroot_identity="8:12345",
             process_root_identity="8:12345",
+            thread_seccomp_modes=[2, 2],
         )
 
 
@@ -194,4 +197,28 @@ CapEff:\t0000000000000000
             process_pid_namespace="pid:[4026532445]",
             expected_chroot_identity="8:12345",
             process_root_identity="8:12346",
+            thread_seccomp_modes=[2, 2],
+        )
+
+def test_verify_jailer_evidence_rejects_any_unfiltered_firecracker_thread() -> None:
+    status = """Uid:\t987\t987\t987\t987
+Gid:\t987\t987\t987\t987
+NSpid:\t4321\t1
+NoNewPrivs:\t1
+Seccomp:\t2
+CapEff:\t0000000000000000
+"""
+    with pytest.raises(PermissionError, match="thread seccomp"):
+        verify_jailer_process_evidence(
+            status_text=status,
+            cgroup_text="0::/firecracker/fc-smoke-421",
+            expected_uid=987,
+            expected_gid=987,
+            host_mount_namespace="mnt:[4026531840]",
+            process_mount_namespace="mnt:[4026532444]",
+            host_pid_namespace="pid:[4026531836]",
+            process_pid_namespace="pid:[4026532445]",
+            expected_chroot_identity="8:12345",
+            process_root_identity="8:12345",
+            thread_seccomp_modes=[2, 0, 2],
         )
