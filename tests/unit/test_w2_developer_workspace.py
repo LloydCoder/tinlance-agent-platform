@@ -17,6 +17,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
         / "run-workspace.sh"
     )
     script = fixture.read_text(encoding="utf-8")
+    dockerfile = fixture.with_name("Dockerfile").read_text(encoding="utf-8")
     for marker in (
         "TINLANCE_W2_GIT_CLONE_OK",
         "TINLANCE_W2_PYTHON_EDIT_OK",
@@ -30,6 +31,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     ):
         assert marker in script or marker in payload
     assert " clone --no-hardlinks " in script
+    assert "chown -R 65532:65532 /opt/tinlance-fixture" in dockerfile
     assert "python3 -m compileall" in script
     assert "python3 -m unittest" in script
     assert "node --check" in script
