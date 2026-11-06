@@ -11,7 +11,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-_IMAGE_DIGEST = re.compile(r"^(?:[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}|sha256:[a-f0-9]{64})$")
+_IMAGE_DIGEST = re.compile(
+    r"^(?:[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}|sha256:[a-f0-9]{64})$"
+)
 _RUNTIME_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _SUCCESS_MARKER = "TINLANCE_GVISOR_WORKLOAD_OK"
 _NONROOT_MARKER = "TINLANCE_NONROOT_UID_CONFIRMED"
@@ -221,9 +223,12 @@ def run_benchmark(
                 "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
                 "TINLANCE_W2_GIT_CLONE_OK",
                 "TINLANCE_W2_PYTHON_EDIT_OK",
+                "TINLANCE_W2_PYTHON_BUILD_OK",
                 "TINLANCE_W2_PYTHON_TESTS_OK",
                 "TINLANCE_W2_NODE_EDIT_OK",
+                "TINLANCE_W2_NODE_BUILD_OK",
                 "TINLANCE_W2_NODE_TESTS_OK",
+                "TINLANCE_W2_WORKTREE_DIRTY_OK",
                 "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
             )
             missing = [marker for marker in required_w2_markers if marker not in output]
@@ -252,6 +257,12 @@ def run_benchmark(
             "user_uid": 65532,
             "user_gid": 65532,
             "tmpfs": "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
+            "workspace_tmpfs": (
+                "/workspace:rw,noexec,nosuid,nodev,size=128m,"
+                "uid=65532,gid=65532,mode=0700"
+                if profile == "W2"
+                else None
+            ),
         },
         "latency": {**summarize_samples(samples), "samples_ms": samples},
         "guest_assertions": {
@@ -271,6 +282,7 @@ def run_benchmark(
             "python_source_edit_and_unit_tests": profile == "W2",
             "node_source_edit_and_tests": profile == "W2",
             "workspace_tmpfs_bounded": profile == "W2",
+            "workspace_changes_are_unprivileged_and_observable": profile == "W2",
         },
         "outputs": outputs,
     }
