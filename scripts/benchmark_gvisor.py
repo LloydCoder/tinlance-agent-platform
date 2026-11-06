@@ -44,12 +44,12 @@ def build_w2_payload() -> str:
         + "command -v setpriv >/dev/null 2>&1; "
         + "command -v mount >/dev/null 2>&1; "
         + (
-            "awk '/^CapEff:/ { if ($2 != \"0000000000000000\") exit 1; found=1 } "
+            'awk \'/^CapEff:/ { if ($2 != "0000000000000000") exit 1; found=1 } '
             "END { exit !found }' /proc/self/status; "
         )
         + "echo TINLANCE_W2_CAPABILITIES_DROPPED; "
         + (
-            "awk '/^NoNewPrivs:/ { if ($2 != \"1\") exit 1; found=1 } "
+            'awk \'/^NoNewPrivs:/ { if ($2 != "1") exit 1; found=1 } '
             "END { exit !found }' /proc/self/status; "
         )
         + "echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED; "
@@ -205,10 +205,7 @@ def run_benchmark(
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
         "workload": {
-            "profile": (
-                f"{profile}-"
-                + ("minimal-agent" if profile == "W1" else "host-surface-probes")
-            ),
+            "profile": f"{profile}-" + ("minimal-agent" if profile == "W1" else "host-surface-probes"),
             "network": "none",
             "read_only_rootfs": True,
             "capabilities": "drop-all",
