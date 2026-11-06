@@ -147,6 +147,8 @@ CapEff:\t0000000000000000
             process_mount_namespace="mnt:[4026532444]",
             host_pid_namespace="pid:[4026531836]",
             process_pid_namespace="pid:[4026532445]",
+            expected_chroot_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
+            process_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
         )
 
 
@@ -168,4 +170,6 @@ CapEff:\t0000000000000000
             process_mount_namespace="mnt:[4026532444]",
             host_pid_namespace="pid:[4026531836]",
             process_pid_namespace="pid:[4026532445]",
+            expected_chroot_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
+            process_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
         )
