@@ -193,7 +193,12 @@ def _find_firecracker_pid(jailer_id: str, timeout_seconds: float = 10) -> int:
     raise RuntimeError("jailed Firecracker process could not be located in /proc")
 
 
-def _read_process_evidence(pid: int, uid: int, gid: int) -> dict[str, int | bool | str]:
+def _read_process_evidence(
+    pid: int,
+    uid: int,
+    gid: int,
+    expected_chroot_root: Path,
+) -> dict[str, int | bool | str]:
     proc = Path("/proc") / str(pid)
     return verify_jailer_process_evidence(
         status_text=(proc / "status").read_text(encoding="utf-8"),
@@ -204,10 +209,7 @@ def _read_process_evidence(pid: int, uid: int, gid: int) -> dict[str, int | bool
         process_mount_namespace=os.readlink(proc / "ns/mnt"),
         host_pid_namespace=os.readlink("/proc/self/ns/pid"),
         process_pid_namespace=os.readlink(proc / "ns/pid"),
-        expected_chroot_root=str(
-            Path("/srv/tinlance-jailer/firecracker").resolve()
-            / Path((proc / "cgroup").read_text(encoding="utf-8").split("fc-", 1)[-1].splitlines()[0])
-        ),
+        expected_chroot_root=str(expected_chroot_root.resolve()),
         process_root=os.readlink(proc / "root"),
     )
 
@@ -301,7 +303,12 @@ def _run_jailer_guest(
             )
             _wait_for_path(socket_path, process, log_path, timeout_seconds)
             firecracker_pid = _find_firecracker_pid(jailer_id)
-            process_evidence = _read_process_evidence(firecracker_pid, uid, gid)
+            process_evidence = _read_process_evidence(
+                firecracker_pid,
+                uid,
+                gid,
+                chroot_root,
+            )
             cgroup_evidence = _verify_cgroup_limits(str(process_evidence["cgroup_path"]))
             guest_kernel, guest_rootfs = _stage_guest_assets(
                 chroot_root,
