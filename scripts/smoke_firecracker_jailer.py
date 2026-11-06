@@ -179,7 +179,13 @@ def _wait_for_path(
 ) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if path.exists():
+        socket_probe = subprocess.run(
+            ["sudo", "-n", "test", "-S", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if socket_probe.returncode == 0:
             return
         if process.poll() is not None:
             break
