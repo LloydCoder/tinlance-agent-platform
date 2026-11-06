@@ -519,6 +519,5 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
 
-
 if __name__ == "__main__":
     unittest.main()
