@@ -72,3 +72,130 @@ jobs:
           for test in database/tests/*.sql; do
             psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$test"
           done
+  # Phase 2 KVM evidence runs only on the dedicated guest-isolation PR branch.
+  persistent-computer-kvm-smoke:
+    if: github.ref == 'refs/heads/feature/phase2-jailer-guest-probes' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/phase2-jailer-guest-probes'))
+    name: Persistent computer guest and jailer smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Install project test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+
+      - name: Test guest and jailer isolation contracts
+        run: |
+          pytest -q tests/unit/test_firecracker_guest_boot.py tests/unit/test_firecracker_jailer.py
+
+      - name: Verify KVM host prerequisites
+        run: |
+          mkdir -p artifacts
+          sudo env PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" python scripts/probe_persistent_computer_host.py --output artifacts/host.json
+          sudo chmod 644 artifacts/host.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/host.json").read_text(encoding="utf-8"))
+          required = {
+              "microvm_ready": report.get("microvm_ready") is True,
+              "kvm_accessible": report.get("kvm_accessible") is True,
+              "cpu_virtualization": report.get("cpu_virtualization") is True,
+              "cgroup_limits_ready": report.get("cgroup_limits_ready") is True,
+              "seccomp_filter_supported": report.get("seccomp_filter_supported") is True,
+          }
+          failed = [name for name, passed in required.items() if not passed]
+          if failed:
+              raise SystemExit(f"KVM host prerequisites unavailable: {failed}; report={report}")
+          PY
+
+      - name: Download and verify pinned Firecracker release
+        run: |
+          set -euo pipefail
+          version="1.17.0"
+          arch="x86_64"
+          archive="/tmp/firecracker-v${version}-${arch}.tgz"
+          expected_sha="06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
+          curl --fail --silent --show-error --location \
+            "https://github.com/firecracker-microvm/firecracker/releases/download/v${version}/firecracker-v${version}-${arch}.tgz" \
+            --output "${archive}"
+          echo "${expected_sha}  ${archive}" | sha256sum --check -
+          mkdir -p /tmp/firecracker-release
+          tar -xzf "${archive}" -C /tmp/firecracker-release
+          firecracker_bin="$(find /tmp/firecracker-release -type f -name "firecracker-v${version}-${arch}" -print -quit)"
+          jailer_bin="$(find /tmp/firecracker-release -type f -name "jailer-v${version}-${arch}" -print -quit)"
+          test -n "${firecracker_bin}"
+          test -n "${jailer_bin}"
+          sudo install -d -o root -g root -m 0755 /usr/local/libexec/firecracker/${version}
+          sudo install -o root -g root -m 0755 "${firecracker_bin}" /usr/local/libexec/firecracker/${version}/firecracker
+          sudo install -o root -g root -m 0755 "${jailer_bin}" /usr/local/libexec/firecracker/${version}/jailer
+          echo "FIRECRACKER_BIN=/usr/local/libexec/firecracker/${version}/firecracker" >> "${GITHUB_ENV}"
+          echo "JAILER_BIN=/usr/local/libexec/firecracker/${version}/jailer" >> "${GITHUB_ENV}"
+          echo "FIRECRACKER_ARCHIVE=${archive}" >> "${GITHUB_ENV}"
+
+      - name: Create dedicated unprivileged jailer identity
+        run: |
+          set -euo pipefail
+          user="tinlance-fc-${GITHUB_RUN_ID}"
+          sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin "${user}"
+          echo "JAILER_UID=$(id -u "${user}")" >> "${GITHUB_ENV}"
+          echo "JAILER_GID=$(id -g "${user}")" >> "${GITHUB_ENV}"
+          sudo install -d -o root -g root -m 0755 /srv/tinlance-jailer
+
+      - name: Install guest image tooling
+        run: |
+          if ! command -v unsquashfs >/dev/null 2>&1 || ! command -v mkfs.ext4 >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y squashfs-tools e2fsprogs
+          fi
+
+      - name: Run direct VMM guest boot and guest isolation probes
+        run: |
+          python scripts/smoke_firecracker_guest_boot.py \
+            --firecracker "${FIRECRACKER_BIN}" \
+            --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
+            --assets-manifest tests/fixtures/firecracker-guest-assets.json \
+            --runs 3 \
+            --timeout-seconds 45 \
+            --output artifacts/firecracker-direct-vmm.json \
+            --log-dir artifacts/firecracker-direct-vmm-logs
+
+      - name: Run jailed guest boot and host confinement probes
+        run: |
+          python -m scripts.smoke_firecracker_jailer \
+            --jailer "${JAILER_BIN}" \
+            --firecracker "${FIRECRACKER_BIN}" \
+            --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
+            --assets-manifest tests/fixtures/firecracker-guest-assets.json \
+            --uid "${JAILER_UID}" \
+            --gid "${JAILER_GID}" \
+            --chroot-base-dir /srv/tinlance-jailer \
+            --runs 3 \
+            --timeout-seconds 45 \
+            --output artifacts/firecracker-jailer.json \
+            --log-dir artifacts/firecracker-jailer-logs
+
+      - name: Upload persistent computer KVM evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persistent-computer-kvm-smoke-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Teardown ephemeral jailer identity and chroot
+        if: always()
+        run: |
+          sudo rm -rf -- /srv/tinlance-jailer
+          sudo userdel "tinlance-fc-${GITHUB_RUN_ID}" || true
+          sudo groupdel "tinlance-fc-${GITHUB_RUN_ID}" || true
