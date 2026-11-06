@@ -21,6 +21,10 @@ from urllib.parse import urlencode
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 FIRECRACKER_VERSION = "1.17.0"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
+GUEST_READ_ONLY_MARKER = "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED"
+GUEST_NO_NIC_MARKER = "TINLANCE_NO_NIC_CONFIRMED"
+GUEST_WRITE_UNEXPECTED_MARKER = "TINLANCE_ROOTFS_WRITE_UNEXPECTED"
+GUEST_NIC_UNEXPECTED_MARKER = "TINLANCE_NETWORK_INTERFACE_UNEXPECTED"
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 
 
@@ -159,6 +163,24 @@ exec /usr/bin/sleep 60
 """
 
 
+def verify_guest_boot_markers(log_text: str) -> dict[str, bool]:
+    if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest root filesystem unexpectedly accepted a write")
+    if GUEST_NIC_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
+        raise RuntimeError("guest could not mount sysfs to verify network interfaces")
+    required = {
+        "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
+        "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "guest_ready": GUEST_READY_MARKER,
+    }
+    missing = [name for name, marker in required.items() if marker not in log_text]
+    if missing:
+        raise ValueError(f"guest isolation markers are missing: {missing}")
+    return {name: True for name in required}
+
+
 def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -> None:
     _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
@@ -286,7 +308,7 @@ def _run_guest(
     work_dir: Path,
     log_dir: Path,
     timeout_seconds: float,
-) -> tuple[float, dict[str, str]]:
+) -> tuple[float, dict[str, str], dict[str, bool]]:
     socket_path = work_dir / f"api-{run_index}.sock"
     log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
     _stop_firecracker(socket_path)
@@ -348,8 +370,15 @@ def _run_guest(
             deadline = started + timeout_seconds
             while time.monotonic() < deadline:
                 log_text = log_path.read_text(encoding="utf-8", errors="replace")
+                if (
+                    GUEST_WRITE_UNEXPECTED_MARKER in log_text
+                    or GUEST_NIC_UNEXPECTED_MARKER in log_text
+                    or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                ):
+                    verify_guest_boot_markers(log_text)
                 if GUEST_READY_MARKER in log_text:
-                    return (time.monotonic() - started) * 1000, version
+                    guest_isolation = verify_guest_boot_markers(log_text)
+                    return (time.monotonic() - started) * 1000, version, guest_isolation
                 running = subprocess.run(
                     ["sudo", "-n", "pgrep", "-x", "firecracker"],
                     check=False,
@@ -524,9 +553,10 @@ def main() -> int:
             raise RuntimeError("pinned guest asset loader returned invalid paths")
 
         samples: list[float] = []
+        guest_isolation_samples: list[dict[str, bool]] = []
         firecracker_version: dict[str, str] = {}
         for run_index in range(1, args.runs + 1):
-            boot_time_ms, version = _run_guest(
+            boot_time_ms, version, guest_isolation = _run_guest(
                 firecracker_binary,
                 kernel_path,
                 rootfs_path,
@@ -536,6 +566,7 @@ def main() -> int:
                 args.timeout_seconds,
             )
             samples.append(boot_time_ms)
+            guest_isolation_samples.append(guest_isolation)
             firecracker_version = version
 
         summary = summarize_boot_times(samples)
@@ -545,7 +576,10 @@ def main() -> int:
             "jailer_executed": False,
             "production_certification": False,
             "guest_network_configured": False,
-            "guest_rootfs_read_only": True,
+            "guest_rootfs_read_only": all(
+                sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
+            ),
+            "guest_isolation_checks": guest_isolation_samples,
             "guest_ready_marker": GUEST_READY_MARKER,
             "boot_time_measurement": (
                 "elapsed time from immediately before the InstanceStart API request "
