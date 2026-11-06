@@ -139,3 +139,16 @@ def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
     assert "TINLANCE_NETWORK_INTERFACE_UNEXPECTED" in script
     assert "TINLANCE_NO_NIC_CONFIRMED" in script
     assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
+
+
+def test_guest_init_executes_w1_workload_in_bounded_tmpfs_before_ready() -> None:
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    script = guest_init_script()
+    assert "mount -t tmpfs -o size=64m tmpfs /tmp" in script
+    assert "printf tinlance-gvisor-ok > /tmp/workload.txt" in script
+    assert 'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok' in script
+    assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index(
+        "TINLANCE_W1_WORKLOAD_OK"
+    )
+    assert script.index("TINLANCE_W1_WORKLOAD_OK") < script.index("TINLANCE_GUEST_READY")
