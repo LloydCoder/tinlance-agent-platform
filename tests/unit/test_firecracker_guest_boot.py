@@ -552,7 +552,9 @@ def test_w2_rootfs_extractor_fails_closed_on_unapplied_extended_attributes(
         extract_w2_rootfs_tar(source, tmp_path / "rootfs")
 
 
-def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(tmp_path: Path) -> None:
+def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "modes-rootfs.tar"
     with tarfile.open(source, "w") as archive:
         directory = tarfile.TarInfo("root-only")
@@ -568,4 +570,3 @@ def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(tmp_path
     extract_w2_rootfs_tar(source, destination)
     assert stat.S_IMODE((destination / "root-only").stat().st_mode) == 0o700
     assert stat.S_IMODE((destination / "root-only" / "secret").stat().st_mode) == 0o600
-
