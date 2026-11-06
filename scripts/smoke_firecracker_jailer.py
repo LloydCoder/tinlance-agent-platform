@@ -194,24 +194,37 @@ def _wait_for_path(
     raise RuntimeError(f"jailer did not create the Firecracker API socket: {log[-5000:]}")
 
 
-def _find_firecracker_pid(jailer_id: str, timeout_seconds: float = 10) -> int:
+def _find_firecracker_pid(
+    jailer_id: str,
+    expected_uid: int,
+    timeout_seconds: float = 10,
+) -> int:
     deadline = time.monotonic() + timeout_seconds
-    expected_id = f"--id={jailer_id}".encode()
     while time.monotonic() < deadline:
         for entry in Path("/proc").iterdir():
             if not entry.name.isdecimal():
                 continue
             try:
-                command_line = (entry / "cmdline").read_bytes().split(b"\\x00")
+                comm = (entry / "comm").read_text(encoding="utf-8").strip()
+                status = _parse_proc_status(
+                    (entry / "status").read_text(encoding="utf-8")
+                )
+                cgroup_text = (entry / "cgroup").read_text(encoding="utf-8")
             except (FileNotFoundError, PermissionError, ProcessLookupError):
                 continue
-            if expected_id in command_line and Path(entry / "comm").read_text(
-                encoding="utf-8"
-            ).strip() == "firecracker":
+            uid_values = status.get("Uid", "").split()
+            if (
+                comm == "firecracker"
+                and uid_values
+                and int(uid_values[0]) == expected_uid
+                and jailer_id in cgroup_text
+            ):
                 return int(entry.name)
         time.sleep(0.1)
-    raise RuntimeError("jailed Firecracker process could not be located in /proc")
-
+    raise RuntimeError(
+        "jailed Firecracker process could not be located by its dedicated "
+        "uid and cgroup identity"
+    )
 
 def _read_process_evidence(
     pid: int,
@@ -347,7 +360,7 @@ def _run_jailer_guest(
                 start_new_session=True,
             )
             _wait_for_path(socket_path, process, log_path, timeout_seconds)
-            firecracker_pid = _find_firecracker_pid(jailer_id)
+            firecracker_pid = _find_firecracker_pid(jailer_id, uid)
             process_evidence = _read_process_evidence(
                 firecracker_pid,
                 uid,
