@@ -366,12 +366,35 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
 
 
 def _prepare_rootfs(
-    squashfs_path: Path,
+    squashfs_path: Path | None,
     rootfs_path: Path,
     extract_dir: Path,
     profile: str = "W1",
+    w2_rootfs_tar: Path | None = None,
 ) -> None:
-    _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    if profile == "W2":
+        if w2_rootfs_tar is None:
+            raise ValueError("W2 rootfs tar is required")
+        extract_w2_rootfs_tar(w2_rootfs_tar, extract_dir)
+        etc_dir = extract_dir / "etc"
+        etc_dir.mkdir(parents=True, exist_ok=True)
+        network_files = {
+            "hosts": "127.0.0.1 localhost\\n::1 localhost\\n",
+            "hostname": "tinlance-w2\\n",
+            "resolv.conf": "# guest network is disabled\\n",
+        }
+        for name, content in network_files.items():
+            path = etc_dir / name
+            if path.is_symlink() or path.exists():
+                path.unlink()
+            path.write_text(content, encoding="utf-8")
+    else:
+        if squashfs_path is None or w2_rootfs_tar is not None:
+            raise ValueError("W1 requires the pinned squashfs rootfs only")
+        _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
     init_path.parent.mkdir(parents=True, exist_ok=True)
     init_path.write_text(guest_init_script(profile), encoding="utf-8")
@@ -404,18 +427,38 @@ def _prepare_rootfs(
                     str(minor),
                 ]
             )
-    _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
-    _run(
-        [
-            "sudo",
-            "-n",
-            "chown",
-            "65532:65532",
-            str(extract_dir / "home" / "tinlance"),
-        ]
-    )
+
+    fixture_dir = extract_dir / "opt" / "tinlance-fixture"
+    if profile == "W2":
+        if not (fixture_dir / "run-workspace.sh").is_file():
+            raise ValueError("W2 OCI rootfs is missing the developer-workspace fixture")
+        _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "65532:65532",
+                str(extract_dir / "home" / "tinlance"),
+            ]
+        )
+        _run(["sudo", "-n", "chown", "-R", "65532:65532", str(fixture_dir)])
+        _run(["sudo", "-n", "chmod", "-R", "a=rX", str(fixture_dir)])
+    else:
+        _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "65532:65532",
+                str(extract_dir / "home" / "tinlance"),
+            ]
+        )
+
     try:
-        _run(["truncate", "-s", "1G", str(rootfs_path)])
+        image_size = "2G" if profile == "W2" else "1G"
+        _run(["truncate", "-s", image_size, str(rootfs_path)])
         _run(
             [
                 "sudo",
