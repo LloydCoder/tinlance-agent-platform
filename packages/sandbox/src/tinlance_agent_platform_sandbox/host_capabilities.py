@@ -58,15 +58,10 @@ def probe_host_capabilities(
     kvm_device = root / "dev/kvm"
 
     cpuinfo = _read_text(proc / "cpuinfo").lower()
-    cpu_virtualization = any(
-        flag in cpuinfo.split()
-        for flag in ("vmx", "svm", "virt")
-    )
+    cpu_virtualization = any(flag in cpuinfo.split() for flag in ("vmx", "svm", "virt"))
 
     kvm_device_present = kvm_device.exists()
-    kvm_accessible = kvm_device_present and access_check(
-        kvm_device, os.R_OK | os.W_OK
-    )
+    kvm_accessible = kvm_device_present and access_check(kvm_device, os.R_OK | os.W_OK)
 
     try:
         max_user_namespaces = int(
@@ -102,13 +97,9 @@ def probe_host_capabilities(
     if not kvm_device_present:
         microvm_blockers.append("KVM device is unavailable")
     elif not kvm_accessible:
-        microvm_blockers.append(
-            "KVM device is not readable and writable by the runner"
-        )
+        microvm_blockers.append("KVM device is not readable and writable by the runner")
     if machine.lower() not in supported_architectures:
-        microvm_blockers.append(
-            f"unsupported microVM host architecture: {machine}"
-        )
+        microvm_blockers.append(f"unsupported microVM host architecture: {machine}")
     if not cgroup_v2:
         microvm_blockers.append("cgroup v2 is unavailable")
     if not seccomp_filter_supported:
