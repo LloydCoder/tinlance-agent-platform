@@ -9,7 +9,14 @@ import pytest
 from scripts.normalize_rootfs_tar import SOURCE_DATE_EPOCH, normalize_rootfs_tar
 
 
-def _write_archive(path: Path, entries: list[tuple[str, str, bytes | str]]) -> None:
+def _write_archive(
+    path: Path,
+    entries: list[tuple[str, str, bytes | str]],
+    *,
+    uid: int = 1234,
+    gid: int = 5678,
+    mtime: int = 1_700_000_000,
+) -> None:
     with tarfile.open(path, "w") as archive:
         for kind, name, value in entries:
             member = tarfile.TarInfo(name)
@@ -68,7 +75,7 @@ def test_normalizer_produces_identical_rootfs_for_order_owner_and_timestamp_vari
 
     with tarfile.open(normalized_first, "r:") as archive:
         members = archive.getmembers()
-        assert [member.name for member in members] == sorted(member.name for member in members)
+        order = [\n            (0 if member.isdir() else 1 if member.isfile() else 2 if member.issym() else 3, member.name)\n            for member in members\n        ]\n        assert order == sorted(order)
         assert all(member.uid == 0 and member.gid == 0 for member in members)
         assert all(member.mtime == SOURCE_DATE_EPOCH for member in members)
         assert "etc/machine-id" not in archive.getnames()
