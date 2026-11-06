@@ -65,7 +65,7 @@ jobs:
           done
           test -S /tmp/firecracker-api.sock
           sudo pgrep -x firecracker >/dev/null
-          curl --fail --silent --show-error --unix-socket /tmp/firecracker-api.sock http://localhost/version > artifacts/firecracker-version.json
+          sudo curl --fail --silent --show-error --unix-socket /tmp/firecracker-api.sock http://localhost/version > artifacts/firecracker-version.json
           grep -Fq '"firecracker_version":"1.17.0"' artifacts/firecracker-version.json
           sudo pkill -x firecracker || true
           sudo cat /tmp/firecracker-vmm.log > artifacts/firecracker-vmm.log
