@@ -454,8 +454,7 @@ def main() -> int:
         "--assets-manifest",
         type=Path,
         default=(
-            Path(__file__).resolve().parents[1]
-            / "tests/fixtures/firecracker-guest-assets.json"
+            Path(__file__).resolve().parents[1] / "tests/fixtures/firecracker-guest-assets.json"
         ),
     )
     parser.add_argument("--discover-latest", action="store_true")
