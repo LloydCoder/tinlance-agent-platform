@@ -236,4 +236,3 @@ def test_w2_benchmark_evidence_reports_the_actual_resource_envelope(
 
     assert report["workload"]["cpu_limit"] == "2"
     assert report["workload"]["memory_limit"] == "2g"
-
