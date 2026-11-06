@@ -234,10 +234,10 @@ exec /usr/bin/sleep 60
     if profile == "W2":
         script = script.replace(
             "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp",
-            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp\\n"
-            "mkdir -p /workspace\\n"
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp\n"
+            "mkdir -p /workspace\n"
             "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
-            "noexec,nosuid,nodev tmpfs /workspace\\n"
+            "noexec,nosuid,nodev tmpfs /workspace\n"
             "echo TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
         )
         script = script.replace(
@@ -293,8 +293,8 @@ exec /usr/bin/sleep 60
     fi
 """
         script = script.replace(
-            "    echo TINLANCE_NONROOT_UID_CONFIRMED\\n",
-            "    echo TINLANCE_NONROOT_UID_CONFIRMED\\n" + probes,
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
         )
         if "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED" not in script:
             raise RuntimeError("W2 guest init did not configure a workspace tmpfs")
