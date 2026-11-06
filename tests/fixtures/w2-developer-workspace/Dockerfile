@@ -6,8 +6,9 @@ ARG APT_SNAPSHOT
 # Resolve every package from one immutable Ubuntu archive snapshot. Updating the
 # indexes and installing from that same snapshot avoids mixed-time package sets.
 # The package manifest emitted below is retained as guest-build provenance.
-# The minimal base has no CA bundle; bootstrap the pinned CA package from the
-# signed Ubuntu HTTP archive before contacting the HTTPS snapshot service.
+# The minimal base has no CA bundle. Bootstrap the pinned CA package from the
+# signed Ubuntu snapshot. TLS peer verification is temporarily disabled for
+# this bootstrap transaction; APT still verifies signed metadata and package hashes.
 RUN DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
