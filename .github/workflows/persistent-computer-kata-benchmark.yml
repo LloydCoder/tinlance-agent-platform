@@ -64,10 +64,11 @@ jobs:
           config = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
           runtimes = config.setdefault("runtimes", {})
           runtimes["kata"] = {
-              "runtimeType": "/opt/kata/runtime-rs/bin/containerd-shim-kata-v2",
-              "options": {
-                  "ConfigPath": "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml"
-              },
+              "path": "/opt/kata/runtime-rs/bin/containerd-shim-kata-v2",
+              "runtimeArgs": [
+                  "--kata-config",
+                  "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml",
+              ],
           }
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
