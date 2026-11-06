@@ -49,11 +49,24 @@ def build_docker_command(*, image_digest: str, payload: str) -> list[str]:
     if not isinstance(payload, str) or not payload.strip() or "\x00" in payload:
         raise ValueError("payload must be non-empty text without NUL bytes")
     return [
-        "docker", "run", "--rm", "--runtime=runsc", "--network=none",
-        "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-        "--cpus=1", "--memory=512m", "--pids-limit=128",
-        "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m",
-        "--workdir=/tmp", image_digest, "sh", "-lc", payload,
+        "docker",
+        "run",
+        "--rm",
+        "--runtime=runsc",
+        "--network=none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--cpus=1",
+        "--memory=512m",
+        "--pids-limit=128",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,nodev,size=64m",
+        "--workdir=/tmp",
+        image_digest,
+        "sh",
+        "-lc",
+        payload,
     ]
 
 
