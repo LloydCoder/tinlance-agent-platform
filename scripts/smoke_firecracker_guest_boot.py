@@ -232,7 +232,1640 @@ exec /usr/bin/sleep 60
             "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups",
         )
         probes = """    command -v mount >/dev/null 2>&1
-    awk '/^CapEff:/ { if ($2 != "0000000000000000") exit 1; found=1 } END { exit !found }' /proc/self/status
+    grep -q '^CapEff: *0000000000000000
+    echo TINLANCE_W2_CAPABILITIES_DROPPED
+    grep -q '^NoNewPrivs: *1
+    echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
+    test -f /etc/shadow
+    test ! -r /etc/shadow
+    echo TINLANCE_W2_SENSITIVE_FILES_DENIED
+    test ! -e /dev/kvm
+    echo TINLANCE_W2_HOST_DEVICES_ABSENT
+    test ! -S /run/docker.sock
+    test ! -S /var/run/docker.sock
+    test ! -S /run/containerd/containerd.sock
+    test ! -S /run/podman/podman.sock
+    echo TINLANCE_W2_HOST_SOCKETS_ABSENT
+    if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
+        echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
+        exit 81
+    fi
+    echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED
+    if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; then
+        echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED
+        exit 82
+    fi
+    echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    test -e /proc/sys/kernel/hostname
+    test ! -w /proc/sys/kernel/hostname
+    echo TINLANCE_W2_PROC_SYS_READONLY
+    echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
+"""
+        script = script.replace(
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
+        )
+    return script
+
+
+def verify_guest_boot_markers(
+    log_text: str,
+    profile: str = "W1",
+) -> dict[str, bool]:
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    for marker in GUEST_W2_UNEXPECTED_MARKERS:
+        if marker in log_text:
+            detail = marker.removeprefix("TINLANCE_W2_").removesuffix("_UNEXPECTED").lower().replace("_", " ")
+            raise PermissionError(f"guest host-surface boundary violated: {detail}")
+    if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest root filesystem unexpectedly accepted a write")
+    if GUEST_NIC_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SETPRIV_MISSING" in log_text:
+        raise RuntimeError("guest image does not provide setpriv for the non-root W1 workload")
+    if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
+        raise RuntimeError("guest could not mount sysfs to verify network interfaces")
+    required = {
+        "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
+        "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "nonroot_uid_confirmed": "TINLANCE_NONROOT_UID_CONFIRMED",
+        "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
+        "guest_ready": GUEST_READY_MARKER,
+    }
+    if profile == "W2":
+        required.update(
+            {
+                "capabilities_dropped": "TINLANCE_W2_CAPABILITIES_DROPPED",
+                "no_new_privileges": "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+                "sensitive_files_denied": "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+                "host_devices_absent": "TINLANCE_W2_HOST_DEVICES_ABSENT",
+                "host_sockets_absent": "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+                "privilege_escalation_denied": "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+                "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+                "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
+                "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+            }
+        )
+    missing = [name for name, marker in required.items() if marker not in log_text]
+    if missing:
+        raise ValueError(f"guest isolation markers are missing: {missing}")
+    return {name: True for name in required}
+
+
+def _prepare_rootfs(
+    squashfs_path: Path,
+    rootfs_path: Path,
+    extract_dir: Path,
+    profile: str = "W1",
+) -> None:
+    _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+    init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
+    init_path.parent.mkdir(parents=True, exist_ok=True)
+    init_path.write_text(guest_init_script(profile), encoding="utf-8")
+    init_path.chmod(0o755)
+    ensure_w1_user(extract_dir)
+    tmp_dir = extract_dir / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir.chmod(0o1777)
+    dev_dir = extract_dir / "dev"
+    dev_dir.mkdir(parents=True, exist_ok=True)
+    for node, major, minor, mode in (
+        ("console", 5, 1, "600"),
+        ("null", 1, 3, "666"),
+        ("tty", 5, 0, "666"),
+    ):
+        node_path = dev_dir / node
+        if node_path.is_symlink() and not node_path.exists():
+            node_path.unlink()
+        if not node_path.exists():
+            _run(
+                [
+                    "sudo",
+                    "-n",
+                    "mknod",
+                    "-m",
+                    mode,
+                    str(node_path),
+                    "c",
+                    str(major),
+                    str(minor),
+                ]
+            )
+    _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+    _run(
+        [
+            "sudo",
+            "-n",
+            "chown",
+            "65532:65532",
+            str(extract_dir / "home" / "tinlance"),
+        ]
+    )
+    try:
+        _run(["truncate", "-s", "1G", str(rootfs_path)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "mkfs.ext4",
+                "-F",
+                "-d",
+                str(extract_dir),
+                str(rootfs_path),
+            ]
+        )
+        _run(["sudo", "-n", "e2fsck", "-fn", str(rootfs_path)])
+    finally:
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "-R",
+                f"{os.getuid()}:{os.getgid()}",
+                str(extract_dir),
+            ]
+        )
+
+
+def _api_request(
+    socket_path: Path,
+    method: str,
+    endpoint: str,
+    payload: dict[str, object] | None = None,
+) -> str:
+    command = [
+        "sudo",
+        "-n",
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--unix-socket",
+        str(socket_path),
+        "-X",
+        method,
+    ]
+    if payload is not None:
+        command.extend(
+            [
+                "--header",
+                "Content-Type: application/json",
+                "--data-binary",
+                json.dumps(payload, separators=(",", ":")),
+            ]
+        )
+    command.append(f"http://localhost{endpoint}")
+    return _run(command, capture_output=True).stdout
+
+
+def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float = 10) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if socket_path.exists():
+            return
+        if (
+            log_path.exists()
+            and "error" in log_path.read_text(encoding="utf-8", errors="replace").lower()
+        ):
+            break
+        time.sleep(0.1)
+    log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+    raise RuntimeError(f"Firecracker API socket did not appear. VMM log tail:\\n{log[-3000:]}")
+
+
+def _stop_firecracker(socket_path: Path) -> None:
+    subprocess.run(
+        ["sudo", "-n", "pkill", "-x", "firecracker"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["sudo", "-n", "rm", "-f", str(socket_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_guest(
+    firecracker_binary: Path,
+    kernel_path: Path,
+    rootfs_path: Path,
+    run_index: int,
+    work_dir: Path,
+    log_dir: Path,
+    timeout_seconds: float,
+    profile: str = "W1",
+) -> tuple[float, dict[str, str], dict[str, bool]]:
+    socket_path = work_dir / f"api-{run_index}.sock"
+    log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
+    _stop_firecracker(socket_path)
+
+    try:
+        with log_path.open("w", encoding="utf-8") as log_handle:
+            subprocess.run(
+                [
+                    "sudo",
+                    "-n",
+                    "-b",
+                    str(firecracker_binary),
+                    "--api-sock",
+                    str(socket_path),
+                ],
+                check=True,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            _wait_for_socket(socket_path, log_path)
+
+            version = json.loads(_api_request(socket_path, "GET", "/version"))
+            if version.get("firecracker_version") != FIRECRACKER_VERSION:
+                raise RuntimeError("Firecracker VMM version does not match the pinned release")
+            _api_request(
+                socket_path,
+                "PUT",
+                "/machine-config",
+                {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+            )
+            _api_request(
+                socket_path,
+                "PUT",
+                "/boot-source",
+                {
+                    "kernel_image_path": str(kernel_path),
+                    "boot_args": (
+                        "console=ttyS0 reboot=k panic=1 "
+                        "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
+                    ),
+                },
+            )
+            _api_request(
+                socket_path,
+                "PUT",
+                "/drives/rootfs",
+                {
+                    "drive_id": "rootfs",
+                    "path_on_host": str(rootfs_path),
+                    "is_root_device": True,
+                    "is_read_only": True,
+                },
+            )
+            time.sleep(0.015)
+            started = time.monotonic()
+            _api_request(socket_path, "PUT", "/actions", {"action_type": "InstanceStart"})
+
+            deadline = started + timeout_seconds
+            while time.monotonic() < deadline:
+                log_text = log_path.read_text(encoding="utf-8", errors="replace")
+                if (
+                    GUEST_WRITE_UNEXPECTED_MARKER in log_text
+                    or GUEST_NIC_UNEXPECTED_MARKER in log_text
+                    or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                    or any(marker in log_text for marker in GUEST_W2_UNEXPECTED_MARKERS)
+                ):
+                    verify_guest_boot_markers(log_text, profile)
+                if GUEST_READY_MARKER in log_text:
+                    guest_isolation = verify_guest_boot_markers(log_text, profile)
+                    return (time.monotonic() - started) * 1000, version, guest_isolation
+                running = subprocess.run(
+                    ["sudo", "-n", "pgrep", "-x", "firecracker"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if running.returncode != 0:
+                    raise RuntimeError(
+                        "Firecracker exited before guest-ready marker. "
+                        f"VMM log tail:\\n{log_text[-5000:]}"
+                    )
+                time.sleep(0.1)
+
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+            raise TimeoutError(
+                f"guest did not reach init shell within {timeout_seconds}s. "
+                f"VMM log tail:\\n{log_text[-5000:]}"
+            )
+    finally:
+        _stop_firecracker(socket_path)
+
+
+def load_asset_manifest(path: Path, architecture: str) -> GuestAssetManifest:
+    data: Any = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    if data.get("schema_version") != 1:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    manifest = cast(GuestAssetManifest, data)
+    if manifest.get("architecture") != architecture:
+        raise ValueError("guest asset manifest architecture does not match the runner")
+    artifact_prefix = manifest.get("artifact_prefix", "")
+    if not isinstance(artifact_prefix, str) or not re.fullmatch(
+        r"firecracker-ci/\d{8}-[^/]+/",
+        artifact_prefix,
+    ):
+        raise ValueError("guest asset manifest has an invalid upstream artifact prefix")
+    expected_prefix = f"{artifact_prefix}{architecture}/"
+    for key_name, pattern in (
+        ("kernel_key", r"vmlinux-\d+\.\d+\.\d+$"),
+        ("rootfs_key", r"ubuntu-\d+\.\d+\.squashfs$"),
+    ):
+        key = manifest.get(key_name, "")
+        if (
+            not isinstance(key, str)
+            or not key.startswith(expected_prefix)
+            or key.count("/") != expected_prefix.count("/")
+        ):
+            raise ValueError(f"guest asset manifest {key_name} is outside its artifact prefix")
+        if not re.search(pattern, key):
+            raise ValueError(f"guest asset manifest {key_name} has an invalid filename")
+    for hash_name in ("kernel_sha256", "rootfs_squashfs_sha256"):
+        digest = manifest.get(hash_name, "")
+        if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+            raise ValueError(f"guest asset manifest {hash_name} is invalid")
+    return manifest
+
+
+def _discover_asset_manifest(work_dir: Path, architecture: str) -> GuestAssetManifest:
+    prefix_listing = _s3_listing("firecracker-ci/", delimiter="/")
+    artifact_prefix = parse_latest_artifact_prefix(prefix_listing)
+    architecture_prefix = f"{artifact_prefix}{architecture}/"
+    kernel_listing = _s3_listing(f"{architecture_prefix}vmlinux-")
+    kernel_key = select_latest_versioned_key(
+        kernel_listing,
+        architecture_prefix,
+        r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
+    )
+    rootfs_listing = _s3_listing(f"{architecture_prefix}ubuntu-")
+    rootfs_key = select_latest_versioned_key(
+        rootfs_listing,
+        architecture_prefix,
+        r"ubuntu-(\d+)\.(\d+)\.squashfs$",
+    )
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    _download(f"{S3_BASE}/{kernel_key}", kernel_path)
+    _download(f"{S3_BASE}/{rootfs_key}", squashfs_path)
+    return {
+        "schema_version": 1,
+        "architecture": architecture,
+        "source": f"{S3_BASE}/",
+        "discovered_at": datetime.now(UTC).date().isoformat(),
+        "artifact_prefix": artifact_prefix,
+        "kernel_key": kernel_key,
+        "kernel_sha256": _sha256(kernel_path),
+        "rootfs_key": rootfs_key,
+        "rootfs_squashfs_sha256": _sha256(squashfs_path),
+    }
+
+
+def _download_pinned_guest_assets(
+    work_dir: Path,
+    manifest: GuestAssetManifest,
+    profile: str = "W1",
+) -> dict[str, object]:
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    rootfs_path = work_dir / "guest-rootfs.ext4"
+    _download(f"{S3_BASE}/{manifest['kernel_key']}", kernel_path)
+    _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
+    kernel_sha256 = _sha256(kernel_path)
+    rootfs_squashfs_sha256 = _sha256(squashfs_path)
+    if kernel_sha256 != manifest["kernel_sha256"]:
+        raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
+    if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
+        raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
+    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+    return {
+        **manifest,
+        "kernel_path": kernel_path,
+        "squashfs_path": squashfs_path,
+        "rootfs_path": rootfs_path,
+        "kernel_sha256": kernel_sha256,
+        "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
+        "rootfs_ext4_sha256": _sha256(rootfs_path),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Boot a network-disconnected Firecracker guest on an ephemeral KVM runner."
+    )
+    parser.add_argument("--firecracker", type=Path)
+    parser.add_argument("--firecracker-archive", type=Path)
+    parser.add_argument(
+        "--assets-manifest",
+        type=Path,
+        default=(
+            Path(__file__).resolve().parents[1] / "tests/fixtures/firecracker-guest-assets.json"
+        ),
+    )
+    parser.add_argument("--discover-latest", action="store_true")
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--log-dir", type=Path)
+    parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--timeout-seconds", type=float, default=45)
+    args = parser.parse_args()
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.discover_latest:
+        with tempfile.TemporaryDirectory(prefix="fc-asset-discovery-", dir="/tmp") as temporary:
+            manifest = _discover_asset_manifest(Path(temporary), platform.machine())
+            args.output.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return 0
+
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.firecracker is None or not args.firecracker.is_file():
+        parser.error("--firecracker must point to the verified Firecracker binary")
+    if args.firecracker_archive is None or not args.firecracker_archive.is_file():
+        parser.error("--firecracker-archive must point to the downloaded release archive")
+    archive_sha256 = _sha256(args.firecracker_archive)
+    if archive_sha256 != FIRECRACKER_ARCHIVE_SHA256:
+        raise ValueError("Firecracker release archive SHA-256 does not match the pinned release")
+
+    manifest = load_asset_manifest(args.assets_manifest, platform.machine())
+    log_dir = args.log_dir or args.output.parent / "firecracker-guest-boot-logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="fc-guest-boot-", dir="/tmp") as temporary:
+        work_dir = Path(temporary)
+        firecracker_binary = work_dir / "firecracker"
+        shutil.copy2(args.firecracker, firecracker_binary)
+        firecracker_binary.chmod(0o755)
+        assets = _download_pinned_guest_assets(work_dir, manifest, args.profile)
+        kernel_path = assets["kernel_path"]
+        rootfs_path = assets["rootfs_path"]
+        if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
+            raise RuntimeError("pinned guest asset loader returned invalid paths")
+
+        samples: list[float] = []
+        guest_isolation_samples: list[dict[str, bool]] = []
+        firecracker_version: dict[str, str] = {}
+        for run_index in range(1, args.runs + 1):
+            boot_time_ms, version, guest_isolation = _run_guest(
+                firecracker_binary,
+                kernel_path,
+                rootfs_path,
+                run_index,
+                work_dir,
+                log_dir,
+                args.timeout_seconds,
+                args.profile,
+            )
+            samples.append(boot_time_ms)
+            guest_isolation_samples.append(guest_isolation)
+            firecracker_version = version
+
+        summary = summarize_boot_times(samples)
+        report = {
+            "status": "passed",
+            "execution_mode": "direct-vmm-ephemeral-smoke",
+            "jailer_executed": False,
+            "production_certification": False,
+            "guest_network_configured": False,
+            "guest_rootfs_read_only": all(
+                sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
+            ),
+            "guest_isolation_checks": guest_isolation_samples,
+            "guest_workload": {
+                "profile": f"{args.profile}-" + ("minimal-agent" if args.profile == "W1" else "host-surface-probes"),
+                "network": "none",
+                "rootfs_read_only": True,
+                "uid": 65532,
+                "gid": 65532,
+                "tmpfs": "/tmp:rw,size=64m,mode=0700,uid=65532,gid=65532",
+                "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
+                "host_surface_marker": (
+                    "TINLANCE_W2_HOST_SURFACE_PROBES_OK" if args.profile == "W2" else None
+                ),
+            },
+            "guest_ready_marker": GUEST_READY_MARKER,
+            "boot_time_measurement": (
+                "elapsed time from immediately before the InstanceStart API request "
+                f"until the guest completes the {args.profile} workload and emits its ready marker "
+                "on the serial console"
+            ),
+            "firecracker_version": firecracker_version.get("firecracker_version"),
+            "firecracker_archive_sha256": archive_sha256,
+            "guest_asset_manifest_sha256": _sha256(args.assets_manifest),
+            "guest_architecture": platform.machine(),
+            "host_kernel_release": platform.release(),
+            "upstream_ci_artifact_prefix": assets["artifact_prefix"],
+            "guest_kernel_key": assets["kernel_key"],
+            "guest_rootfs_key": assets["rootfs_key"],
+            "guest_kernel_sha256": assets["kernel_sha256"],
+            "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
+            "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
+            "boot_time_samples_ms": samples,
+            **summary,
+            "captured_at": datetime.now(UTC).isoformat(),
+        }
+        args.output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+ /proc/self/status
+    echo TINLANCE_W2_CAPABILITIES_DROPPED
+    awk '/^NoNewPrivs:/ { if ($2 != "1") exit 1; found=1 } END { exit !found }' /proc/self/status
+    echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
+    test -f /etc/shadow
+    test ! -r /etc/shadow
+    echo TINLANCE_W2_SENSITIVE_FILES_DENIED
+    test ! -e /dev/kvm
+    echo TINLANCE_W2_HOST_DEVICES_ABSENT
+    test ! -S /run/docker.sock
+    test ! -S /var/run/docker.sock
+    test ! -S /run/containerd/containerd.sock
+    test ! -S /run/podman/podman.sock
+    echo TINLANCE_W2_HOST_SOCKETS_ABSENT
+    if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
+        echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
+        exit 81
+    fi
+    echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED
+    if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; then
+        echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED
+        exit 82
+    fi
+    echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    test -e /proc/sys/kernel/hostname
+    test ! -w /proc/sys/kernel/hostname
+    echo TINLANCE_W2_PROC_SYS_READONLY
+    echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
+"""
+        script = script.replace(
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
+        )
+    return script
+
+
+def verify_guest_boot_markers(
+    log_text: str,
+    profile: str = "W1",
+) -> dict[str, bool]:
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    for marker in GUEST_W2_UNEXPECTED_MARKERS:
+        if marker in log_text:
+            detail = marker.removeprefix("TINLANCE_W2_").removesuffix("_UNEXPECTED").lower().replace("_", " ")
+            raise PermissionError(f"guest host-surface boundary violated: {detail}")
+    if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest root filesystem unexpectedly accepted a write")
+    if GUEST_NIC_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SETPRIV_MISSING" in log_text:
+        raise RuntimeError("guest image does not provide setpriv for the non-root W1 workload")
+    if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
+        raise RuntimeError("guest could not mount sysfs to verify network interfaces")
+    required = {
+        "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
+        "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "nonroot_uid_confirmed": "TINLANCE_NONROOT_UID_CONFIRMED",
+        "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
+        "guest_ready": GUEST_READY_MARKER,
+    }
+    if profile == "W2":
+        required.update(
+            {
+                "capabilities_dropped": "TINLANCE_W2_CAPABILITIES_DROPPED",
+                "no_new_privileges": "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+                "sensitive_files_denied": "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+                "host_devices_absent": "TINLANCE_W2_HOST_DEVICES_ABSENT",
+                "host_sockets_absent": "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+                "privilege_escalation_denied": "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+                "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+                "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
+                "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+            }
+        )
+    missing = [name for name, marker in required.items() if marker not in log_text]
+    if missing:
+        raise ValueError(f"guest isolation markers are missing: {missing}")
+    return {name: True for name in required}
+
+
+def _prepare_rootfs(
+    squashfs_path: Path,
+    rootfs_path: Path,
+    extract_dir: Path,
+    profile: str = "W1",
+) -> None:
+    _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+    init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
+    init_path.parent.mkdir(parents=True, exist_ok=True)
+    init_path.write_text(guest_init_script(profile), encoding="utf-8")
+    init_path.chmod(0o755)
+    ensure_w1_user(extract_dir)
+    tmp_dir = extract_dir / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir.chmod(0o1777)
+    dev_dir = extract_dir / "dev"
+    dev_dir.mkdir(parents=True, exist_ok=True)
+    for node, major, minor, mode in (
+        ("console", 5, 1, "600"),
+        ("null", 1, 3, "666"),
+        ("tty", 5, 0, "666"),
+    ):
+        node_path = dev_dir / node
+        if node_path.is_symlink() and not node_path.exists():
+            node_path.unlink()
+        if not node_path.exists():
+            _run(
+                [
+                    "sudo",
+                    "-n",
+                    "mknod",
+                    "-m",
+                    mode,
+                    str(node_path),
+                    "c",
+                    str(major),
+                    str(minor),
+                ]
+            )
+    _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+    _run(
+        [
+            "sudo",
+            "-n",
+            "chown",
+            "65532:65532",
+            str(extract_dir / "home" / "tinlance"),
+        ]
+    )
+    try:
+        _run(["truncate", "-s", "1G", str(rootfs_path)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "mkfs.ext4",
+                "-F",
+                "-d",
+                str(extract_dir),
+                str(rootfs_path),
+            ]
+        )
+        _run(["sudo", "-n", "e2fsck", "-fn", str(rootfs_path)])
+    finally:
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "-R",
+                f"{os.getuid()}:{os.getgid()}",
+                str(extract_dir),
+            ]
+        )
+
+
+def _api_request(
+    socket_path: Path,
+    method: str,
+    endpoint: str,
+    payload: dict[str, object] | None = None,
+) -> str:
+    command = [
+        "sudo",
+        "-n",
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--unix-socket",
+        str(socket_path),
+        "-X",
+        method,
+    ]
+    if payload is not None:
+        command.extend(
+            [
+                "--header",
+                "Content-Type: application/json",
+                "--data-binary",
+                json.dumps(payload, separators=(",", ":")),
+            ]
+        )
+    command.append(f"http://localhost{endpoint}")
+    return _run(command, capture_output=True).stdout
+
+
+def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float = 10) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if socket_path.exists():
+            return
+        if (
+            log_path.exists()
+            and "error" in log_path.read_text(encoding="utf-8", errors="replace").lower()
+        ):
+            break
+        time.sleep(0.1)
+    log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+    raise RuntimeError(f"Firecracker API socket did not appear. VMM log tail:\\n{log[-3000:]}")
+
+
+def _stop_firecracker(socket_path: Path) -> None:
+    subprocess.run(
+        ["sudo", "-n", "pkill", "-x", "firecracker"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["sudo", "-n", "rm", "-f", str(socket_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_guest(
+    firecracker_binary: Path,
+    kernel_path: Path,
+    rootfs_path: Path,
+    run_index: int,
+    work_dir: Path,
+    log_dir: Path,
+    timeout_seconds: float,
+    profile: str = "W1",
+) -> tuple[float, dict[str, str], dict[str, bool]]:
+    socket_path = work_dir / f"api-{run_index}.sock"
+    log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
+    _stop_firecracker(socket_path)
+
+    try:
+        with log_path.open("w", encoding="utf-8") as log_handle:
+            subprocess.run(
+                [
+                    "sudo",
+                    "-n",
+                    "-b",
+                    str(firecracker_binary),
+                    "--api-sock",
+                    str(socket_path),
+                ],
+                check=True,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            _wait_for_socket(socket_path, log_path)
+
+            version = json.loads(_api_request(socket_path, "GET", "/version"))
+            if version.get("firecracker_version") != FIRECRACKER_VERSION:
+                raise RuntimeError("Firecracker VMM version does not match the pinned release")
+            _api_request(
+                socket_path,
+                "PUT",
+                "/machine-config",
+                {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+            )
+            _api_request(
+                socket_path,
+                "PUT",
+                "/boot-source",
+                {
+                    "kernel_image_path": str(kernel_path),
+                    "boot_args": (
+                        "console=ttyS0 reboot=k panic=1 "
+                        "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
+                    ),
+                },
+            )
+            _api_request(
+                socket_path,
+                "PUT",
+                "/drives/rootfs",
+                {
+                    "drive_id": "rootfs",
+                    "path_on_host": str(rootfs_path),
+                    "is_root_device": True,
+                    "is_read_only": True,
+                },
+            )
+            time.sleep(0.015)
+            started = time.monotonic()
+            _api_request(socket_path, "PUT", "/actions", {"action_type": "InstanceStart"})
+
+            deadline = started + timeout_seconds
+            while time.monotonic() < deadline:
+                log_text = log_path.read_text(encoding="utf-8", errors="replace")
+                if (
+                    GUEST_WRITE_UNEXPECTED_MARKER in log_text
+                    or GUEST_NIC_UNEXPECTED_MARKER in log_text
+                    or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                    or any(marker in log_text for marker in GUEST_W2_UNEXPECTED_MARKERS)
+                ):
+                    verify_guest_boot_markers(log_text, profile)
+                if GUEST_READY_MARKER in log_text:
+                    guest_isolation = verify_guest_boot_markers(log_text, profile)
+                    return (time.monotonic() - started) * 1000, version, guest_isolation
+                running = subprocess.run(
+                    ["sudo", "-n", "pgrep", "-x", "firecracker"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if running.returncode != 0:
+                    raise RuntimeError(
+                        "Firecracker exited before guest-ready marker. "
+                        f"VMM log tail:\\n{log_text[-5000:]}"
+                    )
+                time.sleep(0.1)
+
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+            raise TimeoutError(
+                f"guest did not reach init shell within {timeout_seconds}s. "
+                f"VMM log tail:\\n{log_text[-5000:]}"
+            )
+    finally:
+        _stop_firecracker(socket_path)
+
+
+def load_asset_manifest(path: Path, architecture: str) -> GuestAssetManifest:
+    data: Any = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    if data.get("schema_version") != 1:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    manifest = cast(GuestAssetManifest, data)
+    if manifest.get("architecture") != architecture:
+        raise ValueError("guest asset manifest architecture does not match the runner")
+    artifact_prefix = manifest.get("artifact_prefix", "")
+    if not isinstance(artifact_prefix, str) or not re.fullmatch(
+        r"firecracker-ci/\d{8}-[^/]+/",
+        artifact_prefix,
+    ):
+        raise ValueError("guest asset manifest has an invalid upstream artifact prefix")
+    expected_prefix = f"{artifact_prefix}{architecture}/"
+    for key_name, pattern in (
+        ("kernel_key", r"vmlinux-\d+\.\d+\.\d+$"),
+        ("rootfs_key", r"ubuntu-\d+\.\d+\.squashfs$"),
+    ):
+        key = manifest.get(key_name, "")
+        if (
+            not isinstance(key, str)
+            or not key.startswith(expected_prefix)
+            or key.count("/") != expected_prefix.count("/")
+        ):
+            raise ValueError(f"guest asset manifest {key_name} is outside its artifact prefix")
+        if not re.search(pattern, key):
+            raise ValueError(f"guest asset manifest {key_name} has an invalid filename")
+    for hash_name in ("kernel_sha256", "rootfs_squashfs_sha256"):
+        digest = manifest.get(hash_name, "")
+        if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+            raise ValueError(f"guest asset manifest {hash_name} is invalid")
+    return manifest
+
+
+def _discover_asset_manifest(work_dir: Path, architecture: str) -> GuestAssetManifest:
+    prefix_listing = _s3_listing("firecracker-ci/", delimiter="/")
+    artifact_prefix = parse_latest_artifact_prefix(prefix_listing)
+    architecture_prefix = f"{artifact_prefix}{architecture}/"
+    kernel_listing = _s3_listing(f"{architecture_prefix}vmlinux-")
+    kernel_key = select_latest_versioned_key(
+        kernel_listing,
+        architecture_prefix,
+        r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
+    )
+    rootfs_listing = _s3_listing(f"{architecture_prefix}ubuntu-")
+    rootfs_key = select_latest_versioned_key(
+        rootfs_listing,
+        architecture_prefix,
+        r"ubuntu-(\d+)\.(\d+)\.squashfs$",
+    )
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    _download(f"{S3_BASE}/{kernel_key}", kernel_path)
+    _download(f"{S3_BASE}/{rootfs_key}", squashfs_path)
+    return {
+        "schema_version": 1,
+        "architecture": architecture,
+        "source": f"{S3_BASE}/",
+        "discovered_at": datetime.now(UTC).date().isoformat(),
+        "artifact_prefix": artifact_prefix,
+        "kernel_key": kernel_key,
+        "kernel_sha256": _sha256(kernel_path),
+        "rootfs_key": rootfs_key,
+        "rootfs_squashfs_sha256": _sha256(squashfs_path),
+    }
+
+
+def _download_pinned_guest_assets(
+    work_dir: Path,
+    manifest: GuestAssetManifest,
+    profile: str = "W1",
+) -> dict[str, object]:
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    rootfs_path = work_dir / "guest-rootfs.ext4"
+    _download(f"{S3_BASE}/{manifest['kernel_key']}", kernel_path)
+    _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
+    kernel_sha256 = _sha256(kernel_path)
+    rootfs_squashfs_sha256 = _sha256(squashfs_path)
+    if kernel_sha256 != manifest["kernel_sha256"]:
+        raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
+    if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
+        raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
+    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+    return {
+        **manifest,
+        "kernel_path": kernel_path,
+        "squashfs_path": squashfs_path,
+        "rootfs_path": rootfs_path,
+        "kernel_sha256": kernel_sha256,
+        "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
+        "rootfs_ext4_sha256": _sha256(rootfs_path),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Boot a network-disconnected Firecracker guest on an ephemeral KVM runner."
+    )
+    parser.add_argument("--firecracker", type=Path)
+    parser.add_argument("--firecracker-archive", type=Path)
+    parser.add_argument(
+        "--assets-manifest",
+        type=Path,
+        default=(
+            Path(__file__).resolve().parents[1] / "tests/fixtures/firecracker-guest-assets.json"
+        ),
+    )
+    parser.add_argument("--discover-latest", action="store_true")
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--log-dir", type=Path)
+    parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--timeout-seconds", type=float, default=45)
+    args = parser.parse_args()
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.discover_latest:
+        with tempfile.TemporaryDirectory(prefix="fc-asset-discovery-", dir="/tmp") as temporary:
+            manifest = _discover_asset_manifest(Path(temporary), platform.machine())
+            args.output.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return 0
+
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.firecracker is None or not args.firecracker.is_file():
+        parser.error("--firecracker must point to the verified Firecracker binary")
+    if args.firecracker_archive is None or not args.firecracker_archive.is_file():
+        parser.error("--firecracker-archive must point to the downloaded release archive")
+    archive_sha256 = _sha256(args.firecracker_archive)
+    if archive_sha256 != FIRECRACKER_ARCHIVE_SHA256:
+        raise ValueError("Firecracker release archive SHA-256 does not match the pinned release")
+
+    manifest = load_asset_manifest(args.assets_manifest, platform.machine())
+    log_dir = args.log_dir or args.output.parent / "firecracker-guest-boot-logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="fc-guest-boot-", dir="/tmp") as temporary:
+        work_dir = Path(temporary)
+        firecracker_binary = work_dir / "firecracker"
+        shutil.copy2(args.firecracker, firecracker_binary)
+        firecracker_binary.chmod(0o755)
+        assets = _download_pinned_guest_assets(work_dir, manifest, args.profile)
+        kernel_path = assets["kernel_path"]
+        rootfs_path = assets["rootfs_path"]
+        if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
+            raise RuntimeError("pinned guest asset loader returned invalid paths")
+
+        samples: list[float] = []
+        guest_isolation_samples: list[dict[str, bool]] = []
+        firecracker_version: dict[str, str] = {}
+        for run_index in range(1, args.runs + 1):
+            boot_time_ms, version, guest_isolation = _run_guest(
+                firecracker_binary,
+                kernel_path,
+                rootfs_path,
+                run_index,
+                work_dir,
+                log_dir,
+                args.timeout_seconds,
+                args.profile,
+            )
+            samples.append(boot_time_ms)
+            guest_isolation_samples.append(guest_isolation)
+            firecracker_version = version
+
+        summary = summarize_boot_times(samples)
+        report = {
+            "status": "passed",
+            "execution_mode": "direct-vmm-ephemeral-smoke",
+            "jailer_executed": False,
+            "production_certification": False,
+            "guest_network_configured": False,
+            "guest_rootfs_read_only": all(
+                sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
+            ),
+            "guest_isolation_checks": guest_isolation_samples,
+            "guest_workload": {
+                "profile": f"{args.profile}-" + ("minimal-agent" if args.profile == "W1" else "host-surface-probes"),
+                "network": "none",
+                "rootfs_read_only": True,
+                "uid": 65532,
+                "gid": 65532,
+                "tmpfs": "/tmp:rw,size=64m,mode=0700,uid=65532,gid=65532",
+                "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
+                "host_surface_marker": (
+                    "TINLANCE_W2_HOST_SURFACE_PROBES_OK" if args.profile == "W2" else None
+                ),
+            },
+            "guest_ready_marker": GUEST_READY_MARKER,
+            "boot_time_measurement": (
+                "elapsed time from immediately before the InstanceStart API request "
+                f"until the guest completes the {args.profile} workload and emits its ready marker "
+                "on the serial console"
+            ),
+            "firecracker_version": firecracker_version.get("firecracker_version"),
+            "firecracker_archive_sha256": archive_sha256,
+            "guest_asset_manifest_sha256": _sha256(args.assets_manifest),
+            "guest_architecture": platform.machine(),
+            "host_kernel_release": platform.release(),
+            "upstream_ci_artifact_prefix": assets["artifact_prefix"],
+            "guest_kernel_key": assets["kernel_key"],
+            "guest_rootfs_key": assets["rootfs_key"],
+            "guest_kernel_sha256": assets["kernel_sha256"],
+            "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
+            "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
+            "boot_time_samples_ms": samples,
+            **summary,
+            "captured_at": datetime.now(UTC).isoformat(),
+        }
+        args.output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+ /proc/self/status
+    echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
+    test -f /etc/shadow
+    test ! -r /etc/shadow
+    echo TINLANCE_W2_SENSITIVE_FILES_DENIED
+    test ! -e /dev/kvm
+    echo TINLANCE_W2_HOST_DEVICES_ABSENT
+    test ! -S /run/docker.sock
+    test ! -S /var/run/docker.sock
+    test ! -S /run/containerd/containerd.sock
+    test ! -S /run/podman/podman.sock
+    echo TINLANCE_W2_HOST_SOCKETS_ABSENT
+    if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
+        echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
+        exit 81
+    fi
+    echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED
+    if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; then
+        echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED
+        exit 82
+    fi
+    echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    test -e /proc/sys/kernel/hostname
+    test ! -w /proc/sys/kernel/hostname
+    echo TINLANCE_W2_PROC_SYS_READONLY
+    echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
+"""
+        script = script.replace(
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
+        )
+    return script
+
+
+def verify_guest_boot_markers(
+    log_text: str,
+    profile: str = "W1",
+) -> dict[str, bool]:
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    for marker in GUEST_W2_UNEXPECTED_MARKERS:
+        if marker in log_text:
+            detail = marker.removeprefix("TINLANCE_W2_").removesuffix("_UNEXPECTED").lower().replace("_", " ")
+            raise PermissionError(f"guest host-surface boundary violated: {detail}")
+    if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest root filesystem unexpectedly accepted a write")
+    if GUEST_NIC_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SETPRIV_MISSING" in log_text:
+        raise RuntimeError("guest image does not provide setpriv for the non-root W1 workload")
+    if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
+        raise RuntimeError("guest could not mount sysfs to verify network interfaces")
+    required = {
+        "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
+        "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "nonroot_uid_confirmed": "TINLANCE_NONROOT_UID_CONFIRMED",
+        "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
+        "guest_ready": GUEST_READY_MARKER,
+    }
+    if profile == "W2":
+        required.update(
+            {
+                "capabilities_dropped": "TINLANCE_W2_CAPABILITIES_DROPPED",
+                "no_new_privileges": "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+                "sensitive_files_denied": "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+                "host_devices_absent": "TINLANCE_W2_HOST_DEVICES_ABSENT",
+                "host_sockets_absent": "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+                "privilege_escalation_denied": "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+                "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+                "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
+                "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+            }
+        )
+    missing = [name for name, marker in required.items() if marker not in log_text]
+    if missing:
+        raise ValueError(f"guest isolation markers are missing: {missing}")
+    return {name: True for name in required}
+
+
+def _prepare_rootfs(
+    squashfs_path: Path,
+    rootfs_path: Path,
+    extract_dir: Path,
+    profile: str = "W1",
+) -> None:
+    _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+    init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
+    init_path.parent.mkdir(parents=True, exist_ok=True)
+    init_path.write_text(guest_init_script(profile), encoding="utf-8")
+    init_path.chmod(0o755)
+    ensure_w1_user(extract_dir)
+    tmp_dir = extract_dir / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir.chmod(0o1777)
+    dev_dir = extract_dir / "dev"
+    dev_dir.mkdir(parents=True, exist_ok=True)
+    for node, major, minor, mode in (
+        ("console", 5, 1, "600"),
+        ("null", 1, 3, "666"),
+        ("tty", 5, 0, "666"),
+    ):
+        node_path = dev_dir / node
+        if node_path.is_symlink() and not node_path.exists():
+            node_path.unlink()
+        if not node_path.exists():
+            _run(
+                [
+                    "sudo",
+                    "-n",
+                    "mknod",
+                    "-m",
+                    mode,
+                    str(node_path),
+                    "c",
+                    str(major),
+                    str(minor),
+                ]
+            )
+    _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+    _run(
+        [
+            "sudo",
+            "-n",
+            "chown",
+            "65532:65532",
+            str(extract_dir / "home" / "tinlance"),
+        ]
+    )
+    try:
+        _run(["truncate", "-s", "1G", str(rootfs_path)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "mkfs.ext4",
+                "-F",
+                "-d",
+                str(extract_dir),
+                str(rootfs_path),
+            ]
+        )
+        _run(["sudo", "-n", "e2fsck", "-fn", str(rootfs_path)])
+    finally:
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "-R",
+                f"{os.getuid()}:{os.getgid()}",
+                str(extract_dir),
+            ]
+        )
+
+
+def _api_request(
+    socket_path: Path,
+    method: str,
+    endpoint: str,
+    payload: dict[str, object] | None = None,
+) -> str:
+    command = [
+        "sudo",
+        "-n",
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--unix-socket",
+        str(socket_path),
+        "-X",
+        method,
+    ]
+    if payload is not None:
+        command.extend(
+            [
+                "--header",
+                "Content-Type: application/json",
+                "--data-binary",
+                json.dumps(payload, separators=(",", ":")),
+            ]
+        )
+    command.append(f"http://localhost{endpoint}")
+    return _run(command, capture_output=True).stdout
+
+
+def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float = 10) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if socket_path.exists():
+            return
+        if (
+            log_path.exists()
+            and "error" in log_path.read_text(encoding="utf-8", errors="replace").lower()
+        ):
+            break
+        time.sleep(0.1)
+    log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+    raise RuntimeError(f"Firecracker API socket did not appear. VMM log tail:\\n{log[-3000:]}")
+
+
+def _stop_firecracker(socket_path: Path) -> None:
+    subprocess.run(
+        ["sudo", "-n", "pkill", "-x", "firecracker"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["sudo", "-n", "rm", "-f", str(socket_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_guest(
+    firecracker_binary: Path,
+    kernel_path: Path,
+    rootfs_path: Path,
+    run_index: int,
+    work_dir: Path,
+    log_dir: Path,
+    timeout_seconds: float,
+    profile: str = "W1",
+) -> tuple[float, dict[str, str], dict[str, bool]]:
+    socket_path = work_dir / f"api-{run_index}.sock"
+    log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
+    _stop_firecracker(socket_path)
+
+    try:
+        with log_path.open("w", encoding="utf-8") as log_handle:
+            subprocess.run(
+                [
+                    "sudo",
+                    "-n",
+                    "-b",
+                    str(firecracker_binary),
+                    "--api-sock",
+                    str(socket_path),
+                ],
+                check=True,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            _wait_for_socket(socket_path, log_path)
+
+            version = json.loads(_api_request(socket_path, "GET", "/version"))
+            if version.get("firecracker_version") != FIRECRACKER_VERSION:
+                raise RuntimeError("Firecracker VMM version does not match the pinned release")
+            _api_request(
+                socket_path,
+                "PUT",
+                "/machine-config",
+                {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+            )
+            _api_request(
+                socket_path,
+                "PUT",
+                "/boot-source",
+                {
+                    "kernel_image_path": str(kernel_path),
+                    "boot_args": (
+                        "console=ttyS0 reboot=k panic=1 "
+                        "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
+                    ),
+                },
+            )
+            _api_request(
+                socket_path,
+                "PUT",
+                "/drives/rootfs",
+                {
+                    "drive_id": "rootfs",
+                    "path_on_host": str(rootfs_path),
+                    "is_root_device": True,
+                    "is_read_only": True,
+                },
+            )
+            time.sleep(0.015)
+            started = time.monotonic()
+            _api_request(socket_path, "PUT", "/actions", {"action_type": "InstanceStart"})
+
+            deadline = started + timeout_seconds
+            while time.monotonic() < deadline:
+                log_text = log_path.read_text(encoding="utf-8", errors="replace")
+                if (
+                    GUEST_WRITE_UNEXPECTED_MARKER in log_text
+                    or GUEST_NIC_UNEXPECTED_MARKER in log_text
+                    or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                    or any(marker in log_text for marker in GUEST_W2_UNEXPECTED_MARKERS)
+                ):
+                    verify_guest_boot_markers(log_text, profile)
+                if GUEST_READY_MARKER in log_text:
+                    guest_isolation = verify_guest_boot_markers(log_text, profile)
+                    return (time.monotonic() - started) * 1000, version, guest_isolation
+                running = subprocess.run(
+                    ["sudo", "-n", "pgrep", "-x", "firecracker"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if running.returncode != 0:
+                    raise RuntimeError(
+                        "Firecracker exited before guest-ready marker. "
+                        f"VMM log tail:\\n{log_text[-5000:]}"
+                    )
+                time.sleep(0.1)
+
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+            raise TimeoutError(
+                f"guest did not reach init shell within {timeout_seconds}s. "
+                f"VMM log tail:\\n{log_text[-5000:]}"
+            )
+    finally:
+        _stop_firecracker(socket_path)
+
+
+def load_asset_manifest(path: Path, architecture: str) -> GuestAssetManifest:
+    data: Any = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    if data.get("schema_version") != 1:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    manifest = cast(GuestAssetManifest, data)
+    if manifest.get("architecture") != architecture:
+        raise ValueError("guest asset manifest architecture does not match the runner")
+    artifact_prefix = manifest.get("artifact_prefix", "")
+    if not isinstance(artifact_prefix, str) or not re.fullmatch(
+        r"firecracker-ci/\d{8}-[^/]+/",
+        artifact_prefix,
+    ):
+        raise ValueError("guest asset manifest has an invalid upstream artifact prefix")
+    expected_prefix = f"{artifact_prefix}{architecture}/"
+    for key_name, pattern in (
+        ("kernel_key", r"vmlinux-\d+\.\d+\.\d+$"),
+        ("rootfs_key", r"ubuntu-\d+\.\d+\.squashfs$"),
+    ):
+        key = manifest.get(key_name, "")
+        if (
+            not isinstance(key, str)
+            or not key.startswith(expected_prefix)
+            or key.count("/") != expected_prefix.count("/")
+        ):
+            raise ValueError(f"guest asset manifest {key_name} is outside its artifact prefix")
+        if not re.search(pattern, key):
+            raise ValueError(f"guest asset manifest {key_name} has an invalid filename")
+    for hash_name in ("kernel_sha256", "rootfs_squashfs_sha256"):
+        digest = manifest.get(hash_name, "")
+        if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+            raise ValueError(f"guest asset manifest {hash_name} is invalid")
+    return manifest
+
+
+def _discover_asset_manifest(work_dir: Path, architecture: str) -> GuestAssetManifest:
+    prefix_listing = _s3_listing("firecracker-ci/", delimiter="/")
+    artifact_prefix = parse_latest_artifact_prefix(prefix_listing)
+    architecture_prefix = f"{artifact_prefix}{architecture}/"
+    kernel_listing = _s3_listing(f"{architecture_prefix}vmlinux-")
+    kernel_key = select_latest_versioned_key(
+        kernel_listing,
+        architecture_prefix,
+        r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
+    )
+    rootfs_listing = _s3_listing(f"{architecture_prefix}ubuntu-")
+    rootfs_key = select_latest_versioned_key(
+        rootfs_listing,
+        architecture_prefix,
+        r"ubuntu-(\d+)\.(\d+)\.squashfs$",
+    )
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    _download(f"{S3_BASE}/{kernel_key}", kernel_path)
+    _download(f"{S3_BASE}/{rootfs_key}", squashfs_path)
+    return {
+        "schema_version": 1,
+        "architecture": architecture,
+        "source": f"{S3_BASE}/",
+        "discovered_at": datetime.now(UTC).date().isoformat(),
+        "artifact_prefix": artifact_prefix,
+        "kernel_key": kernel_key,
+        "kernel_sha256": _sha256(kernel_path),
+        "rootfs_key": rootfs_key,
+        "rootfs_squashfs_sha256": _sha256(squashfs_path),
+    }
+
+
+def _download_pinned_guest_assets(
+    work_dir: Path,
+    manifest: GuestAssetManifest,
+    profile: str = "W1",
+) -> dict[str, object]:
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    rootfs_path = work_dir / "guest-rootfs.ext4"
+    _download(f"{S3_BASE}/{manifest['kernel_key']}", kernel_path)
+    _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
+    kernel_sha256 = _sha256(kernel_path)
+    rootfs_squashfs_sha256 = _sha256(squashfs_path)
+    if kernel_sha256 != manifest["kernel_sha256"]:
+        raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
+    if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
+        raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
+    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+    return {
+        **manifest,
+        "kernel_path": kernel_path,
+        "squashfs_path": squashfs_path,
+        "rootfs_path": rootfs_path,
+        "kernel_sha256": kernel_sha256,
+        "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
+        "rootfs_ext4_sha256": _sha256(rootfs_path),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Boot a network-disconnected Firecracker guest on an ephemeral KVM runner."
+    )
+    parser.add_argument("--firecracker", type=Path)
+    parser.add_argument("--firecracker-archive", type=Path)
+    parser.add_argument(
+        "--assets-manifest",
+        type=Path,
+        default=(
+            Path(__file__).resolve().parents[1] / "tests/fixtures/firecracker-guest-assets.json"
+        ),
+    )
+    parser.add_argument("--discover-latest", action="store_true")
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--log-dir", type=Path)
+    parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--timeout-seconds", type=float, default=45)
+    args = parser.parse_args()
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.discover_latest:
+        with tempfile.TemporaryDirectory(prefix="fc-asset-discovery-", dir="/tmp") as temporary:
+            manifest = _discover_asset_manifest(Path(temporary), platform.machine())
+            args.output.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return 0
+
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.firecracker is None or not args.firecracker.is_file():
+        parser.error("--firecracker must point to the verified Firecracker binary")
+    if args.firecracker_archive is None or not args.firecracker_archive.is_file():
+        parser.error("--firecracker-archive must point to the downloaded release archive")
+    archive_sha256 = _sha256(args.firecracker_archive)
+    if archive_sha256 != FIRECRACKER_ARCHIVE_SHA256:
+        raise ValueError("Firecracker release archive SHA-256 does not match the pinned release")
+
+    manifest = load_asset_manifest(args.assets_manifest, platform.machine())
+    log_dir = args.log_dir or args.output.parent / "firecracker-guest-boot-logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="fc-guest-boot-", dir="/tmp") as temporary:
+        work_dir = Path(temporary)
+        firecracker_binary = work_dir / "firecracker"
+        shutil.copy2(args.firecracker, firecracker_binary)
+        firecracker_binary.chmod(0o755)
+        assets = _download_pinned_guest_assets(work_dir, manifest, args.profile)
+        kernel_path = assets["kernel_path"]
+        rootfs_path = assets["rootfs_path"]
+        if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
+            raise RuntimeError("pinned guest asset loader returned invalid paths")
+
+        samples: list[float] = []
+        guest_isolation_samples: list[dict[str, bool]] = []
+        firecracker_version: dict[str, str] = {}
+        for run_index in range(1, args.runs + 1):
+            boot_time_ms, version, guest_isolation = _run_guest(
+                firecracker_binary,
+                kernel_path,
+                rootfs_path,
+                run_index,
+                work_dir,
+                log_dir,
+                args.timeout_seconds,
+                args.profile,
+            )
+            samples.append(boot_time_ms)
+            guest_isolation_samples.append(guest_isolation)
+            firecracker_version = version
+
+        summary = summarize_boot_times(samples)
+        report = {
+            "status": "passed",
+            "execution_mode": "direct-vmm-ephemeral-smoke",
+            "jailer_executed": False,
+            "production_certification": False,
+            "guest_network_configured": False,
+            "guest_rootfs_read_only": all(
+                sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
+            ),
+            "guest_isolation_checks": guest_isolation_samples,
+            "guest_workload": {
+                "profile": f"{args.profile}-" + ("minimal-agent" if args.profile == "W1" else "host-surface-probes"),
+                "network": "none",
+                "rootfs_read_only": True,
+                "uid": 65532,
+                "gid": 65532,
+                "tmpfs": "/tmp:rw,size=64m,mode=0700,uid=65532,gid=65532",
+                "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
+                "host_surface_marker": (
+                    "TINLANCE_W2_HOST_SURFACE_PROBES_OK" if args.profile == "W2" else None
+                ),
+            },
+            "guest_ready_marker": GUEST_READY_MARKER,
+            "boot_time_measurement": (
+                "elapsed time from immediately before the InstanceStart API request "
+                f"until the guest completes the {args.profile} workload and emits its ready marker "
+                "on the serial console"
+            ),
+            "firecracker_version": firecracker_version.get("firecracker_version"),
+            "firecracker_archive_sha256": archive_sha256,
+            "guest_asset_manifest_sha256": _sha256(args.assets_manifest),
+            "guest_architecture": platform.machine(),
+            "host_kernel_release": platform.release(),
+            "upstream_ci_artifact_prefix": assets["artifact_prefix"],
+            "guest_kernel_key": assets["kernel_key"],
+            "guest_rootfs_key": assets["rootfs_key"],
+            "guest_kernel_sha256": assets["kernel_sha256"],
+            "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
+            "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
+            "boot_time_samples_ms": samples,
+            **summary,
+            "captured_at": datetime.now(UTC).isoformat(),
+        }
+        args.output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+ /proc/self/status
     echo TINLANCE_W2_CAPABILITIES_DROPPED
     awk '/^NoNewPrivs:/ { if ($2 != "1") exit 1; found=1 } END { exit !found }' /proc/self/status
     echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
