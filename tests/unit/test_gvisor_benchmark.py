@@ -121,6 +121,7 @@ def test_w1_payload_verifies_nonroot_readonly_rootfs_and_isolated_network() -> N
     assert "TINLANCE_NO_NIC_CONFIRMED" in payload
     assert "/tmp/workload.txt" in payload
 
+
 def test_w2_payload_requires_capability_and_host_surface_denials() -> None:
     from scripts.benchmark_gvisor import build_w2_payload
 
