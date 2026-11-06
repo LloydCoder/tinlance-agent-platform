@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Emit a read-only capability report for the Phase 2 compute-host gate."""
+
 from __future__ import annotations
 
 import argparse
