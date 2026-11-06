@@ -291,6 +291,7 @@ def _run_jailer_guest(
     chroot_root = chroot_base_dir / "firecracker" / jailer_id / "root"
     socket_path = chroot_root / "run/firecracker.socket"
     process: subprocess.Popen[str] | None = None
+    cgroup_path: str | None = None
 
     try:
         with log_path.open("w", encoding="utf-8") as log_handle:
@@ -309,7 +310,8 @@ def _run_jailer_guest(
                 gid,
                 chroot_root,
             )
-            cgroup_evidence = _verify_cgroup_limits(str(process_evidence["cgroup_path"]))
+            cgroup_path = str(process_evidence["cgroup_path"])
+            cgroup_evidence = _verify_cgroup_limits(cgroup_path)
             guest_kernel, guest_rootfs = _stage_guest_assets(
                 chroot_root,
                 kernel_path,
@@ -371,6 +373,14 @@ def _run_jailer_guest(
     finally:
         if process is not None:
             _stop_process(process)
+        if cgroup_path is not None:
+            cgroup_dir = Path("/sys/fs/cgroup") / cgroup_path.lstrip("/")
+            subprocess.run(
+                ["sudo", "-n", "rmdir", "--", str(cgroup_dir)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
         subprocess.run(
             ["sudo", "-n", "rm", "-rf", "--", str(chroot_base_dir / "firecracker" / jailer_id)],
             check=False,
