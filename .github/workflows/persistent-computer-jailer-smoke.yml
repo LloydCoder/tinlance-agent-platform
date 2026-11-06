@@ -105,7 +105,7 @@ jobs:
 
       - name: Boot three jailed guest instances and verify host restrictions
         run: |
-          python scripts/smoke_firecracker_jailer.py \
+          python -m scripts.smoke_firecracker_jailer \
             --jailer "${JAILER_BIN}" \
             --firecracker "${FIRECRACKER_BIN}" \
             --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
