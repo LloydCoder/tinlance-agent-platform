@@ -380,13 +380,13 @@ def _discover_asset_manifest(work_dir: Path, architecture: str) -> GuestAssetMan
     kernel_key = select_latest_versioned_key(
         kernel_listing,
         architecture_prefix,
-        r"vmlinux-(\\d+)\\.(\\d+)\\.(\\d+)$",
+        r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
     )
     rootfs_listing = _s3_listing(f"{architecture_prefix}ubuntu-")
     rootfs_key = select_latest_versioned_key(
         rootfs_listing,
         architecture_prefix,
-        r"ubuntu-(\\d+)\\.(\\d+)\\.squashfs$",
+        r"ubuntu-(\d+)\.(\d+)\.squashfs$",
     )
     kernel_path = work_dir / "guest-vmlinux"
     squashfs_path = work_dir / "guest-rootfs.squashfs"
