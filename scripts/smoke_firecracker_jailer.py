@@ -97,7 +97,8 @@ def verify_jailer_process_evidence(
     process_pid_namespace: str,
     expected_chroot_identity: str,
     process_root_identity: str,
-) -> dict[str, int | bool | str]:
+    thread_seccomp_modes: Sequence[int],
+) -> dict[str, int | bool | str | list[int]]:
     status = _parse_proc_status(status_text)
     try:
         uid_values = [int(value) for value in status["Uid"].split()]
@@ -119,6 +120,8 @@ def verify_jailer_process_evidence(
         )
     if seccomp_mode != 2:
         raise PermissionError("jailer process does not have seccomp filter mode enabled")
+    if not thread_seccomp_modes or any(mode != 2 for mode in thread_seccomp_modes):
+        raise PermissionError("one or more Firecracker threads lack seccomp filter mode")
     if not no_new_privs:
         raise PermissionError("jailer process does not have no_new_privs enabled")
     if capabilities_effective != "0000000000000000":
@@ -149,6 +152,7 @@ def verify_jailer_process_evidence(
         "uid": expected_uid,
         "gid": expected_gid,
         "seccomp_mode": seccomp_mode,
+        "thread_seccomp_modes": list(thread_seccomp_modes),
         "no_new_privs": no_new_privs,
         "capabilities_effective": capabilities_effective,
         "pid_namespace_isolated": True,
@@ -235,6 +239,19 @@ def _stat_identity_as_root(path: Path) -> str:
     ).stdout.strip()
 
 
+def _read_thread_seccomp_modes(pid: int) -> tuple[int, ...]:
+    task_dir = Path("/proc") / str(pid) / "task"
+    modes: list[int] = []
+    for thread_dir in task_dir.iterdir():
+        status_text = _run(
+            ["sudo", "-n", "cat", str(thread_dir / "status")],
+            capture_output=True,
+        ).stdout
+        status = _parse_proc_status(status_text)
+        modes.append(int(status["Seccomp"]))
+    return tuple(modes)
+
+
 def _read_process_evidence(
     pid: int,
     uid: int,
@@ -253,6 +270,7 @@ def _read_process_evidence(
         process_pid_namespace=_readlink_as_root(proc / "ns/pid"),
         expected_chroot_identity=_stat_identity_as_root(expected_chroot_root),
         process_root_identity=_stat_identity_as_root(proc / "root"),
+        thread_seccomp_modes=_read_thread_seccomp_modes(pid),
     )
 
 
