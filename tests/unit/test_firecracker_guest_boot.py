@@ -70,8 +70,6 @@ def test_summarize_boot_times_rejects_empty_samples() -> None:
     with pytest.raises(ValueError, match="at least one"):
         summarize_boot_times([])
 
-
-
 def test_load_pinned_guest_asset_manifest_matches_runner_architecture() -> None:
     manifest_path = (
         Path(__file__).resolve().parents[1] / "fixtures" / "firecracker-guest-assets.json"
