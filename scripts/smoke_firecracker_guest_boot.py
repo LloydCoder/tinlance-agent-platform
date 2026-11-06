@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
-GUEST_READY_MARKER = "Run /bin/sh as init process"
+GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
 FIRECRACKER_ARCHIVE_SHA256 = (
     "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 )
@@ -121,6 +121,35 @@ def _sha256(path: Path) -> str:
 
 def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -> None:
     _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+    init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
+    init_path.parent.mkdir(parents=True, exist_ok=True)
+    init_path.write_text(
+        "#!/bin/sh\\necho TINLANCE_GUEST_READY\\nexec /usr/bin/sleep 60\\n",
+        encoding="utf-8",
+    )
+    init_path.chmod(0o755)
+    dev_dir = extract_dir / "dev"
+    dev_dir.mkdir(parents=True, exist_ok=True)
+    for node, major, minor, mode in (
+        ("console", 5, 1, "600"),
+        ("null", 1, 3, "666"),
+        ("tty", 5, 0, "666"),
+    ):
+        node_path = dev_dir / node
+        if not node_path.exists():
+            _run(
+                [
+                    "sudo",
+                    "-n",
+                    "mknod",
+                    "-m",
+                    mode,
+                    str(node_path),
+                    "c",
+                    str(major),
+                    str(minor),
+                ]
+            )
     _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
     _run(["truncate", "-s", "1G", str(rootfs_path)])
     _run(
@@ -243,7 +272,7 @@ def _run_guest(
                     "kernel_image_path": str(kernel_path),
                     "boot_args": (
                         "console=ttyS0 reboot=k panic=1 "
-                        "root=/dev/vda ro init=/bin/sh"
+                        "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
                     ),
                 },
             )
