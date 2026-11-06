@@ -205,7 +205,7 @@ def run_benchmark(
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
         "workload": {
-            "profile": f"{profile}-" + ("minimal-agent" if profile == "W1" else "host-surface-probes"),
+            "profile": "W1-minimal-agent" if profile == "W1" else "W2-host-surface-probes",
             "network": "none",
             "read_only_rootfs": True,
             "capabilities": "drop-all",
