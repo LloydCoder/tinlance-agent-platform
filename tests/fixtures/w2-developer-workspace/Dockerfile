@@ -6,7 +6,12 @@ ARG APT_SNAPSHOT
 # Resolve every package from one immutable Ubuntu archive snapshot. Updating the
 # indexes and installing from that same snapshot avoids mixed-time package sets.
 # The package manifest emitted below is retained as guest-build provenance.
-RUN DEBIAN_FRONTEND=noninteractive apt-get \
+# The minimal base has no CA bundle; bootstrap the pinned CA package from the
+# signed Ubuntu HTTP archive before contacting the HTTPS snapshot service.
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+        ca-certificates=20260816ubuntu0.24.04.2 \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
