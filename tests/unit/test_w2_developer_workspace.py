@@ -121,4 +121,4 @@ def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> N
     assert "timeout-minutes: 60" in workflow
     assert "--runs 30 --profile W2" in workflow
     assert 'report.get("sample_count") != 30' in workflow
-
+    assert 'len(markers) != 30' in workflow
