@@ -55,7 +55,8 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
     assert update_index < install_index
-    assert "ca-certificates git python3 nodejs npm util-linux" in dockerfile
+    assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
+    assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" not in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
     assert "Acquire::Retries=5" in dockerfile
