@@ -161,9 +161,13 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
 
     for line in passwd_lines:
         fields = line.split(":")
-        if len(fields) >= 7 and (fields[0] == "tinlance" or fields[2] == "65532"):
+        if len(fields) >= 7 and (
+            fields[0] == "tinlance" or fields[2] == "65532"
+        ):
             if fields[0] != "tinlance" or fields[2] != "65532":
-                raise ValueError("UID 65532 is already assigned to a different guest account")
+                raise ValueError(
+                    "UID 65532 is already assigned to a different guest account"
+                )
     if not any(line.startswith("tinlance:") for line in passwd_lines):
         passwd_lines.append(
             "tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin"
@@ -172,9 +176,13 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
 
     for line in group_lines:
         fields = line.split(":")
-        if len(fields) >= 3 and (fields[0] == "tinlance" or fields[2] == "65532"):
+        if len(fields) >= 3 and (
+            fields[0] == "tinlance" or fields[2] == "65532"
+        ):
             if fields[0] != "tinlance" or fields[2] != "65532":
-                raise ValueError("GID 65532 is already assigned to a different guest group")
+                raise ValueError(
+                    "GID 65532 is already assigned to a different guest group"
+                )
     if not any(line.startswith("tinlance:") for line in group_lines):
         group_lines.append("tinlance:x:65532:")
         group_path.write_text("\n".join(group_lines) + "\n", encoding="utf-8")
@@ -650,7 +658,9 @@ def main() -> int:
                 "profile": "W1-minimal-agent",
                 "network": "none",
                 "rootfs_read_only": True,
-                "tmpfs": "/tmp:rw,size=64m",
+                "uid": 65532,
+                "gid": 65532,
+                "tmpfs": "/tmp:rw,size=64m,mode=0700,uid=65532,gid=65532",
                 "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
             },
             "guest_ready_marker": GUEST_READY_MARKER,
