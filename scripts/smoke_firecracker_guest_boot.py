@@ -173,7 +173,7 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
         passwd_lines.append(
             "tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin"
         )
-        passwd_path.write_text("\\n".join(passwd_lines) + "\\n", encoding="utf-8")
+        passwd_path.write_text("\n".join(passwd_lines) + "\n", encoding="utf-8")
 
     for line in group_lines:
         fields = line.split(":")
@@ -187,7 +187,7 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
             )
     if not any(line.startswith("tinlance:") for line in group_lines):
         group_lines.append("tinlance:x:65532:")
-        group_path.write_text("\\n".join(group_lines) + "\\n", encoding="utf-8")
+        group_path.write_text("\n".join(group_lines) + "\n", encoding="utf-8")
 
     home_dir = rootfs_dir / "home" / "tinlance"
     home_dir.mkdir(parents=True, exist_ok=True)
