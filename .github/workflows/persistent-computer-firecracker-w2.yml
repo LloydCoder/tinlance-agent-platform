@@ -145,10 +145,16 @@ jobs:
           from pathlib import Path
 
           report_path = Path("artifacts/firecracker-w2.json")
-          if not report_path.exists():
-              print("Guest boot report was not produced; inspect uploaded VMM logs and job output.")
-              raise SystemExit(0)
+          if not report_path.is_file():
+              raise SystemExit("Required Firecracker W2 guest report is missing; acceptance cannot pass.")
           report = json.loads(report_path.read_text(encoding="utf-8"))
+          if report.get("sample_count") != 3:
+              raise SystemExit(f"Expected exactly three W2 guest boots, got {report.get('sample_count')!r}")
+          if report.get("w2_rootfs_tar_sha256") is None:
+              raise SystemExit("W2 rootfs export digest is missing from guest evidence.")
+          markers = report.get("guest_isolation_checks", [])
+          if len(markers) != 3 or any(not item.get("developer_workspace_passed") for item in markers):
+              raise SystemExit("All three guest boots must prove developer-workspace completion.")
           summary = (
               f"Firecracker {report['firecracker_version']}: "
               f"{report['sample_count']} guest boots; "
