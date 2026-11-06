@@ -94,6 +94,8 @@ def verify_jailer_process_evidence(
     process_mount_namespace: str,
     host_pid_namespace: str,
     process_pid_namespace: str,
+    expected_chroot_root: str,
+    process_root: str,
 ) -> dict[str, int | bool | str]:
     status = _parse_proc_status(status_text)
     try:
@@ -122,6 +124,8 @@ def verify_jailer_process_evidence(
         raise PermissionError("jailer process is not isolated in a mount namespace")
     if host_pid_namespace == process_pid_namespace:
         raise PermissionError("jailer process is not isolated in a PID namespace")
+    if process_root != expected_chroot_root:
+        raise PermissionError("jailer process root does not match its dedicated chroot")
 
     cgroup_v2_path = next(
         (
@@ -144,6 +148,7 @@ def verify_jailer_process_evidence(
         "capabilities_effective": capabilities_effective,
         "pid_namespace_isolated": True,
         "mount_namespace_isolated": True,
+        "chroot_root": process_root,
         "cgroup_path": cgroup_v2_path,
     }
 
@@ -199,6 +204,11 @@ def _read_process_evidence(pid: int, uid: int, gid: int) -> dict[str, int | bool
         process_mount_namespace=os.readlink(proc / "ns/mnt"),
         host_pid_namespace=os.readlink("/proc/self/ns/pid"),
         process_pid_namespace=os.readlink(proc / "ns/pid"),
+        expected_chroot_root=str(
+            Path("/srv/tinlance-jailer/firecracker").resolve()
+            / Path((proc / "cgroup").read_text(encoding="utf-8").split("fc-", 1)[-1].splitlines()[0])
+        ),
+        process_root=os.readlink(proc / "root"),
     )
 
 
