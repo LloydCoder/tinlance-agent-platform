@@ -75,7 +75,7 @@ def _capture(command: list[str]) -> str:
     return result.stdout.strip()
 
 
-def run_benchmark(*, image_digest: str, runs: int = 3) -> dict[str, Any]:
+def run_benchmark(*, image_digest: str, runs: int = 30) -> dict[str, Any]:
     if runs < 3 or runs > 100:
         raise ValueError("runs must be between 3 and 100")
     version = _capture(["runsc", "--version"])
@@ -143,7 +143,7 @@ def run_benchmark(*, image_digest: str, runs: int = 3) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the Tinlance gVisor W1 benchmark.")
     parser.add_argument("--image-digest", required=True)
-    parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--runs", type=int, default=30)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run_benchmark(image_digest=args.image_digest, runs=args.runs)
