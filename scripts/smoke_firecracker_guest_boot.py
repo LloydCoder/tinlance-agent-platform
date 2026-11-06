@@ -370,6 +370,7 @@ def verify_guest_boot_markers(
                 "python_version_reported": "TINLANCE_W2_PYTHON_VERSION=",
                 "node_version_reported": "TINLANCE_W2_NODE_VERSION=",
                 "npm_version_reported": "TINLANCE_W2_NPM_VERSION=",
+                "package_manifest_reported": "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
             }
         )
     missing = [name for name, marker in required.items() if marker not in log_text]
