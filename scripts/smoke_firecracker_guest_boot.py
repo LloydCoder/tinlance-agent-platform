@@ -21,6 +21,10 @@ from urllib.parse import urlencode
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 FIRECRACKER_VERSION = "1.17.0"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
+GUEST_READ_ONLY_MARKER = "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED"
+GUEST_NO_NIC_MARKER = "TINLANCE_NO_NIC_CONFIRMED"
+GUEST_WRITE_UNEXPECTED_MARKER = "TINLANCE_ROOTFS_WRITE_UNEXPECTED"
+GUEST_NIC_UNEXPECTED_MARKER = "TINLANCE_NETWORK_INTERFACE_UNEXPECTED"
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 
 
@@ -72,6 +76,46 @@ def select_latest_versioned_key(
     if not candidates:
         raise ValueError(f"no versioned Firecracker CI object found under {prefix}")
     return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def guest_init_script() -> str:
+    return """#!/bin/sh
+mount -t sysfs sysfs /sys || { echo TINLANCE_SYSFS_MOUNT_FAILED; exit 44; }
+for iface_path in /sys/class/net/*; do
+    [ -e "$iface_path" ] || continue
+    iface="${iface_path##*/}"
+    if [ "$iface" != "lo" ]; then
+        echo TINLANCE_NETWORK_INTERFACE_UNEXPECTED
+        exit 43
+    fi
+done
+if touch /etc/tinlance-write-probe 2>/dev/null; then
+    echo TINLANCE_ROOTFS_WRITE_UNEXPECTED
+    exit 42
+fi
+echo TINLANCE_NO_NIC_CONFIRMED
+echo TINLANCE_ROOTFS_READ_ONLY_CONFIRMED
+echo TINLANCE_GUEST_READY
+exec /usr/bin/sleep 60
+"""
+
+
+def verify_guest_boot_markers(log_text: str) -> dict[str, bool]:
+    if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest root filesystem unexpectedly accepted a write")
+    if GUEST_NIC_UNEXPECTED_MARKER in log_text:
+        raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
+        raise RuntimeError("guest could not mount sysfs to verify network interfaces")
+    required = {
+        "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
+        "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "guest_ready": GUEST_READY_MARKER,
+    }
+    missing = [name for name, marker in required.items() if marker not in log_text]
+    if missing:
+        raise ValueError(f"guest isolation markers are missing: {missing}")
+    return {name: True for name in required}
 
 
 def summarize_boot_times(samples: Sequence[float]) -> dict[str, int | float]:
