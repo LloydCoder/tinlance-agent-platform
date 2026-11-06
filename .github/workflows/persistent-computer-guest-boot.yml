@@ -90,13 +90,13 @@ jobs:
             sudo apt-get install -y squashfs-tools e2fsprogs
           fi
 
-      - name: Boot three network-disconnected guest instances
+      - name: Boot 30 network-disconnected W1 guest instances
         run: |
           python scripts/smoke_firecracker_guest_boot.py \
             --firecracker "${FIRECRACKER_BIN}" \
             --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
             --assets-manifest tests/fixtures/firecracker-guest-assets.json \
-            --runs 3 \
+            --runs 30 \
             --timeout-seconds 45 \
             --output artifacts/firecracker-guest-boot.json \
             --log-dir artifacts/firecracker-guest-boot-logs
@@ -123,7 +123,8 @@ jobs:
               f"Kernel SHA-256={report['guest_kernel_sha256']}; "
               f"rootfs SHA-256={report['guest_rootfs_ext4_sha256']}"
           )
-          print("Direct VMM smoke only: jailer/production isolation not certified.")
+          print(f"W1 workload: {report['guest_w1_workload']}")
+print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
           PY
 
       - name: Upload guest boot evidence
