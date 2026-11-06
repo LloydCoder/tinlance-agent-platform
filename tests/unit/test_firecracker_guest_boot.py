@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+import stat
 import tarfile
 from pathlib import Path
 
@@ -534,3 +536,37 @@ def test_w2_network_configuration_uses_real_line_endings() -> None:
         "hostname": "tinlance-w2\n",
         "resolv.conf": "# guest network is disabled\n",
     }
+
+
+def test_w2_rootfs_extractor_fails_closed_on_unapplied_extended_attributes(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "xattr-rootfs.tar"
+    with tarfile.open(source, "w", format=tarfile.PAX_FORMAT) as archive:
+        member = tarfile.TarInfo("usr/bin/ping")
+        member.size = 1
+        member.pax_headers = {"SCHILY.xattr.security.capability": "capability-v2"}
+        archive.addfile(member, io.BytesIO(b"x"))
+
+    with pytest.raises(ValueError, match="extended metadata"):
+        extract_w2_rootfs_tar(source, tmp_path / "rootfs")
+
+
+def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "modes-rootfs.tar"
+    with tarfile.open(source, "w") as archive:
+        directory = tarfile.TarInfo("root-only")
+        directory.type = tarfile.DIRTYPE
+        directory.mode = 0o700
+        archive.addfile(directory)
+        secret = tarfile.TarInfo("root-only/secret")
+        secret.size = 1
+        secret.mode = 0o600
+        archive.addfile(secret, io.BytesIO(b"x"))
+
+    destination = tmp_path / "rootfs"
+    extract_w2_rootfs_tar(source, destination)
+    assert stat.S_IMODE((destination / "root-only").stat().st_mode) == 0o700
+    assert stat.S_IMODE((destination / "root-only" / "secret").stat().st_mode) == 0o600
