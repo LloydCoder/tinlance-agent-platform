@@ -99,6 +99,7 @@ def test_docker_command_rejects_nul_payload() -> None:
             payload="unsafe\x00payload",
         )
 
+
 def test_docker_command_runs_as_unprivileged_identity_with_owned_tmpfs() -> None:
     command = build_docker_command(
         image_digest="ubuntu@sha256:" + "a" * 64,
