@@ -46,6 +46,7 @@ RUN git -C /opt/tinlance-fixture init --quiet --initial-branch=main \
     && GIT_AUTHOR_DATE="2025-01-01T00:00:00Z" \
        GIT_COMMITTER_DATE="2025-01-01T00:00:00Z" \
        git -C /opt/tinlance-fixture commit --quiet -m "Add deterministic developer workspace fixture" \
+    && rm -rf /opt/tinlance-fixture/.git/index /opt/tinlance-fixture/.git/logs \
     && chmod 0555 /opt/tinlance-fixture/run-workspace.sh \
     && chmod -R a=rX /opt/tinlance-fixture \
     && chown -R 65532:65532 /opt/tinlance-fixture
