@@ -35,7 +35,7 @@ jobs:
       - name: Unit-test host capability gates
         run: pytest -q tests/unit/test_sandbox_host_capabilities.py
       - name: Probe runner without changing host state
-        run: sudo "$(which python)" scripts/probe_persistent_computer_host.py --output artifacts/persistent-computer-host.json && sudo chmod 644 artifacts/persistent-computer-host.json
+        run: mkdir -p artifacts && sudo "$(which python)" scripts/probe_persistent_computer_host.py --output artifacts/persistent-computer-host.json && sudo chmod 644 artifacts/persistent-computer-host.json
       - name: Install and smoke-test pinned Firecracker VMM
         if: success()
         run: |
