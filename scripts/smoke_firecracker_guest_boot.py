@@ -236,6 +236,7 @@ exec /usr/bin/sleep 60
     echo TINLANCE_W2_CAPABILITIES_DROPPED
     awk '/^NoNewPrivs:/ { if ($2 != "1") exit 1; found=1 } END { exit !found }' /proc/self/status
     echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
+    test -f /etc/shadow
     test ! -r /etc/shadow
     echo TINLANCE_W2_SENSITIVE_FILES_DENIED
     test ! -e /dev/kvm
@@ -255,6 +256,7 @@ exec /usr/bin/sleep 60
         exit 82
     fi
     echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    test -e /proc/sys/kernel/hostname
     test ! -w /proc/sys/kernel/hostname
     echo TINLANCE_W2_PROC_SYS_READONLY
     echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
