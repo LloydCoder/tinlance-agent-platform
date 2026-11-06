@@ -504,7 +504,6 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         self.assertEqual(response.payload, {"delegated": "runs.read"})
         self.assertEqual(self.http.calls, [])
 
-
     def test_handler_rejects_subject_identity_spoof_before_network_call(self) -> None:
         request = APIRequest(
             tenant_id="tenant-a",
@@ -518,6 +517,7 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
             self.handler.handle(request)
         self.assertEqual(self.http.calls, [])
         self.assertEqual(self.issuer.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()
