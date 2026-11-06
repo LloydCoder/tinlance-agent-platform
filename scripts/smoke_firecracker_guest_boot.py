@@ -167,10 +167,7 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
             and (fields[0] != "tinlance" or fields[2] != "65532")
         ):
             raise ValueError(
-                "UID 65532 is already assigned to a different guest account"
             )
-                    "UID 65532 is already assigned to a different guest account"
-                )
     if not any(line.startswith("tinlance:") for line in passwd_lines):
         passwd_lines.append(
             "tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin"
@@ -185,10 +182,7 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
             and (fields[0] != "tinlance" or fields[2] != "65532")
         ):
             raise ValueError(
-                "GID 65532 is already assigned to a different guest group"
             )
-                    "GID 65532 is already assigned to a different guest group"
-                )
     if not any(line.startswith("tinlance:") for line in group_lines):
         group_lines.append("tinlance:x:65532:")
         group_path.write_text("\n".join(group_lines) + "\n", encoding="utf-8")
@@ -464,7 +458,6 @@ def _run_guest(
                     check=False,
                     capture_output=True,
                     text=True,
-                )
                 if running.returncode != 0:
                     raise RuntimeError(
                         "Firecracker exited before guest-ready marker. "
