@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -109,9 +110,13 @@ def verify_jailer_process_evidence(
         raise PermissionError("jailer process security evidence is incomplete") from exc
 
     if not uid_values or any(value != expected_uid for value in uid_values):
-        raise PermissionError("jailer process uid does not match the dedicated unprivileged identity")
+        raise PermissionError(
+            "jailer process uid does not match the dedicated unprivileged identity"
+        )
     if not gid_values or any(value != expected_gid for value in gid_values):
-        raise PermissionError("jailer process gid does not match the dedicated unprivileged identity")
+        raise PermissionError(
+            "jailer process gid does not match the dedicated unprivileged identity"
+        )
     if seccomp_mode != 2:
         raise PermissionError("jailer process does not have seccomp filter mode enabled")
     if not no_new_privs:
@@ -153,7 +158,11 @@ def verify_jailer_process_evidence(
     }
 
 
-def _run(command: Sequence[str], *, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(
+    command: Sequence[str],
+    *,
+    capture_output: bool = False,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         list(command),
         check=True,
@@ -162,7 +171,12 @@ def _run(command: Sequence[str], *, capture_output: bool = False) -> subprocess.
     )
 
 
-def _wait_for_path(path: Path, process: subprocess.Popen[str], log_path: Path, timeout: float) -> None:
+def _wait_for_path(
+    path: Path,
+    process: subprocess.Popen[str],
+    log_path: Path,
+    timeout: float,
+) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if path.exists():
@@ -241,14 +255,10 @@ def _stop_process(process: subprocess.Popen[str]) -> None:
         os.killpg(process.pid, signal.SIGTERM)
         process.wait(timeout=5)
     except (ProcessLookupError, subprocess.TimeoutExpired):
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        try:
+        with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            pass
 
 
 def _stage_guest_assets(
@@ -262,8 +272,36 @@ def _stage_guest_assets(
     _run(["sudo", "-n", "mkdir", "-p", str(guest_dir)])
     kernel_target = guest_dir / "vmlinux"
     rootfs_target = guest_dir / "rootfs.ext4"
-    _run(["sudo", "-n", "install", "-o", str(uid), "-g", str(gid), "-m", "0400", str(kernel_source), str(kernel_target)])
-    _run(["sudo", "-n", "install", "-o", str(uid), "-g", str(gid), "-m", "0400", str(rootfs_source), str(rootfs_target)])
+    _run(
+        [
+            "sudo",
+            "-n",
+            "install",
+            "-o",
+            str(uid),
+            "-g",
+            str(gid),
+            "-m",
+            "0400",
+            str(kernel_source),
+            str(kernel_target),
+        ]
+    )
+    _run(
+        [
+            "sudo",
+            "-n",
+            "install",
+            "-o",
+            str(uid),
+            "-g",
+            str(gid),
+            "-m",
+            "0400",
+            str(rootfs_source),
+            str(rootfs_target),
+        ]
+    )
     return "/var/lib/firecracker/vmlinux", "/var/lib/firecracker/rootfs.ext4"
 
 
@@ -366,7 +404,10 @@ def _run_jailer_guest(
                         version,
                     )
                 if process.poll() is not None:
-                    raise RuntimeError(f"jailed Firecracker exited before guest readiness: {log_text[-5000:]}")
+                    raise RuntimeError(
+                        "jailed Firecracker exited before guest readiness: "
+                        f"{log_text[-5000:]}"
+                    )
                 time.sleep(0.1)
             log_text = log_path.read_text(encoding="utf-8", errors="replace")
             raise TimeoutError(f"jailed guest did not reach readiness: {log_text[-5000:]}")
@@ -391,7 +432,10 @@ def _run_jailer_guest(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Boot a Firecracker guest through the upstream jailer and verify host isolation."
+        description=(
+            "Boot a Firecracker guest through the upstream jailer "
+            "and verify host isolation."
+        )
     )
     parser.add_argument("--jailer", required=True, type=Path)
     parser.add_argument("--firecracker", required=True, type=Path)
@@ -416,7 +460,11 @@ def main() -> int:
         parser.error("pinned Firecracker release archive must exist")
     if not args.chroot_base_dir.is_absolute():
         parser.error("jailer chroot base directory must be absolute")
-    if _run(["sha256sum", str(args.firecracker_archive)], capture_output=True).stdout.split()[0] != FIRECRACKER_ARCHIVE_SHA256:
+    archive_sha256 = _run(
+        ["sha256sum", str(args.firecracker_archive)],
+        capture_output=True,
+    ).stdout.split()[0]
+    if archive_sha256 != FIRECRACKER_ARCHIVE_SHA256:
         raise ValueError("Firecracker release archive SHA-256 does not match the pinned release")
 
     manifest = load_asset_manifest(args.assets_manifest, "x86_64")
@@ -461,11 +509,20 @@ def main() -> int:
             "execution_mode": "firecracker-jailer-ephemeral-smoke",
             "production_certification": False,
             "jailer_executed": True,
-            "jailer_binary_sha256": _run(["sha256sum", str(args.jailer)], capture_output=True).stdout.split()[0],
-            "firecracker_binary_sha256": _run(["sha256sum", str(args.firecracker)], capture_output=True).stdout.split()[0],
+            "jailer_binary_sha256": _run(
+                ["sha256sum", str(args.jailer)],
+                capture_output=True,
+            ).stdout.split()[0],
+            "firecracker_binary_sha256": _run(
+                ["sha256sum", str(args.firecracker)],
+                capture_output=True,
+            ).stdout.split()[0],
             "firecracker_archive_sha256": FIRECRACKER_ARCHIVE_SHA256,
             "firecracker_version": firecracker_version.get("firecracker_version"),
-            "guest_asset_manifest_sha256": _run(["sha256sum", str(args.assets_manifest)], capture_output=True).stdout.split()[0],
+            "guest_asset_manifest_sha256": _run(
+                ["sha256sum", str(args.assets_manifest)],
+                capture_output=True,
+            ).stdout.split()[0],
             "guest_kernel_sha256": assets["kernel_sha256"],
             "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
             "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
