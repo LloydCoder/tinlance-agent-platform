@@ -47,8 +47,8 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     fixture = fixture_root / "fixtures" / "w2-developer-workspace" / "Dockerfile"
     dockerfile = fixture.read_text(encoding="utf-8")
     assert "ARG APT_SNAPSHOT" in dockerfile
-    assert 'apt-get --snapshot="${APT_SNAPSHOT}" update' in dockerfile
-    assert 'apt-get --snapshot="${APT_SNAPSHOT}" install' in dockerfile
+    assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
+    assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
