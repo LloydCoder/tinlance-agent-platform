@@ -154,6 +154,10 @@ for iface_path in /sys/class/net/*; do
     fi
 done
 echo TINLANCE_NO_NIC_CONFIRMED
+mount -t tmpfs -o size=64m tmpfs /tmp
+printf tinlance-gvisor-ok > /tmp/workload.txt
+test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok
+echo TINLANCE_W1_WORKLOAD_OK
 echo TINLANCE_GUEST_READY
 exec /usr/bin/sleep 60
 """
@@ -165,6 +169,9 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
     init_path.parent.mkdir(parents=True, exist_ok=True)
     init_path.write_text(guest_init_script(), encoding="utf-8")
     init_path.chmod(0o755)
+    tmp_dir = extract_dir / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir.chmod(0o1777)
     dev_dir = extract_dir / "dev"
     dev_dir.mkdir(parents=True, exist_ok=True)
     for node, major, minor, mode in (
@@ -546,10 +553,18 @@ def main() -> int:
             "production_certification": False,
             "guest_network_configured": False,
             "guest_rootfs_read_only": True,
+            "guest_network_configured": False,
+            "guest_w1_workload": {
+                "profile": "W1-minimal-agent",
+                "network": "none",
+                "rootfs_read_only": True,
+                "tmpfs": "/tmp:rw,size=64m",
+                "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
+            },
             "guest_ready_marker": GUEST_READY_MARKER,
             "boot_time_measurement": (
                 "elapsed time from immediately before the InstanceStart API request "
-                "until the guest init marker appears on the serial console"
+                "until the guest completes the W1 workload and emits its ready marker on the serial console"
             ),
             "firecracker_version": firecracker_version.get("firecracker_version"),
             "firecracker_archive_sha256": archive_sha256,
