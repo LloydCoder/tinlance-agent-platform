@@ -193,7 +193,9 @@ def run_benchmark(
         raise ValueError("runs must be between 3 and 100")
     if profile not in {"W1", "W2"}:
         raise ValueError("profile must be W1 or W2")
-    if profile == "W2" and (rootfs_sha256 is None or not re.fullmatch(r"sha256:[a-f0-9]{64}", rootfs_sha256)):
+    if profile == "W2" and (
+        rootfs_sha256 is None or not re.fullmatch(r"sha256:[a-f0-9]{64}", rootfs_sha256)
+    ):
         raise ValueError("W2 requires a normalized rootfs SHA-256 digest")
     if profile == "W1" and rootfs_sha256 is not None:
         raise ValueError("W1 does not accept a W2 rootfs digest")
