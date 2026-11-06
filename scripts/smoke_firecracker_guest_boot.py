@@ -354,11 +354,11 @@ def load_asset_manifest(path: Path, architecture: str) -> GuestAssetManifest:
         raise ValueError("guest asset manifest architecture does not match the runner")
     artifact_prefix = manifest.get("artifact_prefix", "")
     expected_prefix = f"{artifact_prefix}{architecture}/"
-    if not re.fullmatch(r"firecracker-ci/\\d{8}-[^/]+/", artifact_prefix):
+    if not re.fullmatch(r"firecracker-ci/\d{8}-[^/]+/", artifact_prefix):
         raise ValueError("guest asset manifest has an invalid upstream artifact prefix")
     for key_name, pattern in (
-        ("kernel_key", r"vmlinux-\\d+\\.\\d+\\.\\d+$"),
-        ("rootfs_key", r"ubuntu-\\d+\\.\\d+\\.squashfs$"),
+        ("kernel_key", r"vmlinux-\d+\.\d+\.\d+$"),
+        ("rootfs_key", r"ubuntu-\d+\.\d+\.squashfs$"),
     ):
         key = manifest.get(key_name, "")
         if not isinstance(key, str) or not key.startswith(expected_prefix):
@@ -455,7 +455,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="fc-asset-discovery-", dir="/tmp") as temporary:
             manifest = _discover_asset_manifest(Path(temporary), platform.machine())
             args.output.write_text(
-                json.dumps(manifest, indent=2, sort_keys=True) + "\\n",
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
         return 0
@@ -529,7 +529,7 @@ def main() -> int:
             "captured_at": datetime.now(UTC).isoformat(),
         }
         args.output.write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\\n",
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
     return 0
