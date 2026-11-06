@@ -247,6 +247,7 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
             "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
         )
 
+
 def test_guest_init_w2_enforces_no_new_privileges_and_host_surface_denials() -> None:
     from scripts.smoke_firecracker_guest_boot import guest_init_script
 
@@ -305,6 +306,7 @@ def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
         )
     with pytest.raises(PermissionError, match="privilege escalation"):
         verify_guest_boot_markers("TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED", "W2")
+
 
 def test_guest_init_w2_script_is_valid_posix_shell() -> None:
     import subprocess
