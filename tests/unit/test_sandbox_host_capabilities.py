@@ -118,6 +118,8 @@ def test_probe_reports_tooling_and_serializable_evidence(tmp_path: Path) -> None
     payload = result.to_dict()
     assert payload["binaries"] == binaries
     assert payload["architecture"] == "aarch64"
+    assert payload["cgroup_controllers"] == ["cpu", "io", "memory", "pids"]
+    assert payload["cgroup_limits_ready"] is True
     assert payload["microvm_ready"] is True
     assert json.loads(json.dumps(payload))["kernel_release"] == "test-kernel"
 
