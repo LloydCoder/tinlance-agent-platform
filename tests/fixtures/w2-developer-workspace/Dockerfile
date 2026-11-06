@@ -15,4 +15,4 @@ RUN git -C /opt/tinlance-fixture init --quiet \
     && chmod 0555 /opt/tinlance-fixture/run-workspace.sh \
     && chmod -R a=rX /opt/tinlance-fixture
 
-ENTRYPOINT ["/bin/sh", "/opt/tinlance-fixture/run-workspace.sh"]
+CMD ["/bin/sh", "/opt/tinlance-fixture/run-workspace.sh"]
