@@ -44,16 +44,23 @@ def summarize_samples(samples: list[float]) -> dict[str, int | float]:
     }
 
 
-def build_docker_command(*, image_digest: str, payload: str) -> list[str]:
+def build_docker_command(
+    *,
+    image_digest: str,
+    payload: str,
+    runtime_name: str = "runsc",
+) -> list[str]:
     if not _IMAGE_DIGEST.fullmatch(image_digest):
         raise ValueError("image reference must be pinned by sha256 digest")
-    if not isinstance(payload, str) or not payload.strip() or "\x00" in payload:
+    if not _RUNTIME_NAME.fullmatch(runtime_name):
+        raise ValueError("runtime name must be a safe Docker runtime identifier")
+    if not isinstance(payload, str) or not payload.strip() or "\\x00" in payload:
         raise ValueError("payload must be non-empty text without NUL bytes")
     return [
         "docker",
         "run",
         "--rm",
-        "--runtime=runsc",
+        f"--runtime={runtime_name}",
         "--network=none",
         "--read-only",
         "--cap-drop=ALL",
@@ -69,7 +76,6 @@ def build_docker_command(*, image_digest: str, payload: str) -> list[str]:
         "-lc",
         payload,
     ]
-
 
 def _capture(command: list[str]) -> str:
     result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=120)
