@@ -69,6 +69,21 @@ def test_docker_command_enforces_restricted_profile() -> None:
     assert "ubuntu@sha256:" + "a" * 64 in command
 
 
+def test_w2_docker_command_uses_the_declared_two_cpu_two_gib_envelope() -> None:
+    command = build_docker_command(
+        image_digest="ubuntu@sha256:" + "a" * 64,
+        payload="printf tinlance-w2-ok",
+        workspace=True,
+    )
+    assert "--cpus=2" in command
+    assert "--memory=2g" in command
+    assert "--pids-limit=128" in command
+    assert (
+        "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700"
+        in command
+    )
+
+
 def test_docker_command_rejects_mutable_image_reference() -> None:
     with pytest.raises(ValueError, match="digest"):
         build_docker_command(image_digest="ubuntu:24.04", payload="true")
