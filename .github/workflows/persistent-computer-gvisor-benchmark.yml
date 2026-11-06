@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   gvisor-w1:
-    name: gVisor W1 restricted workload (ephemeral runner)
+    name: gVisor W1 and W2 restricted workloads (ephemeral runner)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
