@@ -120,7 +120,8 @@ jobs:
           printf '%s\n' "$rootfs_sha256" > artifacts/w2-rootfs.sha256
           rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar
           echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
-          echo "rootfs_sha256=$rootfs_sha256" >> "$GITHUB_OUTPUT"
+          rootfs_digest="sha256:${rootfs_sha256}"
+          echo "rootfs_sha256=$rootfs_digest" >> "$GITHUB_OUTPUT"
           echo "W2 developer workspace image: $image_id"
           echo "W2 normalized rootfs SHA-256: $rootfs_sha256"
       - name: Prove Kata launches a separate guest kernel
