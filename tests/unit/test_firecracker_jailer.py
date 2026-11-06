@@ -90,12 +90,14 @@ CapEff:\t0000000000000000
         process_pid_namespace="pid:[4026532445]",
         expected_chroot_identity="8:12345",
         process_root_identity="8:12345",
+        thread_seccomp_modes=[2, 2],
     )
 
     assert result == {
         "uid": 987,
         "gid": 987,
         "seccomp_mode": 2,
+        "thread_seccomp_modes": [2, 2],
         "no_new_privs": True,
         "capabilities_effective": "0000000000000000",
         "pid_namespace_isolated": True,
