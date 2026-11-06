@@ -7,20 +7,19 @@ ARG APT_SNAPSHOT
 # indexes and installing from that same snapshot avoids mixed-time package sets.
 # The package manifest emitted below is retained as guest-build provenance.
 # The minimal base has no CA bundle. Bootstrap the pinned CA package from the
-# signed Ubuntu snapshot. TLS peer verification is temporarily disabled for
-# this bootstrap transaction; APT still verifies signed metadata and package hashes.
+# signed Ubuntu snapshot using the base image's HTTP Ubuntu archive source.
+# APT's signed Release metadata and package hashes remain mandatory. Subsequent
+# package transactions use HTTPS with normal certificate verification.
 RUN DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
-        -o Acquire::https::Verify-Peer=false \
         -o APT::Update::Error-Mode=any \
         --snapshot="${APT_SNAPSHOT}" update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
-        -o Acquire::https::Verify-Peer=false \
         --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
         ca-certificates=20260816ubuntu0.24.04.2 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
