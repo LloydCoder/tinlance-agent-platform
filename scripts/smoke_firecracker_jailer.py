@@ -187,8 +187,6 @@ def _wait_for_path(
         )
         if socket_probe.returncode == 0:
             return
-        if process.poll() is not None:
-            break
         time.sleep(0.1)
     log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
     raise RuntimeError(f"jailer did not create the Firecracker API socket: {log[-5000:]}")
@@ -275,17 +273,46 @@ def _verify_cgroup_limits(cgroup_path: str) -> dict[str, str]:
     return observed
 
 
-def _stop_process(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
-        return
+def _is_process_alive(pid: int) -> bool:
+    stat_path = Path("/proc") / str(pid) / "stat"
     try:
-        os.killpg(process.pid, signal.SIGTERM)
-        process.wait(timeout=5)
-    except (ProcessLookupError, subprocess.TimeoutExpired):
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGKILL)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            process.wait(timeout=2)
+        stat = stat_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    state = stat.rsplit(")", 1)[-1].strip().split(maxsplit=1)[0]
+    return state != "Z"
+
+
+def _stop_process(
+    process: subprocess.Popen[str],
+    firecracker_pid: int | None,
+) -> None:
+    if firecracker_pid is not None and _is_process_alive(firecracker_pid):
+        subprocess.run(
+            ["sudo", "-n", "kill", "-TERM", str(firecracker_pid)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and _is_process_alive(firecracker_pid):
+            time.sleep(0.1)
+        if _is_process_alive(firecracker_pid):
+            subprocess.run(
+                ["sudo", "-n", "kill", "-KILL", str(firecracker_pid)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=5)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=2)
 
 
 def _stage_guest_assets(
@@ -356,6 +383,7 @@ def _run_jailer_guest(
     chroot_root = chroot_base_dir / "firecracker" / jailer_id / "root"
     socket_path = chroot_root / "run/firecracker.socket"
     process: subprocess.Popen[str] | None = None
+    firecracker_pid: int | None = None
     cgroup_path: str | None = None
 
     try:
@@ -442,16 +470,17 @@ def _run_jailer_guest(
                         cgroup_evidence,
                         version,
                     )
-                if process.poll() is not None:
+                if not _is_process_alive(firecracker_pid):
                     raise RuntimeError(
-                        f"jailed Firecracker exited before guest readiness: {log_text[-5000:]}"
+                        "jailed Firecracker exited before guest readiness: "
+                        f"{log_text[-5000:]}"
                     )
                 time.sleep(0.1)
             log_text = log_path.read_text(encoding="utf-8", errors="replace")
             raise TimeoutError(f"jailed guest did not reach readiness: {log_text[-5000:]}")
     finally:
         if process is not None:
-            _stop_process(process)
+            _stop_process(process, firecracker_pid)
         if cgroup_path is not None:
             cgroup_dir = Path("/sys/fs/cgroup") / cgroup_path.lstrip("/")
             subprocess.run(
