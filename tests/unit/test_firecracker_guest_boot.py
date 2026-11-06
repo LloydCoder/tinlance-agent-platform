@@ -142,6 +142,7 @@ def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
     assert "TINLANCE_NO_NIC_CONFIRMED" in script
     assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
 
+
 def test_guest_boot_marker_verifier_accepts_read_only_no_nic_evidence() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
