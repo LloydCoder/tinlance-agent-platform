@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import platform
 import re
 import shutil
@@ -37,7 +36,7 @@ def parse_latest_artifact_prefix(xml_text: str) -> str:
     prefixes = [
         value
         for value in _xml_values(xml_text, "Prefix")
-        if re.fullmatch(r"firecracker-ci/\\d{8}-[^/]+/", value)
+        if re.fullmatch(r"firecracker-ci/\d{8}-[^/]+/", value)
     ]
     if not prefixes:
         raise ValueError("Firecracker CI artifact listing contains no dated build prefixes")
@@ -213,7 +212,7 @@ def _run_guest(
 
     try:
         with log_path.open("w", encoding="utf-8") as log_handle:
-            _run(
+            subprocess.run(
                 [
                     "sudo",
                     "-n",
@@ -221,7 +220,11 @@ def _run_guest(
                     str(firecracker_binary),
                     "--api-sock",
                     str(socket_path),
-                ]
+                ],
+                check=True,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
             )
             _wait_for_socket(socket_path, log_path)
 
@@ -295,13 +298,13 @@ def _discover_guest_assets(work_dir: Path, architecture: str) -> dict[str, objec
     kernel_key = select_latest_versioned_key(
         kernel_listing,
         architecture_prefix,
-        r"vmlinux-(\\d+)\\.(\\d+)\\.(\\d+)$",
+        r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
     )
     rootfs_listing = _s3_listing(f"{architecture_prefix}ubuntu-")
     rootfs_key = select_latest_versioned_key(
         rootfs_listing,
         architecture_prefix,
-        r"ubuntu-(\\d+)\\.(\\d+)\\.squashfs$",
+        r"ubuntu-(\d+)\.(\d+)\.squashfs$",
     )
 
     kernel_path = work_dir / "guest-vmlinux"
@@ -395,7 +398,7 @@ def main() -> int:
             "captured_at": datetime.now(UTC).isoformat(),
         }
         args.output.write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\\n",
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
     return 0
