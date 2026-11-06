@@ -426,3 +426,22 @@ def test_w2_rootfs_preparation_requires_content_addressed_oci_export(tmp_path: P
             tmp_path / "extract",
             "W2",
         )
+
+
+def test_w2_rootfs_tar_normalizes_safe_absolute_guest_symlinks(tmp_path: Path) -> None:
+    import io
+    import os
+
+    archive = tmp_path / "symlink-rootfs.tar"
+    with tarfile.open(archive, "w") as handle:
+        target = tarfile.TarInfo("usr/bin/python3")
+        target.size = len(b"python")
+        handle.addfile(target, io.BytesIO(b"python"))
+        link = tarfile.TarInfo("etc/python3")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "/usr/bin/python3"
+        handle.addfile(link)
+
+    destination = tmp_path / "rootfs"
+    extract_w2_rootfs_tar(archive, destination)
+    assert os.readlink(destination / "etc/python3") == "../usr/bin/python3"
