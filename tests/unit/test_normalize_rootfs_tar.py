@@ -150,3 +150,38 @@ def test_normalizer_preserves_semantic_pax_xattrs_and_strips_volatile_metadata(
         assert normalized.pax_headers["SCHILY.acl.access"] == "user::rwx,group::r-x,other::r-x"
         assert not {"mtime", "atime", "ctime"} & normalized.pax_headers.keys()
         assert normalized.mtime == SOURCE_DATE_EPOCH
+
+
+def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(tmp_path: Path) -> None:
+    def write_archive(path: Path, regular_name: str, hardlink_name: str, inode: str) -> None:
+        with tarfile.open(path, "w", format=tarfile.PAX_FORMAT) as archive:
+            regular = tarfile.TarInfo(regular_name)
+            regular.size = 3
+            regular.mode = 0o755
+            regular.pax_headers = {"SCHILY.ino": inode, "SCHILY.nlink": "2"}
+            archive.addfile(regular, io.BytesIO(b"bin"))
+
+            hardlink = tarfile.TarInfo(hardlink_name)
+            hardlink.type = tarfile.LNKTYPE
+            hardlink.linkname = regular_name
+            hardlink.mode = 0o755
+            hardlink.pax_headers = {"SCHILY.nlink": "2", "SCHILY.ino": inode}
+            archive.addfile(hardlink)
+
+    first = tmp_path / "first-hardlinks.tar"
+    second = tmp_path / "second-hardlinks.tar"
+    write_archive(first, "usr/bin/a", "usr/bin/b", "100")
+    write_archive(second, "usr/bin/b", "usr/bin/a", "900")
+
+    first_output = tmp_path / "first-normalized.tar"
+    second_output = tmp_path / "second-normalized.tar"
+    first_digest, _ = normalize_rootfs_tar(first, first_output)
+    second_digest, _ = normalize_rootfs_tar(second, second_output)
+
+    assert first_digest == second_digest
+    with tarfile.open(first_output, "r:") as archive:
+        members = archive.getmembers()
+        assert all(member.isfile() for member in members)
+        assert all("SCHILY.ino" not in member.pax_headers for member in members)
+        assert all("SCHILY.nlink" not in member.pax_headers for member in members)
+
