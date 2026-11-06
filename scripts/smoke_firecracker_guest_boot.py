@@ -246,9 +246,9 @@ exec /usr/bin/sleep 60
             "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups",
         )
         probes = """    command -v mount >/dev/null 2>&1
-    grep -q "^CapEff: *0000000000000000" /proc/self/status
+    grep -Eq "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status
     echo TINLANCE_W2_CAPABILITIES_DROPPED
-    grep -q "^NoNewPrivs: *1" /proc/self/status
+    grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/self/status
     echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
     test -f /etc/shadow
     test ! -r /etc/shadow
