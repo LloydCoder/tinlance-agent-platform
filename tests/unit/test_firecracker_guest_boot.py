@@ -117,6 +117,8 @@ def test_load_guest_asset_manifest_rejects_invalid_digest(tmp_path: Path) -> Non
     with pytest.raises(ValueError, match="kernel_sha256"):
         load_asset_manifest(tampered_path, "x86_64")
 
+
+
 def test_guest_init_rejects_writable_rootfs_before_ready_marker() -> None:
     from scripts.smoke_firecracker_guest_boot import guest_init_script
 
