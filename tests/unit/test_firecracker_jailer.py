@@ -89,6 +89,8 @@ CapEff:\t0000000000000000
         process_mount_namespace="mnt:[4026532444]",
         host_pid_namespace="pid:[4026531836]",
         process_pid_namespace="pid:[4026532445]",
+        expected_chroot_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
+        process_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
     )
 
     assert result == {
@@ -99,6 +101,7 @@ CapEff:\t0000000000000000
         "capabilities_effective": "0000000000000000",
         "pid_namespace_isolated": True,
         "mount_namespace_isolated": True,
+        "chroot_root": "/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
         "cgroup_path": "/firecracker/fc-smoke-421",
     }
 
@@ -121,6 +124,8 @@ CapEff:\t0000000000000000
             process_mount_namespace="mnt:[4026532444]",
             host_pid_namespace="pid:[4026531836]",
             process_pid_namespace="pid:[4026532445]",
+            expected_chroot_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
+            process_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
         )
 
 
