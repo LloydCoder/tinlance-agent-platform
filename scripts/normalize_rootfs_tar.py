@@ -117,7 +117,9 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
                         if member.isfile():
                             content: BinaryIO | None = incoming.extractfile(original)
                             if content is None:
-                                raise ValueError(f"unable to read rootfs archive entry: {member.name}")
+                                raise ValueError(
+                                    f"unable to read rootfs archive entry: {member.name}"
+                                )
                             with content:
                                 outgoing.addfile(member, content)
                         else:
