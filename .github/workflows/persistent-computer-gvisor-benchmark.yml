@@ -1,4 +1,4 @@
-name: Persistent Computer gVisor W1 Benchmark
+name: Persistent Computer gVisor W1 and W2 Benchmark
 
 on:
   pull_request:
@@ -62,28 +62,31 @@ jobs:
       - name: Run 30 isolated W1 workloads
         run: |
           python scripts/benchmark_gvisor.py --image-digest '${{ steps.image.outputs.image_digest }}' --runs 30 --output artifacts/gvisor-w1.json
+      - name: Run 30 isolated W2 host-surface workloads
+        run: |
+          python scripts/benchmark_gvisor.py --image-digest '${{ steps.image.outputs.image_digest }}' --runs 30 --profile W2 --output artifacts/gvisor-w2.json
       - name: Publish benchmark summary
         if: always()
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          path = Path("artifacts/gvisor-w1.json")
-          if not path.exists():
-              print("No gVisor benchmark report was produced.")
-              raise SystemExit(0)
-          report = json.loads(path.read_text(encoding="utf-8"))
-          latency = report["latency"]
-          print(f"gVisor: {latency['sample_count']} W1 samples")
-          print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
-          print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
+          for profile in ("w1", "w2"):
+              path = Path(f"artifacts/gvisor-{profile}.json")
+              if not path.exists():
+                  raise SystemExit(f"Missing gVisor {profile.upper()} benchmark report.")
+              report = json.loads(path.read_text(encoding="utf-8"))
+              latency = report["latency"]
+              print(f"gVisor {profile.upper()}: {latency['sample_count']} samples")
+              print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
+              print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
           print("Feasibility benchmark only; not production isolation certification.")
           PY
       - name: Upload gVisor benchmark evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: gvisor-w1-benchmark-${{ github.run_id }}
+          name: gvisor-w1-w2-benchmark-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: warn
           retention-days: 90
