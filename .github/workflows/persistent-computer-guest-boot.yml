@@ -124,7 +124,7 @@ jobs:
               f"rootfs SHA-256={report['guest_rootfs_ext4_sha256']}"
           )
           print(f"W1 workload: {report['guest_w1_workload']}")
-print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
+          print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
           PY
 
       - name: Upload guest boot evidence
