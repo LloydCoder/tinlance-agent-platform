@@ -534,3 +534,19 @@ def test_w2_network_configuration_uses_real_line_endings() -> None:
         "hostname": "tinlance-w2\n",
         "resolv.conf": "# guest network is disabled\n",
     }
+
+
+
+def test_w2_rootfs_extractor_fails_closed_on_unapplied_extended_attributes(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "xattr-rootfs.tar"
+    with tarfile.open(source, "w", format=tarfile.PAX_FORMAT) as archive:
+        member = tarfile.TarInfo("usr/bin/ping")
+        member.size = 1
+        member.pax_headers = {"SCHILY.xattr.security.capability": "capability-v2"}
+        archive.addfile(member, __import__("io").BytesIO(b"x"))
+
+    with pytest.raises(ValueError, match="extended metadata"):
+        extract_w2_rootfs_tar(source, tmp_path / "rootfs")
+
