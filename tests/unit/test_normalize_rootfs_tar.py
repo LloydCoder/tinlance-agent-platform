@@ -150,4 +150,3 @@ def test_normalizer_preserves_semantic_pax_xattrs_and_strips_volatile_metadata(
         assert normalized.pax_headers["SCHILY.acl.access"] == "user::rwx,group::r-x,other::r-x"
         assert not {"mtime", "atime", "ctime"} & normalized.pax_headers.keys()
         assert normalized.mtime == SOURCE_DATE_EPOCH
-
