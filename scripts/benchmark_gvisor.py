@@ -54,7 +54,7 @@ def build_docker_command(
         raise ValueError("image reference must be pinned by sha256 digest")
     if not _RUNTIME_NAME.fullmatch(runtime_name):
         raise ValueError("runtime name must be a safe Docker runtime identifier")
-    if not isinstance(payload, str) or not payload.strip() or "\\x00" in payload:
+    if not isinstance(payload, str) or not payload.strip() or "\x00" in payload:
         raise ValueError("payload must be non-empty text without NUL bytes")
     return [
         "docker",
