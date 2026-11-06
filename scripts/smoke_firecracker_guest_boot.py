@@ -233,7 +233,8 @@ exec /usr/bin/sleep 60
 """
     if profile == "W2":
         script = script.replace(
-            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev tmpfs /tmp",
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,"
+            "noexec,nosuid,nodev tmpfs /tmp",
             "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp\n"
             "mkdir -p /workspace\n"
             "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
@@ -375,7 +376,9 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     target = PurePosixPath(member.linkname)
                     if target.is_absolute():
                         if ".." in target.parts:
-                            raise ValueError(f"unsafe absolute symlink in rootfs archive: {member.name}")
+                            raise ValueError(
+                                f"unsafe absolute symlink in rootfs archive: {member.name}"
+                            )
                         member.linkname = os.path.relpath(
                             target.as_posix().lstrip("/"),
                             member_path.parent.as_posix(),
@@ -947,7 +950,9 @@ def main() -> int:
             "guest_kernel_key": assets["kernel_key"],
             "guest_rootfs_key": assets["rootfs_key"] if args.profile == "W1" else None,
             "guest_rootfs_source": (
-                "pinned-upstream-squashfs" if args.profile == "W1" else "content-addressed-oci-export"
+                "pinned-upstream-squashfs"
+                if args.profile == "W1"
+                else "content-addressed-oci-export"
             ),
             "w2_base_image_digest": args.w2_base_image_digest,
             "w2_image_id": args.w2_image_id,
