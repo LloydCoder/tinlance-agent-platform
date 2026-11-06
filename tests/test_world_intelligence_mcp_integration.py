@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 from collections.abc import Mapping
+from unittest.mock import patch
 from typing import Any
 
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
@@ -11,6 +12,7 @@ from tinlance_agent_platform_app.world_intelligence_api_handler import (
     WorldIntelligenceMCPDispatcher,
 )
 from tinlance_agent_platform_contracts import Principal
+from tinlance_agent_platform_mcp.world_intelligence import _UrllibWorldIntelligenceHTTPClient
 from tinlance_agent_platform_mcp import (
     MCPProtocolService,
     MCPToolGateway,
@@ -259,6 +261,19 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
                     )
                 self.assertEqual(caught.exception.retryable, retryable)
 
+    def test_default_http_client_classifies_timeout_as_retryable(self) -> None:
+        client = _UrllibWorldIntelligenceHTTPClient()
+        with patch.object(client._opener, "open", side_effect=TimeoutError("socket timed out")):
+            with self.assertRaises(WorldIntelligenceTransportError) as caught:
+                client.request(
+                    "GET",
+                    "https://world-intelligence.internal/v1/entities",
+                    headers={"Accept": "application/json"},
+                    body=None,
+                    timeout_seconds=1.0,
+                )
+        self.assertIsNone(caught.exception.status_code)
+        self.assertTrue(caught.exception.retryable)
     def test_production_transport_requires_https_and_exact_audience(self) -> None:
         with self.assertRaises(ValueError):
             WorldIntelligenceHTTPTransport(
