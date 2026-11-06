@@ -1,4 +1,4 @@
-name: Persistent Computer Firecracker W2 Host Surface Smoke
+name: Persistent Computer Firecracker W2 Developer Workspace
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
       - "scripts/smoke_firecracker_guest_boot.py"
       - "tests/fixtures/firecracker-guest-assets.json"
       - "tests/unit/test_firecracker_guest_boot.py"
+      - "tests/fixtures/w2-developer-workspace/**"
       - "pyproject.toml"
   workflow_dispatch:
 
@@ -22,9 +23,9 @@ concurrency:
 
 jobs:
   guest-boot:
-    name: KVM guest boot smoke (ephemeral runner)
+    name: KVM W2 developer workspace (ephemeral runner)
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -85,19 +86,57 @@ jobs:
 
       - name: Install guest image tooling
         run: |
-          if ! command -v unsquashfs >/dev/null 2>&1 || ! command -v mkfs.ext4 >/dev/null 2>&1; then
+          if ! command -v mkfs.ext4 >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y squashfs-tools e2fsprogs
+            sudo apt-get install -y e2fsprogs
           fi
 
-      - name: Boot three network-disconnected W2 host-surface guest instances
+      - name: Build digest-pinned W2 developer image and export rootfs
         run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          docker pull ubuntu:24.04
+          base_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)"
+          case "$base_digest" in
+            ubuntu@sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "Ubuntu base image is not digest-pinned: $base_digest"; exit 1 ;;
+          esac
+          docker build \
+            --build-arg BASE_IMAGE="$base_digest" \
+            --file tests/fixtures/w2-developer-workspace/Dockerfile \
+            --tag tinlance-w2-developer-workspace:firecracker \
+            tests/fixtures/w2-developer-workspace
+          image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:firecracker)"
+          case "$image_id" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
+          esac
+          container_id="$(docker create "$image_id")"
+          docker export --output artifacts/w2-rootfs.tar "$container_id"
+          docker rm "$container_id"
+          rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
+          echo "W2 base image: $base_digest"
+          echo "W2 image ID: $image_id"
+          echo "W2 rootfs tar SHA-256: $rootfs_sha256"
+          {
+            echo "W2_BASE_IMAGE_DIGEST=$base_digest"
+            echo "W2_IMAGE_ID=$image_id"
+            echo "W2_ROOTFS_TAR=artifacts/w2-rootfs.tar"
+          } >> "$GITHUB_ENV"
+
+      - name: Boot three network-disconnected W2 developer-workspace guest instances
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$W2_ROOTFS_TAR"' EXIT
           python scripts/smoke_firecracker_guest_boot.py \
             --firecracker "${FIRECRACKER_BIN}" \
             --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
             --assets-manifest tests/fixtures/firecracker-guest-assets.json \
             --runs 3 --profile W2 \
-            --timeout-seconds 45 \
+            --w2-rootfs-tar "$W2_ROOTFS_TAR" \
+            --w2-image-id "$W2_IMAGE_ID" \
+            --w2-base-image-digest "$W2_BASE_IMAGE_DIGEST" \
+            --timeout-seconds 60 \
             --output artifacts/firecracker-w2.json \
             --log-dir artifacts/firecracker-w2-logs
 
