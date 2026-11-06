@@ -407,9 +407,7 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr."))
                     for key in member.pax_headers
                 ):
-                    raise ValueError(
-                        f"unsupported rootfs extended metadata: {member.name}"
-                    )
+                    raise ValueError(f"unsupported rootfs extended metadata: {member.name}")
                 member_path = PurePosixPath(member.name)
                 if member_path.is_absolute() or ".." in member_path.parts:
                     raise ValueError(f"unsafe rootfs archive path: {member.name}")
