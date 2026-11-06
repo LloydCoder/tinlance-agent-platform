@@ -15,11 +15,14 @@ from typing import Any
 
 from scripts.smoke_firecracker_guest_boot import (
     FIRECRACKER_ARCHIVE_SHA256,
+    GUEST_NIC_UNEXPECTED_MARKER,
     GUEST_READY_MARKER,
+    GUEST_WRITE_UNEXPECTED_MARKER,
     _api_request,
     _download_pinned_guest_assets,
     load_asset_manifest,
     summarize_boot_times,
+    verify_guest_boot_markers,
 )
 
 CGROUP_LIMITS = (
@@ -392,7 +395,13 @@ def _run_jailer_guest(
     rootfs_path: Path,
     log_path: Path,
     timeout_seconds: float,
-) -> tuple[float, dict[str, int | bool | str], dict[str, str], dict[str, str]]:
+) -> tuple[
+    float,
+    dict[str, int | bool | str | list[int]],
+    dict[str, str],
+    dict[str, str],
+    dict[str, bool],
+]:
     command = build_jailer_command(
         jailer_binary=str(jailer_binary),
         firecracker_binary=str(firecracker_binary),
@@ -477,7 +486,14 @@ def _run_jailer_guest(
             deadline = started + timeout_seconds
             while time.monotonic() < deadline:
                 log_text = log_path.read_text(encoding="utf-8", errors="replace")
+                if (
+                    GUEST_WRITE_UNEXPECTED_MARKER in log_text
+                    or GUEST_NIC_UNEXPECTED_MARKER in log_text
+                    or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                ):
+                    verify_guest_boot_markers(log_text)
                 if GUEST_READY_MARKER in log_text:
+                    guest_isolation = verify_guest_boot_markers(log_text)
                     process_evidence = _read_process_evidence(
                         firecracker_pid,
                         uid,
@@ -490,6 +506,7 @@ def _run_jailer_guest(
                         process_evidence,
                         cgroup_evidence,
                         version,
+                        guest_isolation,
                     )
                 if not _is_process_alive(firecracker_pid):
                     raise RuntimeError(
@@ -569,12 +586,19 @@ def main() -> int:
         _run(["sudo", "-n", "chmod", "0755", str(args.chroot_base_dir)])
 
         samples: list[float] = []
-        process_evidence: dict[str, int | bool | str] = {}
+        guest_isolation_samples: list[dict[str, bool]] = []
+        process_evidence: dict[str, int | bool | str | list[int]] = {}
         cgroup_evidence: dict[str, str] = {}
         firecracker_version: dict[str, Any] = {}
         for run_index in range(1, args.runs + 1):
             jailer_id = f"fc-{os.environ.get('GITHUB_RUN_ID', 'local')}-{run_index}"
-            boot_time, process_evidence, cgroup_evidence, firecracker_version = _run_jailer_guest(
+            (
+                boot_time,
+                process_evidence,
+                cgroup_evidence,
+                firecracker_version,
+                guest_isolation,
+            ) = _run_jailer_guest(
                 jailer_binary=args.jailer,
                 firecracker_binary=args.firecracker,
                 jailer_id=jailer_id,
@@ -587,6 +611,7 @@ def main() -> int:
                 timeout_seconds=args.timeout_seconds,
             )
             samples.append(boot_time)
+            guest_isolation_samples.append(guest_isolation)
 
         report = {
             "status": "passed",
@@ -610,6 +635,11 @@ def main() -> int:
             "guest_kernel_sha256": assets["kernel_sha256"],
             "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
             "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
+            "guest_rootfs_read_only": all(
+                sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
+            ),
+            "guest_network_configured": False,
+            "guest_isolation_checks": guest_isolation_samples,
             "boot_time_samples_ms": samples,
             **summarize_boot_times(samples),
             "process_isolation": process_evidence,
