@@ -751,26 +751,48 @@ def _download_pinned_guest_assets(
     work_dir: Path,
     manifest: GuestAssetManifest,
     profile: str = "W1",
+    w2_rootfs_tar: Path | None = None,
 ) -> dict[str, object]:
     kernel_path = work_dir / "guest-vmlinux"
     squashfs_path = work_dir / "guest-rootfs.squashfs"
     rootfs_path = work_dir / "guest-rootfs.ext4"
     _download(f"{S3_BASE}/{manifest['kernel_key']}", kernel_path)
-    _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
     kernel_sha256 = _sha256(kernel_path)
-    rootfs_squashfs_sha256 = _sha256(squashfs_path)
     if kernel_sha256 != manifest["kernel_sha256"]:
         raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
-    if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
-        raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
-    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+
+    rootfs_squashfs_sha256: str | None = None
+    if profile == "W1":
+        if w2_rootfs_tar is not None:
+            raise ValueError("W1 cannot accept a W2 OCI rootfs tar")
+        _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
+        rootfs_squashfs_sha256 = _sha256(squashfs_path)
+        if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
+            raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
+        _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+    elif profile == "W2":
+        if w2_rootfs_tar is None:
+            raise ValueError("W2 requires the content-addressed OCI rootfs tar")
+        _prepare_rootfs(
+            None,
+            rootfs_path,
+            work_dir / "oci-rootfs",
+            profile,
+            w2_rootfs_tar,
+        )
+    else:
+        raise ValueError("profile must be W1 or W2")
+
     return {
         **manifest,
         "kernel_path": kernel_path,
-        "squashfs_path": squashfs_path,
+        "squashfs_path": squashfs_path if profile == "W1" else None,
         "rootfs_path": rootfs_path,
         "kernel_sha256": kernel_sha256,
         "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
+        "w2_rootfs_tar_sha256": (
+            _sha256(w2_rootfs_tar) if w2_rootfs_tar is not None else None
+        ),
         "rootfs_ext4_sha256": _sha256(rootfs_path),
     }
 
