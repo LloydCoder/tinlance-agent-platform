@@ -440,6 +440,15 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
         raise ValueError(f"unsafe rootfs archive: {error}") from error
 
 
+def w2_network_files() -> dict[str, str]:
+    """Return valid, newline-terminated guest-local network configuration."""
+    return {
+        "hosts": "127.0.0.1 localhost\n::1 localhost\n",
+        "hostname": "tinlance-w2\n",
+        "resolv.conf": "# guest network is disabled\n",
+    }
+
+
 def _prepare_rootfs(
     squashfs_path: Path | None,
     rootfs_path: Path,
@@ -455,12 +464,7 @@ def _prepare_rootfs(
         extract_w2_rootfs_tar(w2_rootfs_tar, extract_dir)
         etc_dir = extract_dir / "etc"
         etc_dir.mkdir(parents=True, exist_ok=True)
-        network_files = {
-            "hosts": "127.0.0.1 localhost\\n::1 localhost\\n",
-            "hostname": "tinlance-w2\\n",
-            "resolv.conf": "# guest network is disabled\\n",
-        }
-        for name, content in network_files.items():
+        for name, content in w2_network_files().items():
             path = etc_dir / name
             if path.is_symlink() or path.exists():
                 path.unlink()
