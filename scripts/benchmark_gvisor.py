@@ -58,9 +58,7 @@ def build_docker_command(*, image_digest: str, payload: str) -> list[str]:
 
 
 def _capture(command: list[str]) -> str:
-    result = subprocess.run(
-        command, check=True, capture_output=True, text=True, timeout=120
-    )
+    result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=120)
     return result.stdout.strip()
 
 
@@ -82,7 +80,7 @@ def run_benchmark(*, image_digest: str, runs: int = 3) -> dict[str, Any]:
         "then echo TINLANCE_NO_NIC_CONFIRMED; else "
         "echo TINLANCE_NETWORK_INTERFACE_UNEXPECTED; exit 72; fi; "
         "printf tinlance-gvisor-ok > /tmp/workload.txt; "
-        "test \"$(cat /tmp/workload.txt)\" = tinlance-gvisor-ok; "
+        'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok; '
         f"echo {_SUCCESS_MARKER}"
     )
     command = build_docker_command(image_digest=image_digest, payload=payload)
