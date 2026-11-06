@@ -169,6 +169,8 @@ jobs:
               f"rootfs SHA-256={report['guest_rootfs_ext4_sha256']}"
           )
           print(f"Guest workload: {report['guest_workload']}")
+          print(f"W2 base image={report['w2_base_image_digest']}; image ID={report['w2_image_id']}")
+          print(f"W2 rootfs tar SHA-256={report['w2_rootfs_tar_sha256']}")
           print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
           PY
 
