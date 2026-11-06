@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import tarfile
 from pathlib import Path
@@ -545,8 +546,7 @@ def test_w2_rootfs_extractor_fails_closed_on_unapplied_extended_attributes(
         member = tarfile.TarInfo("usr/bin/ping")
         member.size = 1
         member.pax_headers = {"SCHILY.xattr.security.capability": "capability-v2"}
-        archive.addfile(member, __import__("io").BytesIO(b"x"))
+        archive.addfile(member, io.BytesIO(b"x"))
 
     with pytest.raises(ValueError, match="extended metadata"):
         extract_w2_rootfs_tar(source, tmp_path / "rootfs")
-
