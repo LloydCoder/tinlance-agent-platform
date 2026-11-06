@@ -8,8 +8,21 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         ca-certificates=20260816ubuntu0.24.04.2 \
         openssl=3.0.13-0ubuntu3.16 \
         libssl3t64=3.0.13-0ubuntu3.16 \
-    && DEBIAN_FRONTEND=noninteractive apt-get --snapshot="${APT_SNAPSHOT}" update \
-    && DEBIAN_FRONTEND=noninteractive apt-get --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends git python3 nodejs npm util-linux \
+    && sed -i \
+        -e 's/^Suites: noble noble-updates noble-backports$/Suites: noble noble-updates/' \
+        -e 's/^Components: main restricted universe multiverse$/Components: main universe/' \
+        /etc/apt/sources.list.d/ubuntu.sources \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::Retries=5 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        -o APT::Update::Error-Mode=any \
+        --snapshot="${APT_SNAPSHOT}" update \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::Retries=5 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
     && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
