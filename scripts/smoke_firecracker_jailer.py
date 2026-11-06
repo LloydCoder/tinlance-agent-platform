@@ -532,7 +532,7 @@ def main() -> int:
             "cgroup_limits": cgroup_evidence,
         }
         args.output.write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\\n",
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
     return 0
