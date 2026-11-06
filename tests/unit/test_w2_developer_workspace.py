@@ -37,6 +37,8 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     assert "python3 -m unittest" in script
     assert "node --check" in script
     assert "npm test" in script
+    assert "w2-package-manifest.lock" in script
+    assert "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" in script
     assert "/opt/tinlance-fixture/run-workspace.sh" in payload
 
 
