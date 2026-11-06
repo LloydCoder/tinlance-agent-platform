@@ -15,11 +15,24 @@ import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, TypedDict, cast
 from urllib.parse import urlencode
 
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
+
+
+class GuestAssetManifest(TypedDict):
+    schema_version: int
+    architecture: str
+    source: str
+    discovered_at: str
+    artifact_prefix: str
+    kernel_key: str
+    kernel_sha256: str
+    rootfs_key: str
+    rootfs_squashfs_sha256: str
 
 
 def _xml_values(xml_text: str, element_suffix: str) -> list[str]:
@@ -332,40 +345,89 @@ def _run_guest(
         _stop_firecracker(socket_path)
 
 
-def _discover_guest_assets(work_dir: Path, architecture: str) -> dict[str, object]:
+def load_asset_manifest(path: Path, architecture: str) -> GuestAssetManifest:
+    data: Any = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or data.get("schema_version") != 1:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    manifest = cast(GuestAssetManifest, data)
+    if manifest.get("architecture") != architecture:
+        raise ValueError("guest asset manifest architecture does not match the runner")
+    artifact_prefix = manifest.get("artifact_prefix", "")
+    expected_prefix = f"{artifact_prefix}{architecture}/"
+    if not re.fullmatch(r"firecracker-ci/\\d{8}-[^/]+/", artifact_prefix):
+        raise ValueError("guest asset manifest has an invalid upstream artifact prefix")
+    for key_name, pattern in (
+        ("kernel_key", r"vmlinux-\\d+\\.\\d+\\.\\d+$"),
+        ("rootfs_key", r"ubuntu-\\d+\\.\\d+\\.squashfs$"),
+    ):
+        key = manifest.get(key_name, "")
+        if not isinstance(key, str) or not key.startswith(expected_prefix):
+            raise ValueError(f"guest asset manifest {key_name} is outside its artifact prefix")
+        if not re.search(pattern, key):
+            raise ValueError(f"guest asset manifest {key_name} has an invalid filename")
+    for hash_name in ("kernel_sha256", "rootfs_squashfs_sha256"):
+        digest = manifest.get(hash_name, "")
+        if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+            raise ValueError(f"guest asset manifest {hash_name} is invalid")
+    return manifest
+
+
+def _discover_asset_manifest(work_dir: Path, architecture: str) -> GuestAssetManifest:
     prefix_listing = _s3_listing("firecracker-ci/", delimiter="/")
     artifact_prefix = parse_latest_artifact_prefix(prefix_listing)
     architecture_prefix = f"{artifact_prefix}{architecture}/"
-
     kernel_listing = _s3_listing(f"{architecture_prefix}vmlinux-")
     kernel_key = select_latest_versioned_key(
         kernel_listing,
         architecture_prefix,
-        r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
+        r"vmlinux-(\\d+)\\.(\\d+)\\.(\\d+)$",
     )
     rootfs_listing = _s3_listing(f"{architecture_prefix}ubuntu-")
     rootfs_key = select_latest_versioned_key(
         rootfs_listing,
         architecture_prefix,
-        r"ubuntu-(\d+)\.(\d+)\.squashfs$",
+        r"ubuntu-(\\d+)\\.(\\d+)\\.squashfs$",
     )
+    kernel_path = work_dir / "guest-vmlinux"
+    squashfs_path = work_dir / "guest-rootfs.squashfs"
+    _download(f"{S3_BASE}/{kernel_key}", kernel_path)
+    _download(f"{S3_BASE}/{rootfs_key}", squashfs_path)
+    return {
+        "schema_version": 1,
+        "architecture": architecture,
+        "source": f"{S3_BASE}/",
+        "discovered_at": datetime.now(UTC).date().isoformat(),
+        "artifact_prefix": artifact_prefix,
+        "kernel_key": kernel_key,
+        "kernel_sha256": _sha256(kernel_path),
+        "rootfs_key": rootfs_key,
+        "rootfs_squashfs_sha256": _sha256(squashfs_path),
+    }
 
+
+def _download_pinned_guest_assets(
+    work_dir: Path,
+    manifest: GuestAssetManifest,
+) -> dict[str, object]:
     kernel_path = work_dir / "guest-vmlinux"
     squashfs_path = work_dir / "guest-rootfs.squashfs"
     rootfs_path = work_dir / "guest-rootfs.ext4"
-    _download(f"{S3_BASE}/{kernel_key}", kernel_path)
-    _download(f"{S3_BASE}/{rootfs_key}", squashfs_path)
+    _download(f"{S3_BASE}/{manifest['kernel_key']}", kernel_path)
+    _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
+    kernel_sha256 = _sha256(kernel_path)
+    rootfs_squashfs_sha256 = _sha256(squashfs_path)
+    if kernel_sha256 != manifest["kernel_sha256"]:
+        raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
+    if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
+        raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
     _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root")
-
     return {
-        "artifact_prefix": artifact_prefix,
-        "kernel_key": kernel_key,
-        "rootfs_key": rootfs_key,
+        **manifest,
         "kernel_path": kernel_path,
         "squashfs_path": squashfs_path,
         "rootfs_path": rootfs_path,
-        "kernel_sha256": _sha256(kernel_path),
-        "rootfs_squashfs_sha256": _sha256(squashfs_path),
+        "kernel_sha256": kernel_sha256,
+        "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
         "rootfs_ext4_sha256": _sha256(rootfs_path),
     }
 
@@ -374,19 +436,41 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Boot a network-disconnected Firecracker guest on an ephemeral KVM runner."
     )
-    parser.add_argument("--firecracker", required=True, type=Path)
+    parser.add_argument("--firecracker", type=Path)
+    parser.add_argument("--firecracker-archive", type=Path)
+    parser.add_argument(
+        "--assets-manifest",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "tests/fixtures/firecracker-guest-assets.json",
+    )
+    parser.add_argument("--discover-latest", action="store_true")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--timeout-seconds", type=float, default=45)
     args = parser.parse_args()
 
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.discover_latest:
+        with tempfile.TemporaryDirectory(prefix="fc-asset-discovery-", dir="/tmp") as temporary:
+            manifest = _discover_asset_manifest(Path(temporary), platform.machine())
+            args.output.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\\n",
+                encoding="utf-8",
+            )
+        return 0
+
     if args.runs < 1:
         parser.error("--runs must be at least 1")
-    if not args.firecracker.is_file():
-        parser.error(f"Firecracker binary does not exist: {args.firecracker}")
+    if args.firecracker is None or not args.firecracker.is_file():
+        parser.error("--firecracker must point to the verified Firecracker binary")
+    if args.firecracker_archive is None or not args.firecracker_archive.is_file():
+        parser.error("--firecracker-archive must point to the downloaded release archive")
+    archive_sha256 = _sha256(args.firecracker_archive)
+    if archive_sha256 != FIRECRACKER_ARCHIVE_SHA256:
+        raise ValueError("Firecracker release archive SHA-256 does not match the pinned release")
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+    manifest = load_asset_manifest(args.assets_manifest, platform.machine())
     log_dir = args.log_dir or args.output.parent / "firecracker-guest-boot-logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -395,12 +479,11 @@ def main() -> int:
         firecracker_binary = work_dir / "firecracker"
         shutil.copy2(args.firecracker, firecracker_binary)
         firecracker_binary.chmod(0o755)
-
-        assets = _discover_guest_assets(work_dir, platform.machine())
+        assets = _download_pinned_guest_assets(work_dir, manifest)
         kernel_path = assets["kernel_path"]
         rootfs_path = assets["rootfs_path"]
         if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
-            raise RuntimeError("guest asset discovery returned invalid paths")
+            raise RuntimeError("pinned guest asset loader returned invalid paths")
 
         samples: list[float] = []
         firecracker_version: dict[str, str] = {}
@@ -426,8 +509,13 @@ def main() -> int:
             "guest_network_configured": False,
             "guest_rootfs_read_only": True,
             "guest_ready_marker": GUEST_READY_MARKER,
+            "boot_time_measurement": (
+                "elapsed time from immediately before the InstanceStart API request "
+                "until the guest init marker appears on the serial console"
+            ),
             "firecracker_version": firecracker_version.get("firecracker_version"),
-            "firecracker_archive_sha256": FIRECRACKER_ARCHIVE_SHA256,
+            "firecracker_archive_sha256": archive_sha256,
+            "guest_asset_manifest_sha256": _sha256(args.assets_manifest),
             "guest_architecture": platform.machine(),
             "host_kernel_release": platform.release(),
             "upstream_ci_artifact_prefix": assets["artifact_prefix"],
@@ -441,7 +529,7 @@ def main() -> int:
             "captured_at": datetime.now(UTC).isoformat(),
         }
         args.output.write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            json.dumps(report, indent=2, sort_keys=True) + "\\n",
             encoding="utf-8",
         )
     return 0
