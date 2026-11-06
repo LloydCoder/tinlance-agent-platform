@@ -8,6 +8,7 @@ on:
       - "scripts/__init__.py"
       - "scripts/probe_persistent_computer_host.py"
       - "scripts/smoke_firecracker_guest_boot.py"
+      - "tests/fixtures/firecracker-guest-assets.json"
       - "tests/unit/test_firecracker_guest_boot.py"
       - "pyproject.toml"
   workflow_dispatch:
@@ -80,6 +81,7 @@ jobs:
           firecracker_bin="$(find /tmp/firecracker-release -type f -name "firecracker-v${version}-${arch}" -print -quit)"
           test -n "${firecracker_bin}"
           echo "FIRECRACKER_BIN=${firecracker_bin}" >> "${GITHUB_ENV}"
+          echo "FIRECRACKER_ARCHIVE=${archive}" >> "${GITHUB_ENV}"
 
       - name: Install guest image tooling
         run: |
@@ -92,6 +94,8 @@ jobs:
         run: |
           python scripts/smoke_firecracker_guest_boot.py \
             --firecracker "${FIRECRACKER_BIN}" \
+            --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
+            --assets-manifest tests/fixtures/firecracker-guest-assets.json \
             --runs 3 \
             --timeout-seconds 45 \
             --output artifacts/firecracker-guest-boot.json \
