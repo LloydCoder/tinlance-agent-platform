@@ -132,14 +132,37 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def guest_init_script() -> str:
+    """Return a fail-closed guest init that proves read-only rootfs and no NIC."""
+    return """#!/bin/sh
+set -eu
+mount -t proc proc /proc 2>/dev/null || true
+mkdir -p /sys
+mount -t sysfs sysfs /sys
+if touch /etc/tinlance-write-probe 2>/dev/null; then
+    echo TINLANCE_ROOTFS_WRITE_UNEXPECTED
+    rm -f /etc/tinlance-write-probe
+    exit 71
+fi
+echo TINLANCE_ROOTFS_READ_ONLY_CONFIRMED
+for iface_path in /sys/class/net/*; do
+    [ -e "$iface_path" ] || continue
+    iface=${iface_path##*/}
+    if [ "$iface" != "lo" ]; then
+        echo TINLANCE_NETWORK_INTERFACE_UNEXPECTED
+        exit 72
+    fi
+done
+echo TINLANCE_NO_NIC_CONFIRMED
+echo TINLANCE_GUEST_READY
+exec /usr/bin/sleep 60
+"""
+
 def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -> None:
     _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
     init_path.parent.mkdir(parents=True, exist_ok=True)
-    init_path.write_text(
-        "#!/bin/sh\necho TINLANCE_GUEST_READY\nexec /usr/bin/sleep 60\n",
-        encoding="utf-8",
-    )
+    init_path.write_text(guest_init_script(), encoding="utf-8")
     init_path.chmod(0o755)
     dev_dir = extract_dir / "dev"
     dev_dir.mkdir(parents=True, exist_ok=True)
