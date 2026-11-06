@@ -11,9 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-_IMAGE_DIGEST = re.compile(
-    r"^(?:[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}|sha256:[a-f0-9]{64})$"
-)
+_IMAGE_DIGEST = re.compile(r"^(?:[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}|sha256:[a-f0-9]{64})$")
 _RUNTIME_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _SUCCESS_MARKER = "TINLANCE_GVISOR_WORKLOAD_OK"
 _NONROOT_MARKER = "TINLANCE_NONROOT_UID_CONFIRMED"
