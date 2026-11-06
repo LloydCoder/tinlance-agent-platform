@@ -238,6 +238,7 @@ def test_guest_boot_marker_verifier_rejects_missing_isolation_evidence() -> None
     with pytest.raises(ValueError, match="markers are missing"):
         verify_guest_boot_markers("TINLANCE_GUEST_READY")
 
+
 def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
