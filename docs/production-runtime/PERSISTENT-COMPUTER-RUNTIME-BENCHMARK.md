@@ -33,6 +33,24 @@ Kata's smoke job also observed host kernel `7.0.0-1017-azure` and guest kernel `
 
 The Firecracker jailer integration was separately exercised on an ephemeral KVM runner. The merged PR #176 run 42183744126 completed three jailed guest boots; the reported median was 1,075.5 ms and maximum 1,076.6 ms. The report includes host-observed process/cgroup evidence and guest isolation marker checks. This is a short smoke sample, not a statistically meaningful latency comparison.
 
+## Aligned non-root W1 comparison — 2026-11-06
+
+The first comparison used different workload identities. The following rerun closes that comparability gap for the W1 profile: all three candidates now execute the workload as UID/GID 65532, with a read-only root filesystem, no non-loopback network interface, and a bounded 64 MiB writable tmpfs owned by that identity. The same workload success contract is required before a sample is accepted.
+
+| Candidate | Runtime / version | Samples | p50 | p95 | p99 | Evidence |
+|---|---|---:|---:|---:|---:|---|
+| Firecracker | 1.17.0 direct VMM | 30 | 1,064.4 ms | 1,072.1 ms | 1,081.0 ms | [workflow 42199684589](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42199684589), artifact SHA-256 `70ddce855951cb850bee0fb1efad8142e0819ddaf455266caec38c896f3a7915` |
+| gVisor | runsc release-20261102.0 | 30 | 143.3 ms | 196.2 ms | 286.9 ms | [workflow 42190204241](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42190204241), artifact SHA-256 `6dc469b9ed5b3ee1aae89deb93b81b2898ae96f9295f9d1a7e4562d10585b455` |
+| Kata | 4.3.1 runtime-rs + QEMU | 30 | 7,164.0 ms | 7,227.3 ms | 7,246.7 ms | [workflow 42190204278](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42190204278), artifact SHA-256 `9e3b08dc91ae49c54e074961b3c6ed02a9ba0d4efc3c5f9cda038f92209cf2e6` |
+
+**Guest assertions:** all 30 samples per candidate reported non-root UID 65532, read-only rootfs, only loopback networking, successful write/read in the owned tmpfs, and the W1 success marker. Firecracker's machine-readable report records the exact kernel/rootfs manifest digest; gVisor and Kata used the same immutable OCI image digest recorded above.
+
+**Firecracker host-confinement evidence:** the separate jailer smoke [workflow 42199684509](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42199684509) completed 3/3 jailed boots. It observed UID 999/GID 987, zero effective capabilities, `NoNewPrivs=1`, seccomp mode 2 on all observed threads, isolated PID/mount namespaces, and live cgroup v2 limits (`cpu.max=100000 100000`, `memory.max=805306368`, `pids.max=128`). The jailer identity and chroot were removed by workflow cleanup.
+
+**Security follow-up:** CodeQL initially identified a clear-text-storage dataflow at the guest account-file rewrite. The implementation was changed to append only the fixed `x`-placeholder account/group records instead of rewriting existing `/etc/passwd` entries. The final SARIF for the reviewed head contained zero results; CI, R10, CodeQL, Secret Scan, Reference Agents, TSIC conformance, guest boot and jailer smoke all passed before PR #180 was merged as `bc3543d4edfa22fa649eba027f0adc34fe8a98b6`.
+
+**Interpretation:** this is a materially stronger, aligned W1 feasibility comparison, but it is still not a controlled head-to-head performance study. Candidates ran on separate ephemeral runners; Firecracker's guest-kernel boundary and measurement path differ from OCI runtime launch. The results establish repeatable W1 execution and provide an initial startup-cost signal only. They do not establish hostile-tenant isolation, escape resistance, side-channel resistance, egress/metadata policy, snapshot/restore correctness, workload compatibility beyond W1, density, or production economics.
+
 ## Interpretation and limitations
 
 These measurements must **not** be presented as a controlled head-to-head performance benchmark:
