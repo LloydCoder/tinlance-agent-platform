@@ -395,7 +395,13 @@ def _run_jailer_guest(
     rootfs_path: Path,
     log_path: Path,
     timeout_seconds: float,
-) -> tuple[float, dict[str, int | bool | str | list[int]], dict[str, str], dict[str, str], dict[str, bool]]:
+) -> tuple[
+    float,
+    dict[str, int | bool | str | list[int]],
+    dict[str, str],
+    dict[str, str],
+    dict[str, bool],
+]:
     command = build_jailer_command(
         jailer_binary=str(jailer_binary),
         firecracker_binary=str(firecracker_binary),
