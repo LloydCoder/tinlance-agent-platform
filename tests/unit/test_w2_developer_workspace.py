@@ -45,10 +45,7 @@ def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None
         payload=build_w2_developer_workspace_payload(),
         workspace=True,
     )
-    workspace_mount = (
-        "/workspace:rw,noexec,nosuid,nodev,size=128m,"
-        "uid=65532,gid=65532,mode=0700"
-    )
+    workspace_mount = "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700"
     assert workspace_mount not in w1
     assert workspace_mount in w2
     assert "--network=none" in w2
