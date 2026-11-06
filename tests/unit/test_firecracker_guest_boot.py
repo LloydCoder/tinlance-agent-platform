@@ -138,10 +138,7 @@ def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
     assert 'if [ "$iface" != "lo" ]' in script
     assert "TINLANCE_NETWORK_INTERFACE_UNEXPECTED" in script
     assert "TINLANCE_NO_NIC_CONFIRMED" in script
-    assert (
-        script.index("TINLANCE_NO_NIC_CONFIRMED")
-        < script.index("TINLANCE_NONROOT_UID_CONFIRMED")
-    )
+    assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
 
 
 def test_guest_init_executes_nonroot_w1_workload_in_owned_tmpfs_before_ready() -> None:
@@ -149,13 +146,19 @@ def test_guest_init_executes_nonroot_w1_workload_in_owned_tmpfs_before_ready() -
 
     script = guest_init_script()
     assert "setpriv --reuid=65532 --regid=65532 --clear-groups" in script
-    assert "test \"$(id -u)\" = 65532" in script
+    assert 'test "$(id -u)" = 65532' in script
     assert "TINLANCE_NONROOT_UID_CONFIRMED" in script
     assert "mode=0700,uid=65532,gid=65532" in script
     assert "printf tinlance-gvisor-ok > /tmp/workload.txt" in script
     assert 'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok' in script
-    assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_NONROOT_UID_CONFIRMED")
-    assert script.index("TINLANCE_NONROOT_UID_CONFIRMED") < script.index("TINLANCE_W1_WORKLOAD_OK")
+    assert (
+        script.index("TINLANCE_NO_NIC_CONFIRMED")
+        < script.index("TINLANCE_NONROOT_UID_CONFIRMED")
+    )
+    assert (
+        script.index("TINLANCE_NONROOT_UID_CONFIRMED")
+        < script.index("TINLANCE_W1_WORKLOAD_OK")
+    )
     assert script.index("TINLANCE_W1_WORKLOAD_OK") < script.index("TINLANCE_GUEST_READY")
 
 
@@ -164,8 +167,11 @@ def test_ensure_w1_user_adds_deterministic_passwd_group_and_home(tmp_path: Path)
 
     rootfs = tmp_path / "rootfs"
     (rootfs / "etc").mkdir(parents=True)
-    (rootfs / "etc" / "group").write_text("root:x:0:\n", encoding="utf-8")
-    (rootfs / "etc" / "group").write_text("root:x:0:\n", encoding="utf-8")
+    (rootfs / "etc" / "passwd").write_text(
+        "root:x:0:0:root:/root:/bin/sh\\n",
+        encoding="utf-8",
+    )
+    (rootfs / "etc" / "group").write_text("root:x:0:\\n", encoding="utf-8")
 
     ensure_w1_user(rootfs)
     ensure_w1_user(rootfs)
@@ -184,7 +190,7 @@ def test_ensure_w1_user_rejects_uid_collision(tmp_path: Path) -> None:
     rootfs = tmp_path / "rootfs"
     (rootfs / "etc").mkdir(parents=True)
     (rootfs / "etc" / "passwd").write_text(
-        "other:x:65532:65532:Other:/home/other:/bin/sh\n",
+        "other:x:65532:65532:Other:/home/other:/bin/sh\\n",
         encoding="utf-8",
     )
 
@@ -204,8 +210,8 @@ def test_guest_boot_marker_verifier_accepts_isolated_nonroot_w1_evidence() -> No
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
     evidence = verify_guest_boot_markers(
-        "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\n"
-        "TINLANCE_NONROOT_UID_CONFIRMED\nTINLANCE_W1_WORKLOAD_OK\nTINLANCE_GUEST_READY"
+        "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\n"
+        "TINLANCE_NONROOT_UID_CONFIRMED\\nTINLANCE_W1_WORKLOAD_OK\\nTINLANCE_GUEST_READY"
     )
     assert evidence == {
         "rootfs_read_only_confirmed": True,
@@ -241,6 +247,7 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
 
     with pytest.raises(ValueError, match="nonroot_uid_confirmed"):
         verify_guest_boot_markers(
-            "TINLANCE_NO_NIC_CONFIRMED\n"
+            "TINLANCE_NO_NIC_CONFIRMED\\n"
             "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
         )
+
