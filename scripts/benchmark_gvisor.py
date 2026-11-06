@@ -40,6 +40,7 @@ def build_w2_payload() -> str:
     """Add fail-closed privilege and host-surface probes to the W1 contract."""
     return (
         build_w1_payload()
+        + "; "
         + "command -v setpriv >/dev/null 2>&1; "
         + "command -v mount >/dev/null 2>&1; "
         + "awk '/^CapEff:/ { if ($2 != \"0000000000000000\") exit 1; found=1 } END { exit !found }' /proc/self/status; "
