@@ -29,7 +29,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
     ):
         assert marker in script or marker in payload
-    assert "git clone" in script
+    assert " clone --no-hardlinks " in script
     assert "python3 -m compileall" in script
     assert "python3 -m unittest" in script
     assert "node --check" in script
