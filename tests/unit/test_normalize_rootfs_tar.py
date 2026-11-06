@@ -148,6 +148,7 @@ def test_normalizer_preserves_semantic_pax_xattrs_and_strips_volatile_metadata(
         normalized = archive.getmember("usr/bin/ping")
         assert normalized.pax_headers["SCHILY.xattr.security.capability"] == "\\x01\\x00\\x00\\x02"
         assert normalized.pax_headers["SCHILY.acl.access"] == "user::rwx,group::r-x,other::r-x"
+        assert list(normalized.pax_headers) == sorted(normalized.pax_headers)
         assert not {"mtime", "atime", "ctime"} & normalized.pax_headers.keys()
         assert normalized.mtime == SOURCE_DATE_EPOCH
 
