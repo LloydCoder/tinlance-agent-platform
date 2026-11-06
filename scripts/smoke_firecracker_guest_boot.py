@@ -161,11 +161,14 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
 
     for line in passwd_lines:
         fields = line.split(":")
-        if len(fields) >= 7 and (
-            fields[0] == "tinlance" or fields[2] == "65532"
+        if (
+            len(fields) >= 7
+            and (fields[0] == "tinlance" or fields[2] == "65532")
+            and (fields[0] != "tinlance" or fields[2] != "65532")
         ):
-            if fields[0] != "tinlance" or fields[2] != "65532":
-                raise ValueError(
+            raise ValueError(
+                "UID 65532 is already assigned to a different guest account"
+            )
                     "UID 65532 is already assigned to a different guest account"
                 )
     if not any(line.startswith("tinlance:") for line in passwd_lines):
@@ -176,11 +179,14 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
 
     for line in group_lines:
         fields = line.split(":")
-        if len(fields) >= 3 and (
-            fields[0] == "tinlance" or fields[2] == "65532"
+        if (
+            len(fields) >= 3
+            and (fields[0] == "tinlance" or fields[2] == "65532")
+            and (fields[0] != "tinlance" or fields[2] != "65532")
         ):
-            if fields[0] != "tinlance" or fields[2] != "65532":
-                raise ValueError(
+            raise ValueError(
+                "GID 65532 is already assigned to a different guest group"
+            )
                     "GID 65532 is already assigned to a different guest group"
                 )
     if not any(line.startswith("tinlance:") for line in group_lines):
