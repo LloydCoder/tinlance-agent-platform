@@ -122,7 +122,8 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
                                 outgoing.addfile(member, content)
                         else:
                             outgoing.addfile(member)
-                with temporary_path.open("rb") as normalized_file:\n                    digest = hashlib.file_digest(normalized_file, "sha256").hexdigest()
+                with temporary_path.open("rb") as normalized_file:
+                    digest = hashlib.file_digest(normalized_file, "sha256").hexdigest()
                 os.replace(temporary_path, output)
             finally:
                 temporary_path.unlink(missing_ok=True)
