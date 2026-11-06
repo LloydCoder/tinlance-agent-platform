@@ -19,9 +19,7 @@ from urllib.parse import urlencode
 
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
-FIRECRACKER_ARCHIVE_SHA256 = (
-    "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
-)
+FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 
 
 def _xml_values(xml_text: str, element_suffix: str) -> list[str]:
@@ -217,9 +215,10 @@ def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float =
     while time.monotonic() < deadline:
         if socket_path.exists():
             return
-        if log_path.exists() and "error" in log_path.read_text(
-            encoding="utf-8", errors="replace"
-        ).lower():
+        if (
+            log_path.exists()
+            and "error" in log_path.read_text(encoding="utf-8", errors="replace").lower()
+        ):
             break
         time.sleep(0.1)
     log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
