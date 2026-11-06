@@ -286,7 +286,7 @@ exec /usr/bin/sleep 60
     command -v npm >/dev/null 2>&1
     test -x /opt/tinlance-fixture/run-workspace.sh
     if /opt/tinlance-fixture/run-workspace.sh; then
-        :
+        echo TINLANCE_W2_DEVELOPER_WORKSPACE_OK
     else
         echo TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED
         exit 83
