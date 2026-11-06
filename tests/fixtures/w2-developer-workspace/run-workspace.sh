@@ -19,7 +19,7 @@ source.write_text(source_text.replace("Tinlance Agent Workspace", "Tinlance W2 D
 tests.write_text(test_text.replace("Tinlance Agent Workspace", "Tinlance W2 Developer Workspace"), encoding="utf-8")
 PY
 echo TINLANCE_W2_PYTHON_EDIT_OK
-python3 -m unittest discover -s "$workspace/python/tests" -v
+PYTHONPATH="$workspace/python" python3 -m unittest discover -s "$workspace/python/tests" -v
 echo TINLANCE_W2_PYTHON_TESTS_OK
 
 python3 - "$workspace" <<'PY'
