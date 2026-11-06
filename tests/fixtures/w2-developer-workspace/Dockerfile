@@ -30,7 +30,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get \
         --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
         git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
