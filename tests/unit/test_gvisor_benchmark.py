@@ -98,3 +98,25 @@ def test_docker_command_rejects_nul_payload() -> None:
             image_digest="ubuntu@sha256:" + "a" * 64,
             payload="unsafe\x00payload",
         )
+
+
+def test_docker_command_runs_as_unprivileged_identity_with_owned_tmpfs() -> None:
+    command = build_docker_command(
+        image_digest="ubuntu@sha256:" + "a" * 64,
+        payload="printf tinlance-w1-ok",
+    )
+    assert "--user=65532:65532" in command
+    assert "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700" in command
+
+
+def test_w1_payload_verifies_nonroot_readonly_rootfs_and_isolated_network() -> None:
+    from scripts.benchmark_gvisor import build_w1_payload
+
+    payload = build_w1_payload()
+    assert 'test "$(id -u)" = 65532' in payload
+    assert "TINLANCE_NONROOT_UID_CONFIRMED" in payload
+    assert "/proc/mounts" in payload
+    assert "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED" in payload
+    assert "/proc/net/dev" in payload
+    assert "TINLANCE_NO_NIC_CONFIRMED" in payload
+    assert "/tmp/workload.txt" in payload
