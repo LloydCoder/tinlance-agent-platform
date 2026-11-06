@@ -47,15 +47,15 @@ def test_normalizer_produces_identical_rootfs_for_order_owner_and_timestamp_vari
     first_entries = [
         ("directory", "etc", b""),
         ("directory", "usr/bin", b""),
-        ("file", "etc/issue", b"Ubuntu 24.04"),\n        ("file", ".hidden", b"keep leading dot"),
+        ("file", "etc/issue", b"Ubuntu 24.04"),
+        ("file", ".hidden", b"keep leading dot"),
         ("file", "usr/bin/tool", b"#!/bin/sh\necho stable\n"),
         ("symlink", "usr/local-tool", "/usr/bin/tool"),
         ("file", "etc/machine-id", b"machine-one"),
         ("file", "var/log/dpkg.log", b"built at 10:00"),
     ]
-    second_entries = list(reversed(first_entries))
     _write_archive(first, first_entries)
-    _write_archive(second, second_entries)
+    _write_archive(second, list(reversed(first_entries)))
 
     normalized_first = tmp_path / "first.normalized.tar"
     normalized_second = tmp_path / "second.normalized.tar"
@@ -71,8 +71,9 @@ def test_normalizer_produces_identical_rootfs_for_order_owner_and_timestamp_vari
         assert [member.name for member in members] == sorted(member.name for member in members)
         assert all(member.uid == 0 and member.gid == 0 for member in members)
         assert all(member.mtime == SOURCE_DATE_EPOCH for member in members)
-        assert "etc/machine-id" not in archive.getnames()\n        assert ".hidden" in archive.getnames()
+        assert "etc/machine-id" not in archive.getnames()
         assert "var/log/dpkg.log" not in archive.getnames()
+        assert ".hidden" in archive.getnames()
         assert archive.extractfile("etc/issue").read() == b"Ubuntu 24.04"
         assert archive.getmember("usr/local-tool").linkname == "/usr/bin/tool"
 
@@ -100,4 +101,4 @@ def test_normalizer_rejects_special_files(tmp_path: Path) -> None:
     _write_archive(source, [("fifo", "var/run/host-control", b"")])
 
     with pytest.raises(ValueError, match="unsupported special file"):
-        normalize_rootfs_tar(source, tmp_path / "normalized.tar")\n
+        normalize_rootfs_tar(source, tmp_path / "normalized.tar")
