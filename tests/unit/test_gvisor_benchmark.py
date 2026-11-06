@@ -90,3 +90,11 @@ def test_docker_command_rejects_unsafe_runtime_name() -> None:
             payload="true",
             runtime_name="../../runsc",
         )
+
+
+def test_docker_command_rejects_nul_payload() -> None:
+    with pytest.raises(ValueError, match="payload"):
+        build_docker_command(
+            image_digest="ubuntu@sha256:" + "a" * 64,
+            payload="unsafe\x00payload",
+        )
