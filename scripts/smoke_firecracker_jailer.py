@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import signal
 import subprocess
 import tempfile
@@ -170,6 +169,25 @@ def _wait_for_path(path: Path, process: subprocess.Popen[str], log_path: Path, t
     raise RuntimeError(f"jailer did not create the Firecracker API socket: {log[-5000:]}")
 
 
+def _find_firecracker_pid(jailer_id: str, timeout_seconds: float = 10) -> int:
+    deadline = time.monotonic() + timeout_seconds
+    expected_id = f"--id={jailer_id}".encode()
+    while time.monotonic() < deadline:
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdecimal():
+                continue
+            try:
+                command_line = (entry / "cmdline").read_bytes().split(b"\\x00")
+            except (FileNotFoundError, PermissionError, ProcessLookupError):
+                continue
+            if expected_id in command_line and Path(entry / "comm").read_text(
+                encoding="utf-8"
+            ).strip() == "firecracker":
+                return int(entry.name)
+        time.sleep(0.1)
+    raise RuntimeError("jailed Firecracker process could not be located in /proc")
+
+
 def _read_process_evidence(pid: int, uid: int, gid: int) -> dict[str, int | bool | str]:
     proc = Path("/proc") / str(pid)
     return verify_jailer_process_evidence(
@@ -272,7 +290,8 @@ def _run_jailer_guest(
                 start_new_session=True,
             )
             _wait_for_path(socket_path, process, log_path, timeout_seconds)
-            process_evidence = _read_process_evidence(process.pid, uid, gid)
+            firecracker_pid = _find_firecracker_pid(jailer_id)
+            process_evidence = _read_process_evidence(firecracker_pid, uid, gid)
             cgroup_evidence = _verify_cgroup_limits(str(process_evidence["cgroup_path"]))
             guest_kernel, guest_rootfs = _stage_guest_assets(
                 chroot_root,
@@ -299,7 +318,7 @@ def _run_jailer_guest(
                     "kernel_image_path": guest_kernel,
                     "boot_args": (
                         "console=ttyS0 reboot=k panic=1 "
-                        f"root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
+                        "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
                     ),
                 },
             )
