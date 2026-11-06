@@ -7,7 +7,6 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 BinaryLookup = Callable[[str], str | None]
 AccessCheck = Callable[[str | os.PathLike[str], int], bool]
 
