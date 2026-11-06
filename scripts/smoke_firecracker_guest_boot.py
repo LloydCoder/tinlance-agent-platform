@@ -78,11 +78,17 @@ def summarize_boot_times(samples: Sequence[float]) -> dict[str, int | float]:
     values = sorted(float(sample) for sample in samples)
     if not values:
         raise ValueError("at least one boot-time sample is required")
-    return {
+    summary: dict[str, int | float] = {
         "sample_count": len(values),
         "median_boot_time_ms": statistics.median(values),
         "max_boot_time_ms": max(values),
     }
+    if len(values) >= 30:
+        p95_rank = (95 * len(values) + 99) // 100
+        p99_rank = (99 * len(values) + 99) // 100
+        summary["p95_boot_time_ms"] = values[p95_rank - 1]
+        summary["p99_boot_time_ms"] = values[p99_rank - 1]
+    return summary
 
 
 def _run(
