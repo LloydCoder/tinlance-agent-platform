@@ -164,8 +164,8 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
         ):
             raise ValueError("UID 65532 is already assigned to a different guest account")
     if not any(line.startswith("tinlance:") for line in passwd_lines):
-        passwd_lines.append("tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin")
-        passwd_path.write_text("\n".join(passwd_lines) + "\n", encoding="utf-8")
+        with passwd_path.open("a", encoding="utf-8") as passwd_file:
+            passwd_file.write("tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin\n")
 
     for line in group_lines:
         fields = line.split(":")
@@ -176,8 +176,8 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
         ):
             raise ValueError("GID 65532 is already assigned to a different guest group")
     if not any(line.startswith("tinlance:") for line in group_lines):
-        group_lines.append("tinlance:x:65532:")
-        group_path.write_text("\n".join(group_lines) + "\n", encoding="utf-8")
+        with group_path.open("a", encoding="utf-8") as group_file:
+            group_file.write("tinlance:x:65532:\n")
 
     home_dir = rootfs_dir / "home" / "tinlance"
     home_dir.mkdir(parents=True, exist_ok=True)
