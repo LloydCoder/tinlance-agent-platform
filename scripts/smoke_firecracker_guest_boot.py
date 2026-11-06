@@ -261,7 +261,13 @@ exec /usr/bin/sleep 60
     done
     echo TINLANCE_W2_HOST_DEVICES_ABSENT
     echo TINLANCE_W2_DEVICE_PROBE_COMPLETED
-    for host_socket in \\\n        /run/docker.sock \\\n        /var/run/docker.sock \\\n        /run/containerd/containerd.sock \\\n        /run/podman/podman.sock \\\n        /run/crio/crio.sock \\\n        /run/buildkit/buildkitd.sock; do
+    for host_socket in \
+        /run/docker.sock \
+        /var/run/docker.sock \
+        /run/containerd/containerd.sock \
+        /run/podman/podman.sock \
+        /run/crio/crio.sock \
+        /run/buildkit/buildkitd.sock; do
         if [ -S "$host_socket" ]; then
             echo "TINLANCE_W2_HOST_SOCKET_UNEXPECTED=$host_socket"
             exit 85
