@@ -142,9 +142,7 @@ def test_microvm_readiness_requires_cpu_memory_and_process_cgroup_controllers(
     tmp_path: Path,
 ) -> None:
     write_probe_fixture(tmp_path, kvm=True)
-    (tmp_path / "sys/fs/cgroup/cgroup.controllers").write_text(
-        "memory io\\n", encoding="utf-8"
-    )
+    (tmp_path / "sys/fs/cgroup/cgroup.controllers").write_text("memory io\\n", encoding="utf-8")
     result = probe_host_capabilities(
         root=tmp_path,
         architecture="x86_64",
