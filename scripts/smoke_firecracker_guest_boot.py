@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import re
 import shutil
@@ -153,19 +154,31 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
                 ]
             )
     _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
-    _run(["truncate", "-s", "1G", str(rootfs_path)])
-    _run(
-        [
-            "sudo",
-            "-n",
-            "mkfs.ext4",
-            "-F",
-            "-d",
-            str(extract_dir),
-            str(rootfs_path),
-        ]
-    )
-    _run(["sudo", "-n", "e2fsck", "-fn", str(rootfs_path)])
+    try:
+        _run(["truncate", "-s", "1G", str(rootfs_path)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "mkfs.ext4",
+                "-F",
+                "-d",
+                str(extract_dir),
+                str(rootfs_path),
+            ]
+        )
+        _run(["sudo", "-n", "e2fsck", "-fn", str(rootfs_path)])
+    finally:
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "-R",
+                f"{os.getuid()}:{os.getgid()}",
+                str(extract_dir),
+            ]
+        )
 
 
 def _api_request(
