@@ -158,8 +158,8 @@ jobs:
           if report.get("w2_rootfs_tar_sha256") is None:
               raise SystemExit("W2 rootfs export digest is missing from guest evidence.")
           markers = report.get("guest_isolation_checks", [])
-          if len(markers) != 3 or any(not item.get("developer_workspace_passed") for item in markers):
-              raise SystemExit("All three guest boots must prove developer-workspace completion.")
+          if len(markers) != 30 or any(not item.get("developer_workspace_passed") for item in markers):
+              raise SystemExit("All 30 guest boots must prove developer-workspace completion.")
           summary = (
               f"Firecracker {report['firecracker_version']}: "
               f"{report['sample_count']} guest boots; "
