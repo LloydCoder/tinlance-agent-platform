@@ -117,6 +117,8 @@ jobs:
               f"Firecracker {report['firecracker_version']}: "
               f"{report['sample_count']} guest boots; "
               f"median={report['median_boot_time_ms']:.1f} ms; "
+              f"p95={report['p95_boot_time_ms']:.1f} ms; "
+              f"p99={report['p99_boot_time_ms']:.1f} ms; "
               f"max={report['max_boot_time_ms']:.1f} ms"
           )
           print(
