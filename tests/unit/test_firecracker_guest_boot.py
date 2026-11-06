@@ -201,7 +201,8 @@ def test_guest_boot_marker_verifier_accepts_read_only_no_nic_evidence() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
     evidence = verify_guest_boot_markers(
-        "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\nTINLANCE_GUEST_READY"
+        "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\n"
+        "TINLANCE_NONROOT_UID_CONFIRMED\nTINLANCE_W1_WORKLOAD_OK\nTINLANCE_GUEST_READY"
     )
     assert evidence == {
         "rootfs_read_only_confirmed": True,
