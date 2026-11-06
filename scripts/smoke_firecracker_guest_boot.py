@@ -559,7 +559,6 @@ def main() -> int:
             "production_certification": False,
             "guest_network_configured": False,
             "guest_rootfs_read_only": True,
-            "guest_network_configured": False,
             "guest_w1_workload": {
                 "profile": "W1-minimal-agent",
                 "network": "none",
@@ -570,7 +569,8 @@ def main() -> int:
             "guest_ready_marker": GUEST_READY_MARKER,
             "boot_time_measurement": (
                 "elapsed time from immediately before the InstanceStart API request "
-                "until the guest completes the W1 workload and emits its ready marker on the serial console"
+                "until the guest completes the W1 workload and emits its ready marker "
+                "on the serial console"
             ),
             "firecracker_version": firecracker_version.get("firecracker_version"),
             "firecracker_archive_sha256": archive_sha256,
