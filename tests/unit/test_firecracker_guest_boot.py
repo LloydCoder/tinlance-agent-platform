@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
 from scripts.smoke_firecracker_guest_boot import (
+    extract_w2_rootfs_tar,
     load_asset_manifest,
     parse_latest_artifact_prefix,
     select_latest_versioned_key,
@@ -253,11 +255,23 @@ def test_guest_init_w2_enforces_no_new_privileges_and_host_surface_denials() -> 
 
     script = guest_init_script("W2")
     assert "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups" in script
+    assert 'grep -Eq "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status' in script
+    assert 'grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/self/status' in script
+    for marker in (
+        "TINLANCE_W2_DEVICE_PROBE_COMPLETED",
+        "TINLANCE_W2_SOCKET_PROBE_COMPLETED",
+        "TINLANCE_W2_ESCALATION_PROBE_COMPLETED",
+        "TINLANCE_W2_MOUNT_PROBE_COMPLETED",
+        "TINLANCE_W2_PROC_PROBE_COMPLETED",
+    ):
+        assert marker in script
+    assert script.count("set -eu") >= 2
     for marker in (
         "TINLANCE_W2_CAPABILITIES_DROPPED",
         "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
         "TINLANCE_W2_SENSITIVE_FILES_DENIED",
         "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
         "TINLANCE_W2_HOST_SOCKETS_ABSENT",
         "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
@@ -280,16 +294,34 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
         "TINLANCE_W2_SENSITIVE_FILES_DENIED",
         "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
         "TINLANCE_W2_HOST_SOCKETS_ABSENT",
         "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
         "TINLANCE_W2_PROC_SYS_READONLY",
         "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+        "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+        "TINLANCE_W2_GIT_VERSION=git version",
+        "TINLANCE_W2_PYTHON_VERSION=Python",
+        "TINLANCE_W2_NODE_VERSION=v",
+        "TINLANCE_W2_NPM_VERSION=",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
     assert evidence["host_surface_probes_passed"] is True
     assert evidence["no_new_privileges"] is True
+
+
+def test_guest_init_w2_distinguishes_guest_memory_device_from_host_devices() -> None:
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    script = guest_init_script("W2")
+    assert "for host_device in /dev/kvm /dev/vhost-net; do" in script
+    assert "if [ -e /dev/mem ] && [ -r /dev/mem ]; then" in script
+    assert "TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED" in script
+    assert "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED" in script
 
 
 def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
@@ -321,3 +353,184 @@ def test_guest_init_w2_script_is_valid_posix_shell() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_firecracker_machine_profile_matches_w1_and_w2_resource_contracts() -> None:
+    from scripts.smoke_firecracker_guest_boot import machine_config_for_profile
+
+    assert machine_config_for_profile("W1") == {
+        "vcpu_count": 1,
+        "mem_size_mib": 512,
+        "smt": False,
+    }
+    assert machine_config_for_profile("W2") == {
+        "vcpu_count": 2,
+        "mem_size_mib": 2048,
+        "smt": False,
+    }
+    with pytest.raises(ValueError, match="profile"):
+        machine_config_for_profile("W3")
+
+
+def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    script = guest_init_script("W2")
+    assert (
+        "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
+        "noexec,nosuid,nodev tmpfs /workspace"
+    ) in script
+    assert "size=64m,mode=0700,uid=65532,gid=65532" in script
+    assert "noexec,nosuid,nodev tmpfs /tmp" in script
+    fixture_script = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "w2-developer-workspace"
+        / "run-workspace.sh"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "TINLANCE_W2_GIT_CLONE_OK",
+        "TINLANCE_W2_PYTHON_EDIT_OK",
+        "TINLANCE_W2_PYTHON_BUILD_OK",
+        "TINLANCE_W2_PYTHON_TESTS_OK",
+        "TINLANCE_W2_NODE_EDIT_OK",
+        "TINLANCE_W2_NODE_BUILD_OK",
+        "TINLANCE_W2_NODE_TESTS_OK",
+        "TINLANCE_W2_WORKTREE_DIRTY_OK",
+        "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+    ):
+        assert marker in fixture_script or marker in script
+    assert "/opt/tinlance-fixture/run-workspace.sh" in script
+    workspace_marker_index = script.index("TINLANCE_W2_DEVELOPER_WORKSPACE_OK")
+    guest_ready_index = script.index("TINLANCE_GUEST_READY")
+    assert workspace_marker_index < guest_ready_index
+
+
+def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    markers = [
+        "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED",
+        "TINLANCE_NO_NIC_CONFIRMED",
+        "TINLANCE_NONROOT_UID_CONFIRMED",
+        "TINLANCE_W1_WORKLOAD_OK",
+        "TINLANCE_W2_CAPABILITIES_DROPPED",
+        "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+        "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+        "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
+        "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+        "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+        "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+        "TINLANCE_W2_PROC_SYS_READONLY",
+        "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+        "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        "TINLANCE_W2_GIT_CLONE_OK",
+        "TINLANCE_W2_PYTHON_EDIT_OK",
+        "TINLANCE_W2_PYTHON_BUILD_OK",
+        "TINLANCE_W2_PYTHON_TESTS_OK",
+        "TINLANCE_W2_NODE_EDIT_OK",
+        "TINLANCE_W2_NODE_BUILD_OK",
+        "TINLANCE_W2_NODE_TESTS_OK",
+        "TINLANCE_W2_WORKTREE_DIRTY_OK",
+        "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+        "TINLANCE_W2_GIT_VERSION=",
+        "TINLANCE_W2_PYTHON_VERSION=",
+        "TINLANCE_W2_NODE_VERSION=",
+        "TINLANCE_W2_NPM_VERSION=",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+        "TINLANCE_GUEST_READY",
+    ]
+    evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
+    assert evidence["developer_workspace_passed"] is True
+
+
+def test_w2_rootfs_tar_extracts_safe_paths(tmp_path: Path) -> None:
+    archive = tmp_path / "rootfs.tar"
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "tool.txt").write_text("synthetic", encoding="utf-8")
+    with tarfile.open(archive, "w") as handle:
+        handle.add(source / "tool.txt", arcname="opt/tool.txt")
+
+    destination = tmp_path / "rootfs"
+    extract_w2_rootfs_tar(archive, destination)
+    assert (destination / "opt/tool.txt").read_text(encoding="utf-8") == "synthetic"
+
+
+def test_w2_rootfs_tar_rejects_path_traversal(tmp_path: Path) -> None:
+    archive = tmp_path / "unsafe-rootfs.tar"
+    item = tarfile.TarInfo("../escape.txt")
+    item.size = len(b"unsafe")
+    with tarfile.open(archive, "w") as handle:
+        import io
+
+        handle.addfile(item, io.BytesIO(b"unsafe"))
+
+    with pytest.raises(ValueError, match="unsafe rootfs archive"):
+        extract_w2_rootfs_tar(archive, tmp_path / "rootfs")
+
+
+def test_w2_rootfs_preparation_requires_content_addressed_oci_export(tmp_path: Path) -> None:
+    from scripts.smoke_firecracker_guest_boot import _prepare_rootfs
+
+    with pytest.raises(ValueError, match="W2 rootfs tar"):
+        _prepare_rootfs(
+            tmp_path / "unused.squashfs",
+            tmp_path / "rootfs.ext4",
+            tmp_path / "extract",
+            "W2",
+        )
+
+
+def test_w2_rootfs_tar_normalizes_safe_absolute_guest_symlinks(tmp_path: Path) -> None:
+    import io
+    import os
+
+    archive = tmp_path / "symlink-rootfs.tar"
+    with tarfile.open(archive, "w") as handle:
+        target = tarfile.TarInfo("usr/bin/python3")
+        target.size = len(b"python")
+        handle.addfile(target, io.BytesIO(b"python"))
+        link = tarfile.TarInfo("etc/python3")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "/usr/bin/python3"
+        handle.addfile(link)
+
+    destination = tmp_path / "rootfs"
+    extract_w2_rootfs_tar(archive, destination)
+    assert os.readlink(destination / "etc/python3") == "../usr/bin/python3"
+
+
+def test_w2_cli_fails_closed_without_content_addressed_oci_rootfs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    from scripts.smoke_firecracker_guest_boot import main
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "smoke_firecracker_guest_boot.py",
+            "--profile",
+            "W2",
+            "--output",
+            str(tmp_path / "report.json"),
+        ],
+    )
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 2
+
+
+def test_w2_network_configuration_uses_real_line_endings() -> None:
+    from scripts.smoke_firecracker_guest_boot import w2_network_files
+
+    assert w2_network_files() == {
+        "hosts": "127.0.0.1 localhost\n::1 localhost\n",
+        "hostname": "tinlance-w2\n",
+        "resolv.conf": "# guest network is disabled\n",
+    }

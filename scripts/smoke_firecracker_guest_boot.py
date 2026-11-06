@@ -9,12 +9,13 @@ import re
 import shutil
 import statistics
 import subprocess
+import tarfile
 import tempfile
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, TypedDict, cast
 from urllib.parse import urlencode
 
@@ -28,8 +29,26 @@ GUEST_NIC_UNEXPECTED_MARKER = "TINLANCE_NETWORK_INTERFACE_UNEXPECTED"
 GUEST_W2_UNEXPECTED_MARKERS = (
     "TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED",
     "TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED",
+    "TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED",
+    "TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED",
 )
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
+
+
+def machine_config_for_profile(profile: str) -> dict[str, int | bool]:
+    """Return the bounded Firecracker machine profile; reject unknown profiles."""
+    profiles: dict[str, dict[str, int | bool]] = {
+        "W1": {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+        "W2": {"vcpu_count": 2, "mem_size_mib": 2048, "smt": False},
+    }
+    try:
+        return profiles[profile].copy()
+    except KeyError as exc:
+        raise ValueError("profile must be W1 or W2") from exc
+
+
+_OCI_IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
+_OCI_IMAGE_ID = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 class GuestAssetManifest(TypedDict):
@@ -215,8 +234,9 @@ for iface_path in /sys/class/net/*; do
 done
 echo TINLANCE_NO_NIC_CONFIRMED
 command -v setpriv >/dev/null 2>&1 || { echo TINLANCE_SETPRIV_MISSING; exit 73; }
-mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp
+mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev tmpfs /tmp
 setpriv --reuid=65532 --regid=65532 --clear-groups /bin/sh -c '
+    set -eu
     test "$(id -u)" = 65532
     echo TINLANCE_NONROOT_UID_CONFIRMED
     printf tinlance-gvisor-ok > /tmp/workload.txt
@@ -228,43 +248,91 @@ exec /usr/bin/sleep 60
 """
     if profile == "W2":
         script = script.replace(
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,"
+            "noexec,nosuid,nodev tmpfs /tmp",
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,"
+            "noexec,nosuid,nodev tmpfs /tmp\n"
+            "mkdir -p /workspace\n"
+            "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
+            "noexec,nosuid,nodev tmpfs /workspace\n"
+            "echo TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        )
+        script = script.replace(
             "setpriv --reuid=65532 --regid=65532 --clear-groups",
             "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups",
         )
         probes = """    command -v mount >/dev/null 2>&1
-    grep -q "^CapEff: *0000000000000000" /proc/self/status
+    grep -Eq "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status
     echo TINLANCE_W2_CAPABILITIES_DROPPED
-    grep -q "^NoNewPrivs: *1" /proc/self/status
+    grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/self/status
     echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
     test -f /etc/shadow
     test ! -r /etc/shadow
     echo TINLANCE_W2_SENSITIVE_FILES_DENIED
-    test ! -e /dev/kvm
+    for host_device in /dev/kvm /dev/vhost-net; do
+        if [ -e "$host_device" ]; then
+            echo "TINLANCE_W2_HOST_DEVICE_UNEXPECTED=$host_device"
+            exit 84
+        fi
+    done
     echo TINLANCE_W2_HOST_DEVICES_ABSENT
-    test ! -S /run/docker.sock
-    test ! -S /var/run/docker.sock
-    test ! -S /run/containerd/containerd.sock
-    test ! -S /run/podman/podman.sock
+    if [ -e /dev/mem ] && [ -r /dev/mem ]; then
+        echo TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED
+        exit 86
+    fi
+    echo TINLANCE_W2_GUEST_MEM_DEVICE_DENIED
+    echo TINLANCE_W2_DEVICE_PROBE_COMPLETED
+    for host_socket in \
+        /run/docker.sock \
+        /var/run/docker.sock \
+        /run/containerd/containerd.sock \
+        /run/podman/podman.sock \
+        /run/crio/crio.sock \
+        /run/buildkit/buildkitd.sock; do
+        if [ -S "$host_socket" ]; then
+            echo "TINLANCE_W2_HOST_SOCKET_UNEXPECTED=$host_socket"
+            exit 85
+        fi
+    done
     echo TINLANCE_W2_HOST_SOCKETS_ABSENT
+    echo TINLANCE_W2_SOCKET_PROBE_COMPLETED
     if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
         echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
         exit 81
     fi
     echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED
+    echo TINLANCE_W2_ESCALATION_PROBE_COMPLETED
     if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; then
         echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED
         exit 82
     fi
     echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    echo TINLANCE_W2_MOUNT_PROBE_COMPLETED
     test -e /proc/sys/kernel/hostname
     test ! -w /proc/sys/kernel/hostname
     echo TINLANCE_W2_PROC_SYS_READONLY
+    echo TINLANCE_W2_PROC_PROBE_COMPLETED
     echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
+    export HOME=/tmp
+    export npm_config_cache=/tmp/npm-cache
+    command -v git >/dev/null 2>&1
+    command -v python3 >/dev/null 2>&1
+    command -v node >/dev/null 2>&1
+    command -v npm >/dev/null 2>&1
+    test -x /opt/tinlance-fixture/run-workspace.sh
+    if /opt/tinlance-fixture/run-workspace.sh; then
+        echo TINLANCE_W2_DEVELOPER_WORKSPACE_OK
+    else
+        echo TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED
+        exit 83
+    fi
 """
         script = script.replace(
             "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
             "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
         )
+        if "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED" not in script:
+            raise RuntimeError("W2 guest init did not configure a workspace tmpfs")
     return script
 
 
@@ -305,11 +373,19 @@ def verify_guest_boot_markers(
                 "no_new_privileges": "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
                 "sensitive_files_denied": "TINLANCE_W2_SENSITIVE_FILES_DENIED",
                 "host_devices_absent": "TINLANCE_W2_HOST_DEVICES_ABSENT",
+                "guest_mem_device_denied": "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
                 "host_sockets_absent": "TINLANCE_W2_HOST_SOCKETS_ABSENT",
                 "privilege_escalation_denied": "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
                 "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
                 "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
                 "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+                "workspace_tmpfs_mounted": "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+                "developer_workspace_passed": "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+                "git_version_reported": "TINLANCE_W2_GIT_VERSION=",
+                "python_version_reported": "TINLANCE_W2_PYTHON_VERSION=",
+                "node_version_reported": "TINLANCE_W2_NODE_VERSION=",
+                "npm_version_reported": "TINLANCE_W2_NPM_VERSION=",
+                "package_manifest_reported": "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
             }
         )
     missing = [name for name, marker in required.items() if marker not in log_text]
@@ -318,13 +394,86 @@ def verify_guest_boot_markers(
     return {name: True for name in required}
 
 
+def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
+    """Safely extract the trusted OCI export while rejecting path and link escapes."""
+    if not archive_path.is_file():
+        raise ValueError("W2 rootfs tar does not exist")
+    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        with tarfile.open(archive_path, "r:*") as archive:
+            members = archive.getmembers()
+            for member in members:
+                member_path = PurePosixPath(member.name)
+                if member_path.is_absolute() or ".." in member_path.parts:
+                    raise ValueError(f"unsafe rootfs archive path: {member.name}")
+                if member.isdev() or member.isfifo():
+                    raise ValueError(f"unsupported special file in rootfs archive: {member.name}")
+                if member.issym():
+                    target = PurePosixPath(member.linkname)
+                    if target.is_absolute():
+                        if ".." in target.parts:
+                            raise ValueError(
+                                f"unsafe absolute symlink in rootfs archive: {member.name}"
+                            )
+                        member.linkname = os.path.relpath(
+                            target.as_posix().lstrip("/"),
+                            member_path.parent.as_posix(),
+                        )
+                    else:
+                        resolved = os.path.normpath(
+                            os.path.join(member_path.parent.as_posix(), member.linkname)
+                        )
+                        if resolved == ".." or resolved.startswith("../"):
+                            raise ValueError(f"unsafe symlink in rootfs archive: {member.name}")
+                if member.islnk():
+                    target = PurePosixPath(member.linkname)
+                    if target.is_absolute() or ".." in target.parts:
+                        raise ValueError(f"unsafe hardlink in rootfs archive: {member.name}")
+            ordered = sorted(
+                members,
+                key=lambda item: (
+                    0 if item.isdir() else 1 if item.isfile() else 2 if item.issym() else 3
+                ),
+            )
+            archive.extractall(destination, members=ordered, filter="data")
+    except (tarfile.TarError, OSError, ValueError) as error:
+        raise ValueError(f"unsafe rootfs archive: {error}") from error
+
+
+def w2_network_files() -> dict[str, str]:
+    """Return valid, newline-terminated guest-local network configuration."""
+    return {
+        "hosts": "127.0.0.1 localhost\n::1 localhost\n",
+        "hostname": "tinlance-w2\n",
+        "resolv.conf": "# guest network is disabled\n",
+    }
+
+
 def _prepare_rootfs(
-    squashfs_path: Path,
+    squashfs_path: Path | None,
     rootfs_path: Path,
     extract_dir: Path,
     profile: str = "W1",
+    w2_rootfs_tar: Path | None = None,
 ) -> None:
-    _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    if profile == "W2":
+        if w2_rootfs_tar is None:
+            raise ValueError("W2 rootfs tar is required")
+        extract_w2_rootfs_tar(w2_rootfs_tar, extract_dir)
+        etc_dir = extract_dir / "etc"
+        etc_dir.mkdir(parents=True, exist_ok=True)
+        for name, content in w2_network_files().items():
+            path = etc_dir / name
+            if path.is_symlink() or path.exists():
+                path.unlink()
+            path.write_text(content, encoding="utf-8")
+    else:
+        if squashfs_path is None or w2_rootfs_tar is not None:
+            raise ValueError("W1 requires the pinned squashfs rootfs only")
+        _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
+
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
     init_path.parent.mkdir(parents=True, exist_ok=True)
     init_path.write_text(guest_init_script(profile), encoding="utf-8")
@@ -357,18 +506,38 @@ def _prepare_rootfs(
                     str(minor),
                 ]
             )
-    _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
-    _run(
-        [
-            "sudo",
-            "-n",
-            "chown",
-            "65532:65532",
-            str(extract_dir / "home" / "tinlance"),
-        ]
-    )
+
+    fixture_dir = extract_dir / "opt" / "tinlance-fixture"
+    if profile == "W2":
+        if not (fixture_dir / "run-workspace.sh").is_file():
+            raise ValueError("W2 OCI rootfs is missing the developer-workspace fixture")
+        _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "65532:65532",
+                str(extract_dir / "home" / "tinlance"),
+            ]
+        )
+        _run(["sudo", "-n", "chown", "-R", "65532:65532", str(fixture_dir)])
+        _run(["sudo", "-n", "chmod", "-R", "a=rX", str(fixture_dir)])
+    else:
+        _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+        _run(
+            [
+                "sudo",
+                "-n",
+                "chown",
+                "65532:65532",
+                str(extract_dir / "home" / "tinlance"),
+            ]
+        )
+
     try:
-        _run(["truncate", "-s", "1G", str(rootfs_path)])
+        image_size = "2G" if profile == "W2" else "1G"
+        _run(["truncate", "-s", image_size, str(rootfs_path)])
         _run(
             [
                 "sudo",
@@ -494,7 +663,7 @@ def _run_guest(
                 socket_path,
                 "PUT",
                 "/machine-config",
-                {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+                machine_config_for_profile(profile),
             )
             _api_request(
                 socket_path,
@@ -631,26 +800,46 @@ def _download_pinned_guest_assets(
     work_dir: Path,
     manifest: GuestAssetManifest,
     profile: str = "W1",
+    w2_rootfs_tar: Path | None = None,
 ) -> dict[str, object]:
     kernel_path = work_dir / "guest-vmlinux"
     squashfs_path = work_dir / "guest-rootfs.squashfs"
     rootfs_path = work_dir / "guest-rootfs.ext4"
     _download(f"{S3_BASE}/{manifest['kernel_key']}", kernel_path)
-    _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
     kernel_sha256 = _sha256(kernel_path)
-    rootfs_squashfs_sha256 = _sha256(squashfs_path)
     if kernel_sha256 != manifest["kernel_sha256"]:
         raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
-    if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
-        raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
-    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+
+    rootfs_squashfs_sha256: str | None = None
+    if profile == "W1":
+        if w2_rootfs_tar is not None:
+            raise ValueError("W1 cannot accept a W2 OCI rootfs tar")
+        _download(f"{S3_BASE}/{manifest['rootfs_key']}", squashfs_path)
+        rootfs_squashfs_sha256 = _sha256(squashfs_path)
+        if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
+            raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
+        _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
+    elif profile == "W2":
+        if w2_rootfs_tar is None:
+            raise ValueError("W2 requires the content-addressed OCI rootfs tar")
+        _prepare_rootfs(
+            None,
+            rootfs_path,
+            work_dir / "oci-rootfs",
+            profile,
+            w2_rootfs_tar,
+        )
+    else:
+        raise ValueError("profile must be W1 or W2")
+
     return {
         **manifest,
         "kernel_path": kernel_path,
-        "squashfs_path": squashfs_path,
+        "squashfs_path": squashfs_path if profile == "W1" else None,
         "rootfs_path": rootfs_path,
         "kernel_sha256": kernel_sha256,
         "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
+        "w2_rootfs_tar_sha256": (_sha256(w2_rootfs_tar) if w2_rootfs_tar is not None else None),
         "rootfs_ext4_sha256": _sha256(rootfs_path),
     }
 
@@ -673,6 +862,9 @@ def main() -> int:
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--w2-rootfs-tar", type=Path)
+    parser.add_argument("--w2-image-id")
+    parser.add_argument("--w2-base-image-digest")
     parser.add_argument("--timeout-seconds", type=float, default=45)
     args = parser.parse_args()
 
@@ -688,6 +880,17 @@ def main() -> int:
 
     if args.runs < 1:
         parser.error("--runs must be at least 1")
+    if args.profile == "W2":
+        if args.w2_rootfs_tar is None or not args.w2_rootfs_tar.is_file():
+            parser.error("--profile W2 requires an existing --w2-rootfs-tar")
+        if args.w2_image_id is None or not _OCI_IMAGE_ID.fullmatch(args.w2_image_id):
+            parser.error("--profile W2 requires a content-addressed --w2-image-id")
+        if args.w2_base_image_digest is None or not _OCI_IMAGE_DIGEST.fullmatch(
+            args.w2_base_image_digest
+        ):
+            parser.error("--profile W2 requires a digest-pinned --w2-base-image-digest")
+    elif any((args.w2_rootfs_tar, args.w2_image_id, args.w2_base_image_digest)):
+        parser.error("W2 OCI rootfs arguments are only valid with --profile W2")
     if args.firecracker is None or not args.firecracker.is_file():
         parser.error("--firecracker must point to the verified Firecracker binary")
     if args.firecracker_archive is None or not args.firecracker_archive.is_file():
@@ -705,7 +908,12 @@ def main() -> int:
         firecracker_binary = work_dir / "firecracker"
         shutil.copy2(args.firecracker, firecracker_binary)
         firecracker_binary.chmod(0o755)
-        assets = _download_pinned_guest_assets(work_dir, manifest, args.profile)
+        assets = _download_pinned_guest_assets(
+            work_dir,
+            manifest,
+            args.profile,
+            args.w2_rootfs_tar,
+        )
         kernel_path = assets["kernel_path"]
         rootfs_path = assets["rootfs_path"]
         if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
@@ -741,7 +949,11 @@ def main() -> int:
             ),
             "guest_isolation_checks": guest_isolation_samples,
             "guest_workload": {
-                "profile": "W1-minimal-agent" if args.profile == "W1" else "W2-host-surface-probes",
+                "profile": (
+                    "W1-minimal-agent"
+                    if args.profile == "W1"
+                    else "W2-developer-workspace-and-host-surface"
+                ),
                 "network": "none",
                 "rootfs_read_only": True,
                 "uid": 65532,
@@ -750,6 +962,15 @@ def main() -> int:
                 "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
                 "host_surface_marker": (
                     "TINLANCE_W2_HOST_SURFACE_PROBES_OK" if args.profile == "W2" else None
+                ),
+                "developer_workspace": args.profile == "W2",
+                "workspace_tmpfs": (
+                    "/workspace:rw,size=128m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev"
+                    if args.profile == "W2"
+                    else None
+                ),
+                "developer_workspace_marker": (
+                    "TINLANCE_W2_DEVELOPER_WORKSPACE_OK" if args.profile == "W2" else None
                 ),
             },
             "guest_ready_marker": GUEST_READY_MARKER,
@@ -765,7 +986,15 @@ def main() -> int:
             "host_kernel_release": platform.release(),
             "upstream_ci_artifact_prefix": assets["artifact_prefix"],
             "guest_kernel_key": assets["kernel_key"],
-            "guest_rootfs_key": assets["rootfs_key"],
+            "guest_rootfs_key": assets["rootfs_key"] if args.profile == "W1" else None,
+            "guest_rootfs_source": (
+                "pinned-upstream-squashfs"
+                if args.profile == "W1"
+                else "content-addressed-oci-export"
+            ),
+            "w2_base_image_digest": args.w2_base_image_digest,
+            "w2_image_id": args.w2_image_id,
+            "w2_rootfs_tar_sha256": assets["w2_rootfs_tar_sha256"],
             "guest_kernel_sha256": assets["kernel_sha256"],
             "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
             "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
