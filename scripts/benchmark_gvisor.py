@@ -23,8 +23,8 @@ def build_w1_payload() -> str:
         "set -eu; "
         'test "$(id -u)" = 65532; '
         f"echo {_NONROOT_MARKER}; "
-        'awk \'$2 == "/" { split($4, flags, ","); '
-        'for (i in flags) if (flags[i] == "ro") found=1 } '
+        """awk '$2 == "/" { split($4, flags, ","); """
+        """for (i in flags) if (flags[i] == "ro") found=1 } """
         "END { exit !found }' /proc/mounts; "
         "echo TINLANCE_ROOTFS_READ_ONLY_CONFIRMED; "
         "if awk 'NR>2 && $1 !~ /^lo:/ { found=1 } END { exit found }' /proc/net/dev; "
