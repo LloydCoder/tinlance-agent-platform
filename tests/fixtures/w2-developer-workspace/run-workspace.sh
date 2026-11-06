@@ -2,7 +2,7 @@
 set -eu
 
 workspace=/workspace/project
-git -c safe.directory=/opt/tinlance-fixture clone --no-hardlinks /opt/tinlance-fixture "$workspace"
+git clone --no-hardlinks /opt/tinlance-fixture "$workspace"
 test "$(git -C "$workspace" rev-parse --is-inside-work-tree)" = true
 test -n "$(git -C "$workspace" rev-parse HEAD)"
 echo "TINLANCE_W2_GIT_VERSION=$(git --version)"
