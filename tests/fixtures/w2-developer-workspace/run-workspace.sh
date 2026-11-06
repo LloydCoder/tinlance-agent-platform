@@ -16,7 +16,7 @@ from pathlib import Path
 import sys
 root = Path(sys.argv[1])
 source = root / "python/src/app.py"
-tests = root / "python/tests/test_app.py"
+tests = root / "python/tests/testapp.py"
 source_text = source.read_text(encoding="utf-8")
 test_text = tests.read_text(encoding="utf-8")
 source.write_text(source_text.replace("Tinlance Agent Workspace", "Tinlance W2 Developer Workspace"), encoding="utf-8")
