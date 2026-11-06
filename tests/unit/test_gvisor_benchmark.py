@@ -193,3 +193,46 @@ def test_docker_command_w2_profile_keeps_all_outer_security_controls() -> None:
         "--pids-limit=128",
     ):
         assert option in command
+
+def test_w2_benchmark_evidence_reports_the_actual_resource_envelope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.benchmark_gvisor import run_benchmark
+
+    def fake_capture(command: list[str]) -> str:
+        if command == ["kata", "--version"]:
+            return "Kata Containers 4.3.1"
+        if command[:2] == ["docker", "version"]:
+            return "28.0.0"
+        if command[:2] == ["docker", "info"]:
+            return '{"kata":{}}'
+        return "\\n".join(
+            (
+                "TINLANCE_GVISOR_WORKLOAD_OK",
+                "TINLANCE_NONROOT_UID_CONFIRMED",
+                "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED",
+                "TINLANCE_NO_NIC_CONFIRMED",
+                "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+                "TINLANCE_W2_GIT_CLONE_OK",
+                "TINLANCE_W2_PYTHON_EDIT_OK",
+                "TINLANCE_W2_PYTHON_BUILD_OK",
+                "TINLANCE_W2_PYTHON_TESTS_OK",
+                "TINLANCE_W2_NODE_EDIT_OK",
+                "TINLANCE_W2_NODE_BUILD_OK",
+                "TINLANCE_W2_NODE_TESTS_OK",
+                "TINLANCE_W2_WORKTREE_DIRTY_OK",
+                "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+            )
+        )
+
+    monkeypatch.setattr("scripts.benchmark_gvisor._capture", fake_capture)
+    report = run_benchmark(
+        image_digest="sha256:" + "a" * 64,
+        runs=3,
+        runtime_name="kata",
+        profile="W2",
+    )
+
+    assert report["workload"]["cpu_limit"] == "2"
+    assert report["workload"]["memory_limit"] == "2g"
+
