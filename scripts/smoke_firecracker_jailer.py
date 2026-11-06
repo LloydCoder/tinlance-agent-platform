@@ -223,6 +223,13 @@ def _find_firecracker_pid(
     )
 
 
+def _readlink_as_root(path: Path) -> str:
+    return _run(
+        ["sudo", "-n", "readlink", str(path)],
+        capture_output=True,
+    ).stdout.strip()
+
+
 def _stat_identity_as_root(path: Path) -> str:
     return _run(
         ["sudo", "-n", "stat", "-Lc", "%d:%i", str(path)],
