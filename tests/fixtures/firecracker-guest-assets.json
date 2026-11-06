@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "architecture": "x86_64",
+  "source": "https://s3.amazonaws.com/spec.ccfc.min/",
+  "discovered_at": "2026-11-06",
+  "artifact_prefix": "firecracker-ci/20261105-6ea6634994fa-0/",
+  "kernel_key": "firecracker-ci/20261105-6ea6634994fa-0/x86_64/vmlinux-6.18.56",
+  "kernel_sha256": "af348226aa2a25b846156150d5cdb5dae3bf2a022f1db176e3a2b9a3249817bf",
+  "rootfs_key": "firecracker-ci/20261105-6ea6634994fa-0/x86_64/ubuntu-24.04.squashfs",
+  "rootfs_squashfs_sha256": "91da33c2013bd1b018f2c1e6b3d37a3316e0ff8c19a71de640d7a4c3ca31b92b"
+}
