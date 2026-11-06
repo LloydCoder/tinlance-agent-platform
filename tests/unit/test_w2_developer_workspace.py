@@ -32,6 +32,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
         assert marker in script or marker in payload
     assert " clone --no-hardlinks " in script
     assert "chown -R 65532:65532 /opt/tinlance-fixture" in dockerfile
+    assert "mkdir -p /workspace" in dockerfile
     assert "python3 -m compileall" in script
     assert "python3 -m unittest" in script
     assert "node --check" in script
