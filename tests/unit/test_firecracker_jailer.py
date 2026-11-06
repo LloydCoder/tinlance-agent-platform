@@ -173,6 +173,7 @@ CapEff:\t0000000000000000
             process_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
         )
 
+
 def test_verify_jailer_evidence_rejects_process_outside_expected_chroot() -> None:
     status = """Uid:\t987\t987\t987\t987
 Gid:\t987\t987\t987\t987
