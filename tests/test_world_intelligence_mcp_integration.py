@@ -268,12 +268,12 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
             self.assertRaises(WorldIntelligenceTransportError) as caught,
         ):
             client.request(
-                    "GET",
-                    "https://world-intelligence.internal/v1/entities",
-                    headers={"Accept": "application/json"},
-                    body=None,
-                    timeout_seconds=1.0,
-                )
+                "GET",
+                "https://world-intelligence.internal/v1/entities",
+                headers={"Accept": "application/json"},
+                body=None,
+                timeout_seconds=1.0,
+            )
         self.assertIsNone(caught.exception.status_code)
         self.assertTrue(caught.exception.retryable)
 
