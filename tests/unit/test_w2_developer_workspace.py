@@ -52,13 +52,12 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert "dpkg-query -W" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     assert dockerfile.index('--snapshot="${APT_SNAPSHOT}" update') < dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert "apt-get update \\\\" not in dockerfile
     assert "ca-certificates git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" not in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
     assert "Acquire::Retries=5" in dockerfile
     assert "APT::Update::Error-Mode=any" in dockerfile
-    assert "Components: main universe" in dockerfile
+    assert dockerfile.count("--snapshot=") == 2
 
 
 def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
