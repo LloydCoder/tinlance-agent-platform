@@ -40,6 +40,21 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     assert "/opt/tinlance-fixture/run-workspace.sh" in payload
 
 
+def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest() -> None:
+    fixture = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "w2-developer-workspace"
+        / "Dockerfile"
+    )
+    dockerfile = fixture.read_text(encoding="utf-8")
+    assert "ARG APT_SNAPSHOT" in dockerfile
+    assert "apt-get --snapshot=\\"\u0024{APT_SNAPSHOT}\\" update" in dockerfile
+    assert "apt-get --snapshot=\\"\u0024{APT_SNAPSHOT}\\" install" in dockerfile
+    assert "dpkg-query -W" in dockerfile
+    assert "w2-package-manifest.lock" in dockerfile
+
+
 def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None:
     image = "ubuntu@sha256:" + "a" * 64
     w1 = build_docker_command(image_digest=image, payload="true")
