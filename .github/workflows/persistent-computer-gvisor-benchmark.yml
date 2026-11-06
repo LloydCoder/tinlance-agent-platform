@@ -61,7 +61,7 @@ jobs:
           echo "Pinned benchmark image: $image_digest"
       - name: Run three isolated W1 workloads
         run: |
-          python scripts/benchmark_gvisor.py --image-digest '${{ steps.image.outputs.image_digest }}' --runs 3 --output artifacts/gvisor-w1.json
+          python scripts/benchmark_gvisor.py --image-digest '${{ steps.image.outputs.image_digest }}' --runs 30 --output artifacts/gvisor-w1.json
       - name: Publish benchmark summary
         if: always()
         run: |
