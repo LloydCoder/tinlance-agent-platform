@@ -458,7 +458,7 @@ def _run_jailer_guest(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Boot a Firecracker guest through the upstream jailer and verify host isolation.",
+        description="Verify a Firecracker guest boot through the upstream jailer.",
     )
     parser.add_argument("--jailer", required=True, type=Path)
     parser.add_argument("--firecracker", required=True, type=Path)
