@@ -255,6 +255,7 @@ def test_guest_init_w2_enforces_no_new_privileges_and_host_surface_denials() -> 
 
     script = guest_init_script("W2")
     assert "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups" in script
+    assert script.count("set -eu") >= 2
     for marker in (
         "TINLANCE_W2_CAPABILITIES_DROPPED",
         "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
