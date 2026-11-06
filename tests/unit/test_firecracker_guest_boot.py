@@ -124,7 +124,9 @@ def test_guest_init_rejects_writable_rootfs_before_ready_marker() -> None:
     assert "touch /etc/tinlance-write-probe" in script
     assert "TINLANCE_ROOTFS_WRITE_UNEXPECTED" in script
     assert "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED" in script
-    assert script.index("TINLANCE_ROOTFS_READ_ONLY_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
+    assert script.index("TINLANCE_ROOTFS_READ_ONLY_CONFIRMED") < script.index(
+        "TINLANCE_GUEST_READY"
+    )
 
 
 def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
