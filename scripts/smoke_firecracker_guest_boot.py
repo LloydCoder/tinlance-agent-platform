@@ -9,14 +9,13 @@ import re
 import shutil
 import statistics
 import subprocess
-import tempfile
 import tarfile
+import tempfile
 import time
 from pathlib import PurePosixPath
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, TypedDict, cast
 from urllib.parse import urlencode
 
