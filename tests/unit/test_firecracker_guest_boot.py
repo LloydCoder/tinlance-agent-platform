@@ -359,9 +359,7 @@ def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
     ):
         assert marker in fixture_script or marker in script
     assert "/opt/tinlance-fixture/run-workspace.sh" in script
-    assert script.index("TINLANCE_W2_DEVELOPER_WORKSPACE_OK") < script.index(
-        "TINLANCE_GUEST_READY"
-    )
+    assert script.index("TINLANCE_W2_DEVELOPER_WORKSPACE_OK") < script.index("TINLANCE_GUEST_READY")
 
 
 def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
