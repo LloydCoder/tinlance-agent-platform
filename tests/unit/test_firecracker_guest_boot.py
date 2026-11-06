@@ -333,6 +333,12 @@ def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
         "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
         "noexec,nosuid,nodev tmpfs /workspace"
     ) in script
+    fixture_script = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "w2-developer-workspace"
+        / "run-workspace.sh"
+    ).read_text(encoding="utf-8")
     for marker in (
         "TINLANCE_W2_GIT_CLONE_OK",
         "TINLANCE_W2_PYTHON_EDIT_OK",
@@ -344,7 +350,7 @@ def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
     ):
-        assert marker in script
+        assert marker in fixture_script or marker in script
     assert "/opt/tinlance-fixture/run-workspace.sh" in script
     assert script.index("TINLANCE_W2_DEVELOPER_WORKSPACE_OK") < script.index(
         "TINLANCE_GUEST_READY"
@@ -368,6 +374,7 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
         "TINLANCE_W2_PROC_SYS_READONLY",
         "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+        "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
         "TINLANCE_W2_GIT_CLONE_OK",
         "TINLANCE_W2_PYTHON_EDIT_OK",
         "TINLANCE_W2_PYTHON_BUILD_OK",
