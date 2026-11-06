@@ -537,7 +537,6 @@ def test_w2_network_configuration_uses_real_line_endings() -> None:
     }
 
 
-
 def test_w2_rootfs_extractor_fails_closed_on_unapplied_extended_attributes(
     tmp_path: Path,
 ) -> None:
