@@ -31,10 +31,12 @@ def test_select_latest_kernel_key_uses_numeric_version_order() -> None:
       <Contents><Key>firecracker-ci/20261106-build/x86_64/vmlinux-6.10.11</Key></Contents>
     </ListBucketResult>"""
 
-    assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index(
-        "TINLANCE_NONROOT_UID_CONFIRMED"
-    )
-    assert script.index("TINLANCE_NONROOT_UID_CONFIRMED") < script.index("TINLANCE_W1_WORKLOAD_OK")
+    assert (
+        select_latest_versioned_key(
+            xml,
+            "firecracker-ci/20261106-build/x86_64/",
+            r"vmlinux-(\\d+)\\.(\\d+)\\.(\\d+)$",
+        )
         == "firecracker-ci/20261106-build/x86_64/vmlinux-6.10.11"
     )
 
@@ -247,5 +249,3 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
         verify_guest_boot_markers(
             "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
         )
-        )
-
