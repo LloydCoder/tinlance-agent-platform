@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.benchmark_gvisor import (
     build_docker_command,
     percentile_nearest_rank,
