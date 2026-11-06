@@ -6,6 +6,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --chown=0:0 . /opt/tinlance-fixture/
+RUN mkdir -p /workspace
 RUN git -C /opt/tinlance-fixture init --quiet \
     && git -C /opt/tinlance-fixture config user.name "Tinlance W2 Fixture" \
     && git -C /opt/tinlance-fixture config user.email "fixture@invalid.example" \
