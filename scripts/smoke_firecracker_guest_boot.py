@@ -799,9 +799,7 @@ def _download_pinned_guest_assets(
         "rootfs_path": rootfs_path,
         "kernel_sha256": kernel_sha256,
         "rootfs_squashfs_sha256": rootfs_squashfs_sha256,
-        "w2_rootfs_tar_sha256": (
-            _sha256(w2_rootfs_tar) if w2_rootfs_tar is not None else None
-        ),
+        "w2_rootfs_tar_sha256": (_sha256(w2_rootfs_tar) if w2_rootfs_tar is not None else None),
         "rootfs_ext4_sha256": _sha256(rootfs_path),
     }
 
