@@ -19,6 +19,7 @@ from typing import Any, TypedDict, cast
 from urllib.parse import urlencode
 
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
+FIRECRACKER_VERSION = "1.17.0"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 
@@ -285,6 +286,8 @@ def _run_guest(
             _wait_for_socket(socket_path, log_path)
 
             version = json.loads(_api_request(socket_path, "GET", "/version"))
+            if version.get("firecracker_version") != FIRECRACKER_VERSION:
+                raise RuntimeError("Firecracker VMM version does not match the pinned release")
             _api_request(
                 socket_path,
                 "PUT",
