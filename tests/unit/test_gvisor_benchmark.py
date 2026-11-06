@@ -239,6 +239,7 @@ def test_w2_benchmark_evidence_reports_the_actual_resource_envelope(
     assert report["workload"]["cpu_limit"] == "2"
     assert report["workload"]["memory_limit"] == "2g"
 
+
 def test_w2_benchmark_requires_normalized_rootfs_digest() -> None:
     from scripts.benchmark_gvisor import run_benchmark
 
@@ -249,4 +250,3 @@ def test_w2_benchmark_requires_normalized_rootfs_digest() -> None:
             runtime_name="kata",
             profile="W2",
         )
-
