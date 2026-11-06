@@ -30,3 +30,13 @@ jobs:
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370
         with:
           category: "/language:python"
+          output: sarif-output
+
+      - name: Retain SARIF for forensic review
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: codeql-python-sarif-${{ github.run_id }}
+          path: sarif-output/python.sarif
+          if-no-files-found: ignore
+          retention-days: 7

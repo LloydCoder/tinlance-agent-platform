@@ -142,8 +142,52 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def ensure_w1_user(rootfs_dir: Path) -> None:
+    """Add a deterministic unprivileged W1 account to an extracted guest rootfs."""
+    etc_dir = rootfs_dir / "etc"
+    etc_dir.mkdir(parents=True, exist_ok=True)
+    passwd_path = etc_dir / "passwd"
+    group_path = etc_dir / "group"
+    passwd_lines: list[str] = []
+    group_lines: list[str] = []
+    if passwd_path.exists():
+        passwd_lines = passwd_path.read_text(encoding="utf-8").splitlines()
+    if group_path.exists():
+        group_lines = group_path.read_text(encoding="utf-8").splitlines()
+
+    for line in passwd_lines:
+        fields = line.split(":")
+        if (
+            len(fields) >= 7
+            and (fields[0] == "tinlance" or fields[2] == "65532")
+            and (fields[0] != "tinlance" or fields[2] != "65532")
+        ):
+            raise ValueError("UID 65532 is already assigned to a different guest account")
+    if not any(line.startswith("tinlance:") for line in passwd_lines):
+        with passwd_path.open("a", encoding="utf-8") as passwd_file:
+            passwd_file.write(
+                "tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin\n"
+            )
+
+    for line in group_lines:
+        fields = line.split(":")
+        if (
+            len(fields) >= 3
+            and (fields[0] == "tinlance" or fields[2] == "65532")
+            and (fields[0] != "tinlance" or fields[2] != "65532")
+        ):
+            raise ValueError("GID 65532 is already assigned to a different guest group")
+    if not any(line.startswith("tinlance:") for line in group_lines):
+        with group_path.open("a", encoding="utf-8") as group_file:
+            group_file.write("tinlance:x:65532:\n")
+
+    home_dir = rootfs_dir / "home" / "tinlance"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    home_dir.chmod(0o700)
+
+
 def guest_init_script() -> str:
-    """Return a fail-closed guest init that proves read-only rootfs and no NIC."""
+    """Return a fail-closed guest init that proves isolation and a non-root W1 workload."""
     return """#!/bin/sh
 set -eu
 mount -t proc proc /proc 2>/dev/null || true
@@ -164,9 +208,14 @@ for iface_path in /sys/class/net/*; do
     fi
 done
 echo TINLANCE_NO_NIC_CONFIRMED
-mount -t tmpfs -o size=64m tmpfs /tmp
-printf tinlance-gvisor-ok > /tmp/workload.txt
-test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok
+command -v setpriv >/dev/null 2>&1 || { echo TINLANCE_SETPRIV_MISSING; exit 73; }
+mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp
+setpriv --reuid=65532 --regid=65532 --clear-groups /bin/sh -c '
+    test "$(id -u)" = 65532
+    echo TINLANCE_NONROOT_UID_CONFIRMED
+    printf tinlance-gvisor-ok > /tmp/workload.txt
+    test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok
+'
 echo TINLANCE_W1_WORKLOAD_OK
 echo TINLANCE_GUEST_READY
 exec /usr/bin/sleep 60
@@ -178,11 +227,15 @@ def verify_guest_boot_markers(log_text: str) -> dict[str, bool]:
         raise PermissionError("guest root filesystem unexpectedly accepted a write")
     if GUEST_NIC_UNEXPECTED_MARKER in log_text:
         raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SETPRIV_MISSING" in log_text:
+        raise RuntimeError("guest image does not provide setpriv for the non-root W1 workload")
     if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
         raise RuntimeError("guest could not mount sysfs to verify network interfaces")
     required = {
         "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
         "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "nonroot_uid_confirmed": "TINLANCE_NONROOT_UID_CONFIRMED",
+        "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
         "guest_ready": GUEST_READY_MARKER,
     }
     missing = [name for name, marker in required.items() if marker not in log_text]
@@ -197,6 +250,7 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
     init_path.parent.mkdir(parents=True, exist_ok=True)
     init_path.write_text(guest_init_script(), encoding="utf-8")
     init_path.chmod(0o755)
+    ensure_w1_user(extract_dir)
     tmp_dir = extract_dir / "tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     tmp_dir.chmod(0o1777)
@@ -225,6 +279,15 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
                 ]
             )
     _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+    _run(
+        [
+            "sudo",
+            "-n",
+            "chown",
+            "65532:65532",
+            str(extract_dir / "home" / "tinlance"),
+        ]
+    )
     try:
         _run(["truncate", "-s", "1G", str(rootfs_path)])
         _run(
@@ -597,7 +660,9 @@ def main() -> int:
                 "profile": "W1-minimal-agent",
                 "network": "none",
                 "rootfs_read_only": True,
-                "tmpfs": "/tmp:rw,size=64m",
+                "uid": 65532,
+                "gid": 65532,
+                "tmpfs": "/tmp:rw,size=64m,mode=0700,uid=65532,gid=65532",
                 "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
             },
             "guest_ready_marker": GUEST_READY_MARKER,
