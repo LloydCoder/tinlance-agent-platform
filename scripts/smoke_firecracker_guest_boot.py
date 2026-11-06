@@ -306,7 +306,7 @@ def _run_guest(
     work_dir: Path,
     log_dir: Path,
     timeout_seconds: float,
-) -> tuple[float, dict[str, str]]:
+) -> tuple[float, dict[str, str], dict[str, bool]]:
     socket_path = work_dir / f"api-{run_index}.sock"
     log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
     _stop_firecracker(socket_path)
@@ -368,8 +368,15 @@ def _run_guest(
             deadline = started + timeout_seconds
             while time.monotonic() < deadline:
                 log_text = log_path.read_text(encoding="utf-8", errors="replace")
+                if (
+                    GUEST_WRITE_UNEXPECTED_MARKER in log_text
+                    or GUEST_NIC_UNEXPECTED_MARKER in log_text
+                    or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                ):
+                    verify_guest_boot_markers(log_text)
                 if GUEST_READY_MARKER in log_text:
-                    return (time.monotonic() - started) * 1000, version
+                    guest_isolation = verify_guest_boot_markers(log_text)
+                    return (time.monotonic() - started) * 1000, version, guest_isolation
                 running = subprocess.run(
                     ["sudo", "-n", "pgrep", "-x", "firecracker"],
                     check=False,
@@ -544,9 +551,10 @@ def main() -> int:
             raise RuntimeError("pinned guest asset loader returned invalid paths")
 
         samples: list[float] = []
+        guest_isolation_samples: list[dict[str, bool]] = []
         firecracker_version: dict[str, str] = {}
         for run_index in range(1, args.runs + 1):
-            boot_time_ms, version = _run_guest(
+            boot_time_ms, version, guest_isolation = _run_guest(
                 firecracker_binary,
                 kernel_path,
                 rootfs_path,
@@ -556,6 +564,7 @@ def main() -> int:
                 args.timeout_seconds,
             )
             samples.append(boot_time_ms)
+            guest_isolation_samples.append(guest_isolation)
             firecracker_version = version
 
         summary = summarize_boot_times(samples)
@@ -565,7 +574,10 @@ def main() -> int:
             "jailer_executed": False,
             "production_certification": False,
             "guest_network_configured": False,
-            "guest_rootfs_read_only": True,
+            "guest_rootfs_read_only": all(
+                sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
+            ),
+            "guest_isolation_checks": guest_isolation_samples,
             "guest_ready_marker": GUEST_READY_MARKER,
             "boot_time_measurement": (
                 "elapsed time from immediately before the InstanceStart API request "
