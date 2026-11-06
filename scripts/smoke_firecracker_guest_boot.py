@@ -253,31 +253,38 @@ exec /usr/bin/sleep 60
     test -f /etc/shadow
     test ! -r /etc/shadow
     echo TINLANCE_W2_SENSITIVE_FILES_DENIED
-    test ! -e /dev/kvm
-    test ! -e /dev/mem
-    test ! -e /dev/vhost-net
-    test ! -e /dev/fuse
+    for host_device in /dev/kvm /dev/mem /dev/vhost-net /dev/fuse; do
+        if [ -e "$host_device" ]; then
+            echo "TINLANCE_W2_HOST_DEVICE_UNEXPECTED=$host_device"
+            exit 84
+        fi
+    done
     echo TINLANCE_W2_HOST_DEVICES_ABSENT
-    test ! -S /run/docker.sock
-    test ! -S /var/run/docker.sock
-    test ! -S /run/containerd/containerd.sock
-    test ! -S /run/podman/podman.sock
-    test ! -S /run/crio/crio.sock
-    test ! -S /run/buildkit/buildkitd.sock
+    echo TINLANCE_W2_DEVICE_PROBE_COMPLETED
+    for host_socket in /run/docker.sock /var/run/docker.sock /run/containerd/containerd.sock /run/podman/podman.sock /run/crio/crio.sock /run/buildkit/buildkitd.sock; do
+        if [ -S "$host_socket" ]; then
+            echo "TINLANCE_W2_HOST_SOCKET_UNEXPECTED=$host_socket"
+            exit 85
+        fi
+    done
     echo TINLANCE_W2_HOST_SOCKETS_ABSENT
+    echo TINLANCE_W2_SOCKET_PROBE_COMPLETED
     if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
         echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
         exit 81
     fi
     echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED
+    echo TINLANCE_W2_ESCALATION_PROBE_COMPLETED
     if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; then
         echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED
         exit 82
     fi
     echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    echo TINLANCE_W2_MOUNT_PROBE_COMPLETED
     test -e /proc/sys/kernel/hostname
     test ! -w /proc/sys/kernel/hostname
     echo TINLANCE_W2_PROC_SYS_READONLY
+    echo TINLANCE_W2_PROC_PROBE_COMPLETED
     echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
     export HOME=/tmp
     export npm_config_cache=/tmp/npm-cache
