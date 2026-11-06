@@ -524,3 +524,13 @@ def test_w2_cli_fails_closed_without_content_addressed_oci_rootfs(
     with pytest.raises(SystemExit) as error:
         main()
     assert error.value.code == 2
+
+def test_w2_network_configuration_uses_real_line_endings() -> None:
+    from scripts.smoke_firecracker_guest_boot import w2_network_files
+
+    assert w2_network_files() == {
+        "hosts": "127.0.0.1 localhost\\n::1 localhost\\n",
+        "hostname": "tinlance-w2\\n",
+        "resolv.conf": "# guest network is disabled\\n",
+    }
+
