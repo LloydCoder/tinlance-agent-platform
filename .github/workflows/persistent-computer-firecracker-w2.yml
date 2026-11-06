@@ -95,14 +95,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          docker pull ubuntu:24.04
-          base_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)"
-          case "$base_digest" in
-            ubuntu@sha256:????????????????????????????????????????????????????????????????) ;;
-            *) echo "Ubuntu base image is not digest-pinned: $base_digest"; exit 1 ;;
-          esac
+          base_digest="ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+          docker pull "$base_digest"
           docker build \
             --build-arg BASE_IMAGE="$base_digest" \
+            --build-arg APT_SNAPSHOT=20261106T000000Z \
             --file tests/fixtures/w2-developer-workspace/Dockerfile \
             --tag tinlance-w2-developer-workspace:firecracker \
             tests/fixtures/w2-developer-workspace
