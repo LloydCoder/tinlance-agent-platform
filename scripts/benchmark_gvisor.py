@@ -43,9 +43,15 @@ def build_w2_payload() -> str:
         + "; "
         + "command -v setpriv >/dev/null 2>&1; "
         + "command -v mount >/dev/null 2>&1; "
-        + "awk '/^CapEff:/ { if ($2 != \"0000000000000000\") exit 1; found=1 } END { exit !found }' /proc/self/status; "
+        + (
+            "awk '/^CapEff:/ { if ($2 != \"0000000000000000\") exit 1; found=1 } "
+            "END { exit !found }' /proc/self/status; "
+        )
         + "echo TINLANCE_W2_CAPABILITIES_DROPPED; "
-        + "awk '/^NoNewPrivs:/ { if ($2 != \"1\") exit 1; found=1 } END { exit !found }' /proc/self/status; "
+        + (
+            "awk '/^NoNewPrivs:/ { if ($2 != \"1\") exit 1; found=1 } "
+            "END { exit !found }' /proc/self/status; "
+        )
         + "echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED; "
         + "test -f /etc/shadow; "
         + "test ! -r /etc/shadow; "
@@ -199,7 +205,10 @@ def run_benchmark(
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
         "workload": {
-            "profile": f"{profile}-" + ("minimal-agent" if profile == "W1" else "host-surface-probes"),
+            "profile": (
+                f"{profile}-"
+                + ("minimal-agent" if profile == "W1" else "host-surface-probes")
+            ),
             "network": "none",
             "read_only_rootfs": True,
             "capabilities": "drop-all",
@@ -252,7 +261,8 @@ def main() -> int:
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latency = report["latency"]
     print(
-        f"{report['candidate']} {report['runtime_version']}: {latency['sample_count']} {args.profile} runs; "
+        f"{report['candidate']} {report['runtime_version']}: "
+        f"{latency['sample_count']} {args.profile} runs; "
         f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms"
     )
     return 0
