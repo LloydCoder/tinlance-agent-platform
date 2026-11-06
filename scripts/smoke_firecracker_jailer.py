@@ -369,14 +369,19 @@ def _run_jailer_guest(
             )
             _wait_for_path(socket_path, process, log_path, timeout_seconds)
             firecracker_pid = _find_firecracker_pid(jailer_id, uid)
-            process_evidence = _read_process_evidence(
-                firecracker_pid,
-                uid,
-                gid,
-                chroot_root,
+            process_cgroup = (
+                Path("/proc") / str(firecracker_pid) / "cgroup"
+            ).read_text(encoding="utf-8")
+            cgroup_path = next(
+                (
+                    line.partition("::")[2]
+                    for line in process_cgroup.splitlines()
+                    if "::" in line and line.partition("::")[0] == "0"
+                ),
+                "",
             )
-            cgroup_path = str(process_evidence["cgroup_path"])
-            cgroup_evidence = _verify_cgroup_limits(cgroup_path)
+            if not cgroup_path.startswith("/") or cgroup_path == "/":
+                raise PermissionError("jailed Firecracker has no dedicated cgroup v2")
             guest_kernel, guest_rootfs = _stage_guest_assets(
                 chroot_root,
                 kernel_path,
@@ -424,6 +429,13 @@ def _run_jailer_guest(
             while time.monotonic() < deadline:
                 log_text = log_path.read_text(encoding="utf-8", errors="replace")
                 if GUEST_READY_MARKER in log_text:
+                    process_evidence = _read_process_evidence(
+                        firecracker_pid,
+                        uid,
+                        gid,
+                        chroot_root,
+                    )
+                    cgroup_evidence = _verify_cgroup_limits(cgroup_path)
                     return (
                         (time.monotonic() - started) * 1000,
                         process_evidence,
