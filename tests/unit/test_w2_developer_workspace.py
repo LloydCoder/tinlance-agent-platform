@@ -109,10 +109,7 @@ def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
     assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
     assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
     assert "rm -rf /opt/tinlance-fixture/.git/index /opt/tinlance-fixture/.git/logs" in dockerfile
-
-
-
-def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> None:
+\n\ndef test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> None:
     workflow = (
         Path(__file__).resolve().parents[2]
         / ".github"
