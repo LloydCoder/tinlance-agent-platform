@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: persistent-computer-guest-boot-${{ github.ref }}
+  group: persistent-computer-guest-boot-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
