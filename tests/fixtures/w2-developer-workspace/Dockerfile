@@ -1,9 +1,8 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends git python3 nodejs npm ca-certificates \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends git python3 nodejs npm ca-certificates util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --chown=0:0 . /opt/tinlance-fixture/
