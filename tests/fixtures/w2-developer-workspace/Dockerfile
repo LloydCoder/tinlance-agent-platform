@@ -8,8 +8,17 @@ ARG APT_SNAPSHOT
 # The package manifest emitted below is retained as guest-build provenance.
 # The minimal base has no CA bundle; bootstrap the pinned CA package from the
 # signed Ubuntu HTTP archive before contacting the HTTPS snapshot service.
-RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::Retries=5 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        -o APT::Update::Error-Mode=any \
+        update \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::Retries=5 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        install --yes --no-install-recommends \
         ca-certificates=20260816ubuntu0.24.04.2 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
