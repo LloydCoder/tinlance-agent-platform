@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
