@@ -118,5 +118,40 @@ def test_probe_reports_tooling_and_serializable_evidence(tmp_path: Path) -> None
     payload = result.to_dict()
     assert payload["binaries"] == binaries
     assert payload["architecture"] == "aarch64"
+    assert payload["cgroup_controllers"] == ["cpu", "io", "memory", "pids"]
+    assert payload["cgroup_limits_ready"] is True
     assert payload["microvm_ready"] is True
     assert json.loads(json.dumps(payload))["kernel_release"] == "test-kernel"
+
+
+def test_microvm_readiness_requires_cpu_virtualization_extensions(tmp_path: Path) -> None:
+    write_probe_fixture(tmp_path, kvm=True)
+    (tmp_path / "proc/cpuinfo").write_text("processor: 0\\nflags: fpu sse4_2\\n", encoding="utf-8")
+    result = probe_host_capabilities(
+        root=tmp_path,
+        architecture="x86_64",
+        kernel_release="test-kernel",
+        binary_lookup=lambda _: None,
+        access_check=lambda *_: True,
+    )
+
+    assert result.cpu_virtualization is False
+    assert result.microvm_ready is False
+    assert "CPU virtualization extensions are unavailable" in result.microvm_blockers
+
+
+def test_microvm_readiness_requires_cpu_memory_and_process_cgroup_controllers(
+    tmp_path: Path,
+) -> None:
+    write_probe_fixture(tmp_path, kvm=True)
+    (tmp_path / "sys/fs/cgroup/cgroup.controllers").write_text("memory io\\n", encoding="utf-8")
+    result = probe_host_capabilities(
+        root=tmp_path,
+        architecture="x86_64",
+        kernel_release="test-kernel",
+        binary_lookup=lambda _: None,
+        access_check=lambda *_: True,
+    )
+
+    assert result.microvm_ready is False
+    assert "required cgroup v2 controllers are unavailable: cpu, pids" in result.microvm_blockers

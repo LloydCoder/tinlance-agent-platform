@@ -20,6 +20,8 @@ class HostCapabilities:
     kvm_accessible: bool
     user_namespaces: bool
     cgroup_v2: bool
+    cgroup_controllers: tuple[str, ...]
+    cgroup_limits_ready: bool
     seccomp_filter_supported: bool
     seccomp_active: bool
     apparmor: bool
@@ -31,6 +33,7 @@ class HostCapabilities:
 
     def to_dict(self) -> dict[str, object]:
         payload = asdict(self)
+        payload["cgroup_controllers"] = list(self.cgroup_controllers)
         payload["microvm_blockers"] = list(self.microvm_blockers)
         payload["container_sandbox_blockers"] = list(self.container_sandbox_blockers)
         return payload
@@ -69,7 +72,12 @@ def probe_host_capabilities(
         max_user_namespaces = 0
     user_namespaces = max_user_namespaces > 0
 
-    cgroup_v2 = (sysfs / "fs/cgroup/cgroup.controllers").is_file()
+    cgroup_controller_file = sysfs / "fs/cgroup/cgroup.controllers"
+    cgroup_v2 = cgroup_controller_file.is_file()
+    cgroup_controllers = tuple(sorted(set(_read_text(cgroup_controller_file).split())))
+    required_cgroup_controllers = {"cpu", "memory", "pids"}
+    missing_cgroup_controllers = sorted(required_cgroup_controllers - set(cgroup_controllers))
+    cgroup_limits_ready = cgroup_v2 and not missing_cgroup_controllers
     status = _read_text(proc / "self/status")
     seccomp_active = any(
         line.startswith("Seccomp:") and line.split(":", 1)[1].strip() in {"1", "2"}
@@ -88,6 +96,8 @@ def probe_host_capabilities(
     machine = architecture or platform.machine()
     supported_architectures = {"x86_64", "aarch64", "amd64", "arm64"}
     microvm_blockers: list[str] = []
+    if not cpu_virtualization:
+        microvm_blockers.append("CPU virtualization extensions are unavailable")
     if not kvm_device_present:
         microvm_blockers.append("KVM device is unavailable")
     elif not kvm_accessible:
@@ -96,6 +106,11 @@ def probe_host_capabilities(
         microvm_blockers.append(f"unsupported microVM host architecture: {machine}")
     if not cgroup_v2:
         microvm_blockers.append("cgroup v2 is unavailable")
+    elif not cgroup_limits_ready:
+        microvm_blockers.append(
+            "required cgroup v2 controllers are unavailable: "
+            + ", ".join(missing_cgroup_controllers)
+        )
     if not seccomp_filter_supported:
         microvm_blockers.append("kernel seccomp filter support is unavailable")
 
@@ -104,6 +119,11 @@ def probe_host_capabilities(
         container_blockers.append("unprivileged user namespaces are unavailable")
     if not cgroup_v2:
         container_blockers.append("cgroup v2 is unavailable")
+    elif not cgroup_limits_ready:
+        container_blockers.append(
+            "required cgroup v2 controllers are unavailable: "
+            + ", ".join(missing_cgroup_controllers)
+        )
     if not seccomp_filter_supported:
         container_blockers.append("seccomp filtering is unavailable")
 
@@ -125,6 +145,8 @@ def probe_host_capabilities(
         kvm_accessible=kvm_accessible,
         user_namespaces=user_namespaces,
         cgroup_v2=cgroup_v2,
+        cgroup_controllers=cgroup_controllers,
+        cgroup_limits_ready=cgroup_limits_ready,
         seccomp_filter_supported=seccomp_filter_supported,
         seccomp_active=seccomp_active,
         apparmor=apparmor,
