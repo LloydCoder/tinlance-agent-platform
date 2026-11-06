@@ -380,6 +380,10 @@ def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
         "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
         "noexec,nosuid,nodev tmpfs /workspace"
     ) in script
+    assert (
+        "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,"
+        "noexec,nosuid,nodev tmpfs /tmp"
+    ) in script
     fixture_script = (
         Path(__file__).resolve().parents[1]
         / "fixtures"
