@@ -147,7 +147,7 @@ def build_docker_command(
         "--security-opt=no-new-privileges",
         "--user=65532:65532",
         f"--cpus={2 if workspace else 1}",
-        f"--memory={"2g" if workspace else "512m"}",
+        f"--memory={'2g' if workspace else '512m'}",
         "--pids-limit=128",
         "--tmpfs",
         "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
