@@ -66,7 +66,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
     assert dockerfile.count("--snapshot=") == 2
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
-    assert dockerfile.index("apt-get update") < dockerfile.index(
+    assert dockerfile.index("Acquire::Retries=5") < dockerfile.index(
         '--snapshot="${APT_SNAPSHOT}" update'
     )
 
