@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import asdict, dataclass
 import os
-from pathlib import Path
 import platform
 import shutil
+
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 
 BinaryLookup = Callable[[str], str | None]
