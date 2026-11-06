@@ -202,6 +202,7 @@ CapEff:\t0000000000000000
             thread_seccomp_modes=[2, 2],
         )
 
+
 def test_verify_jailer_evidence_rejects_any_unfiltered_firecracker_thread() -> None:
     status = """Uid:\t987\t987\t987\t987
 Gid:\t987\t987\t987\t987
