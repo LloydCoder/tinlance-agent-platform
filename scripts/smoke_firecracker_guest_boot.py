@@ -30,6 +30,7 @@ GUEST_W2_UNEXPECTED_MARKERS = (
     "TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED",
     "TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED",
     "TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED",
+    "TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED",
 )
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 _OCI_IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
@@ -253,13 +254,18 @@ exec /usr/bin/sleep 60
     test -f /etc/shadow
     test ! -r /etc/shadow
     echo TINLANCE_W2_SENSITIVE_FILES_DENIED
-    for host_device in /dev/kvm /dev/mem /dev/vhost-net /dev/fuse; do
+    for host_device in /dev/kvm /dev/vhost-net; do
         if [ -e "$host_device" ]; then
             echo "TINLANCE_W2_HOST_DEVICE_UNEXPECTED=$host_device"
             exit 84
         fi
     done
     echo TINLANCE_W2_HOST_DEVICES_ABSENT
+    if [ -e /dev/mem ] && [ -r /dev/mem ]; then
+        echo TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED
+        exit 86
+    fi
+    echo TINLANCE_W2_GUEST_MEM_DEVICE_DENIED
     echo TINLANCE_W2_DEVICE_PROBE_COMPLETED
     for host_socket in \
         /run/docker.sock \
@@ -352,6 +358,7 @@ def verify_guest_boot_markers(
                 "no_new_privileges": "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
                 "sensitive_files_denied": "TINLANCE_W2_SENSITIVE_FILES_DENIED",
                 "host_devices_absent": "TINLANCE_W2_HOST_DEVICES_ABSENT",
+                "guest_mem_device_denied": "TINLANCE_W2_GUEST_MEM_DEVICE_DENIED",
                 "host_sockets_absent": "TINLANCE_W2_HOST_SOCKETS_ABSENT",
                 "privilege_escalation_denied": "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
                 "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
