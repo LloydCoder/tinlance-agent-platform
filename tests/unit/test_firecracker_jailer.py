@@ -210,7 +210,7 @@ NoNewPrivs:\t1
 Seccomp:\t2
 CapEff:\t0000000000000000
 """
-    with pytest.raises(PermissionError, match="thread seccomp"):
+    with pytest.raises(PermissionError, match="threads lack seccomp"):
         verify_jailer_process_evidence(
             status_text=status,
             cgroup_text="0::/firecracker/fc-smoke-421",
