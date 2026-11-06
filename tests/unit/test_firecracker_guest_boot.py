@@ -238,7 +238,6 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
 
     with pytest.raises(ValueError, match="nonroot_uid_confirmed"):
         verify_guest_boot_markers(
-            "TINLANCE_NO_NIC_CONFIRMED\\n"
+            "TINLANCE_NO_NIC_CONFIRMED\n"
             "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
         )
-\n
