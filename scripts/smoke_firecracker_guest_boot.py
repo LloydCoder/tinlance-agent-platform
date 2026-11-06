@@ -220,7 +220,7 @@ for iface_path in /sys/class/net/*; do
 done
 echo TINLANCE_NO_NIC_CONFIRMED
 command -v setpriv >/dev/null 2>&1 || { echo TINLANCE_SETPRIV_MISSING; exit 73; }
-mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp
+mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev tmpfs /tmp
 setpriv --reuid=65532 --regid=65532 --clear-groups /bin/sh -c '
     set -eu
     test "$(id -u)" = 65532
