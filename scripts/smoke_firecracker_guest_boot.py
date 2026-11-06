@@ -148,16 +148,8 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
     etc_dir.mkdir(parents=True, exist_ok=True)
     passwd_path = etc_dir / "passwd"
     group_path = etc_dir / "group"
-    passwd_lines = (
-        passwd_path.read_text(encoding="utf-8").splitlines()
-        if passwd_path.exists()
-        else []
-    )
-    group_lines = (
-        group_path.read_text(encoding="utf-8").splitlines()
-        if group_path.exists()
-        else []
-    )
+    passwd_lines = passwd_path.read_text(encoding="utf-8").splitlines() if passwd_path.exists() else []
+    group_lines = group_path.read_text(encoding="utf-8").splitlines() if group_path.exists() else []
 
     for line in passwd_lines:
         fields = line.split(":")
@@ -166,13 +158,9 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
             and (fields[0] == "tinlance" or fields[2] == "65532")
             and (fields[0] != "tinlance" or fields[2] != "65532")
         ):
-            raise ValueError(
-                "UID 65532 is already assigned to a different guest account"
-            )
+            raise ValueError("UID 65532 is already assigned to a different guest account")
     if not any(line.startswith("tinlance:") for line in passwd_lines):
-        passwd_lines.append(
-            "tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin"
-        )
+        passwd_lines.append("tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin")
         passwd_path.write_text("\n".join(passwd_lines) + "\n", encoding="utf-8")
 
     for line in group_lines:
