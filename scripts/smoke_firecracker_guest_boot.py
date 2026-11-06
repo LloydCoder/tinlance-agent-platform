@@ -434,13 +434,16 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     target = PurePosixPath(member.linkname)
                     if target.is_absolute() or ".." in target.parts:
                         raise ValueError(f"unsafe hardlink in rootfs archive: {member.name}")
+            for member in members:
+                member.uid = member.gid = None
+                member.uname = member.gname = None
             ordered = sorted(
                 members,
                 key=lambda item: (
                     0 if item.isdir() else 1 if item.isfile() else 2 if item.issym() else 3
                 ),
             )
-            archive.extractall(destination, members=ordered, filter="data")
+            archive.extractall(destination, members=ordered, filter="tar")
     except (tarfile.TarError, OSError, ValueError) as error:
         raise ValueError(f"unsafe rootfs archive: {error}") from error
 
