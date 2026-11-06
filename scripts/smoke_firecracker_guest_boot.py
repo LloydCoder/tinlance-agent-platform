@@ -232,9 +232,9 @@ exec /usr/bin/sleep 60
             "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups",
         )
         probes = """    command -v mount >/dev/null 2>&1
-    grep -q '^CapEff: *0000000000000000
+    grep -q "^CapEff: *0000000000000000" /proc/self/status
     echo TINLANCE_W2_CAPABILITIES_DROPPED
-    grep -q '^NoNewPrivs: *1
+    grep -q "^NoNewPrivs: *1" /proc/self/status
     echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
     test -f /etc/shadow
     test ! -r /etc/shadow
@@ -276,7 +276,12 @@ def verify_guest_boot_markers(
         raise ValueError("profile must be W1 or W2")
     for marker in GUEST_W2_UNEXPECTED_MARKERS:
         if marker in log_text:
-            detail = marker.removeprefix("TINLANCE_W2_").removesuffix("_UNEXPECTED").lower().replace("_", " ")
+            detail = (
+                marker.removeprefix("TINLANCE_W2_")
+                .removesuffix("_UNEXPECTED")
+                .lower()
+                .replace("_", " ")
+            )
             raise PermissionError(f"guest host-surface boundary violated: {detail}")
     if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
         raise PermissionError("guest root filesystem unexpectedly accepted a write")
