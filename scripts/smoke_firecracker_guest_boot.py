@@ -33,6 +33,8 @@ GUEST_W2_UNEXPECTED_MARKERS = (
     "TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED",
 )
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
+_OCI_IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
+_OCI_IMAGE_ID = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 class GuestAssetManifest(TypedDict):
@@ -815,6 +817,9 @@ def main() -> int:
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--w2-rootfs-tar", type=Path)
+    parser.add_argument("--w2-image-id")
+    parser.add_argument("--w2-base-image-digest")
     parser.add_argument("--timeout-seconds", type=float, default=45)
     args = parser.parse_args()
 
@@ -830,6 +835,17 @@ def main() -> int:
 
     if args.runs < 1:
         parser.error("--runs must be at least 1")
+    if args.profile == "W2":
+        if args.w2_rootfs_tar is None or not args.w2_rootfs_tar.is_file():
+            parser.error("--profile W2 requires an existing --w2-rootfs-tar")
+        if args.w2_image_id is None or not _OCI_IMAGE_ID.fullmatch(args.w2_image_id):
+            parser.error("--profile W2 requires a content-addressed --w2-image-id")
+        if args.w2_base_image_digest is None or not _OCI_IMAGE_DIGEST.fullmatch(
+            args.w2_base_image_digest
+        ):
+            parser.error("--profile W2 requires a digest-pinned --w2-base-image-digest")
+    elif any((args.w2_rootfs_tar, args.w2_image_id, args.w2_base_image_digest)):
+        parser.error("W2 OCI rootfs arguments are only valid with --profile W2")
     if args.firecracker is None or not args.firecracker.is_file():
         parser.error("--firecracker must point to the verified Firecracker binary")
     if args.firecracker_archive is None or not args.firecracker_archive.is_file():
@@ -847,7 +863,12 @@ def main() -> int:
         firecracker_binary = work_dir / "firecracker"
         shutil.copy2(args.firecracker, firecracker_binary)
         firecracker_binary.chmod(0o755)
-        assets = _download_pinned_guest_assets(work_dir, manifest, args.profile)
+        assets = _download_pinned_guest_assets(
+            work_dir,
+            manifest,
+            args.profile,
+            args.w2_rootfs_tar,
+        )
         kernel_path = assets["kernel_path"]
         rootfs_path = assets["rootfs_path"]
         if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
@@ -883,7 +904,11 @@ def main() -> int:
             ),
             "guest_isolation_checks": guest_isolation_samples,
             "guest_workload": {
-                "profile": "W1-minimal-agent" if args.profile == "W1" else "W2-host-surface-probes",
+                "profile": (
+                    "W1-minimal-agent"
+                    if args.profile == "W1"
+                    else "W2-developer-workspace-and-host-surface"
+                ),
                 "network": "none",
                 "rootfs_read_only": True,
                 "uid": 65532,
@@ -892,6 +917,15 @@ def main() -> int:
                 "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
                 "host_surface_marker": (
                     "TINLANCE_W2_HOST_SURFACE_PROBES_OK" if args.profile == "W2" else None
+                ),
+                "developer_workspace": args.profile == "W2",
+                "workspace_tmpfs": (
+                    "/workspace:rw,size=128m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev"
+                    if args.profile == "W2"
+                    else None
+                ),
+                "developer_workspace_marker": (
+                    "TINLANCE_W2_DEVELOPER_WORKSPACE_OK" if args.profile == "W2" else None
                 ),
             },
             "guest_ready_marker": GUEST_READY_MARKER,
@@ -907,7 +941,13 @@ def main() -> int:
             "host_kernel_release": platform.release(),
             "upstream_ci_artifact_prefix": assets["artifact_prefix"],
             "guest_kernel_key": assets["kernel_key"],
-            "guest_rootfs_key": assets["rootfs_key"],
+            "guest_rootfs_key": assets["rootfs_key"] if args.profile == "W1" else None,
+            "guest_rootfs_source": (
+                "pinned-upstream-squashfs" if args.profile == "W1" else "content-addressed-oci-export"
+            ),
+            "w2_base_image_digest": args.w2_base_image_digest,
+            "w2_image_id": args.w2_image_id,
+            "w2_rootfs_tar_sha256": assets["w2_rootfs_tar_sha256"],
             "guest_kernel_sha256": assets["kernel_sha256"],
             "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
             "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
