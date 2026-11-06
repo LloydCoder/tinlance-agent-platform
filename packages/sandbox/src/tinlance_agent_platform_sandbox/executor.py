@@ -73,8 +73,11 @@ class SandboxExecutor:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait()
 
+            # max_output_bytes is an aggregate result budget across both streams.
+            # Preserve stdout first, then use only the remaining budget for stderr.
             stdout_data = stdout_path.read_bytes()[: limits.max_output_bytes]
-            stderr_data = stderr_path.read_bytes()[: limits.max_output_bytes]
+            stderr_budget = max(0, limits.max_output_bytes - len(stdout_data))
+            stderr_data = stderr_path.read_bytes()[:stderr_budget]
             return ProcessResult(
                 process.returncode,
                 stdout_data.decode("utf-8", errors="replace"),
