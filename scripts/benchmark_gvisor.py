@@ -76,10 +76,10 @@ def build_docker_command(
         "-lc",
         payload,
     ]
+
+
 def _capture(command: list[str]) -> str:
-    result = subprocess.run(
-        command, check=True, capture_output=True, text=True, timeout=120
-    )
+    result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=120)
     return result.stdout.strip()
 
 
