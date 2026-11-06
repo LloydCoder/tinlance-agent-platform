@@ -142,8 +142,46 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def ensure_w1_user(rootfs_dir: Path) -> None:
+    """Add a deterministic unprivileged W1 account to an extracted guest rootfs."""
+    etc_dir = rootfs_dir / "etc"
+    etc_dir.mkdir(parents=True, exist_ok=True)
+    passwd_path = etc_dir / "passwd"
+    group_path = etc_dir / "group"
+    passwd_lines = passwd_path.read_text(encoding="utf-8").splitlines() if passwd_path.exists() else []
+    group_lines = group_path.read_text(encoding="utf-8").splitlines() if group_path.exists() else []
+
+    passwd_matches = [
+        line.split(":")
+        for line in passwd_lines
+        if len(line.split(":")) >= 7
+        and (line.split(":")[0] == "tinlance" or line.split(":")[2] == "65532")
+    ]
+    if passwd_matches and not any(parts[0] == "tinlance" and parts[2] == "65532" for parts in passwd_matches):
+        raise ValueError("UID 65532 is already assigned to a different guest account")
+    if not passwd_matches:
+        passwd_lines.append("tinlance:x:65532:65532:Tinlance W1:/home/tinlance:/usr/sbin/nologin")
+        passwd_path.write_text("\\n".join(passwd_lines) + "\\n", encoding="utf-8")
+
+    group_matches = [
+        line.split(":")
+        for line in group_lines
+        if len(line.split(":")) >= 3
+        and (line.split(":")[0] == "tinlance" or line.split(":")[2] == "65532")
+    ]
+    if group_matches and not any(parts[0] == "tinlance" and parts[2] == "65532" for parts in group_matches):
+        raise ValueError("GID 65532 is already assigned to a different guest group")
+    if not group_matches:
+        group_lines.append("tinlance:x:65532:")
+        group_path.write_text("\\n".join(group_lines) + "\\n", encoding="utf-8")
+
+    home_dir = rootfs_dir / "home" / "tinlance"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    home_dir.chmod(0o700)
+
+
 def guest_init_script() -> str:
-    """Return a fail-closed guest init that proves read-only rootfs and no NIC."""
+    """Return a fail-closed guest init that proves isolation and a non-root W1 workload."""
     return """#!/bin/sh
 set -eu
 mount -t proc proc /proc 2>/dev/null || true
@@ -164,9 +202,14 @@ for iface_path in /sys/class/net/*; do
     fi
 done
 echo TINLANCE_NO_NIC_CONFIRMED
-mount -t tmpfs -o size=64m tmpfs /tmp
-printf tinlance-gvisor-ok > /tmp/workload.txt
-test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok
+command -v setpriv >/dev/null 2>&1 || { echo TINLANCE_SETPRIV_MISSING; exit 73; }
+mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp
+setpriv --reuid=65532 --regid=65532 --clear-groups /bin/sh -c '
+    test "$(id -u)" = 65532
+    echo TINLANCE_NONROOT_UID_CONFIRMED
+    printf tinlance-gvisor-ok > /tmp/workload.txt
+    test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok
+'
 echo TINLANCE_W1_WORKLOAD_OK
 echo TINLANCE_GUEST_READY
 exec /usr/bin/sleep 60
