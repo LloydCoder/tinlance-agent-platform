@@ -227,6 +227,13 @@ def _find_firecracker_pid(
     )
 
 
+def _readlink_as_root(path: Path) -> str:
+    return _run(
+        ["sudo", "-n", "readlink", str(path)],
+        capture_output=True,
+    ).stdout.strip()
+
+
 def _read_process_evidence(
     pid: int,
     uid: int,
@@ -240,11 +247,11 @@ def _read_process_evidence(
         expected_uid=uid,
         expected_gid=gid,
         host_mount_namespace=os.readlink("/proc/self/ns/mnt"),
-        process_mount_namespace=os.readlink(proc / "ns/mnt"),
+        process_mount_namespace=_readlink_as_root(proc / "ns/mnt"),
         host_pid_namespace=os.readlink("/proc/self/ns/pid"),
-        process_pid_namespace=os.readlink(proc / "ns/pid"),
+        process_pid_namespace=_readlink_as_root(proc / "ns/pid"),
         expected_chroot_root=str(expected_chroot_root.resolve()),
-        process_root=os.readlink(proc / "root"),
+        process_root=_readlink_as_root(proc / "root"),
     )
 
 
