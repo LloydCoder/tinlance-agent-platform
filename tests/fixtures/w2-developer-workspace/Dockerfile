@@ -5,6 +5,7 @@ ARG APT_SNAPSHOT
 
 # Resolve every package from one immutable Ubuntu archive snapshot. Updating the
 # indexes and installing from that same snapshot avoids mixed-time package sets.
+# The package manifest emitted below is retained as guest-build provenance.
 RUN DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
