@@ -225,11 +225,15 @@ def verify_guest_boot_markers(log_text: str) -> dict[str, bool]:
         raise PermissionError("guest root filesystem unexpectedly accepted a write")
     if GUEST_NIC_UNEXPECTED_MARKER in log_text:
         raise PermissionError("guest unexpectedly exposed a non-loopback network interface")
+    if "TINLANCE_SETPRIV_MISSING" in log_text:
+        raise RuntimeError("guest image does not provide setpriv for the non-root W1 workload")
     if "TINLANCE_SYSFS_MOUNT_FAILED" in log_text:
         raise RuntimeError("guest could not mount sysfs to verify network interfaces")
     required = {
         "rootfs_read_only_confirmed": GUEST_READ_ONLY_MARKER,
         "no_non_loopback_network_interfaces": GUEST_NO_NIC_MARKER,
+        "nonroot_uid_confirmed": "TINLANCE_NONROOT_UID_CONFIRMED",
+        "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
         "guest_ready": GUEST_READY_MARKER,
     }
     missing = [name for name, marker in required.items() if marker not in log_text]
@@ -244,6 +248,7 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
     init_path.parent.mkdir(parents=True, exist_ok=True)
     init_path.write_text(guest_init_script(), encoding="utf-8")
     init_path.chmod(0o755)
+    ensure_w1_user(extract_dir)
     tmp_dir = extract_dir / "tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     tmp_dir.chmod(0o1777)
@@ -272,6 +277,7 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
                 ]
             )
     _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
+    _run(["sudo", "-n", "chown", "65532:65532", str(extract_dir / "home" / "tinlance")])
     try:
         _run(["truncate", "-s", "1G", str(rootfs_path)])
         _run(
