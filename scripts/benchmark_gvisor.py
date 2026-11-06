@@ -175,9 +175,7 @@ def _capture(command: list[str]) -> str:
     )
     if result.returncode != 0:
         detail = result.stderr.strip()[-2000:]
-        raise RuntimeError(
-            f"command failed with exit code {result.returncode}: {detail}"
-        )
+        raise RuntimeError(f"command failed with exit code {result.returncode}: {detail}")
     return result.stdout.strip()
 
 
