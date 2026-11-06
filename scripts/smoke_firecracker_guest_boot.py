@@ -33,6 +33,18 @@ GUEST_W2_UNEXPECTED_MARKERS = (
     "TINLANCE_W2_GUEST_MEM_DEVICE_READABLE_UNEXPECTED",
 )
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
+
+def machine_config_for_profile(profile: str) -> dict[str, int | bool]:
+    """Return the bounded Firecracker machine profile; reject unknown profiles."""
+    profiles: dict[str, dict[str, int | bool]] = {
+        "W1": {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+        "W2": {"vcpu_count": 2, "mem_size_mib": 2048, "smt": False},
+    }
+    try:
+        return profiles[profile].copy()
+    except KeyError as exc:
+        raise ValueError("profile must be W1 or W2") from exc
+
 _OCI_IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
 _OCI_IMAGE_ID = re.compile(r"^sha256:[a-f0-9]{64}$")
 
@@ -644,7 +656,7 @@ def _run_guest(
                 socket_path,
                 "PUT",
                 "/machine-config",
-                {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+                machine_config_for_profile(profile),
             )
             _api_request(
                 socket_path,
