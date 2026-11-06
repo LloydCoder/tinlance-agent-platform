@@ -287,7 +287,15 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
                 ]
             )
     _run(["sudo", "-n", "chown", "-R", "root:root", str(extract_dir)])
-    _run(["sudo", "-n", "chown", "65532:65532", str(extract_dir / "home" / "tinlance")])
+    _run(
+        [
+            "sudo",
+            "-n",
+            "chown",
+            "65532:65532",
+            str(extract_dir / "home" / "tinlance"),
+        ]
+    )
     try:
         _run(["truncate", "-s", "1G", str(rootfs_path)])
         _run(
