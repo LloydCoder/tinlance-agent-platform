@@ -108,4 +108,3 @@ def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
     assert "git init --quiet --initial-branch=main" in dockerfile
     assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
     assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
-
