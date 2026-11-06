@@ -55,16 +55,20 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
     assert update_index < install_index
-    assert "ca-certificates git python3 nodejs npm util-linux" in dockerfile
+    assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
+    assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" not in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
     assert "Acquire::Retries=5" in dockerfile
     assert "APT::Update::Error-Mode=any" in dockerfile
-    assert dockerfile.count("Acquire::Retries=5") == 4
-    assert dockerfile.count("Acquire::http::Timeout=30") == 4
-    assert dockerfile.count("Acquire::https::Timeout=30") == 4
-    assert dockerfile.count("APT::Update::Error-Mode=any") == 2
-    assert dockerfile.count("--snapshot=") == 2
+    assert dockerfile.count("Acquire::Retries=5") == 3
+    assert dockerfile.count("Acquire::http::Timeout=30") == 3
+    assert dockerfile.count("Acquire::https::Timeout=30") == 3
+    assert dockerfile.count("APT::Update::Error-Mode=any") == 1
+    assert dockerfile.count("--snapshot=") == 3
+    assert "Acquire::https::Verify-Peer=false" not in dockerfile
+    assert "RUN --network=none" in dockerfile
+    assert "find / -xdev ! -type l -perm /6000" in dockerfile
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
     assert dockerfile.index("Acquire::Retries=5") < dockerfile.index(
         '--snapshot="${APT_SNAPSHOT}" update'
@@ -100,3 +104,25 @@ def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None
     assert "--cap-drop=ALL" in w2
     assert "--user=65532:65532" in w2
     assert "sha256:" + "b" * 64 in w2
+
+
+def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
+    fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "w2-developer-workspace"
+    dockerfile = (fixture_root / "Dockerfile").read_text(encoding="utf-8")
+    assert "git -C /opt/tinlance-fixture init --quiet --initial-branch=main" in dockerfile
+    assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
+    assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
+    assert "rm -rf /opt/tinlance-fixture/.git/index /opt/tinlance-fixture/.git/logs" in dockerfile
+
+
+def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github"
+        / "workflows"
+        / "persistent-computer-firecracker-w2.yml"
+    ).read_text(encoding="utf-8")
+    assert "timeout-minutes: 60" in workflow
+    assert "--runs 30 --profile W2" in workflow
+    assert 'report.get("sample_count") != 30' in workflow
+    assert "len(markers) != 30" in workflow
