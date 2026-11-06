@@ -124,7 +124,7 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
     init_path.parent.mkdir(parents=True, exist_ok=True)
     init_path.write_text(
-        "#!/bin/sh\\necho TINLANCE_GUEST_READY\\nexec /usr/bin/sleep 60\\n",
+        "#!/bin/sh\necho TINLANCE_GUEST_READY\nexec /usr/bin/sleep 60\n",
         encoding="utf-8",
     )
     init_path.chmod(0o755)
@@ -136,6 +136,8 @@ def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -
         ("tty", 5, 0, "666"),
     ):
         node_path = dev_dir / node
+        if node_path.is_symlink() and not node_path.exists():
+            node_path.unlink()
         if not node_path.exists():
             _run(
                 [
