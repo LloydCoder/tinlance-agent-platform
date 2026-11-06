@@ -28,6 +28,20 @@ _VOLATILE_PREFIXES = (
     "var/log/apt/",
     "var/tmp/",
 )
+_VOLATILE_PAX_HEADERS = {
+    "atime",
+    "ctime",
+    "mtime",
+    "path",
+    "linkpath",
+    "size",
+    "uid",
+    "gid",
+    "uname",
+    "gname",
+    "hdrcharset",
+    "LIBARCHIVE.creationtime",
+}
 
 
 def _is_volatile_path(name: str) -> bool:
@@ -68,7 +82,11 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
     member.uname = ""
     member.gname = ""
     member.mtime = SOURCE_DATE_EPOCH
-    member.pax_headers = {}
+    member.pax_headers = {
+        key: value
+        for key, value in member.pax_headers.items()
+        if key not in _VOLATILE_PAX_HEADERS
+    }
     if member.isdir() or member.issym() or member.islnk():
         member.size = 0
     return member
