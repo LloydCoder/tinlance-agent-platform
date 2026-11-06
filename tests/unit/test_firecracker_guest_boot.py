@@ -287,6 +287,8 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
         "TINLANCE_W2_PROC_SYS_READONLY",
         "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+        "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
@@ -445,3 +447,27 @@ def test_w2_rootfs_tar_normalizes_safe_absolute_guest_symlinks(tmp_path: Path) -
     destination = tmp_path / "rootfs"
     extract_w2_rootfs_tar(archive, destination)
     assert os.readlink(destination / "etc/python3") == "../usr/bin/python3"
+
+
+def test_w2_cli_fails_closed_without_content_addressed_oci_rootfs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    from scripts.smoke_firecracker_guest_boot import main
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "smoke_firecracker_guest_boot.py",
+            "--profile",
+            "W2",
+            "--output",
+            str(tmp_path / "report.json"),
+        ],
+    )
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 2
