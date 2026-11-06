@@ -152,7 +152,9 @@ def test_normalizer_preserves_semantic_pax_xattrs_and_strips_volatile_metadata(
         assert normalized.mtime == SOURCE_DATE_EPOCH
 
 
-def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(tmp_path: Path) -> None:
+def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(
+    tmp_path: Path,
+) -> None:
     def write_archive(path: Path, regular_name: str, hardlink_name: str, inode: str) -> None:
         with tarfile.open(path, "w", format=tarfile.PAX_FORMAT) as archive:
             regular = tarfile.TarInfo(regular_name)
@@ -184,4 +186,3 @@ def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(tmp_pat
         assert all(member.isfile() for member in members)
         assert all("SCHILY.ino" not in member.pax_headers for member in members)
         assert all("SCHILY.nlink" not in member.pax_headers for member in members)
-
