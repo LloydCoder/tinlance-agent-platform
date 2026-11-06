@@ -105,9 +105,10 @@ def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None
 def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
     fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "w2-developer-workspace"
     dockerfile = (fixture_root / "Dockerfile").read_text(encoding="utf-8")
-    assert "git init --quiet --initial-branch=main" in dockerfile
+    assert "git -C /opt/tinlance-fixture init --quiet --initial-branch=main" in dockerfile
     assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
     assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
+    assert "rm -rf /opt/tinlance-fixture/.git/index /opt/tinlance-fixture/.git/logs" in dockerfile
 
 
 
