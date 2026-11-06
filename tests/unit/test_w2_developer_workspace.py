@@ -50,6 +50,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
+    assert "dpkg-query -W -f='${binary:Package}=${Version}\\\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
