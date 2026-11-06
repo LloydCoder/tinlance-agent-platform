@@ -147,16 +147,16 @@ def test_guest_init_executes_nonroot_w1_workload_in_owned_tmpfs_before_ready() -
     script = guest_init_script()
     assert "setpriv --reuid=65532 --regid=65532 --clear-groups" in script
     assert 'test "$(id -u)" = 65532' in script
-        "TINLANCE_NONROOT_UID_CONFIRMED\nTINLANCE_W1_WORKLOAD_OK\nTINLANCE_GUEST_READY"
+    assert "TINLANCE_NONROOT_UID_CONFIRMED" in script
     assert "mode=0700,uid=65532,gid=65532" in script
     assert "printf tinlance-gvisor-ok > /tmp/workload.txt" in script
     assert 'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok' in script
     assert (
-            "TINLANCE_NO_NIC_CONFIRMED\n"
-        "TINLANCE_NONROOT_UID_CONFIRMED\nTINLANCE_W1_WORKLOAD_OK\nTINLANCE_GUEST_READY"
+        script.index("TINLANCE_NO_NIC_CONFIRMED")
+        < script.index("TINLANCE_NONROOT_UID_CONFIRMED")
     )
     assert (
-        "TINLANCE_NONROOT_UID_CONFIRMED\nTINLANCE_W1_WORKLOAD_OK\nTINLANCE_GUEST_READY"
+        script.index("TINLANCE_NONROOT_UID_CONFIRMED")
         < script.index("TINLANCE_W1_WORKLOAD_OK")
     )
     assert script.index("TINLANCE_W1_WORKLOAD_OK") < script.index("TINLANCE_GUEST_READY")
