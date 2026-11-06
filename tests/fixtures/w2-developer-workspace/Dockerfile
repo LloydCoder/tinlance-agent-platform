@@ -3,16 +3,9 @@ ARG APT_SNAPSHOT=20261106T000000Z
 FROM ${BASE_IMAGE}
 ARG APT_SNAPSHOT
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
-        ca-certificates=20260816ubuntu0.24.04.2 \
-        openssl=3.0.13-0ubuntu3.16 \
-        libssl3t64=3.0.13-0ubuntu3.16 \
-    && sed -i \
-        -e 's/^Suites: noble noble-updates noble-backports$/Suites: noble noble-updates/' \
-        -e 's/^Components: main restricted universe multiverse$/Components: main universe/' \
-        /etc/apt/sources.list.d/ubuntu.sources \
-    && DEBIAN_FRONTEND=noninteractive apt-get \
+# Resolve every package from one immutable Ubuntu archive snapshot. Updating the
+# indexes and installing from that same snapshot avoids mixed-time package sets.
+RUN DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
@@ -22,9 +15,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
-        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends git python3 nodejs npm util-linux \
+        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
+        ca-certificates git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
