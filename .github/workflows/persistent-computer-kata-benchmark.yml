@@ -1,4 +1,4 @@
-name: Persistent Computer Kata W1 Benchmark
+name: Persistent Computer Kata W1 and W2 Benchmark
 
 on:
   pull_request:
@@ -7,6 +7,8 @@ on:
       - ".github/workflows/persistent-computer-kata-benchmark.yml"
       - "scripts/benchmark_gvisor.py"
       - "tests/unit/test_gvisor_benchmark.py"
+      - "tests/unit/test_w2_developer_workspace.py"
+      - "tests/fixtures/w2-developer-workspace/**"
       - "pyproject.toml"
   workflow_dispatch:
 
@@ -19,9 +21,9 @@ concurrency:
 
 jobs:
   kata-w1:
-    name: Kata QEMU runtime-rs W1 workload (ephemeral KVM runner)
+    name: Kata QEMU runtime-rs W1 and W2 workloads (ephemeral KVM runner)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -34,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test]"
       - name: Test shared OCI benchmark contract
-        run: pytest -q tests/unit/test_gvisor_benchmark.py
+        run: pytest -q tests/unit/test_gvisor_benchmark.py tests/unit/test_w2_developer_workspace.py
       - name: Verify KVM prerequisites
         run: |
           test -c /dev/kvm
@@ -96,6 +98,22 @@ jobs:
             *) echo "Image digest was not returned: $image_digest"; exit 1 ;;
           esac
           echo "image_digest=$image_digest" >> "$GITHUB_OUTPUT"
+      - name: Build pinned W2 developer-workspace image
+        id: workspace
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg BASE_IMAGE='${{ steps.image.outputs.image_digest }}' \
+            --file tests/fixtures/w2-developer-workspace/Dockerfile \
+            --tag tinlance-w2-developer-workspace:ci \
+            tests/fixtures/w2-developer-workspace
+          image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:ci)"
+          case "$image_id" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
+          esac
+          echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
+          echo "W2 developer workspace image: $image_id"
       - name: Prove Kata launches a separate guest kernel
         run: |
           host_kernel="$(uname -r)"
@@ -114,28 +132,38 @@ jobs:
             --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
             --candidate kata-qemu-runtime-rs \
             --output artifacts/kata-w1.json
+      - name: Run 30 restricted Kata W2 developer-workspace workloads
+        run: |
+          python scripts/benchmark_gvisor.py \
+            --image-digest '${{ steps.workspace.outputs.image_id }}' \
+            --runs 30 \
+            --runtime-name kata \
+            --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
+            --candidate kata-qemu-runtime-rs \
+            --profile W2 \
+            --output artifacts/kata-w2.json
       - name: Publish Kata benchmark summary
         if: always()
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          path = Path("artifacts/kata-w1.json")
-          if not path.exists():
-              print("No Kata benchmark report was produced.")
-              raise SystemExit(0)
-          report = json.loads(path.read_text(encoding="utf-8"))
-          latency = report["latency"]
-          print(f"Kata: {latency['sample_count']} W1 samples")
-          print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
-          print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
+          for profile in ("w1", "w2"):
+              path = Path(f"artifacts/kata-{profile}.json")
+              if not path.exists():
+                  raise SystemExit(f"Missing Kata {profile.upper()} benchmark report.")
+              report = json.loads(path.read_text(encoding="utf-8"))
+              latency = report["latency"]
+              print(f"Kata {profile.upper()}: {latency['sample_count']} samples")
+              print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
+              print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
           print("Feasibility benchmark only; not production isolation certification.")
           PY
       - name: Upload Kata benchmark evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: kata-w1-benchmark-${{ github.run_id }}
+          name: kata-w1-w2-benchmark-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: warn
           retention-days: 90

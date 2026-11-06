@@ -1,0 +1,143 @@
+name: Persistent Computer Firecracker W2 Host Surface Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/persistent-computer-firecracker-w2.yml"
+      - "scripts/__init__.py"
+      - "scripts/probe_persistent_computer_host.py"
+      - "scripts/smoke_firecracker_guest_boot.py"
+      - "tests/fixtures/firecracker-guest-assets.json"
+      - "tests/unit/test_firecracker_guest_boot.py"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-computer-guest-boot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guest-boot:
+    name: KVM guest boot smoke (ephemeral runner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Install project test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+
+      - name: Test guest boot evidence helpers
+        run: pytest -q tests/unit/test_firecracker_guest_boot.py
+
+      - name: Verify KVM and resource-control prerequisites
+        run: |
+          mkdir -p artifacts
+          sudo env PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" python scripts/probe_persistent_computer_host.py --output artifacts/host.json
+          sudo chmod 644 artifacts/host.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/host.json").read_text(encoding="utf-8"))
+          required = {
+              "microvm_ready": report.get("microvm_ready") is True,
+              "kvm_accessible": report.get("kvm_accessible") is True,
+              "cpu_virtualization": report.get("cpu_virtualization") is True,
+              "cgroup_limits_ready": report.get("cgroup_limits_ready") is True,
+              "seccomp_filter_supported": report.get("seccomp_filter_supported") is True,
+          }
+          failed = [name for name, passed in required.items() if not passed]
+          if failed:
+              raise SystemExit(f"KVM guest boot prerequisites unavailable: {failed}; report={report}")
+          print("KVM, CPU virtualization, cgroup quota controllers and seccomp-filter prerequisites passed")
+          PY
+
+      - name: Download and verify pinned Firecracker release
+        run: |
+          set -euo pipefail
+          version="1.17.0"
+          arch="x86_64"
+          archive="/tmp/firecracker-v${version}-${arch}.tgz"
+          expected_sha="06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
+          curl --fail --silent --show-error --location \
+            "https://github.com/firecracker-microvm/firecracker/releases/download/v${version}/firecracker-v${version}-${arch}.tgz" \
+            --output "${archive}"
+          echo "${expected_sha}  ${archive}" | sha256sum --check -
+          mkdir -p /tmp/firecracker-release
+          tar -xzf "${archive}" -C /tmp/firecracker-release
+          firecracker_bin="$(find /tmp/firecracker-release -type f -name "firecracker-v${version}-${arch}" -print -quit)"
+          test -n "${firecracker_bin}"
+          echo "FIRECRACKER_BIN=${firecracker_bin}" >> "${GITHUB_ENV}"
+          echo "FIRECRACKER_ARCHIVE=${archive}" >> "${GITHUB_ENV}"
+
+      - name: Install guest image tooling
+        run: |
+          if ! command -v unsquashfs >/dev/null 2>&1 || ! command -v mkfs.ext4 >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y squashfs-tools e2fsprogs
+          fi
+
+      - name: Boot three network-disconnected W2 host-surface guest instances
+        run: |
+          python scripts/smoke_firecracker_guest_boot.py \
+            --firecracker "${FIRECRACKER_BIN}" \
+            --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
+            --assets-manifest tests/fixtures/firecracker-guest-assets.json \
+            --runs 3 --profile W2 \
+            --timeout-seconds 45 \
+            --output artifacts/firecracker-w2.json \
+            --log-dir artifacts/firecracker-w2-logs
+
+      - name: Publish guest boot summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path("artifacts/firecracker-w2.json")
+          if not report_path.exists():
+              print("Guest boot report was not produced; inspect uploaded VMM logs and job output.")
+              raise SystemExit(0)
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          summary = (
+              f"Firecracker {report['firecracker_version']}: "
+              f"{report['sample_count']} guest boots; "
+              f"median={report['median_boot_time_ms']:.1f} ms; "
+              f"max={report['max_boot_time_ms']:.1f} ms"
+          )
+          if "p95_boot_time_ms" in report and "p99_boot_time_ms" in report:
+              summary += (
+                  f"; p95={report['p95_boot_time_ms']:.1f} ms"
+                  f"; p99={report['p99_boot_time_ms']:.1f} ms"
+              )
+          print(summary)
+          print(
+              f"Kernel SHA-256={report['guest_kernel_sha256']}; "
+              f"rootfs SHA-256={report['guest_rootfs_ext4_sha256']}"
+          )
+          print(f"Guest workload: {report['guest_workload']}")
+          print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
+          PY
+
+      - name: Upload guest boot evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: firecracker-w2-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 90

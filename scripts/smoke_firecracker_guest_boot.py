@@ -25,6 +25,10 @@ GUEST_READ_ONLY_MARKER = "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED"
 GUEST_NO_NIC_MARKER = "TINLANCE_NO_NIC_CONFIRMED"
 GUEST_WRITE_UNEXPECTED_MARKER = "TINLANCE_ROOTFS_WRITE_UNEXPECTED"
 GUEST_NIC_UNEXPECTED_MARKER = "TINLANCE_NETWORK_INTERFACE_UNEXPECTED"
+GUEST_W2_UNEXPECTED_MARKERS = (
+    "TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED",
+    "TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED",
+)
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 
 
@@ -186,9 +190,11 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
     home_dir.chmod(0o700)
 
 
-def guest_init_script() -> str:
-    """Return a fail-closed guest init that proves isolation and a non-root W1 workload."""
-    return """#!/bin/sh
+def guest_init_script(profile: str = "W1") -> str:
+    """Return a fail-closed guest init for the selected isolated workload profile."""
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    script = """#!/bin/sh
 set -eu
 mount -t proc proc /proc 2>/dev/null || true
 mkdir -p /sys
@@ -220,9 +226,63 @@ echo TINLANCE_W1_WORKLOAD_OK
 echo TINLANCE_GUEST_READY
 exec /usr/bin/sleep 60
 """
+    if profile == "W2":
+        script = script.replace(
+            "setpriv --reuid=65532 --regid=65532 --clear-groups",
+            "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups",
+        )
+        probes = """    command -v mount >/dev/null 2>&1
+    grep -q "^CapEff: *0000000000000000" /proc/self/status
+    echo TINLANCE_W2_CAPABILITIES_DROPPED
+    grep -q "^NoNewPrivs: *1" /proc/self/status
+    echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED
+    test -f /etc/shadow
+    test ! -r /etc/shadow
+    echo TINLANCE_W2_SENSITIVE_FILES_DENIED
+    test ! -e /dev/kvm
+    echo TINLANCE_W2_HOST_DEVICES_ABSENT
+    test ! -S /run/docker.sock
+    test ! -S /var/run/docker.sock
+    test ! -S /run/containerd/containerd.sock
+    test ! -S /run/podman/podman.sock
+    echo TINLANCE_W2_HOST_SOCKETS_ABSENT
+    if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; then
+        echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED
+        exit 81
+    fi
+    echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED
+    if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; then
+        echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED
+        exit 82
+    fi
+    echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED
+    test -e /proc/sys/kernel/hostname
+    test ! -w /proc/sys/kernel/hostname
+    echo TINLANCE_W2_PROC_SYS_READONLY
+    echo TINLANCE_W2_HOST_SURFACE_PROBES_OK
+"""
+        script = script.replace(
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n",
+            "    echo TINLANCE_NONROOT_UID_CONFIRMED\n" + probes,
+        )
+    return script
 
 
-def verify_guest_boot_markers(log_text: str) -> dict[str, bool]:
+def verify_guest_boot_markers(
+    log_text: str,
+    profile: str = "W1",
+) -> dict[str, bool]:
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    for marker in GUEST_W2_UNEXPECTED_MARKERS:
+        if marker in log_text:
+            detail = (
+                marker.removeprefix("TINLANCE_W2_")
+                .removesuffix("_UNEXPECTED")
+                .lower()
+                .replace("_", " ")
+            )
+            raise PermissionError(f"guest host-surface boundary violated: {detail}")
     if GUEST_WRITE_UNEXPECTED_MARKER in log_text:
         raise PermissionError("guest root filesystem unexpectedly accepted a write")
     if GUEST_NIC_UNEXPECTED_MARKER in log_text:
@@ -238,17 +298,36 @@ def verify_guest_boot_markers(log_text: str) -> dict[str, bool]:
         "w1_workload_passed": "TINLANCE_W1_WORKLOAD_OK",
         "guest_ready": GUEST_READY_MARKER,
     }
+    if profile == "W2":
+        required.update(
+            {
+                "capabilities_dropped": "TINLANCE_W2_CAPABILITIES_DROPPED",
+                "no_new_privileges": "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+                "sensitive_files_denied": "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+                "host_devices_absent": "TINLANCE_W2_HOST_DEVICES_ABSENT",
+                "host_sockets_absent": "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+                "privilege_escalation_denied": "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+                "mount_privilege_denied": "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+                "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
+                "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+            }
+        )
     missing = [name for name, marker in required.items() if marker not in log_text]
     if missing:
         raise ValueError(f"guest isolation markers are missing: {missing}")
     return {name: True for name in required}
 
 
-def _prepare_rootfs(squashfs_path: Path, rootfs_path: Path, extract_dir: Path) -> None:
+def _prepare_rootfs(
+    squashfs_path: Path,
+    rootfs_path: Path,
+    extract_dir: Path,
+    profile: str = "W1",
+) -> None:
     _run(["unsquashfs", "-d", str(extract_dir), str(squashfs_path)])
     init_path = extract_dir / "usr/local/sbin/tinlance-guest-init"
     init_path.parent.mkdir(parents=True, exist_ok=True)
-    init_path.write_text(guest_init_script(), encoding="utf-8")
+    init_path.write_text(guest_init_script(profile), encoding="utf-8")
     init_path.chmod(0o755)
     ensure_w1_user(extract_dir)
     tmp_dir = extract_dir / "tmp"
@@ -384,6 +463,7 @@ def _run_guest(
     work_dir: Path,
     log_dir: Path,
     timeout_seconds: float,
+    profile: str = "W1",
 ) -> tuple[float, dict[str, str], dict[str, bool]]:
     socket_path = work_dir / f"api-{run_index}.sock"
     log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
@@ -450,10 +530,11 @@ def _run_guest(
                     GUEST_WRITE_UNEXPECTED_MARKER in log_text
                     or GUEST_NIC_UNEXPECTED_MARKER in log_text
                     or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                    or any(marker in log_text for marker in GUEST_W2_UNEXPECTED_MARKERS)
                 ):
-                    verify_guest_boot_markers(log_text)
+                    verify_guest_boot_markers(log_text, profile)
                 if GUEST_READY_MARKER in log_text:
-                    guest_isolation = verify_guest_boot_markers(log_text)
+                    guest_isolation = verify_guest_boot_markers(log_text, profile)
                     return (time.monotonic() - started) * 1000, version, guest_isolation
                 running = subprocess.run(
                     ["sudo", "-n", "pgrep", "-x", "firecracker"],
@@ -549,6 +630,7 @@ def _discover_asset_manifest(work_dir: Path, architecture: str) -> GuestAssetMan
 def _download_pinned_guest_assets(
     work_dir: Path,
     manifest: GuestAssetManifest,
+    profile: str = "W1",
 ) -> dict[str, object]:
     kernel_path = work_dir / "guest-vmlinux"
     squashfs_path = work_dir / "guest-rootfs.squashfs"
@@ -561,7 +643,7 @@ def _download_pinned_guest_assets(
         raise ValueError("downloaded guest kernel SHA-256 does not match the pinned manifest")
     if rootfs_squashfs_sha256 != manifest["rootfs_squashfs_sha256"]:
         raise ValueError("downloaded guest rootfs SHA-256 does not match the pinned manifest")
-    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root")
+    _prepare_rootfs(squashfs_path, rootfs_path, work_dir / "squashfs-root", profile)
     return {
         **manifest,
         "kernel_path": kernel_path,
@@ -590,6 +672,7 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
     parser.add_argument("--timeout-seconds", type=float, default=45)
     args = parser.parse_args()
 
@@ -622,7 +705,7 @@ def main() -> int:
         firecracker_binary = work_dir / "firecracker"
         shutil.copy2(args.firecracker, firecracker_binary)
         firecracker_binary.chmod(0o755)
-        assets = _download_pinned_guest_assets(work_dir, manifest)
+        assets = _download_pinned_guest_assets(work_dir, manifest, args.profile)
         kernel_path = assets["kernel_path"]
         rootfs_path = assets["rootfs_path"]
         if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
@@ -640,6 +723,7 @@ def main() -> int:
                 work_dir,
                 log_dir,
                 args.timeout_seconds,
+                args.profile,
             )
             samples.append(boot_time_ms)
             guest_isolation_samples.append(guest_isolation)
@@ -656,19 +740,22 @@ def main() -> int:
                 sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
             ),
             "guest_isolation_checks": guest_isolation_samples,
-            "guest_w1_workload": {
-                "profile": "W1-minimal-agent",
+            "guest_workload": {
+                "profile": "W1-minimal-agent" if args.profile == "W1" else "W2-host-surface-probes",
                 "network": "none",
                 "rootfs_read_only": True,
                 "uid": 65532,
                 "gid": 65532,
                 "tmpfs": "/tmp:rw,size=64m,mode=0700,uid=65532,gid=65532",
                 "workload_marker": "TINLANCE_W1_WORKLOAD_OK",
+                "host_surface_marker": (
+                    "TINLANCE_W2_HOST_SURFACE_PROBES_OK" if args.profile == "W2" else None
+                ),
             },
             "guest_ready_marker": GUEST_READY_MARKER,
             "boot_time_measurement": (
                 "elapsed time from immediately before the InstanceStart API request "
-                "until the guest completes the W1 workload and emits its ready marker "
+                f"until the guest completes the {args.profile} workload and emits its ready marker "
                 "on the serial console"
             ),
             "firecracker_version": firecracker_version.get("firecracker_version"),

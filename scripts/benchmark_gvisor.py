@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-_IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
+_IMAGE_DIGEST = re.compile(r"^(?:[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}|sha256:[a-f0-9]{64})$")
 _RUNTIME_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _SUCCESS_MARKER = "TINLANCE_GVISOR_WORKLOAD_OK"
 _NONROOT_MARKER = "TINLANCE_NONROOT_UID_CONFIRMED"
@@ -33,6 +33,63 @@ def build_w1_payload() -> str:
         "printf tinlance-gvisor-ok > /tmp/workload.txt; "
         'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok; '
         f"echo {_SUCCESS_MARKER}"
+    )
+
+
+def build_w2_payload() -> str:
+    """Add fail-closed privilege and host-surface probes to the W1 contract."""
+    return (
+        build_w1_payload()
+        + "; "
+        + "command -v setpriv >/dev/null 2>&1; "
+        + "command -v mount >/dev/null 2>&1; "
+        + (
+            'awk \'/^CapEff:/ { if ($2 != "0000000000000000") exit 1; found=1 } '
+            "END { exit !found }' /proc/self/status; "
+        )
+        + "echo TINLANCE_W2_CAPABILITIES_DROPPED; "
+        + (
+            'awk \'/^NoNewPrivs:/ { if ($2 != "1") exit 1; found=1 } '
+            "END { exit !found }' /proc/self/status; "
+        )
+        + "echo TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED; "
+        + "test -f /etc/shadow; "
+        + "test ! -r /etc/shadow; "
+        + "echo TINLANCE_W2_SENSITIVE_FILES_DENIED; "
+        + "test ! -e /dev/kvm; "
+        + "echo TINLANCE_W2_HOST_DEVICES_ABSENT; "
+        + "test ! -S /run/docker.sock; "
+        + "test ! -S /var/run/docker.sock; "
+        + "test ! -S /run/containerd/containerd.sock; "
+        + "test ! -S /run/podman/podman.sock; "
+        + "echo TINLANCE_W2_HOST_SOCKETS_ABSENT; "
+        + "if setpriv --reuid=0 --regid=0 --clear-groups /usr/bin/id >/dev/null 2>&1; "
+        + "then echo TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED; exit 81; fi; "
+        + "echo TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED; "
+        + "if mount -t tmpfs -o size=1m tmpfs /tmp >/dev/null 2>&1; "
+        + "then echo TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED; exit 82; fi; "
+        + "echo TINLANCE_W2_MOUNT_PRIVILEGE_DENIED; "
+        + "test -e /proc/sys/kernel/hostname; "
+        + "test ! -w /proc/sys/kernel/hostname; "
+        + "echo TINLANCE_W2_PROC_SYS_READONLY; "
+        + "echo TINLANCE_W2_HOST_SURFACE_PROBES_OK"
+    )
+
+
+def build_w2_developer_workspace_payload() -> str:
+    """Run real Git, Python and Node edit/build/test operations in a bounded workspace."""
+    return (
+        build_w2_payload()
+        + "; "
+        + "command -v git >/dev/null 2>&1; "
+        + "command -v python3 >/dev/null 2>&1; "
+        + "command -v node >/dev/null 2>&1; "
+        + "command -v npm >/dev/null 2>&1; "
+        + "test -x /opt/tinlance-fixture/run-workspace.sh; "
+        + "/opt/tinlance-fixture/run-workspace.sh; "
+        + "test -f /workspace/project/python/src/app.py; "
+        + "test -f /workspace/project/node/src/app.js; "
+        + "echo TINLANCE_W2_DEVELOPER_WORKSPACE_OK"
     )
 
 
@@ -69,6 +126,7 @@ def build_docker_command(
     image_digest: str,
     payload: str,
     runtime_name: str = "runsc",
+    workspace: bool = False,
 ) -> list[str]:
     if not _IMAGE_DIGEST.fullmatch(image_digest):
         raise ValueError("image reference must be pinned by sha256 digest")
@@ -76,7 +134,9 @@ def build_docker_command(
         raise ValueError("runtime name must be a safe Docker runtime identifier")
     if not isinstance(payload, str) or not payload.strip() or "\x00" in payload:
         raise ValueError("payload must be non-empty text without NUL bytes")
-    return [
+    if not isinstance(workspace, bool):
+        raise ValueError("workspace must be a boolean")
+    command = [
         "docker",
         "run",
         "--rm",
@@ -91,22 +151,31 @@ def build_docker_command(
         "--pids-limit=128",
         "--tmpfs",
         "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
+        "--env=HOME=/tmp",
         "--workdir=/tmp",
-        image_digest,
-        "sh",
-        "-lc",
-        payload,
     ]
+    if workspace:
+        command.extend(
+            [
+                "--tmpfs",
+                "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700",
+            ]
+        )
+    command.extend([image_digest, "sh", "-lc", payload])
+    return command
 
 
 def _capture(command: list[str]) -> str:
     result = subprocess.run(
         command,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         timeout=120,
     )
+    if result.returncode != 0:
+        detail = result.stderr.strip()[-2000:]
+        raise RuntimeError(f"command failed with exit code {result.returncode}: {detail}")
     return result.stdout.strip()
 
 
@@ -117,9 +186,12 @@ def run_benchmark(
     runtime_name: str = "runsc",
     runtime_version: str | None = None,
     candidate: str | None = None,
+    profile: str = "W1",
 ) -> dict[str, Any]:
     if runs < 3 or runs > 100:
         raise ValueError("runs must be between 3 and 100")
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
     if not _RUNTIME_NAME.fullmatch(runtime_name):
         raise ValueError("runtime name must be a safe Docker runtime identifier")
     version = runtime_version or _capture([runtime_name, "--version"])
@@ -128,11 +200,12 @@ def run_benchmark(
     runtimes = json.loads(runtime_inventory)
     if runtime_name not in runtimes:
         raise RuntimeError(f"Docker does not report the {runtime_name} runtime")
-    payload = build_w1_payload()
+    payload = build_w1_payload() if profile == "W1" else build_w2_developer_workspace_payload()
     command = build_docker_command(
         image_digest=image_digest,
         payload=payload,
         runtime_name=runtime_name,
+        workspace=profile == "W2",
     )
     samples: list[float] = []
     outputs: list[str] = []
@@ -148,6 +221,22 @@ def run_benchmark(
             raise RuntimeError("gVisor workload did not confirm a read-only root filesystem")
         if "TINLANCE_NO_NIC_CONFIRMED" not in output:
             raise RuntimeError("gVisor workload did not confirm a network-disconnected namespace")
+        if profile == "W2":
+            required_w2_markers = (
+                "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+                "TINLANCE_W2_GIT_CLONE_OK",
+                "TINLANCE_W2_PYTHON_EDIT_OK",
+                "TINLANCE_W2_PYTHON_BUILD_OK",
+                "TINLANCE_W2_PYTHON_TESTS_OK",
+                "TINLANCE_W2_NODE_EDIT_OK",
+                "TINLANCE_W2_NODE_BUILD_OK",
+                "TINLANCE_W2_NODE_TESTS_OK",
+                "TINLANCE_W2_WORKTREE_DIRTY_OK",
+                "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+            )
+            missing = [marker for marker in required_w2_markers if marker not in output]
+            if missing:
+                raise RuntimeError(f"W2 developer workspace evidence is incomplete: {missing}")
         samples.append(elapsed_ms)
         outputs.append(output)
     return {
@@ -160,7 +249,9 @@ def run_benchmark(
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
         "workload": {
-            "profile": "W1-minimal-agent",
+            "profile": (
+                "W1-minimal-agent" if profile == "W1" else "W2-developer-workspace-and-host-surface"
+            ),
             "network": "none",
             "read_only_rootfs": True,
             "capabilities": "drop-all",
@@ -171,6 +262,11 @@ def run_benchmark(
             "user_uid": 65532,
             "user_gid": 65532,
             "tmpfs": "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
+            "workspace_tmpfs": (
+                "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700"
+                if profile == "W2"
+                else None
+            ),
         },
         "latency": {**summarize_samples(samples), "samples_ms": samples},
         "guest_assertions": {
@@ -178,18 +274,32 @@ def run_benchmark(
             "rootfs_read_only": True,
             "network_has_only_loopback": True,
             "filesystem_write_in_tmpfs": True,
+            "capabilities_dropped": profile == "W2",
+            "no_new_privileges": profile == "W2",
+            "sensitive_files_denied": profile == "W2",
+            "host_devices_absent": profile == "W2",
+            "host_sockets_absent": profile == "W2",
+            "privilege_escalation_denied": profile == "W2",
+            "mount_privilege_denied": profile == "W2",
+            "proc_sys_readonly": profile == "W2",
+            "git_clone_and_repository_metadata": profile == "W2",
+            "python_source_edit_and_unit_tests": profile == "W2",
+            "node_source_edit_and_tests": profile == "W2",
+            "workspace_tmpfs_bounded": profile == "W2",
+            "workspace_changes_are_unprivileged_and_observable": profile == "W2",
         },
         "outputs": outputs,
     }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the Tinlance gVisor W1 benchmark.")
+    parser = argparse.ArgumentParser(description="Run the Tinlance isolated workload benchmark.")
     parser.add_argument("--image-digest", required=True)
     parser.add_argument("--runs", type=int, default=30)
     parser.add_argument("--runtime-name", default="runsc")
     parser.add_argument("--runtime-version")
     parser.add_argument("--candidate")
+    parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run_benchmark(
@@ -198,12 +308,14 @@ def main() -> int:
         runtime_name=args.runtime_name,
         runtime_version=args.runtime_version,
         candidate=args.candidate,
+        profile=args.profile,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latency = report["latency"]
     print(
-        f"gVisor {report['runtime_version']}: {latency['sample_count']} W1 runs; "
+        f"{report['candidate']} {report['runtime_version']}: "
+        f"{latency['sample_count']} {args.profile} runs; "
         f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms"
     )
     return 0

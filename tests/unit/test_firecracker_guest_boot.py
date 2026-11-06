@@ -246,3 +246,78 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
         verify_guest_boot_markers(
             "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
         )
+
+
+def test_guest_init_w2_enforces_no_new_privileges_and_host_surface_denials() -> None:
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    script = guest_init_script("W2")
+    assert "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups" in script
+    for marker in (
+        "TINLANCE_W2_CAPABILITIES_DROPPED",
+        "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+        "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+        "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+        "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+        "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+        "TINLANCE_W2_PROC_SYS_READONLY",
+        "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+    ):
+        assert marker in script
+    assert script.index("TINLANCE_W2_HOST_SURFACE_PROBES_OK") < script.index("TINLANCE_GUEST_READY")
+
+
+def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    markers = [
+        "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED",
+        "TINLANCE_NO_NIC_CONFIRMED",
+        "TINLANCE_NONROOT_UID_CONFIRMED",
+        "TINLANCE_W1_WORKLOAD_OK",
+        "TINLANCE_W2_CAPABILITIES_DROPPED",
+        "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+        "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+        "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+        "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+        "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+        "TINLANCE_W2_PROC_SYS_READONLY",
+        "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+        "TINLANCE_GUEST_READY",
+    ]
+    evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
+    assert evidence["host_surface_probes_passed"] is True
+    assert evidence["no_new_privileges"] is True
+
+
+def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(ValueError, match="host_surface_probes_passed"):
+        verify_guest_boot_markers(
+            "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\n"
+            "TINLANCE_NO_NIC_CONFIRMED\\n"
+            "TINLANCE_NONROOT_UID_CONFIRMED\\n"
+            "TINLANCE_W1_WORKLOAD_OK\\n"
+            "TINLANCE_GUEST_READY",
+            "W2",
+        )
+    with pytest.raises(PermissionError, match="privilege escalation"):
+        verify_guest_boot_markers("TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED", "W2")
+
+
+def test_guest_init_w2_script_is_valid_posix_shell() -> None:
+    import subprocess
+
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    result = subprocess.run(
+        ["sh", "-n"],
+        input=guest_init_script("W2"),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr

@@ -1,0 +1,8 @@
+{
+  "name": "tinlance-w2-node-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
