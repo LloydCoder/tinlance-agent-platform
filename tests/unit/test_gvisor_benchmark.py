@@ -194,6 +194,7 @@ def test_docker_command_w2_profile_keeps_all_outer_security_controls() -> None:
     ):
         assert option in command
 
+
 def test_w2_benchmark_evidence_reports_the_actual_resource_envelope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -206,7 +207,7 @@ def test_w2_benchmark_evidence_reports_the_actual_resource_envelope(
             return "28.0.0"
         if command[:2] == ["docker", "info"]:
             return '{"kata":{}}'
-        return "\\n".join(
+        return "\n".join(
             (
                 "TINLANCE_GVISOR_WORKLOAD_OK",
                 "TINLANCE_NONROOT_UID_CONFIRMED",
