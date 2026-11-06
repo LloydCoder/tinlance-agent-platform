@@ -347,21 +347,30 @@ def _run_guest(
 
 def load_asset_manifest(path: Path, architecture: str) -> GuestAssetManifest:
     data: Any = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or data.get("schema_version") != 1:
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int:
+        raise ValueError("unsupported Firecracker guest asset manifest schema")
+    if data.get("schema_version") != 1:
         raise ValueError("unsupported Firecracker guest asset manifest schema")
     manifest = cast(GuestAssetManifest, data)
     if manifest.get("architecture") != architecture:
         raise ValueError("guest asset manifest architecture does not match the runner")
     artifact_prefix = manifest.get("artifact_prefix", "")
-    expected_prefix = f"{artifact_prefix}{architecture}/"
-    if not re.fullmatch(r"firecracker-ci/\d{8}-[^/]+/", artifact_prefix):
+    if not isinstance(artifact_prefix, str) or not re.fullmatch(
+        r"firecracker-ci/\d{8}-[^/]+/",
+        artifact_prefix,
+    ):
         raise ValueError("guest asset manifest has an invalid upstream artifact prefix")
+    expected_prefix = f"{artifact_prefix}{architecture}/"
     for key_name, pattern in (
         ("kernel_key", r"vmlinux-\d+\.\d+\.\d+$"),
         ("rootfs_key", r"ubuntu-\d+\.\d+\.squashfs$"),
     ):
         key = manifest.get(key_name, "")
-        if not isinstance(key, str) or not key.startswith(expected_prefix):
+        if (
+            not isinstance(key, str)
+            or not key.startswith(expected_prefix)
+            or key.count("/") != expected_prefix.count("/")
+        ):
             raise ValueError(f"guest asset manifest {key_name} is outside its artifact prefix")
         if not re.search(pattern, key):
             raise ValueError(f"guest asset manifest {key_name} has an invalid filename")
