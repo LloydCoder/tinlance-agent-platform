@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.smoke_firecracker_jailer import (
     build_jailer_command,
     verify_jailer_process_evidence,
