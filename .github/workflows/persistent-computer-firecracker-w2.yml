@@ -113,19 +113,23 @@ jobs:
               print("Guest boot report was not produced; inspect uploaded VMM logs and job output.")
               raise SystemExit(0)
           report = json.loads(report_path.read_text(encoding="utf-8"))
-          print(
+          summary = (
               f"Firecracker {report['firecracker_version']}: "
               f"{report['sample_count']} guest boots; "
               f"median={report['median_boot_time_ms']:.1f} ms; "
-              f"p95={report['p95_boot_time_ms']:.1f} ms; "
-              f"p99={report['p99_boot_time_ms']:.1f} ms; "
               f"max={report['max_boot_time_ms']:.1f} ms"
           )
+          if "p95_boot_time_ms" in report and "p99_boot_time_ms" in report:
+              summary += (
+                  f"; p95={report['p95_boot_time_ms']:.1f} ms"
+                  f"; p99={report['p99_boot_time_ms']:.1f} ms"
+              )
+          print(summary)
           print(
               f"Kernel SHA-256={report['guest_kernel_sha256']}; "
               f"rootfs SHA-256={report['guest_rootfs_ext4_sha256']}"
           )
-          print(f"W1 workload: {report['guest_workload']}")
+          print(f"Guest workload: {report['guest_workload']}")
           print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
           PY
 
