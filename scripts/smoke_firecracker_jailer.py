@@ -226,6 +226,7 @@ def _find_firecracker_pid(
         "uid and cgroup identity"
     )
 
+
 def _read_process_evidence(
     pid: int,
     uid: int,
@@ -424,8 +425,7 @@ def _run_jailer_guest(
                     )
                 if process.poll() is not None:
                     raise RuntimeError(
-                        "jailed Firecracker exited before guest readiness: "
-                        f"{log_text[-5000:]}"
+                        f"jailed Firecracker exited before guest readiness: {log_text[-5000:]}"
                     )
                 time.sleep(0.1)
             log_text = log_path.read_text(encoding="utf-8", errors="replace")
@@ -451,10 +451,7 @@ def _run_jailer_guest(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=(
-            "Boot a Firecracker guest through the upstream jailer "
-            "and verify host isolation."
-        )
+        description="Boot a Firecracker guest through the upstream jailer and verify host isolation.",
     )
     parser.add_argument("--jailer", required=True, type=Path)
     parser.add_argument("--firecracker", required=True, type=Path)
