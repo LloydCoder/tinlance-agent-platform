@@ -138,7 +138,10 @@ def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
     assert 'if [ "$iface" != "lo" ]' in script
     assert "TINLANCE_NETWORK_INTERFACE_UNEXPECTED" in script
     assert "TINLANCE_NO_NIC_CONFIRMED" in script
-    assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
+    assert (
+        script.index("TINLANCE_NO_NIC_CONFIRMED")
+        < script.index("TINLANCE_NONROOT_UID_CONFIRMED")
+    )
 
 
 def test_guest_init_executes_nonroot_w1_workload_in_owned_tmpfs_before_ready() -> None:
