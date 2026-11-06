@@ -502,5 +502,20 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         self.assertEqual(self.http.calls, [])
 
 
+    def test_handler_rejects_subject_identity_spoof_before_network_call(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-b",
+            operation="world_intelligence.query_entities",
+            payload={"purpose": "account_research"},
+            request_id="platform-wi-query-subject-spoof",
+            authenticated_principal=_principal(ENTITY_CAPABILITY, PURPOSE_SCOPE),
+        )
+        with self.assertRaisesRegex(PermissionError, "does not match request identity"):
+            self.handler.handle(request)
+        self.assertEqual(self.http.calls, [])
+        self.assertEqual(self.issuer.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
