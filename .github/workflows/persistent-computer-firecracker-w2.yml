@@ -8,6 +8,8 @@ on:
       - "scripts/__init__.py"
       - "scripts/probe_persistent_computer_host.py"
       - "scripts/smoke_firecracker_guest_boot.py"
+      - "scripts/normalize_rootfs_tar.py"
+      - "tests/unit/test_normalize_rootfs_tar.py"
       - "tests/fixtures/firecracker-guest-assets.json"
       - "tests/unit/test_firecracker_guest_boot.py"
       - "tests/fixtures/w2-developer-workspace/**"
@@ -25,7 +27,7 @@ jobs:
   guest-boot:
     name: KVM W2 developer workspace (ephemeral runner)
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -41,7 +43,7 @@ jobs:
           python -m pip install -e ".[test]"
 
       - name: Test guest boot evidence helpers
-        run: pytest -q tests/unit/test_firecracker_guest_boot.py
+        run: pytest -q tests/unit/test_firecracker_guest_boot.py tests/unit/test_normalize_rootfs_tar.py
 
       - name: Verify KVM and resource-control prerequisites
         run: |
@@ -109,19 +111,22 @@ jobs:
             *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
           esac
           container_id="$(docker create "$image_id")"
-          docker export --output artifacts/w2-rootfs.tar "$container_id"
+          docker export --output artifacts/w2-rootfs.raw.tar "$container_id"
           docker rm "$container_id"
+          python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.raw.tar --output artifacts/w2-rootfs.tar
           rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
+          printf '%s\n' "$rootfs_sha256" > artifacts/w2-rootfs.sha256
+          rm -f artifacts/w2-rootfs.raw.tar
           echo "W2 base image: $base_digest"
           echo "W2 image ID: $image_id"
-          echo "W2 rootfs tar SHA-256: $rootfs_sha256"
+          echo "W2 normalized rootfs tar SHA-256: $rootfs_sha256"
           {
             echo "W2_BASE_IMAGE_DIGEST=$base_digest"
             echo "W2_IMAGE_ID=$image_id"
             echo "W2_ROOTFS_TAR=artifacts/w2-rootfs.tar"
           } >> "$GITHUB_ENV"
 
-      - name: Boot three network-disconnected W2 developer-workspace guest instances
+      - name: Boot 30 network-disconnected W2 developer-workspace guest instances
         run: |
           set -euo pipefail
           trap 'rm -f "$W2_ROOTFS_TAR"' EXIT
@@ -129,7 +134,7 @@ jobs:
             --firecracker "${FIRECRACKER_BIN}" \
             --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
             --assets-manifest tests/fixtures/firecracker-guest-assets.json \
-            --runs 3 --profile W2 \
+            --runs 30 --profile W2 \
             --w2-rootfs-tar "$W2_ROOTFS_TAR" \
             --w2-image-id "$W2_IMAGE_ID" \
             --w2-base-image-digest "$W2_BASE_IMAGE_DIGEST" \
@@ -148,13 +153,13 @@ jobs:
           if not report_path.is_file():
               raise SystemExit("Required Firecracker W2 guest report is missing; acceptance cannot pass.")
           report = json.loads(report_path.read_text(encoding="utf-8"))
-          if report.get("sample_count") != 3:
-              raise SystemExit(f"Expected exactly three W2 guest boots, got {report.get('sample_count')!r}")
+          if report.get("sample_count") != 30:
+              raise SystemExit(f"Expected exactly 30 W2 guest boots, got {report.get('sample_count')!r}")
           if report.get("w2_rootfs_tar_sha256") is None:
               raise SystemExit("W2 rootfs export digest is missing from guest evidence.")
           markers = report.get("guest_isolation_checks", [])
-          if len(markers) != 3 or any(not item.get("developer_workspace_passed") for item in markers):
-              raise SystemExit("All three guest boots must prove developer-workspace completion.")
+          if len(markers) != 30 or any(not item.get("developer_workspace_passed") for item in markers):
+              raise SystemExit("All 30 guest boots must prove developer-workspace completion.")
           summary = (
               f"Firecracker {report['firecracker_version']}: "
               f"{report['sample_count']} guest boots; "
@@ -173,7 +178,7 @@ jobs:
           )
           print(f"Guest workload: {report['guest_workload']}")
           print(f"W2 base image={report['w2_base_image_digest']}; image ID={report['w2_image_id']}")
-          print(f"W2 rootfs tar SHA-256={report['w2_rootfs_tar_sha256']}")
+          print(f"W2 normalized rootfs tar SHA-256={report['w2_rootfs_tar_sha256']}")
           print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
           PY
 
