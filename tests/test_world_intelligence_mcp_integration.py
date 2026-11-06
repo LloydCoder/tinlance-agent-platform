@@ -4,6 +4,7 @@ import json
 import unittest
 from collections.abc import Mapping
 from typing import Any
+from unittest.mock import patch
 
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
 from tinlance_agent_platform_app.world_intelligence_api_handler import (
@@ -21,6 +22,7 @@ from tinlance_agent_platform_mcp import (
     register_world_intelligence_tools,
     with_world_intelligence_tools,
 )
+from tinlance_agent_platform_mcp.world_intelligence import _UrllibWorldIntelligenceHTTPClient
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"
 TRACEPARENT = f"00-{TRACE_ID}-0123456789abcdef-01"
@@ -259,6 +261,22 @@ class WorldIntelligenceTransportTests(unittest.TestCase):
                     )
                 self.assertEqual(caught.exception.retryable, retryable)
 
+    def test_default_http_client_classifies_timeout_as_retryable(self) -> None:
+        client = _UrllibWorldIntelligenceHTTPClient()
+        with (
+            patch.object(client._opener, "open", side_effect=TimeoutError("socket timed out")),
+            self.assertRaises(WorldIntelligenceTransportError) as caught,
+        ):
+            client.request(
+                "GET",
+                "https://world-intelligence.internal/v1/entities",
+                headers={"Accept": "application/json"},
+                body=None,
+                timeout_seconds=1.0,
+            )
+        self.assertIsNone(caught.exception.status_code)
+        self.assertTrue(caught.exception.retryable)
+
     def test_production_transport_requires_https_and_exact_audience(self) -> None:
         with self.assertRaises(ValueError):
             WorldIntelligenceHTTPTransport(
@@ -485,6 +503,20 @@ class WorldIntelligenceAPIHandlerTests(unittest.TestCase):
         response = self.handler.handle(delegated)
         self.assertEqual(response.payload, {"delegated": "runs.read"})
         self.assertEqual(self.http.calls, [])
+
+    def test_handler_rejects_subject_identity_spoof_before_network_call(self) -> None:
+        request = APIRequest(
+            tenant_id="tenant-a",
+            subject_id="subject-b",
+            operation="world_intelligence.query_entities",
+            payload={"purpose": "account_research"},
+            request_id="platform-wi-query-subject-spoof",
+            authenticated_principal=_principal(ENTITY_CAPABILITY, PURPOSE_SCOPE),
+        )
+        with self.assertRaisesRegex(PermissionError, "does not match request identity"):
+            self.handler.handle(request)
+        self.assertEqual(self.http.calls, [])
+        self.assertEqual(self.issuer.calls, [])
 
 
 if __name__ == "__main__":
