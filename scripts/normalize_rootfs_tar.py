@@ -38,7 +38,7 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
     path = PurePosixPath(member.name)
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"unsafe rootfs archive path: {member.name}")
-    name = path.as_posix().lstrip("./")
+    name = path.as_posix()
     if name in {"", "."}:
         return None
     if _is_volatile_path(name):
@@ -58,7 +58,7 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
         target = PurePosixPath(member.linkname)
         if target.is_absolute() or ".." in target.parts:
             raise ValueError(f"unsafe hardlink in rootfs archive: {name}")
-        member.linkname = target.as_posix().lstrip("./")
+        member.linkname = target.as_posix()
     elif not (member.isdir() or member.isfile()):
         raise ValueError(f"unsupported rootfs archive entry type: {name}")
 
@@ -122,7 +122,7 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
                                 outgoing.addfile(member, content)
                         else:
                             outgoing.addfile(member)
-                digest = hashlib.sha256(temporary_path.read_bytes()).hexdigest()
+                with temporary_path.open("rb") as normalized_file:\n                    digest = hashlib.file_digest(normalized_file, "sha256").hexdigest()
                 os.replace(temporary_path, output)
             finally:
                 temporary_path.unlink(missing_ok=True)
