@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-_IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
+_IMAGE_DIGEST = re.compile(r"^(?:[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}|sha256:[a-f0-9]{64})$")
 _RUNTIME_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _SUCCESS_MARKER = "TINLANCE_GVISOR_WORKLOAD_OK"
 _NONROOT_MARKER = "TINLANCE_NONROOT_UID_CONFIRMED"
@@ -76,6 +76,23 @@ def build_w2_payload() -> str:
     )
 
 
+def build_w2_developer_workspace_payload() -> str:
+    """Run real Git, Python and Node edit/build/test operations in a bounded workspace."""
+    return (
+        build_w2_payload()
+        + "; "
+        + "command -v git >/dev/null 2>&1; "
+        + "command -v python3 >/dev/null 2>&1; "
+        + "command -v node >/dev/null 2>&1; "
+        + "command -v npm >/dev/null 2>&1; "
+        + "test -x /opt/tinlance-fixture/run-workspace.sh; "
+        + "/opt/tinlance-fixture/run-workspace.sh; "
+        + "test -f /workspace/project/python/src/app.py; "
+        + "test -f /workspace/project/node/src/app.js; "
+        + "echo TINLANCE_W2_DEVELOPER_WORKSPACE_OK"
+    )
+
+
 def percentile_nearest_rank(samples: list[float], percentile: int) -> float:
     if not samples:
         raise ValueError("at least one sample is required")
@@ -109,6 +126,7 @@ def build_docker_command(
     image_digest: str,
     payload: str,
     runtime_name: str = "runsc",
+    workspace: bool = False,
 ) -> list[str]:
     if not _IMAGE_DIGEST.fullmatch(image_digest):
         raise ValueError("image reference must be pinned by sha256 digest")
@@ -116,7 +134,9 @@ def build_docker_command(
         raise ValueError("runtime name must be a safe Docker runtime identifier")
     if not isinstance(payload, str) or not payload.strip() or "\x00" in payload:
         raise ValueError("payload must be non-empty text without NUL bytes")
-    return [
+    if not isinstance(workspace, bool):
+        raise ValueError("workspace must be a boolean")
+    command = [
         "docker",
         "run",
         "--rm",
@@ -131,12 +151,16 @@ def build_docker_command(
         "--pids-limit=128",
         "--tmpfs",
         "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
+        "--env=HOME=/tmp",
         "--workdir=/tmp",
-        image_digest,
-        "sh",
-        "-lc",
-        payload,
     ]
+    if workspace:
+        command.extend([
+            "--tmpfs",
+            "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700",
+        ])
+    command.extend([image_digest, "sh", "-lc", payload])
+    return command
 
 
 def _capture(command: list[str]) -> str:
@@ -171,11 +195,12 @@ def run_benchmark(
     runtimes = json.loads(runtime_inventory)
     if runtime_name not in runtimes:
         raise RuntimeError(f"Docker does not report the {runtime_name} runtime")
-    payload = build_w1_payload() if profile == "W1" else build_w2_payload()
+    payload = build_w1_payload() if profile == "W1" else build_w2_developer_workspace_payload()
     command = build_docker_command(
         image_digest=image_digest,
         payload=payload,
         runtime_name=runtime_name,
+        workspace=profile == "W2",
     )
     samples: list[float] = []
     outputs: list[str] = []
@@ -191,8 +216,19 @@ def run_benchmark(
             raise RuntimeError("gVisor workload did not confirm a read-only root filesystem")
         if "TINLANCE_NO_NIC_CONFIRMED" not in output:
             raise RuntimeError("gVisor workload did not confirm a network-disconnected namespace")
-        if profile == "W2" and "TINLANCE_W2_HOST_SURFACE_PROBES_OK" not in output:
-            raise RuntimeError("W2 workload did not pass every host-surface denial probe")
+        if profile == "W2":
+            required_w2_markers = (
+                "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+                "TINLANCE_W2_GIT_CLONE_OK",
+                "TINLANCE_W2_PYTHON_EDIT_OK",
+                "TINLANCE_W2_PYTHON_TESTS_OK",
+                "TINLANCE_W2_NODE_EDIT_OK",
+                "TINLANCE_W2_NODE_TESTS_OK",
+                "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+            )
+            missing = [marker for marker in required_w2_markers if marker not in output]
+            if missing:
+                raise RuntimeError(f"W2 developer workspace evidence is incomplete: {missing}")
         samples.append(elapsed_ms)
         outputs.append(output)
     return {
@@ -205,7 +241,7 @@ def run_benchmark(
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
         "workload": {
-            "profile": "W1-minimal-agent" if profile == "W1" else "W2-host-surface-probes",
+            "profile": "W1-minimal-agent" if profile == "W1" else "W2-developer-workspace-and-host-surface",
             "network": "none",
             "read_only_rootfs": True,
             "capabilities": "drop-all",
@@ -231,6 +267,10 @@ def run_benchmark(
             "privilege_escalation_denied": profile == "W2",
             "mount_privilege_denied": profile == "W2",
             "proc_sys_readonly": profile == "W2",
+            "git_clone_and_repository_metadata": profile == "W2",
+            "python_source_edit_and_unit_tests": profile == "W2",
+            "node_source_edit_and_tests": profile == "W2",
+            "workspace_tmpfs_bounded": profile == "W2",
         },
         "outputs": outputs,
     }
