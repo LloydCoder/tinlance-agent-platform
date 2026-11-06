@@ -140,11 +140,13 @@ def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
     assert "TINLANCE_NO_NIC_CONFIRMED" in script
     assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
 
+
+
 def test_guest_boot_marker_verifier_accepts_read_only_no_nic_evidence() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
     evidence = verify_guest_boot_markers(
-        "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
+        "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\nTINLANCE_GUEST_READY"
     )
 
     assert evidence == {
@@ -157,14 +159,14 @@ def test_guest_boot_marker_verifier_rejects_writable_rootfs() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
     with pytest.raises(PermissionError, match="accepted a write"):
-        verify_guest_boot_markers("TINLANCE_ROOTFS_WRITE_UNEXPECTED\\nTINLANCE_GUEST_READY")
+        verify_guest_boot_markers("TINLANCE_ROOTFS_WRITE_UNEXPECTED\nTINLANCE_GUEST_READY")
 
 
 def test_guest_boot_marker_verifier_rejects_non_loopback_network_interface() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
     with pytest.raises(PermissionError, match="non-loopback"):
-        verify_guest_boot_markers("TINLANCE_NETWORK_INTERFACE_UNEXPECTED\\nTINLANCE_GUEST_READY")
+        verify_guest_boot_markers("TINLANCE_NETWORK_INTERFACE_UNEXPECTED\nTINLANCE_GUEST_READY")
 
 
 def test_guest_boot_marker_verifier_rejects_missing_isolation_evidence() -> None:
