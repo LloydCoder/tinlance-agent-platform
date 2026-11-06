@@ -10,7 +10,9 @@ import shutil
 import statistics
 import subprocess
 import tempfile
+import tarfile
 import time
+from pathlib import PurePosixPath
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -28,6 +30,7 @@ GUEST_NIC_UNEXPECTED_MARKER = "TINLANCE_NETWORK_INTERFACE_UNEXPECTED"
 GUEST_W2_UNEXPECTED_MARKERS = (
     "TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED",
     "TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED",
+    "TINLANCE_W2_DEVELOPER_WORKSPACE_FAILED",
 )
 FIRECRACKER_ARCHIVE_SHA256 = "06094a1108ae9e82aa4c23a775aa92758f53f1175d422270d9d6162cb9ade558"
 
@@ -316,6 +319,50 @@ def verify_guest_boot_markers(
     if missing:
         raise ValueError(f"guest isolation markers are missing: {missing}")
     return {name: True for name in required}
+
+
+def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
+    """Safely extract the trusted OCI export while rejecting path and link escapes."""
+    if not archive_path.is_file():
+        raise ValueError("W2 rootfs tar does not exist")
+    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        with tarfile.open(archive_path, "r:*") as archive:
+            members = archive.getmembers()
+            for member in members:
+                member_path = PurePosixPath(member.name)
+                if member_path.is_absolute() or ".." in member_path.parts:
+                    raise ValueError(f"unsafe rootfs archive path: {member.name}")
+                if member.isdev() or member.isfifo():
+                    raise ValueError(f"unsupported special file in rootfs archive: {member.name}")
+                if member.issym():
+                    target = PurePosixPath(member.linkname)
+                    if target.is_absolute():
+                        if ".." in target.parts:
+                            raise ValueError(f"unsafe absolute symlink in rootfs archive: {member.name}")
+                        member.linkname = os.path.relpath(
+                            target.as_posix().lstrip("/"),
+                            member_path.parent.as_posix(),
+                        )
+                    else:
+                        resolved = os.path.normpath(
+                            os.path.join(member_path.parent.as_posix(), member.linkname)
+                        )
+                        if resolved == ".." or resolved.startswith("../"):
+                            raise ValueError(f"unsafe symlink in rootfs archive: {member.name}")
+                if member.islnk():
+                    target = PurePosixPath(member.linkname)
+                    if target.is_absolute() or ".." in target.parts:
+                        raise ValueError(f"unsafe hardlink in rootfs archive: {member.name}")
+            ordered = sorted(
+                members,
+                key=lambda item: (
+                    0 if item.isdir() else 1 if item.isfile() else 2 if item.issym() else 3
+                ),
+            )
+            archive.extractall(destination, members=ordered, filter="data")
+    except (tarfile.TarError, OSError, ValueError) as error:
+        raise ValueError(f"unsafe rootfs archive: {error}") from error
 
 
 def _prepare_rootfs(
