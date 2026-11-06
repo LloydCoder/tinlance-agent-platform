@@ -43,12 +43,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
 
 
 def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest() -> None:
-    fixture = (
-        Path(__file__).resolve().parents[1]
-        / "fixtures"
-        / "w2-developer-workspace"
-        / "Dockerfile"
-    )
+    fixture = Path(__file__).resolve().parents[1] / "fixtures" / "w2-developer-workspace" / "Dockerfile"
     dockerfile = fixture.read_text(encoding="utf-8")
     assert "ARG APT_SNAPSHOT" in dockerfile
     assert 'apt-get --snapshot="${APT_SNAPSHOT}" update' in dockerfile
@@ -62,10 +57,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
 
 def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
     workflow_root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-    base_digest = (
-        "ubuntu@sha256:"
-        "fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
-    )
+    base_digest = "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
     for name in (
         "persistent-computer-firecracker-w2.yml",
         "persistent-computer-gvisor-benchmark.yml",
