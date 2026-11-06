@@ -108,3 +108,17 @@ def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
     assert "git init --quiet --initial-branch=main" in dockerfile
     assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
     assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
+
+
+
+def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github"
+        / "workflows"
+        / "persistent-computer-firecracker-w2.yml"
+    ).read_text(encoding="utf-8")
+    assert "timeout-minutes: 60" in workflow
+    assert "--runs 30 --profile W2" in workflow
+    assert 'report.get("sample_count") != 30' in workflow
+
