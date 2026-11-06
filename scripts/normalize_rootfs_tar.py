@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import os
 import posixpath
@@ -41,6 +42,10 @@ _VOLATILE_PAX_HEADERS = {
     "gname",
     "hdrcharset",
     "LIBARCHIVE.creationtime",
+    "SCHILY.ino",
+    "SCHILY.nlink",
+    "SCHILY.devmajor",
+    "SCHILY.devminor",
 }
 
 
@@ -49,6 +54,8 @@ def _is_volatile_path(name: str) -> bool:
 
 
 def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
+    member = copy.copy(member)
+    member.pax_headers = dict(member.pax_headers)
     path = PurePosixPath(member.name)
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"unsafe rootfs archive path: {member.name}")
@@ -83,15 +90,41 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
     member.gname = ""
     member.mtime = SOURCE_DATE_EPOCH
     member.pax_headers = {
-        key: value for key, value in member.pax_headers.items() if key not in _VOLATILE_PAX_HEADERS
+        key: member.pax_headers[key]
+        for key in sorted(member.pax_headers)
+        if key not in _VOLATILE_PAX_HEADERS
     }
     if member.isdir() or member.issym() or member.islnk():
         member.size = 0
     return member
 
 
+def _resolve_hardlink_target(
+    name: str,
+    entries: dict[str, tuple[tarfile.TarInfo, tarfile.TarInfo]],
+    seen: set[str] | None = None,
+) -> tuple[tarfile.TarInfo, tarfile.TarInfo]:
+    visited = set() if seen is None else seen
+    if name in visited:
+        raise ValueError(f"cyclic hardlink in rootfs archive: {name}")
+    visited.add(name)
+    try:
+        original, member = entries[name]
+    except KeyError as error:
+        raise ValueError(f"missing hardlink target in rootfs archive: {name}") from error
+    if member.islnk():
+        return _resolve_hardlink_target(member.linkname, entries, visited)
+    if not member.isfile():
+        raise ValueError(f"hardlink target is not a regular file: {name}")
+    return original, member
+
+
 def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int]:
-    """Write a stable, root-owned OCI rootfs tar and return its SHA-256 and entry count."""
+    """Write a stable root-owned OCI rootfs tar and return its SHA-256 and entry count.
+
+    Hardlinks are materialized as regular files because this immutable W2 rootfs
+    is read-only; inode topology is not part of the guest contract.
+    """
     source = Path(source_path)
     output = Path(output_path)
     if not source.is_file():
@@ -100,10 +133,10 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
         raise ValueError("source and normalized rootfs paths must differ")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    normalized: list[tuple[tarfile.TarInfo, tarfile.TarInfo]] = []
-    seen: set[str] = set()
     try:
         with tarfile.open(source, "r:*") as incoming:
+            entries: dict[str, tuple[tarfile.TarInfo, tarfile.TarInfo]] = {}
+            seen: set[str] = set()
             for original in incoming.getmembers():
                 member = _normalized_member(original)
                 if member is None:
@@ -111,7 +144,31 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
                 if member.name in seen:
                     raise ValueError(f"duplicate rootfs archive path: {member.name}")
                 seen.add(member.name)
-                normalized.append((original, member))
+                entries[member.name] = (original, member)
+
+            normalized: list[tuple[tarfile.TarInfo, tarfile.TarInfo]] = []
+            for original, member in entries.values():
+                content_original = original
+                if member.islnk():
+                    content_original, target = _resolve_hardlink_target(
+                        member.linkname, entries
+                    )
+                    merged_pax_headers = dict(target.pax_headers)
+                    for key, value in member.pax_headers.items():
+                        if key in merged_pax_headers and merged_pax_headers[key] != value:
+                            raise ValueError(
+                                f"inconsistent hardlink metadata for rootfs path: {member.name}"
+                            )
+                        merged_pax_headers[key] = value
+                    target.pax_headers = dict(
+                        sorted(merged_pax_headers.items())
+                    )
+                    member.type = tarfile.REGTYPE
+                    member.linkname = ""
+                    member.size = target.size
+                    member.mode = target.mode
+                    member.pax_headers = dict(target.pax_headers)
+                normalized.append((content_original, member))
 
             def order(item: tuple[tarfile.TarInfo, tarfile.TarInfo]) -> tuple[int, str]:
                 member = item[1]
