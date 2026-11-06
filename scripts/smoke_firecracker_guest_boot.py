@@ -233,7 +233,7 @@ exec /usr/bin/sleep 60
 """
     if profile == "W2":
         script = script.replace(
-            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp",
+            "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532,noexec,nosuid,nodev tmpfs /tmp",
             "mount -t tmpfs -o size=64m,mode=0700,uid=65532,gid=65532 tmpfs /tmp\n"
             "mkdir -p /workspace\n"
             "mount -t tmpfs -o size=128m,mode=0700,uid=65532,gid=65532,"
