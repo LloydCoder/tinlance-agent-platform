@@ -246,7 +246,11 @@ def run_benchmark(
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
         "workload": {
-            "profile": "W1-minimal-agent" if profile == "W1" else "W2-developer-workspace-and-host-surface",
+            "profile": (
+                "W1-minimal-agent"
+                if profile == "W1"
+                else "W2-developer-workspace-and-host-surface"
+            ),
             "network": "none",
             "read_only_rootfs": True,
             "capabilities": "drop-all",
