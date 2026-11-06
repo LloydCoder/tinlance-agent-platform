@@ -65,10 +65,10 @@ jobs:
         id: workspace
         run: |
           set -euo pipefail
-          docker build \\
-            --build-arg BASE_IMAGE='${{ steps.image.outputs.image_digest }}' \\
-            --file tests/fixtures/w2-developer-workspace/Dockerfile \\
-            --tag tinlance-w2-developer-workspace:ci \\
+          docker build \
+            --build-arg BASE_IMAGE='${{ steps.image.outputs.image_digest }}' \
+            --file tests/fixtures/w2-developer-workspace/Dockerfile \
+            --tag tinlance-w2-developer-workspace:ci \
             tests/fixtures/w2-developer-workspace
           image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:ci)"
           case "$image_id" in
@@ -79,7 +79,7 @@ jobs:
           echo "W2 developer workspace image: $image_id"
       - name: Run 30 isolated W1 workloads
         run: |
-          python scripts/benchmark_gvisor.py --image-digest '${{ steps.workspace.outputs.image_id }}' --runs 30 --output artifacts/gvisor-w1.json
+          python scripts/benchmark_gvisor.py --image-digest '${{ steps.image.outputs.image_digest }}' --runs 30 --output artifacts/gvisor-w1.json
       - name: Run 30 isolated W2 developer-workspace workloads
         run: |
           python scripts/benchmark_gvisor.py --image-digest '${{ steps.workspace.outputs.image_id }}' --runs 30 --profile W2 --output artifacts/gvisor-w2.json
