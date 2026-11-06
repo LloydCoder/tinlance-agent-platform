@@ -60,6 +60,10 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
     assert "Acquire::Retries=5" in dockerfile
     assert "APT::Update::Error-Mode=any" in dockerfile
+    assert dockerfile.count("Acquire::Retries=5") == 4
+    assert dockerfile.count("Acquire::http::Timeout=30") == 4
+    assert dockerfile.count("Acquire::https::Timeout=30") == 4
+    assert dockerfile.count("APT::Update::Error-Mode=any") == 2
     assert dockerfile.count("--snapshot=") == 2
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
     assert dockerfile.index("apt-get update") < dockerfile.index(
