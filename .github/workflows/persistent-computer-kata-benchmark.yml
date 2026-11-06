@@ -73,6 +73,10 @@ jobs:
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(config, indent=2) + chr(10), encoding="utf-8")
           PY
+          echo "Docker Engine version:"
+          docker version
+          echo "Validating Docker daemon configuration:"
+          sudo dockerd --validate --config-file=/etc/docker/daemon.json
           python -m json.tool /etc/docker/daemon.json >/dev/null
           if ! sudo systemctl restart docker; then
             sudo systemctl status docker.service --no-pager || true
