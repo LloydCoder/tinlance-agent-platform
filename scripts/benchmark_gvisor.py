@@ -157,10 +157,12 @@ def build_docker_command(
         "--workdir=/tmp",
     ]
     if workspace:
-        command.extend([
-            "--tmpfs",
-            "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700",
-        ])
+        command.extend(
+            [
+                "--tmpfs",
+                "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700",
+            ]
+        )
     command.extend([image_digest, "sh", "-lc", payload])
     return command
 
@@ -247,9 +249,7 @@ def run_benchmark(
         "image_digest": image_digest,
         "workload": {
             "profile": (
-                "W1-minimal-agent"
-                if profile == "W1"
-                else "W2-developer-workspace-and-host-surface"
+                "W1-minimal-agent" if profile == "W1" else "W2-developer-workspace-and-host-surface"
             ),
             "network": "none",
             "read_only_rootfs": True,
@@ -262,8 +262,7 @@ def run_benchmark(
             "user_gid": 65532,
             "tmpfs": "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
             "workspace_tmpfs": (
-                "/workspace:rw,noexec,nosuid,nodev,size=128m,"
-                "uid=65532,gid=65532,mode=0700"
+                "/workspace:rw,noexec,nosuid,nodev,size=128m,uid=65532,gid=65532,mode=0700"
                 if profile == "W2"
                 else None
             ),
