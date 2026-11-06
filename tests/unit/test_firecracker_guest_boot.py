@@ -308,3 +308,18 @@ def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
     with pytest.raises(PermissionError, match="privilege escalation"):
         verify_guest_boot_markers("TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED", "W2")
 
+
+
+def test_guest_init_w2_script_is_valid_posix_shell() -> None:
+    import subprocess
+
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    result = subprocess.run(
+        ["sh", "-n"],
+        input=guest_init_script("W2"),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
