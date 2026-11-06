@@ -68,3 +68,33 @@ def test_docker_command_rejects_empty_payload() -> None:
             image_digest="ubuntu@sha256:" + "a" * 64,
             payload="",
         )
+
+
+def test_docker_command_supports_kata_runtime_without_weakening_profile() -> None:
+    command = build_docker_command(
+        image_digest="ubuntu@sha256:" + "a" * 64,
+        payload="printf tinlance-kata-ok",
+        runtime_name="kata",
+    )
+    assert "--runtime=kata" in command
+    assert "--network=none" in command
+    assert "--read-only" in command
+    assert "--cap-drop=ALL" in command
+    assert "--security-opt=no-new-privileges" in command
+
+
+def test_docker_command_rejects_unsafe_runtime_name() -> None:
+    with pytest.raises(ValueError, match="runtime name"):
+        build_docker_command(
+            image_digest="ubuntu@sha256:" + "a" * 64,
+            payload="true",
+            runtime_name="../../runsc",
+        )
+
+
+def test_docker_command_rejects_nul_payload() -> None:
+    with pytest.raises(ValueError, match="payload"):
+        build_docker_command(
+            image_digest="ubuntu@sha256:" + "a" * 64,
+            payload="unsafe\x00payload",
+        )

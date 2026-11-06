@@ -1,0 +1,141 @@
+name: Persistent Computer Kata W1 Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/persistent-computer-kata-benchmark.yml"
+      - "scripts/benchmark_gvisor.py"
+      - "tests/unit/test_gvisor_benchmark.py"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kata-w1:
+    name: Kata QEMU runtime-rs W1 workload (ephemeral KVM runner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+      - name: Test shared OCI benchmark contract
+        run: pytest -q tests/unit/test_gvisor_benchmark.py
+      - name: Verify KVM prerequisites
+        run: |
+          test -c /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          grep -E -q '(vmx|svm)' /proc/cpuinfo
+          echo "KVM device and x86 virtualization extensions are accessible."
+      - name: Download and verify Kata Containers 4.3.1
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zstd
+          archive=/tmp/kata-static-4.3.1-amd64.tar.zst
+          curl --fail --silent --show-error --location \
+            https://github.com/kata-containers/kata-containers/releases/download/4.3.1/kata-static-4.3.1-amd64.tar.zst \
+            --output "$archive"
+          echo "1463a2b86845f4d3d8e87f2f764ec59856fc0fee3520967a79ade32762be2e97  $archive" | sha256sum --check -
+          sudo tar --zstd -xf "$archive" -C /
+          test -x /opt/kata/runtime-rs/bin/containerd-shim-kata-v2
+          test -f /opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml
+      - name: Register Kata runtime with Docker
+        run: |
+          set -euo pipefail
+          sudo python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("/etc/docker/daemon.json")
+          config = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+          runtimes = config.setdefault("runtimes", {})
+          kata_config = Path("/etc/kata-containers/configuration.toml")
+          kata_config.parent.mkdir(parents=True, exist_ok=True)
+          kata_config.write_bytes(
+              Path("/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml").read_bytes()
+          )
+          runtimes["kata"] = {
+              "runtimeType": "/opt/kata/runtime-rs/bin/containerd-shim-kata-v2"
+          }
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(config, indent=2) + chr(10), encoding="utf-8")
+          PY
+          echo "Docker Engine version:"
+          docker version
+          echo "Validating Docker daemon configuration:"
+          sudo dockerd --validate --config-file=/etc/docker/daemon.json
+          python -m json.tool /etc/docker/daemon.json >/dev/null
+          if ! sudo systemctl restart docker; then
+            sudo systemctl status docker.service --no-pager || true
+            sudo journalctl -u docker.service -n 100 --no-pager || true
+            exit 1
+          fi
+          docker info --format '{{json .Runtimes}}'
+      - name: Pull and pin benchmark image
+        id: image
+        run: |
+          set -euo pipefail
+          docker pull ubuntu:24.04
+          image_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' ubuntu:24.04)"
+          case "$image_digest" in
+            *@sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "Image digest was not returned: $image_digest"; exit 1 ;;
+          esac
+          echo "image_digest=$image_digest" >> "$GITHUB_OUTPUT"
+      - name: Prove Kata launches a separate guest kernel
+        run: |
+          host_kernel="$(uname -r)"
+          guest_kernel="$(docker run --rm --runtime kata --network none '${{ steps.image.outputs.image_digest }}' uname -r)"
+          echo "Host kernel: $host_kernel"
+          echo "Kata guest kernel: $guest_kernel"
+          test -n "$guest_kernel"
+          test "$guest_kernel" != "$host_kernel"
+      - name: Run 30 restricted Kata W1 workloads
+        run: |
+          mkdir -p artifacts
+          python scripts/benchmark_gvisor.py \
+            --image-digest '${{ steps.image.outputs.image_digest }}' \
+            --runs 30 \
+            --runtime-name kata \
+            --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
+            --candidate kata-qemu-runtime-rs \
+            --output artifacts/kata-w1.json
+      - name: Publish Kata benchmark summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("artifacts/kata-w1.json")
+          if not path.exists():
+              print("No Kata benchmark report was produced.")
+              raise SystemExit(0)
+          report = json.loads(path.read_text(encoding="utf-8"))
+          latency = report["latency"]
+          print(f"Kata: {latency['sample_count']} W1 samples")
+          print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
+          print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
+          print("Feasibility benchmark only; not production isolation certification.")
+          PY
+      - name: Upload Kata benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kata-w1-benchmark-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
