@@ -14,6 +14,24 @@ from typing import Any
 _IMAGE_DIGEST = re.compile(r"^[A-Za-z0-9./:_-]+@sha256:[a-f0-9]{64}$")
 _RUNTIME_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _SUCCESS_MARKER = "TINLANCE_GVISOR_WORKLOAD_OK"
+_NONROOT_MARKER = "TINLANCE_NONROOT_UID_CONFIRMED"
+
+
+def build_w1_payload() -> str:
+    """Return the same fail-closed W1 workload for every OCI isolation runtime."""
+    return (
+        "set -eu; "
+        'test "$(id -u)" = 65532; '
+        f"echo {_NONROOT_MARKER}; "
+        "awk '$2 == \"/\" { split($4, flags, \","); for (i in flags) if (flags[i] == \"ro\") found=1 } END { exit !found }' /proc/mounts; "
+        "echo TINLANCE_ROOTFS_READ_ONLY_CONFIRMED; "
+        "if awk 'NR>2 && $1 !~ /^lo:/ { found=1 } END { exit found }' /proc/net/dev; "
+        "then echo TINLANCE_NO_NIC_CONFIRMED; else "
+        "echo TINLANCE_NETWORK_INTERFACE_UNEXPECTED; exit 72; fi; "
+        "printf tinlance-gvisor-ok > /tmp/workload.txt; "
+        'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok; '
+        f"echo {_SUCCESS_MARKER}"
+    )
 
 
 def percentile_nearest_rank(samples: list[float], percentile: int) -> float:
@@ -65,11 +83,12 @@ def build_docker_command(
         "--read-only",
         "--cap-drop=ALL",
         "--security-opt=no-new-privileges",
+        "--user=65532:65532",
         "--cpus=1",
         "--memory=512m",
         "--pids-limit=128",
         "--tmpfs",
-        "/tmp:rw,noexec,nosuid,nodev,size=64m",
+        "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
         "--workdir=/tmp",
         image_digest,
         "sh",
@@ -107,18 +126,7 @@ def run_benchmark(
     runtimes = json.loads(runtime_inventory)
     if runtime_name not in runtimes:
         raise RuntimeError(f"Docker does not report the {runtime_name} runtime")
-    payload = (
-        "set -eu; "
-        "if touch /etc/tinlance-readonly-probe 2>/dev/null; then "
-        "echo TINLANCE_ROOTFS_WRITE_UNEXPECTED; exit 71; fi; "
-        "echo TINLANCE_ROOTFS_READ_ONLY_CONFIRMED; "
-        "if awk 'NR>2 && $1 !~ /^lo:/ { found=1 } END { exit found }' /proc/net/dev; "
-        "then echo TINLANCE_NO_NIC_CONFIRMED; else "
-        "echo TINLANCE_NETWORK_INTERFACE_UNEXPECTED; exit 72; fi; "
-        "printf tinlance-gvisor-ok > /tmp/workload.txt; "
-        'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok; '
-        f"echo {_SUCCESS_MARKER}"
-    )
+    payload = build_w1_payload()
     command = build_docker_command(
         image_digest=image_digest,
         payload=payload,
@@ -132,6 +140,8 @@ def run_benchmark(
         elapsed_ms = (time.perf_counter() - started) * 1000
         if _SUCCESS_MARKER not in output:
             raise RuntimeError("gVisor workload did not emit its success marker")
+        if _NONROOT_MARKER not in output:
+            raise RuntimeError("W1 workload did not confirm its unprivileged UID")
         if "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED" not in output:
             raise RuntimeError("gVisor workload did not confirm a read-only root filesystem")
         if "TINLANCE_NO_NIC_CONFIRMED" not in output:
@@ -156,10 +166,13 @@ def run_benchmark(
             "cpu_limit": "1",
             "memory_limit": "512m",
             "pids_limit": 128,
-            "tmpfs": "/tmp:rw,noexec,nosuid,nodev,size=64m",
+            "user_uid": 65532,
+            "user_gid": 65532,
+            "tmpfs": "/tmp:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700",
         },
         "latency": {**summarize_samples(samples), "samples_ms": samples},
         "guest_assertions": {
+            "unprivileged_uid": 65532,
             "rootfs_read_only": True,
             "network_has_only_loopback": True,
             "filesystem_write_in_tmpfs": True,
