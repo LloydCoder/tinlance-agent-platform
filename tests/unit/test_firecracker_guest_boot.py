@@ -58,7 +58,7 @@ def test_select_latest_ubuntu_rootfs_key_uses_numeric_version_order() -> None:
     )
 
 
-def test_summarize_boot_times_reports_median_and_max_without_claiming_p95() -> None:
+def test_summarize_boot_times_reports_median_and_max_for_small_samples() -> None:
     assert summarize_boot_times([120.0, 100.0, 140.0]) == {
         "sample_count": 3,
         "median_boot_time_ms": 120.0,
@@ -139,3 +139,22 @@ def test_guest_init_rejects_non_loopback_network_interfaces() -> None:
     assert "TINLANCE_NETWORK_INTERFACE_UNEXPECTED" in script
     assert "TINLANCE_NO_NIC_CONFIRMED" in script
     assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_GUEST_READY")
+
+
+def test_guest_init_executes_w1_workload_in_bounded_tmpfs_before_ready() -> None:
+    from scripts.smoke_firecracker_guest_boot import guest_init_script
+
+    script = guest_init_script()
+    assert "mount -t tmpfs -o size=64m tmpfs /tmp" in script
+    assert "printf tinlance-gvisor-ok > /tmp/workload.txt" in script
+    assert 'test "$(cat /tmp/workload.txt)" = tinlance-gvisor-ok' in script
+    assert script.index("TINLANCE_NO_NIC_CONFIRMED") < script.index("TINLANCE_W1_WORKLOAD_OK")
+    assert script.index("TINLANCE_W1_WORKLOAD_OK") < script.index("TINLANCE_GUEST_READY")
+
+
+def test_summarize_boot_times_reports_p95_and_p99_with_thirty_samples() -> None:
+    samples = [float(value) for value in range(1, 31)]
+    report = summarize_boot_times(samples)
+    assert report["sample_count"] == 30
+    assert report["p95_boot_time_ms"] == 29.0
+    assert report["p99_boot_time_ms"] == 30.0
