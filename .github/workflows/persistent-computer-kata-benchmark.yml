@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/persistent-computer-kata-benchmark.yml"
       - "scripts/benchmark_gvisor.py"
+      - "scripts/normalize_rootfs_tar.py"
+      - "tests/unit/test_normalize_rootfs_tar.py"
       - "tests/unit/test_gvisor_benchmark.py"
       - "tests/unit/test_w2_developer_workspace.py"
       - "tests/fixtures/w2-developer-workspace/**"
@@ -109,8 +111,19 @@ jobs:
             sha256:????????????????????????????????????????????????????????????????) ;;
             *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
           esac
+          mkdir -p artifacts
+          container_id="$(docker create "$image_id")"
+          docker export --output artifacts/w2-rootfs.raw.tar "$container_id"
+          docker rm "$container_id"
+          python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.raw.tar --output artifacts/w2-rootfs.tar
+          rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
+          printf '%s\n' "$rootfs_sha256" > artifacts/w2-rootfs.sha256
+          rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar
           echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
+          rootfs_digest="sha256:${rootfs_sha256}"
+          echo "rootfs_sha256=$rootfs_digest" >> "$GITHUB_OUTPUT"
           echo "W2 developer workspace image: $image_id"
+          echo "W2 normalized rootfs SHA-256: $rootfs_sha256"
       - name: Prove Kata launches a separate guest kernel
         run: |
           host_kernel="$(uname -r)"
@@ -138,6 +151,7 @@ jobs:
             --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
             --candidate kata-qemu-runtime-rs \
             --profile W2 \
+            --rootfs-sha256 '${{ steps.workspace.outputs.rootfs_sha256 }}' \
             --output artifacts/kata-w2.json
       - name: Publish Kata benchmark summary
         if: always()
@@ -154,6 +168,8 @@ jobs:
               print(f"Kata {profile.upper()}: {latency['sample_count']} samples")
               print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
               print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
+              if profile == "w2":
+                  print(f"normalized_rootfs_sha256={report['rootfs_tar_sha256']}")
           print("Feasibility benchmark only; not production isolation certification.")
           PY
       - name: Upload Kata benchmark evidence
