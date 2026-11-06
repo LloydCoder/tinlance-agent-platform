@@ -173,7 +173,6 @@ def _run(
 
 def _wait_for_path(
     path: Path,
-    process: subprocess.Popen[str],
     log_path: Path,
     timeout: float,
 ) -> None:
@@ -395,7 +394,7 @@ def _run_jailer_guest(
                 text=True,
                 start_new_session=True,
             )
-            _wait_for_path(socket_path, process, log_path, timeout_seconds)
+            _wait_for_path(socket_path, log_path, timeout_seconds)
             firecracker_pid = _find_firecracker_pid(jailer_id, uid)
             process_cgroup = (
                 Path("/proc") / str(firecracker_pid) / "cgroup"
