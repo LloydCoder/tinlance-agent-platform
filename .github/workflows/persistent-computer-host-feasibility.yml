@@ -53,7 +53,7 @@ jobs:
           chmod 0755 "$firecracker_bin" "$jailer_bin"
           "$firecracker_bin" --version
           sudo rm -f /tmp/firecracker-api.sock
-          sudo -b "$firecracker_bin" --api-sock /tmp/firecracker-api.sock > /tmp/firecracker-vmm.log 2>&1
+          sudo -b sh -c 'exec "$1" --api-sock "$2" >> "$3" 2>&1' sh "$firecracker_bin" /tmp/firecracker-api.sock /tmp/firecracker-vmm.log
           for attempt in $(seq 1 50); do
             if [ -S /tmp/firecracker-api.sock ]; then break; fi
                         sleep 0.1
