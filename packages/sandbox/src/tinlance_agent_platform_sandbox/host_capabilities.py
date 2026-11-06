@@ -64,9 +64,7 @@ def probe_host_capabilities(
     kvm_accessible = kvm_device_present and access_check(kvm_device, os.R_OK | os.W_OK)
 
     try:
-        max_user_namespaces = int(
-            _read_text(proc / "sys/user/max_user_namespaces").strip() or "0"
-        )
+        max_user_namespaces = int(_read_text(proc / "sys/user/max_user_namespaces").strip() or "0")
     except ValueError:
         max_user_namespaces = 0
     user_namespaces = max_user_namespaces > 0
@@ -77,19 +75,15 @@ def probe_host_capabilities(
         line.startswith("Seccomp:") and line.split(":", 1)[1].strip() in {"1", "2"}
         for line in status.splitlines()
     )
-    seccomp_actions = set(
-        _read_text(proc / "sys/kernel/seccomp/actions_avail").split()
-    )
-    kernel_config = _read_text(
-        root / "boot" / f"config-{kernel_release or platform.release()}"
-    )
-    seccomp_filter_supported = (
-        {"errno", "allow"}.issubset(seccomp_actions)
-        or "CONFIG_SECCOMP_FILTER=y" in kernel_config
-    )
-    apparmor = _read_text(
-        sysfs / "module/apparmor/parameters/enabled"
-    ).strip().upper() in {"Y", "YES"}
+    seccomp_actions = set(_read_text(proc / "sys/kernel/seccomp/actions_avail").split())
+    kernel_config = _read_text(root / "boot" / f"config-{kernel_release or platform.release()}")
+    seccomp_filter_supported = {"errno", "allow"}.issubset(
+        seccomp_actions
+    ) or "CONFIG_SECCOMP_FILTER=y" in kernel_config
+    apparmor = _read_text(sysfs / "module/apparmor/parameters/enabled").strip().upper() in {
+        "Y",
+        "YES",
+    }
 
     machine = architecture or platform.machine()
     supported_architectures = {"x86_64", "aarch64", "amd64", "arm64"}
