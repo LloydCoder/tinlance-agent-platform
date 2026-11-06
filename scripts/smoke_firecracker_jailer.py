@@ -130,7 +130,10 @@ def verify_jailer_process_evidence(
     if host_pid_namespace == process_pid_namespace:
         raise PermissionError("jailer process is not isolated in a PID namespace")
     if process_root != expected_chroot_root:
-        raise PermissionError("jailer process root does not match its dedicated chroot")
+        raise PermissionError(
+            f"jailer process root {process_root!r} does not match expected "
+            f"chroot {expected_chroot_root!r}"
+        )
 
     cgroup_v2_path = next(
         (
