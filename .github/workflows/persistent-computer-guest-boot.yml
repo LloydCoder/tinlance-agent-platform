@@ -44,7 +44,7 @@ jobs:
       - name: Verify KVM and resource-control prerequisites
         run: |
           mkdir -p artifacts
-          sudo python scripts/probe_persistent_computer_host.py --output artifacts/host.json
+          sudo env PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" python scripts/probe_persistent_computer_host.py --output artifacts/host.json
           sudo chmod 644 artifacts/host.json
           python - <<'PY'
           import json
