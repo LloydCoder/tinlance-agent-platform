@@ -161,8 +161,8 @@ def test_ensure_w1_user_adds_deterministic_passwd_group_and_home(tmp_path: Path)
 
     rootfs = tmp_path / "rootfs"
     (rootfs / "etc").mkdir(parents=True)
-    (rootfs / "etc" / "passwd").write_text("root:x:0:0:root:/root:/bin/sh\\n", encoding="utf-8")
-    (rootfs / "etc" / "group").write_text("root:x:0:\\n", encoding="utf-8")
+    (rootfs / "etc" / "group").write_text("root:x:0:\n", encoding="utf-8")
+    (rootfs / "etc" / "group").write_text("root:x:0:\n", encoding="utf-8")
 
     ensure_w1_user(rootfs)
     ensure_w1_user(rootfs)
@@ -181,7 +181,7 @@ def test_ensure_w1_user_rejects_uid_collision(tmp_path: Path) -> None:
     rootfs = tmp_path / "rootfs"
     (rootfs / "etc").mkdir(parents=True)
     (rootfs / "etc" / "passwd").write_text(
-        "other:x:65532:65532:Other:/home/other:/bin/sh\\n",
+        "other:x:65532:65532:Other:/home/other:/bin/sh\n",
         encoding="utf-8",
     )
 
