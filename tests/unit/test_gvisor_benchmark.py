@@ -120,3 +120,52 @@ def test_w1_payload_verifies_nonroot_readonly_rootfs_and_isolated_network() -> N
     assert "/proc/net/dev" in payload
     assert "TINLANCE_NO_NIC_CONFIRMED" in payload
     assert "/tmp/workload.txt" in payload
+
+def test_w2_payload_requires_capability_and_host_surface_denials() -> None:
+    from scripts.benchmark_gvisor import build_w2_payload
+
+    payload = build_w2_payload()
+    for marker in (
+        "TINLANCE_W2_CAPABILITIES_DROPPED",
+        "TINLANCE_W2_NO_NEW_PRIVS_CONFIRMED",
+        "TINLANCE_W2_SENSITIVE_FILES_DENIED",
+        "TINLANCE_W2_HOST_DEVICES_ABSENT",
+        "TINLANCE_W2_HOST_SOCKETS_ABSENT",
+        "TINLANCE_W2_PRIVILEGE_ESCALATION_DENIED",
+        "TINLANCE_W2_MOUNT_PRIVILEGE_DENIED",
+        "TINLANCE_W2_PROC_SYS_READONLY",
+        "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
+    ):
+        assert marker in payload
+    assert "TINLANCE_W2_PRIVILEGE_ESCALATION_UNEXPECTED" in payload
+    assert "TINLANCE_W2_MOUNT_PRIVILEGE_UNEXPECTED" in payload
+
+
+def test_w2_payload_retains_w1_network_and_filesystem_contract() -> None:
+    from scripts.benchmark_gvisor import build_w2_payload
+
+    payload = build_w2_payload()
+    assert "TINLANCE_NONROOT_UID_CONFIRMED" in payload
+    assert "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED" in payload
+    assert "TINLANCE_NO_NIC_CONFIRMED" in payload
+    assert "/tmp/workload.txt" in payload
+
+
+def test_docker_command_w2_profile_keeps_all_outer_security_controls() -> None:
+    from scripts.benchmark_gvisor import build_w2_payload
+
+    command = build_docker_command(
+        image_digest="ubuntu@sha256:" + "a" * 64,
+        payload=build_w2_payload(),
+        runtime_name="kata",
+    )
+    for option in (
+        "--network=none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--user=65532:65532",
+        "--pids-limit=128",
+    ):
+        assert option in command
+
