@@ -83,9 +83,7 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
     member.gname = ""
     member.mtime = SOURCE_DATE_EPOCH
     member.pax_headers = {
-        key: value
-        for key, value in member.pax_headers.items()
-        if key not in _VOLATILE_PAX_HEADERS
+        key: value for key, value in member.pax_headers.items() if key not in _VOLATILE_PAX_HEADERS
     }
     if member.isdir() or member.issym() or member.islnk():
         member.size = 0
