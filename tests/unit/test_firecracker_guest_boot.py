@@ -153,7 +153,6 @@ def test_guest_boot_marker_verifier_accepts_read_only_no_nic_evidence() -> None:
         "guest_ready": True,
     }
 
-
 def test_guest_boot_marker_verifier_rejects_writable_rootfs() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
