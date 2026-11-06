@@ -257,7 +257,13 @@ def test_guest_init_w2_enforces_no_new_privileges_and_host_surface_denials() -> 
     assert "setpriv --no-new-privs --reuid=65532 --regid=65532 --clear-groups" in script
     assert 'grep -Eq "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status' in script
     assert 'grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/self/status' in script
-    for marker in ("TINLANCE_W2_DEVICE_PROBE_COMPLETED", "TINLANCE_W2_SOCKET_PROBE_COMPLETED", "TINLANCE_W2_ESCALATION_PROBE_COMPLETED", "TINLANCE_W2_MOUNT_PROBE_COMPLETED", "TINLANCE_W2_PROC_PROBE_COMPLETED"):
+    for marker in (
+        "TINLANCE_W2_DEVICE_PROBE_COMPLETED",
+        "TINLANCE_W2_SOCKET_PROBE_COMPLETED",
+        "TINLANCE_W2_ESCALATION_PROBE_COMPLETED",
+        "TINLANCE_W2_MOUNT_PROBE_COMPLETED",
+        "TINLANCE_W2_PROC_PROBE_COMPLETED",
+    ):
         assert marker in script
     assert script.count("set -eu") >= 2
     for marker in (
