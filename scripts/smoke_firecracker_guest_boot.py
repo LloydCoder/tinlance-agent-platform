@@ -148,8 +148,12 @@ def ensure_w1_user(rootfs_dir: Path) -> None:
     etc_dir.mkdir(parents=True, exist_ok=True)
     passwd_path = etc_dir / "passwd"
     group_path = etc_dir / "group"
-    passwd_lines = passwd_path.read_text(encoding="utf-8").splitlines() if passwd_path.exists() else []
-    group_lines = group_path.read_text(encoding="utf-8").splitlines() if group_path.exists() else []
+    passwd_lines: list[str] = []
+    group_lines: list[str] = []
+    if passwd_path.exists():
+        passwd_lines = passwd_path.read_text(encoding="utf-8").splitlines()
+    if group_path.exists():
+        group_lines = group_path.read_text(encoding="utf-8").splitlines()
 
     for line in passwd_lines:
         fields = line.split(":")
