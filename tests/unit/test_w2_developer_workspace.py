@@ -100,3 +100,12 @@ def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None
     assert "--cap-drop=ALL" in w2
     assert "--user=65532:65532" in w2
     assert "sha256:" + "b" * 64 in w2
+
+
+def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
+    fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "w2-developer-workspace"
+    dockerfile = (fixture_root / "Dockerfile").read_text(encoding="utf-8")
+    assert "git init --quiet --initial-branch=main" in dockerfile
+    assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
+    assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
+
