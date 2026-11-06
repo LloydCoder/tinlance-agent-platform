@@ -95,8 +95,8 @@ def verify_jailer_process_evidence(
     process_mount_namespace: str,
     host_pid_namespace: str,
     process_pid_namespace: str,
-    expected_chroot_root: str,
-    process_root: str,
+    expected_chroot_identity: str,
+    process_root_identity: str,
 ) -> dict[str, int | bool | str]:
     status = _parse_proc_status(status_text)
     try:
@@ -129,10 +129,9 @@ def verify_jailer_process_evidence(
         raise PermissionError("jailer process is not isolated in a mount namespace")
     if host_pid_namespace == process_pid_namespace:
         raise PermissionError("jailer process is not isolated in a PID namespace")
-    if process_root != expected_chroot_root:
+    if process_root_identity != expected_chroot_identity:
         raise PermissionError(
-            f"jailer process root {process_root!r} does not match expected "
-            f"chroot {expected_chroot_root!r}"
+            "jailer process root inode does not match its dedicated chroot"
         )
 
     cgroup_v2_path = next(
@@ -156,7 +155,7 @@ def verify_jailer_process_evidence(
         "capabilities_effective": capabilities_effective,
         "pid_namespace_isolated": True,
         "mount_namespace_isolated": True,
-        "chroot_root": process_root,
+        "chroot_identity": process_root_identity,
         "cgroup_path": cgroup_v2_path,
     }
 
@@ -224,9 +223,9 @@ def _find_firecracker_pid(
     )
 
 
-def _readlink_as_root(path: Path) -> str:
+def _stat_identity_as_root(path: Path) -> str:
     return _run(
-        ["sudo", "-n", "readlink", str(path)],
+        ["sudo", "-n", "stat", "-Lc", "%d:%i", str(path)],
         capture_output=True,
     ).stdout.strip()
 
@@ -247,8 +246,8 @@ def _read_process_evidence(
         process_mount_namespace=_readlink_as_root(proc / "ns/mnt"),
         host_pid_namespace=os.readlink("/proc/self/ns/pid"),
         process_pid_namespace=_readlink_as_root(proc / "ns/pid"),
-        expected_chroot_root=str(expected_chroot_root.resolve()),
-        process_root=_readlink_as_root(proc / "root"),
+        expected_chroot_identity=_stat_identity_as_root(expected_chroot_root),
+        process_root_identity=_stat_identity_as_root(proc / "root"),
     )
 
 
