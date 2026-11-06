@@ -232,7 +232,21 @@ def test_w2_benchmark_evidence_reports_the_actual_resource_envelope(
         runs=3,
         runtime_name="kata",
         profile="W2",
+        rootfs_sha256="sha256:" + "b" * 64,
     )
 
+    assert report["rootfs_tar_sha256"] == "sha256:" + "b" * 64
     assert report["workload"]["cpu_limit"] == "2"
     assert report["workload"]["memory_limit"] == "2g"
+
+def test_w2_benchmark_requires_normalized_rootfs_digest() -> None:
+    from scripts.benchmark_gvisor import run_benchmark
+
+    with pytest.raises(ValueError, match="normalized rootfs SHA-256"):
+        run_benchmark(
+            image_digest="sha256:" + "a" * 64,
+            runs=3,
+            runtime_name="kata",
+            profile="W2",
+        )
+
