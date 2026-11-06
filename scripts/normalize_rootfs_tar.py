@@ -150,9 +150,7 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
             for original, member in entries.values():
                 content_original = original
                 if member.islnk():
-                    content_original, target = _resolve_hardlink_target(
-                        member.linkname, entries
-                    )
+                    content_original, target = _resolve_hardlink_target(member.linkname, entries)
                     merged_pax_headers = dict(target.pax_headers)
                     for key, value in member.pax_headers.items():
                         if key in merged_pax_headers and merged_pax_headers[key] != value:
@@ -160,9 +158,7 @@ def normalize_rootfs_tar(source_path: Path, output_path: Path) -> tuple[str, int
                                 f"inconsistent hardlink metadata for rootfs path: {member.name}"
                             )
                         merged_pax_headers[key] = value
-                    target.pax_headers = dict(
-                        sorted(merged_pax_headers.items())
-                    )
+                    target.pax_headers = dict(sorted(merged_pax_headers.items()))
                     member.type = tarfile.REGTYPE
                     member.linkname = ""
                     member.size = target.size
