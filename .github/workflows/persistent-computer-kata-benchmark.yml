@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   kata-w1:
-    name: Kata QEMU runtime-rs W1 workload (ephemeral KVM runner)
+    name: Kata QEMU runtime-rs W1 and W2 workloads (ephemeral KVM runner)
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
