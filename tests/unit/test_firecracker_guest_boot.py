@@ -35,7 +35,7 @@ def test_select_latest_kernel_key_uses_numeric_version_order() -> None:
         select_latest_versioned_key(
             xml,
             "firecracker-ci/20261106-build/x86_64/",
-            r"vmlinux-(\\d+)\\.(\\d+)\\.(\\d+)$",
+            r"vmlinux-(\d+)\.(\d+)\.(\d+)$",
         )
         == "firecracker-ci/20261106-build/x86_64/vmlinux-6.10.11"
     )
