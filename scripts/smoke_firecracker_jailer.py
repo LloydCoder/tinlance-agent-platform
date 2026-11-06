@@ -206,9 +206,7 @@ def _find_firecracker_pid(
                 continue
             try:
                 comm = (entry / "comm").read_text(encoding="utf-8").strip()
-                status = _parse_proc_status(
-                    (entry / "status").read_text(encoding="utf-8")
-                )
+                status = _parse_proc_status((entry / "status").read_text(encoding="utf-8"))
                 cgroup_text = (entry / "cgroup").read_text(encoding="utf-8")
             except (FileNotFoundError, PermissionError, ProcessLookupError):
                 continue
@@ -222,8 +220,7 @@ def _find_firecracker_pid(
                 return int(entry.name)
         time.sleep(0.1)
     raise RuntimeError(
-        "jailed Firecracker process could not be located by its dedicated "
-        "uid and cgroup identity"
+        "jailed Firecracker process could not be located by its dedicated uid and cgroup identity"
     )
 
 
@@ -399,9 +396,9 @@ def _run_jailer_guest(
             )
             _wait_for_path(socket_path, log_path, timeout_seconds)
             firecracker_pid = _find_firecracker_pid(jailer_id, uid)
-            process_cgroup = (
-                Path("/proc") / str(firecracker_pid) / "cgroup"
-            ).read_text(encoding="utf-8")
+            process_cgroup = (Path("/proc") / str(firecracker_pid) / "cgroup").read_text(
+                encoding="utf-8"
+            )
             cgroup_path = next(
                 (
                     line.partition("::")[2]
@@ -474,8 +471,7 @@ def _run_jailer_guest(
                     )
                 if not _is_process_alive(firecracker_pid):
                     raise RuntimeError(
-                        "jailed Firecracker exited before guest readiness: "
-                        f"{log_text[-5000:]}"
+                        f"jailed Firecracker exited before guest readiness: {log_text[-5000:]}"
                     )
                 time.sleep(0.1)
             log_text = log_path.read_text(encoding="utf-8", errors="replace")
