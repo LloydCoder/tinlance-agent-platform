@@ -173,3 +173,25 @@ CapEff:\t0000000000000000
             expected_chroot_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
             process_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
         )
+
+def test_verify_jailer_evidence_rejects_process_outside_expected_chroot() -> None:
+    status = """Uid:\t987\t987\t987\t987
+Gid:\t987\t987\t987\t987
+NSpid:\t4321\t1
+NoNewPrivs:\t1
+Seccomp:\t2
+CapEff:\t0000000000000000
+"""
+    with pytest.raises(PermissionError, match="chroot"):
+        verify_jailer_process_evidence(
+            status_text=status,
+            cgroup_text="0::/firecracker/fc-smoke-421",
+            expected_uid=987,
+            expected_gid=987,
+            host_mount_namespace="mnt:[4026531840]",
+            process_mount_namespace="mnt:[4026532444]",
+            host_pid_namespace="pid:[4026531836]",
+            process_pid_namespace="pid:[4026532445]",
+            expected_chroot_root="/srv/tinlance-jailer/firecracker/fc-smoke-421/root",
+            process_root="/",
+        )
