@@ -51,7 +51,9 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
-    assert dockerfile.index('--snapshot="${APT_SNAPSHOT}" update') < dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
+    update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
+    install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
+    assert update_index < install_index
     assert "ca-certificates git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" not in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
