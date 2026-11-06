@@ -290,6 +290,10 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
         "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
+        "TINLANCE_W2_GIT_VERSION=git version",
+        "TINLANCE_W2_PYTHON_VERSION=Python",
+        "TINLANCE_W2_NODE_VERSION=v",
+        "TINLANCE_W2_NPM_VERSION=",
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
