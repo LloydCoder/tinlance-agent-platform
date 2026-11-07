@@ -84,6 +84,11 @@ def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
         workflow = (workflow_root / name).read_text(encoding="utf-8")
         assert base_digest in workflow
         assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in workflow
+        assert "docker import" in workflow
+        assert "artifacts/w2-rootfs.tar" in workflow
+        assert "org.tinlance.w2.rootfs.tar.sha256" in workflow
+        assert 'image_id=$normalized_image_id' in workflow
+        assert "rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar" in workflow
 
 
 def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None:
