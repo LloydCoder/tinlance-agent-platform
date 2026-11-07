@@ -399,6 +399,7 @@ def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
         "TINLANCE_W2_NODE_EDIT_OK",
         "TINLANCE_W2_NODE_BUILD_OK",
         "TINLANCE_W2_NODE_TESTS_OK",
+        "TINLANCE_W2_NPM_INSTALL_OK",
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
     ):
