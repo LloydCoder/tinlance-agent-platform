@@ -43,8 +43,8 @@ class EgressPolicy:
     max_connections: int = 64
 
     def __post_init__(self) -> None:
-        if not self.allowed_domains:
-            raise ValueError("at least one exact domain or explicit wildcard is required")
+        if not self.allowed_domains or len(self.allowed_domains) > 256:
+            raise ValueError("browser egress requires between 1 and 256 allowlist entries")
         if not self.allowed_ports or any(port != 443 for port in self.allowed_ports):
             raise ValueError("browser egress is HTTPS-only on TCP port 443")
         if (
