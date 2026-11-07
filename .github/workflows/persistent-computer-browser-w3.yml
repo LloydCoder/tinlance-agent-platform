@@ -43,7 +43,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test,browser]"
           python -m playwright install chromium
-          sudo python -m playwright install-deps chromium
+          sudo "$pythonLocation/bin/python" -m playwright install-deps chromium
           chmod o+x "$HOME" "$HOME/.cache" "$HOME/.cache/ms-playwright"
           chmod -R a+rX "$HOME/.cache/ms-playwright"
 
