@@ -55,6 +55,7 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
     if not route_file.is_file():
         raise BrowserIsolationError("Linux IPv4 route table is unavailable")
     connected_to_proxy = False
+    route_count = 0
     for line in route_file.read_text(encoding="ascii").splitlines()[1:]:
         fields = line.split()
         if len(fields) < 8:
@@ -74,9 +75,12 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
         network = ipaddress.IPv4Network(
             (str(network_address), str(network_mask)), strict=False
         )
-        if "0001" in flags and proxy_ip in network:
+        route_count += 1
+        if proxy_ip not in network:
+            raise BrowserIsolationError("unexpected non-proxy route exists in browser namespace")
+        if "0001" in flags:
             connected_to_proxy = True
-    if not connected_to_proxy:
+    if route_count != 1 or not connected_to_proxy:
         raise BrowserIsolationError("browser namespace has no directly connected route to its proxy")
 
     ipv6_route = Path("/proc/net/ipv6_route")
