@@ -249,6 +249,11 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
         self.allowed_client_network = ipaddress.ip_network(
             allowed_client_network, strict=True
         )
+        if not (
+            self.allowed_client_network.is_private
+            or self.allowed_client_network.is_loopback
+        ):
+            raise ValueError("browser proxy clients must come from a private workspace network")
         self._slots = threading.BoundedSemaphore(policy.max_connections)
         super().__init__(server_address, _BrowserProxyHandler)
 
