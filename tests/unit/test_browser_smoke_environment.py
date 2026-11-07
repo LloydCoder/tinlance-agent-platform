@@ -40,8 +40,7 @@ def test_browser_child_environment_is_explicitly_allowlisted(
         "XDG_CACHE_HOME": str(tmp_path / "home" / ".cache"),
     }
     assert not any(
-        key.startswith(("GITHUB_", "ACTIONS_", "AWS_")) or "SECRET" in key
-        for key in environment
+        key.startswith(("GITHUB_", "ACTIONS_", "AWS_")) or "SECRET" in key for key in environment
     )
 
 
