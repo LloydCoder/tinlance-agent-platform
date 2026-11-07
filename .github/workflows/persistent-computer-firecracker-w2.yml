@@ -155,7 +155,7 @@ jobs:
               "byte_identical": True,
           }
           Path("artifacts/w2-rootfs-reproducibility.json").write_text(
-              json.dumps(report, sort_keys=True, indent=2) + "\\n",
+              json.dumps(report, sort_keys=True, indent=2) + "\n",
               encoding="utf-8",
           )
           PY
