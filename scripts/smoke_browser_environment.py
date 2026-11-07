@@ -108,22 +108,23 @@ def main() -> int:
         run(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=1"])
         run(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=1"])
 
-        run(["nft", "add", "table", "inet", nft_table])
+        firewall_script = (
+            f"table inet {nft_table} {{\\n"
+            "  chain input {\\n"
+            "    type filter hook input priority -50; policy accept;\\n"
+            f'    iifname "{host_if}" ip saddr {guest_ip} tcp dport {PROXY_PORT} accept\\n'
+            f'    iifname "{host_if}" drop\\n'
+            "  }\\n"
+            "}\\n"
+        )
+        subprocess.run(
+            ["nft", "-f", "-"],
+            input=firewall_script,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         firewall_created = True
-        run(
-            [
-                "nft", "add", "chain", "inet", nft_table, "input",
-                "{ type filter hook input priority -50; policy accept; }",
-            ]
-        )
-        run(
-            [
-                "nft", "add", "rule", "inet", nft_table, "input",
-                "iifname", host_if, "ip", "saddr", guest_ip,
-                "tcp", "dport", str(PROXY_PORT), "accept",
-            ]
-        )
-        run(["nft", "add", "rule", "inet", nft_table, "input", "iifname", host_if, "drop"])
 
 
         routes = run(["ip", "netns", "exec", namespace, "ip", "-4", "route", "show"])
