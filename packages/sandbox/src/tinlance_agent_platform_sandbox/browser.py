@@ -81,7 +81,9 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
         if "0001" in flags:
             connected_to_proxy = True
     if route_count != 1 or not connected_to_proxy:
-        raise BrowserIsolationError("browser namespace has no directly connected route to its proxy")
+        raise BrowserIsolationError(
+            "browser namespace has no directly connected route to its proxy"
+        )
 
     ipv6_route = Path("/proc/net/ipv6_route")
     if ipv6_route.is_file():
@@ -92,7 +94,9 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
 
     interfaces = {entry.name for entry in Path("/sys/class/net").iterdir()}
     if "lo" not in interfaces or len(interfaces) != 2:
-        raise BrowserIsolationError("browser namespace must contain loopback and exactly one proxy link")
+        raise BrowserIsolationError(
+            "browser namespace must contain loopback and exactly one proxy link"
+        )
     return str(proxy_ip)
 
 
@@ -152,7 +156,9 @@ class BrowserProfileLease:
                 or not stat.S_ISREG(marker_info.st_mode)
                 or marker_value != tenant_identity
             ):
-                raise BrowserIsolationError("profile root is already bound to another tenant")
+                raise BrowserIsolationError(
+                    "profile root is already bound to another tenant"
+                ) from None
             os.chmod(tenant_marker, 0o600)
         else:
             try:
@@ -241,7 +247,9 @@ class BrowserSession:
             or parsed.password is not None
             or parsed.port not in (None, 443)
         ):
-            raise BrowserIsolationError("browser navigation is restricted to credential-free HTTPS URLs")
+            raise BrowserIsolationError(
+                "browser navigation is restricted to credential-free HTTPS URLs"
+            )
         normalize_hostname(parsed.hostname)
         return self.page.goto(url, wait_until="domcontentloaded", timeout=self._timeout_ms)
 
@@ -295,7 +303,9 @@ class BrowserWorkspaceManager:
 
     def open(self, workspace_id: str) -> BrowserSession:
         if os.geteuid() != self.expected_uid:
-            raise BrowserIsolationError("browser process UID does not match tenant supervisor binding")
+            raise BrowserIsolationError(
+                "browser process UID does not match tenant supervisor binding"
+            )
         verify_browser_network_isolation(self.proxy_url)
         lease = BrowserProfileLease.acquire(
             self.profile_root,
