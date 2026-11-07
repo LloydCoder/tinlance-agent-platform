@@ -271,7 +271,8 @@ def _relay_tunnel(
 
 class _BrowserProxyServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = False
-    daemon_threads = True
+    daemon_threads = False
+    block_on_close = True
     request_queue_size = 64
 
     def __init__(
@@ -288,15 +289,49 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
         ):
             raise ValueError("browser proxy clients must come from a private workspace network")
         self._slots = threading.BoundedSemaphore(policy.max_connections)
+        self._active_lock = threading.Lock()
+        self._active_sockets: set[socket.socket] = set()
+        self._closing = False
         super().__init__(server_address, _BrowserProxyHandler)
+
+    def register_socket(self, connection: socket.socket) -> bool:
+        with self._active_lock:
+            if self._closing:
+                return False
+            self._active_sockets.add(connection)
+            return True
+
+    def unregister_socket(self, connection: socket.socket) -> None:
+        with self._active_lock:
+            self._active_sockets.discard(connection)
+
+    def close_active_connections(self) -> None:
+        with self._active_lock:
+            self._closing = True
+            connections = tuple(self._active_sockets)
+            self._active_sockets.clear()
+        for connection in connections:
+            try:
+                connection.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                connection.close()
+            except OSError:
+                pass
 
     def process_request(self, request: socket.socket, client_address: tuple[str, int]) -> None:
         if not self._slots.acquire(blocking=False):
             request.close()
             return
+        if not self.register_socket(request):
+            self._slots.release()
+            request.close()
+            return
         try:
             super().process_request(request, client_address)
         except BaseException:
+            self.unregister_socket(request)
             self._slots.release()
             raise
 
@@ -306,6 +341,7 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
         try:
             super().process_request_thread(request, client_address)
         finally:
+            self.unregister_socket(request)
             self._slots.release()
 
 
@@ -347,8 +383,14 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
                 target,
                 timeout_seconds=self.proxy_server.policy.connect_timeout_seconds,
             )
+            if not self.proxy_server.register_socket(upstream):
+                upstream.close()
+                raise EgressDenied("browser egress proxy is shutting down")
         except (EgressDenied, ValueError, OSError, ConnectionError):
-            self.send_error(403, "Destination denied by browser egress policy")
+            try:
+                self.send_error(403, "Destination denied by browser egress policy")
+            except OSError:
+                pass
             return
 
         try:
@@ -364,6 +406,7 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
                 max_bytes=self.proxy_server.policy.tunnel_max_bytes,
             )
         finally:
+            self.proxy_server.unregister_socket(upstream)
             upstream.close()
 
     def do_GET(self) -> None:
@@ -409,6 +452,7 @@ class BrowserEgressProxy:
             allowed_client_network=allowed_client_network,
         )
         self._thread: threading.Thread | None = None
+        self._closed = False
 
     @property
     def address(self) -> tuple[str, int]:
@@ -416,6 +460,8 @@ class BrowserEgressProxy:
         return str(host), int(port)
 
     def start(self) -> None:
+        if self._closed:
+            raise RuntimeError("browser egress proxy is closed")
         if self._thread is not None:
             raise RuntimeError("browser egress proxy is already started")
         self._thread = threading.Thread(
@@ -426,12 +472,19 @@ class BrowserEgressProxy:
         self._thread.start()
 
     def close(self) -> None:
-        if self._thread is None:
+        if self._closed:
             return
-        self._server.shutdown()
+        self._closed = True
+        thread = self._thread
+        if thread is not None:
+            self._server.shutdown()
+        self._server.close_active_connections()
         self._server.server_close()
-        self._thread.join(timeout=5)
-        self._thread = None
+        if thread is not None:
+            thread.join(timeout=5)
+            if thread.is_alive():
+                raise RuntimeError("browser egress proxy did not stop within the shutdown deadline")
+            self._thread = None
 
     def __enter__(self) -> BrowserEgressProxy:
         self.start()
