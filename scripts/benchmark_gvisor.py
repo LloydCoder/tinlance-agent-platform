@@ -187,11 +187,18 @@ def run_benchmark(
     runtime_version: str | None = None,
     candidate: str | None = None,
     profile: str = "W1",
+    rootfs_sha256: str | None = None,
 ) -> dict[str, Any]:
     if runs < 3 or runs > 100:
         raise ValueError("runs must be between 3 and 100")
     if profile not in {"W1", "W2"}:
         raise ValueError("profile must be W1 or W2")
+    if profile == "W2" and (
+        rootfs_sha256 is None or not re.fullmatch(r"sha256:[a-f0-9]{64}", rootfs_sha256)
+    ):
+        raise ValueError("W2 requires a normalized rootfs SHA-256 digest")
+    if profile == "W1" and rootfs_sha256 is not None:
+        raise ValueError("W1 does not accept a W2 rootfs digest")
     if not _RUNTIME_NAME.fullmatch(runtime_name):
         raise ValueError("runtime name must be a safe Docker runtime identifier")
     version = runtime_version or _capture([runtime_name, "--version"])
@@ -248,6 +255,7 @@ def run_benchmark(
         "host_kernel": platform.release(),
         "host_architecture": platform.machine(),
         "image_digest": image_digest,
+        "rootfs_tar_sha256": rootfs_sha256,
         "workload": {
             "profile": (
                 "W1-minimal-agent" if profile == "W1" else "W2-developer-workspace-and-host-surface"
@@ -300,6 +308,7 @@ def main() -> int:
     parser.add_argument("--runtime-version")
     parser.add_argument("--candidate")
     parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--rootfs-sha256")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run_benchmark(
@@ -309,6 +318,7 @@ def main() -> int:
         runtime_version=args.runtime_version,
         candidate=args.candidate,
         profile=args.profile,
+        rootfs_sha256=args.rootfs_sha256,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

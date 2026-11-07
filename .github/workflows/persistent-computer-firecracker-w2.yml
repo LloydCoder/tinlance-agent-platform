@@ -8,6 +8,8 @@ on:
       - "scripts/__init__.py"
       - "scripts/probe_persistent_computer_host.py"
       - "scripts/smoke_firecracker_guest_boot.py"
+      - "scripts/normalize_rootfs_tar.py"
+      - "tests/unit/test_normalize_rootfs_tar.py"
       - "tests/fixtures/firecracker-guest-assets.json"
       - "tests/unit/test_firecracker_guest_boot.py"
       - "tests/fixtures/w2-developer-workspace/**"
@@ -25,7 +27,7 @@ jobs:
   guest-boot:
     name: KVM W2 developer workspace (ephemeral runner)
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -41,7 +43,7 @@ jobs:
           python -m pip install -e ".[test]"
 
       - name: Test guest boot evidence helpers
-        run: pytest -q tests/unit/test_firecracker_guest_boot.py
+        run: pytest -q tests/unit/test_firecracker_guest_boot.py tests/unit/test_normalize_rootfs_tar.py
 
       - name: Verify KVM and resource-control prerequisites
         run: |
@@ -109,27 +111,29 @@ jobs:
             *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
           esac
           container_id="$(docker create "$image_id")"
-          docker export --output artifacts/w2-rootfs.tar "$container_id"
+          docker export --output artifacts/w2-rootfs.raw.tar "$container_id"
           docker rm "$container_id"
+          python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.raw.tar --output artifacts/w2-rootfs.tar
           rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
+          printf '%s\n' "$rootfs_sha256" > artifacts/w2-rootfs.sha256
+          rm -f artifacts/w2-rootfs.raw.tar
           echo "W2 base image: $base_digest"
           echo "W2 image ID: $image_id"
-          echo "W2 rootfs tar SHA-256: $rootfs_sha256"
+          echo "W2 normalized rootfs tar SHA-256: $rootfs_sha256"
           {
             echo "W2_BASE_IMAGE_DIGEST=$base_digest"
             echo "W2_IMAGE_ID=$image_id"
             echo "W2_ROOTFS_TAR=artifacts/w2-rootfs.tar"
           } >> "$GITHUB_ENV"
 
-      - name: Boot three network-disconnected W2 developer-workspace guest instances
+      - name: Boot 30 network-disconnected W2 developer-workspace guest instances
         run: |
           set -euo pipefail
-          trap 'rm -f "$W2_ROOTFS_TAR"' EXIT
           python scripts/smoke_firecracker_guest_boot.py \
             --firecracker "${FIRECRACKER_BIN}" \
             --firecracker-archive "${FIRECRACKER_ARCHIVE}" \
             --assets-manifest tests/fixtures/firecracker-guest-assets.json \
-            --runs 3 --profile W2 \
+            --runs 30 --profile W2 \
             --w2-rootfs-tar "$W2_ROOTFS_TAR" \
             --w2-image-id "$W2_IMAGE_ID" \
             --w2-base-image-digest "$W2_BASE_IMAGE_DIGEST" \
@@ -148,13 +152,13 @@ jobs:
           if not report_path.is_file():
               raise SystemExit("Required Firecracker W2 guest report is missing; acceptance cannot pass.")
           report = json.loads(report_path.read_text(encoding="utf-8"))
-          if report.get("sample_count") != 3:
-              raise SystemExit(f"Expected exactly three W2 guest boots, got {report.get('sample_count')!r}")
+          if report.get("sample_count") != 30:
+              raise SystemExit(f"Expected exactly 30 W2 guest boots, got {report.get('sample_count')!r}")
           if report.get("w2_rootfs_tar_sha256") is None:
               raise SystemExit("W2 rootfs export digest is missing from guest evidence.")
           markers = report.get("guest_isolation_checks", [])
-          if len(markers) != 3 or any(not item.get("developer_workspace_passed") for item in markers):
-              raise SystemExit("All three guest boots must prove developer-workspace completion.")
+          if len(markers) != 30 or any(not item.get("developer_workspace_passed") for item in markers):
+              raise SystemExit("All 30 guest boots must prove developer-workspace completion.")
           summary = (
               f"Firecracker {report['firecracker_version']}: "
               f"{report['sample_count']} guest boots; "
@@ -173,7 +177,7 @@ jobs:
           )
           print(f"Guest workload: {report['guest_workload']}")
           print(f"W2 base image={report['w2_base_image_digest']}; image ID={report['w2_image_id']}")
-          print(f"W2 rootfs tar SHA-256={report['w2_rootfs_tar_sha256']}")
+          print(f"W2 normalized rootfs tar SHA-256={report['w2_rootfs_tar_sha256']}")
           print("Direct VMM feasibility benchmark only: jailer/production isolation not certified.")
           PY
 
@@ -183,5 +187,202 @@ jobs:
         with:
           name: firecracker-w2-${{ github.run_id }}
           path: artifacts/
+          if-no-files-found: warn
+          retention-days: 90
+
+  gvisor-w2:
+    name: gVisor W2 developer workspace (shared normalized rootfs)
+    needs: guest-boot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+      - name: Install benchmark dependencies
+        run: python -m pip install -e ".[test]"
+      - name: Download the Firecracker-built normalized rootfs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: firecracker-w2-${{ github.run_id }}
+          path: artifacts/
+      - name: Install pinned gVisor release
+        run: |
+          set -euo pipefail
+          sudo install -d -m 0755 /usr/share/keyrings
+          curl --fail --silent --show-error --location https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases 20261102 main" | sudo tee /etc/apt/sources.list.d/gvisor.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y runsc
+          runsc --version
+          sudo runsc install
+          sudo systemctl restart docker
+          docker info --format '{{json .Runtimes}}'
+      - name: Import the shared normalized rootfs
+        id: workspace
+        run: |
+          set -euo pipefail
+          test -s artifacts/w2-rootfs.tar
+          rootfs_sha256="$(cat artifacts/w2-rootfs.sha256)"
+          test "$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')" = "$rootfs_sha256"
+          docker import \
+            --change "LABEL org.tinlance.w2.rootfs.tar.sha256=$rootfs_sha256" \
+            --change "USER 65532:65532" \
+            --change "WORKDIR /tmp" \
+            artifacts/w2-rootfs.tar tinlance-w2-developer-workspace:normalized
+          image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:normalized)"
+          imported_rootfs_sha256="$(docker image inspect --format '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' "$image_id")"
+          test "$imported_rootfs_sha256" = "$rootfs_sha256"
+          echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
+          echo "rootfs_sha256=sha256:$rootfs_sha256" >> "$GITHUB_OUTPUT"
+      - name: Run 30 isolated gVisor W2 workloads
+        run: |
+          python scripts/benchmark_gvisor.py \
+            --image-digest '${{ steps.workspace.outputs.image_id }}' \
+            --runs 30 --profile W2 \
+            --rootfs-sha256 '${{ steps.workspace.outputs.rootfs_sha256 }}' \
+            --output artifacts/gvisor-w2.json
+      - name: Verify shared-rootfs benchmark evidence
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = "sha256:" + Path("artifacts/w2-rootfs.sha256").read_text(encoding="utf-8").strip()
+          report = json.loads(Path("artifacts/gvisor-w2.json").read_text(encoding="utf-8"))
+          assert report["rootfs_tar_sha256"] == expected
+          assert report["latency"]["sample_count"] == 30
+          assert report["guest_assertions"]["git_clone_and_repository_metadata"] is True
+          print(f"gVisor W2: 30 samples; shared rootfs {expected}")
+          PY
+      - name: Upload gVisor W2 evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: gvisor-w2-${{ github.run_id }}
+          path: artifacts/gvisor-w2.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  kata-w2:
+    name: Kata W2 developer workspace (shared normalized rootfs)
+    needs: guest-boot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+      - name: Install benchmark dependencies
+        run: python -m pip install -e ".[test]"
+      - name: Verify KVM prerequisites
+        run: |
+          test -c /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          grep -E -q '(vmx|svm)' /proc/cpuinfo
+      - name: Download the Firecracker-built normalized rootfs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: firecracker-w2-${{ github.run_id }}
+          path: artifacts/
+      - name: Download and verify Kata Containers 4.3.1
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zstd
+          archive=/tmp/kata-static-4.3.1-amd64.tar.zst
+          curl --fail --silent --show-error --location \
+            https://github.com/kata-containers/kata-containers/releases/download/4.3.1/kata-static-4.3.1-amd64.tar.zst \
+            --output "$archive"
+          echo "1463a2b86845f4d3d8e87f2f764ec59856fc0fee3520967a79ade32762be2e97  $archive" | sha256sum --check -
+          sudo tar --zstd -xf "$archive" -C /
+          test -x /opt/kata/runtime-rs/bin/containerd-shim-kata-v2
+          test -f /opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml
+      - name: Register Kata runtime with Docker
+        run: |
+          set -euo pipefail
+          sudo python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("/etc/docker/daemon.json")
+          config = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+          runtimes = config.setdefault("runtimes", {})
+          kata_config = Path("/etc/kata-containers/configuration.toml")
+          kata_config.parent.mkdir(parents=True, exist_ok=True)
+          kata_config.write_bytes(
+              Path("/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml").read_bytes()
+          )
+          runtimes["kata"] = {
+              "runtimeType": "/opt/kata/runtime-rs/bin/containerd-shim-kata-v2"
+          }
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(config, indent=2) + chr(10), encoding="utf-8")
+          PY
+          sudo dockerd --validate --config-file=/etc/docker/daemon.json
+          if ! sudo systemctl restart docker; then
+            sudo systemctl status docker.service --no-pager || true
+            sudo journalctl -u docker.service -n 100 --no-pager || true
+            exit 1
+          fi
+          docker info --format '{{json .Runtimes}}'
+      - name: Import the shared normalized rootfs
+        id: workspace
+        run: |
+          set -euo pipefail
+          test -s artifacts/w2-rootfs.tar
+          rootfs_sha256="$(cat artifacts/w2-rootfs.sha256)"
+          test "$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')" = "$rootfs_sha256"
+          docker import \
+            --change "LABEL org.tinlance.w2.rootfs.tar.sha256=$rootfs_sha256" \
+            --change "USER 65532:65532" \
+            --change "WORKDIR /tmp" \
+            artifacts/w2-rootfs.tar tinlance-w2-developer-workspace:normalized
+          image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:normalized)"
+          imported_rootfs_sha256="$(docker image inspect --format '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' "$image_id")"
+          test "$imported_rootfs_sha256" = "$rootfs_sha256"
+          echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
+          echo "rootfs_sha256=sha256:$rootfs_sha256" >> "$GITHUB_OUTPUT"
+      - name: Prove Kata launches a separate guest kernel
+        run: |
+          host_kernel="$(uname -r)"
+          base_digest="ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+          docker pull "$base_digest"
+          guest_kernel="$(docker run --rm --runtime kata --network none "$base_digest" uname -r)"
+          test -n "$guest_kernel"
+          test "$guest_kernel" != "$host_kernel"
+      - name: Run 30 restricted Kata W2 workloads
+        run: |
+          python scripts/benchmark_gvisor.py \
+            --image-digest '${{ steps.workspace.outputs.image_id }}' \
+            --runs 30 --runtime-name kata \
+            --runtime-version "Kata Containers 4.3.1 runtime-rs with QEMU" \
+            --candidate kata-qemu-runtime-rs --profile W2 \
+            --rootfs-sha256 '${{ steps.workspace.outputs.rootfs_sha256 }}' \
+            --output artifacts/kata-w2.json
+      - name: Verify shared-rootfs benchmark evidence
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = "sha256:" + Path("artifacts/w2-rootfs.sha256").read_text(encoding="utf-8").strip()
+          report = json.loads(Path("artifacts/kata-w2.json").read_text(encoding="utf-8"))
+          assert report["rootfs_tar_sha256"] == expected
+          assert report["latency"]["sample_count"] == 30
+          assert report["guest_assertions"]["git_clone_and_repository_metadata"] is True
+          print(f"Kata W2: 30 samples; shared rootfs {expected}")
+          PY
+      - name: Upload Kata W2 evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: kata-w2-${{ github.run_id }}
+          path: artifacts/kata-w2.json
           if-no-files-found: warn
           retention-days: 90

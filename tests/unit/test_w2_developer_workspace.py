@@ -31,6 +31,8 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     ):
         assert marker in script or marker in payload
     assert " clone --no-hardlinks " in script
+    assert "git config --global --add safe.directory /opt/tinlance-fixture/.git" in script
+    assert "export HOME=/tmp" in script
     assert "chown -R 65532:65532 /opt/tinlance-fixture" in dockerfile
     assert "mkdir -p /workspace" in dockerfile
     assert "python3 -m compileall" in script
@@ -47,41 +49,66 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     fixture = fixture_root / "fixtures" / "w2-developer-workspace" / "Dockerfile"
     dockerfile = fixture.read_text(encoding="utf-8")
     assert "ARG APT_SNAPSHOT" in dockerfile
+    base_image = (
+        "ARG BASE_IMAGE=ubuntu@"
+        "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+    )
+    assert base_image in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
     assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
+    bootstrap_update_index = dockerfile.index("apt-get \\\n        -o Acquire::Retries=5")
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert update_index < install_index
-    assert "ca-certificates git python3 nodejs npm util-linux" in dockerfile
-    assert "openssl=3.0.13-0ubuntu3.16" not in dockerfile
-    assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
+    assert bootstrap_update_index < update_index < install_index
+    assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
+    assert "git python3 nodejs npm util-linux" in dockerfile
+    assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
+    assert "libssl3t64=3.0.13-0ubuntu3.16" in dockerfile
     assert "Acquire::Retries=5" in dockerfile
     assert "APT::Update::Error-Mode=any" in dockerfile
     assert dockerfile.count("Acquire::Retries=5") == 4
     assert dockerfile.count("Acquire::http::Timeout=30") == 4
-    assert dockerfile.count("Acquire::https::Timeout=30") == 4
+    assert dockerfile.count("Acquire::https::Timeout=30") == 2
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
     assert dockerfile.count("--snapshot=") == 2
-    assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
-    assert dockerfile.index("Acquire::Retries=5") < dockerfile.index(
-        '--snapshot="${APT_SNAPSHOT}" update'
-    )
+    assert "Acquire::https::Verify-Peer=false" not in dockerfile
+    assert "http://archive.ubuntu.com/ubuntu" in dockerfile
+    assert "RUN --network=none" in dockerfile
+    assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
 
-def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
+def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     workflow_root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+    firecracker = (workflow_root / "persistent-computer-firecracker-w2.yml").read_text(
+        encoding="utf-8"
+    )
     base_digest = "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+    assert firecracker.count("Build digest-pinned W2 developer image and export rootfs") == 1
+    assert base_digest in firecracker
+    assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in firecracker
+    assert "artifacts/w2-rootfs.tar" in firecracker
+    assert "firecracker-w2-${{ github.run_id }}" in firecracker
+    assert "path: artifacts/" in firecracker
+    assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
+    assert firecracker.count("needs: guest-boot") == 2
+    assert (
+        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093") == 2
+    )
+    assert "gvisor-w2:" in firecracker
+    assert "kata-w2:" in firecracker
+    assert "docker import" in firecracker
+    assert firecracker.count("--runs 30") >= 3
     for name in (
-        "persistent-computer-firecracker-w2.yml",
         "persistent-computer-gvisor-benchmark.yml",
         "persistent-computer-kata-benchmark.yml",
     ):
         workflow = (workflow_root / name).read_text(encoding="utf-8")
-        assert base_digest in workflow
-        assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in workflow
+        assert "Build pinned W2 developer-workspace image" not in workflow
+        assert "--profile W2" not in workflow
+        assert "Run 30" in workflow
 
 
 def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None:
@@ -100,3 +127,25 @@ def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None
     assert "--cap-drop=ALL" in w2
     assert "--user=65532:65532" in w2
     assert "sha256:" + "b" * 64 in w2
+
+
+def test_w2_fixture_git_commit_metadata_is_reproducible() -> None:
+    fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "w2-developer-workspace"
+    dockerfile = (fixture_root / "Dockerfile").read_text(encoding="utf-8")
+    assert "git -C /opt/tinlance-fixture init --quiet --initial-branch=main" in dockerfile
+    assert 'GIT_AUTHOR_DATE="2025-01-01T00:00:00Z"' in dockerfile
+    assert 'GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"' in dockerfile
+    assert "rm -rf /opt/tinlance-fixture/.git/index /opt/tinlance-fixture/.git/logs" in dockerfile
+
+
+def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github"
+        / "workflows"
+        / "persistent-computer-firecracker-w2.yml"
+    ).read_text(encoding="utf-8")
+    assert "timeout-minutes: 60" in workflow
+    assert "--runs 30 --profile W2" in workflow
+    assert 'report.get("sample_count") != 30' in workflow
+    assert "len(markers) != 30" in workflow
