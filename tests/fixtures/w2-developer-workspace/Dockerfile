@@ -6,24 +6,27 @@ ARG APT_SNAPSHOT
 # Resolve every package from one immutable Ubuntu archive snapshot. Updating the
 # indexes and installing from that same snapshot avoids mixed-time package sets.
 # The package manifest emitted below is retained as guest-build provenance.
-# The minimal base has no CA bundle. Bootstrap the pinned CA package from the
-# signed Ubuntu snapshot. TLS peer verification is disabled only for this
-# bootstrap transaction; APT signature verification and package hashes remain
-# mandatory. Later package transactions use HTTPS with normal peer verification.
-RUN DEBIAN_FRONTEND=noninteractive apt-get \
+# The minimal base has no CA bundle. Bootstrap the exact CA package over the
+# Ubuntu archive's HTTP transport, while retaining APT's signed InRelease and
+# package-hash verification. Then use the immutable Ubuntu snapshot over HTTPS
+# with normal certificate-peer verification for all workspace dependencies.
+RUN sed -i 's|https://archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
-        -o Acquire::https::Timeout=30 \
-        -o Acquire::https::Verify-Peer=false \
         -o APT::Update::Error-Mode=any \
-        --snapshot="${APT_SNAPSHOT}" update \
+        update \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::Retries=5 \
+        -o Acquire::http::Timeout=30 \
+        install --yes --no-install-recommends \
+        ca-certificates=20260816ubuntu0.24.04.2 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
-        -o Acquire::https::Verify-Peer=false \
-        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
-        ca-certificates=20260816ubuntu0.24.04.2 \
+        -o APT::Update::Error-Mode=any \
+        --snapshot="${APT_SNAPSHOT}" update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
