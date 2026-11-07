@@ -15,7 +15,6 @@ import time
 from pathlib import Path
 
 
-BROWSER_UID = 65534
 PROXY_PORT = 3128
 
 
@@ -33,6 +32,36 @@ def run(command: list[str], *, timeout: int = 30) -> str:
 def require_root() -> None:
     if os.name != "posix" or os.geteuid() != 0:
         raise SystemExit("W3 network namespace acceptance must run as root")
+
+
+def create_browser_user(username: str, start_uid: int) -> tuple[int, int]:
+    for uid in range(start_uid, start_uid + 1000):
+        if subprocess.run(
+            ["getent", "passwd", str(uid)],
+            check=False,
+            capture_output=True,
+        ).returncode == 0:
+            continue
+        if subprocess.run(
+            ["getent", "group", str(uid)],
+            check=False,
+            capture_output=True,
+        ).returncode == 0:
+            continue
+        run(
+            [
+                "useradd",
+                "--uid",
+                str(uid),
+                "--user-group",
+                "--no-create-home",
+                "--shell",
+                "/usr/sbin/nologin",
+                username,
+            ]
+        )
+        return uid, int(run(["id", "-g", username]))
+    raise RuntimeError("no free UID/GID available for isolated browser tenant")
 
 
 def wait_for_proxy(host: str, port: int, process: subprocess.Popen[bytes]) -> None:
@@ -68,12 +97,16 @@ def main() -> int:
     client_network = str(network)
     proxy_url = f"http://{host_ip}:{PROXY_PORT}"
 
+    browser_user = f"tnlbr-a-{suffix}"
+    other_tenant_user = f"tnlbr-b-{suffix}"
+    browser_uid, browser_gid = create_browser_user(browser_user, 51_000)
+    other_tenant_uid, other_tenant_gid = create_browser_user(other_tenant_user, 52_000)
     work_root = Path(tempfile.mkdtemp(prefix="tinlance-browser-w3-"))
     profile_root = work_root / "profile"
     evidence_path = work_root / "guest-evidence.json"
     profile_root.mkdir(mode=0o700)
-    os.chown(work_root, BROWSER_UID, BROWSER_UID)
-    os.chown(profile_root, BROWSER_UID, BROWSER_UID)
+    os.chown(work_root, browser_uid, browser_gid)
+    os.chown(profile_root, browser_uid, browser_gid)
     os.chmod(work_root, 0o700)
     os.chmod(profile_root, 0o700)
 
@@ -150,9 +183,9 @@ def main() -> int:
                 [
                     "setpriv",
                     "--reuid",
-                    str(BROWSER_UID),
+                    str(browser_uid),
                     "--regid",
-                    str(BROWSER_UID),
+                    str(browser_gid),
                     "--clear-groups",
                     "--no-new-privs",
                     sys.executable,
@@ -192,8 +225,29 @@ def main() -> int:
         if guest_evidence.get("status") != "passed":
             raise RuntimeError("browser guest acceptance did not report passed")
         evidence["guest"] = guest_evidence
-        evidence["proxy_process_uid"] = BROWSER_UID
-        evidence["browser_process_uid"] = BROWSER_UID
+        evidence["proxy_process_uid"] = browser_uid
+        evidence["browser_process_uid"] = browser_uid
+        evidence["other_tenant_uid"] = other_tenant_uid
+
+        tenant_probe = [
+            "setpriv",
+            "--reuid",
+            str(other_tenant_uid),
+            "--regid",
+            str(other_tenant_gid),
+            "--clear-groups",
+            "--no-new-privs",
+            sys.executable,
+            "scripts/browser_tenant_isolation_probe.py",
+            "--profile-root",
+            str(profile_root),
+            "--tenant-id",
+            "phase2-w3-tenant-b",
+            "--workspace-id",
+            "workspace-a",
+        ]
+        run(tenant_probe, timeout=15)
+        evidence["tenant_uid_separation"] = True
         evidence["status"] = "passed"
 
     except BaseException as exc:
@@ -285,6 +339,29 @@ def main() -> int:
             encoding="utf-8",
         )
         shutil.rmtree(work_root, ignore_errors=True)
+        for username in (browser_user, other_tenant_user):
+            deleted_user = subprocess.run(
+                ["userdel", username],
+                check=False,
+                capture_output=True,
+            )
+            if deleted_user.returncode != 0:
+                cleanup_errors.append(f"temporary browser user {username} could not be deleted")
+            subprocess.run(
+                ["groupdel", username],
+                check=False,
+                capture_output=True,
+            )
+        if cleanup_errors:
+            evidence["cleanup_verified"] = False
+            evidence["status"] = "failed"
+            evidence["cleanup_errors"] = cleanup_errors
+            output = Path(args.artifacts)
+            output.mkdir(parents=True, exist_ok=True)
+            (output / "browser-w3.json").write_text(
+                json.dumps(evidence, sort_keys=True, indent=2) + "\\n",
+                encoding="utf-8",
+            )
         if cleanup_errors and evidence.get("failure_type") is None:
             raise RuntimeError(f"W3 cleanup failed: {cleanup_errors}")
 
