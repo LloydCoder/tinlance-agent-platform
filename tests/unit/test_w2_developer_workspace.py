@@ -107,7 +107,11 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert base_digest in firecracker
     assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in firecracker
     assert "artifacts/w2-rootfs.tar" in firecracker
-    assert firecracker.count("docker build --pull --no-cache") == 2
+    assert firecracker.count("docker build --platform=linux/amd64 --pull --no-cache") == 2
+    assert "docker pull --platform linux/amd64" in firecracker
+    assert '"platform": "$image_platform"' in firecracker
+    assert '"docker_engine_version": "$docker_engine_version"' in firecracker
+    assert '"buildx_version": "$buildx_version"' in firecracker
     assert "artifacts/w2-rootfs.rebuild.tar" in firecracker
     assert "cmp --silent artifacts/w2-rootfs.tar artifacts/w2-rootfs.rebuild.tar" in firecracker
     assert "w2-rootfs-reproducibility.json" in firecracker
