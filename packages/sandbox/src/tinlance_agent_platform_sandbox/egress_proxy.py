@@ -314,6 +314,8 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
             return
 
         try:
+            self.connection.settimeout(5.0)
+            upstream.settimeout(5.0)
             self.send_response(200, "Connection Established")
             self.end_headers()
             _relay_tunnel(
@@ -349,6 +351,18 @@ class BrowserEgressProxy:
         *,
         allowed_client_network: str,
     ) -> None:
+        try:
+            bind_ip = ipaddress.ip_address(bind_host)
+        except ValueError as exc:
+            raise ValueError("browser proxy must bind to a specific IP address") from exc
+        if (
+            not isinstance(bind_ip, ipaddress.IPv4Address)
+            or bind_ip.is_unspecified
+            or bind_ip.is_link_local
+            or (not bind_ip.is_private and not bind_ip.is_loopback)
+            or not 0 <= port <= 65_535
+        ):
+            raise ValueError("browser proxy must bind to a specific private or loopback IPv4 address")
         self._server = _BrowserProxyServer(
             (bind_host, port),
             policy,
