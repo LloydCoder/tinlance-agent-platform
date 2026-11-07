@@ -14,13 +14,13 @@ from pathlib import Path
 from typing import Any
 
 from scripts.smoke_firecracker_guest_boot import (
+    _OCI_IMAGE_DIGEST,
+    _OCI_IMAGE_ID,
     FIRECRACKER_ARCHIVE_SHA256,
     GUEST_NIC_UNEXPECTED_MARKER,
     GUEST_READY_MARKER,
     GUEST_W2_UNEXPECTED_MARKERS,
     GUEST_WRITE_UNEXPECTED_MARKER,
-    _OCI_IMAGE_DIGEST,
-    _OCI_IMAGE_ID,
     _api_request,
     _download_pinned_guest_assets,
     load_asset_manifest,
