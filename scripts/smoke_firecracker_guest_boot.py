@@ -393,6 +393,14 @@ def verify_guest_boot_markers(
     missing = [name for name, marker in required.items() if marker not in log_text]
     if profile == "W2":
         for name, marker in (
+            ("git_version_reported", "TINLANCE_W2_GIT_VERSION="),
+            ("python_version_reported", "TINLANCE_W2_PYTHON_VERSION="),
+            ("node_version_reported", "TINLANCE_W2_NODE_VERSION="),
+            ("npm_version_reported", "TINLANCE_W2_NPM_VERSION="),
+        ):
+            if re.search(rf"{re.escape(marker)}[^\r\n]+", log_text) is None:
+                missing.append(name)
+        for name, marker in (
             ("package_manifest_reported", "TINLANCE_W2_PACKAGE_MANIFEST_SHA256="),
             ("npm_lock_sha256_reported", "TINLANCE_W2_NPM_LOCK_SHA256="),
         ):
