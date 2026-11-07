@@ -44,6 +44,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     assert "npm ci --offline --ignore-scripts --no-audit --no-fund" in script
     assert script.index("npm ci --offline") < script.index("npm test")
     assert "TINLANCE_W2_NPM_INSTALL_OK" in script
+    assert "TINLANCE_W2_NPM_LOCK_SHA256=" in script
     assert '"@tinlance/w2-fixture-package": "file:vendor/w2-fixture-package"' in node_package
     assert 'from "@tinlance/w2-fixture-package"' in node_app
     assert "npm test" in script
