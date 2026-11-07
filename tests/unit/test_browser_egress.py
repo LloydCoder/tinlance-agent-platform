@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import socket
 
@@ -288,10 +289,8 @@ def test_proxy_close_terminates_active_tunnels(
 
         proxy.close()
         client.settimeout(1)
-        try:
+        with contextlib.suppress(ConnectionResetError):
             assert client.recv(1) == b""
-        except ConnectionResetError:
-            pass
         peer.settimeout(1)
         assert peer.recv(1) == b""
     finally:
