@@ -125,7 +125,6 @@ def test_connector_uses_validated_ip_literal_without_hostname_lookup(monkeypatch
     assert ipaddress.ip_address(calls[0][0][0]).is_global
 
 
-
 def test_proxy_revalidates_each_connect_and_rejects_redirect_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
