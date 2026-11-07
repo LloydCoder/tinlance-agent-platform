@@ -44,14 +44,15 @@ def build_jailer_command(
     uid: int,
     gid: int,
     chroot_base_dir: str,
+    network_namespace_path: str | None = None,
 ) -> list[str]:
     if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", jailer_id):
         raise ValueError("jailer identifier must be 1-64 safe alphanumeric/hyphen characters")
     if uid <= 0 or gid <= 0:
         raise ValueError("jailer must run under a non-root uid and gid")
-    for path in (jailer_binary, firecracker_binary, chroot_base_dir):
-        if not Path(path).is_absolute():
-            raise ValueError("jailer executable and chroot paths must be absolute")
+    for path in (jailer_binary, firecracker_binary, chroot_base_dir, network_namespace_path):
+        if path is not None and not Path(path).is_absolute():
+            raise ValueError("jailer executable, chroot and network namespace paths must be absolute")
 
     command = [
         "sudo",
@@ -68,6 +69,8 @@ def build_jailer_command(
         "--cgroup-version",
         "2",
     ]
+    if network_namespace_path is not None:
+        command.extend(["--netns", network_namespace_path])
     for name, value in CGROUP_LIMITS:
         command.extend(["--cgroup", f"{name}={value}"])
     command.extend(
@@ -89,16 +92,24 @@ def validate_jailer_profile_inputs(
     w2_rootfs_tar: Path | None,
     w2_image_id: str | None,
     w2_base_image_digest: str | None,
+    network_namespace_path: Path | None,
 ) -> None:
     """Fail closed unless the selected jailer profile has its required immutable inputs."""
     if profile not in {"W1", "W2"}:
         raise ValueError("profile must be W1 or W2")
     if profile == "W1":
-        if any((w2_rootfs_tar, w2_image_id, w2_base_image_digest)):
+        if any((w2_rootfs_tar, w2_image_id, w2_base_image_digest, network_namespace_path)):
             raise ValueError("W2 rootfs inputs are only valid with the W2 profile")
         return
     if w2_rootfs_tar is None or not w2_rootfs_tar.is_file():
         raise ValueError("a normalized W2 rootfs tar is required")
+    if (
+        network_namespace_path is None
+        or not network_namespace_path.is_absolute()
+        or network_namespace_path.is_symlink()
+        or not network_namespace_path.exists()
+    ):
+        raise ValueError("a trusted W2 network namespace handle is required")
     if w2_image_id is None or not _OCI_IMAGE_ID.fullmatch(w2_image_id):
         raise ValueError("a content-addressed W2 image ID is required")
     if w2_base_image_digest is None or not _OCI_IMAGE_DIGEST.fullmatch(w2_base_image_digest):
@@ -191,6 +202,27 @@ def verify_jailer_process_evidence(
     }
 
 
+def verify_jailer_network_namespace_evidence(
+    *,
+    host_network_namespace: str,
+    process_network_namespace: str,
+    process_network_interfaces: Sequence[str],
+) -> dict[str, bool | list[str]]:
+    """Require a distinct Firecracker network namespace with loopback only."""
+    if (
+        not host_network_namespace
+        or not process_network_namespace
+        or host_network_namespace == process_network_namespace
+    ):
+        raise PermissionError("jailer process is not isolated in a separate network namespace")
+    interfaces = sorted(set(process_network_interfaces))
+    if interfaces != ["lo"]:
+        raise PermissionError(
+            f"jailer network namespace exposes non-loopback interfaces: {interfaces}"
+        )
+    return {"network_namespace_isolated": True, "network_interfaces": interfaces}
+
+
 def _run(
     command: Sequence[str],
     *,
@@ -281,14 +313,26 @@ def _read_thread_seccomp_modes(pid: int) -> tuple[int, ...]:
     return tuple(modes)
 
 
+def _read_process_network_interfaces(pid: int) -> tuple[str, ...]:
+    network_dev = Path("/proc") / str(pid) / "net/dev"
+    content = _run(["sudo", "-n", "cat", str(network_dev)], capture_output=True).stdout
+    return tuple(
+        line.partition(":")[0].strip()
+        for line in content.splitlines()[2:]
+        if ":" in line
+    )
+
+
 def _read_process_evidence(
     pid: int,
     uid: int,
     gid: int,
     expected_chroot_root: Path,
-) -> dict[str, int | bool | str]:
+    *,
+    require_network_namespace: bool = False,
+) -> dict[str, int | bool | str | list[int] | list[str]]:
     proc = Path("/proc") / str(pid)
-    return verify_jailer_process_evidence(
+    evidence: dict[str, int | bool | str | list[int] | list[str]] = verify_jailer_process_evidence(
         status_text=(proc / "status").read_text(encoding="utf-8"),
         cgroup_text=(proc / "cgroup").read_text(encoding="utf-8"),
         expected_uid=uid,
@@ -301,6 +345,15 @@ def _read_process_evidence(
         process_root_identity=_stat_identity_as_root(proc / "root"),
         thread_seccomp_modes=_read_thread_seccomp_modes(pid),
     )
+    if require_network_namespace:
+        evidence.update(
+            verify_jailer_network_namespace_evidence(
+                host_network_namespace=os.readlink("/proc/self/ns/net"),
+                process_network_namespace=_readlink_as_root(proc / "ns/net"),
+                process_network_interfaces=_read_process_network_interfaces(pid),
+            )
+        )
+    return evidence
 
 
 def _verify_cgroup_limits(cgroup_path: str) -> dict[str, str]:
@@ -422,9 +475,10 @@ def _run_jailer_guest(
     log_path: Path,
     timeout_seconds: float,
     profile: str = "W1",
+    network_namespace_path: Path | None = None,
 ) -> tuple[
     float,
-    dict[str, int | bool | str | list[int]],
+    dict[str, int | bool | str | list[int] | list[str]],
     dict[str, str],
     dict[str, str],
     dict[str, bool],
@@ -436,6 +490,9 @@ def _run_jailer_guest(
         uid=uid,
         gid=gid,
         chroot_base_dir=str(chroot_base_dir),
+        network_namespace_path=(
+            str(network_namespace_path) if network_namespace_path is not None else None
+        ),
     )
     chroot_root = chroot_base_dir / "firecracker" / jailer_id / "root"
     socket_path = chroot_root / "run/firecracker.socket"
@@ -527,6 +584,7 @@ def _run_jailer_guest(
                         uid,
                         gid,
                         chroot_root,
+                        require_network_namespace=profile == "W2",
                     )
                     cgroup_evidence = _verify_cgroup_limits(cgroup_path)
                     return (
@@ -581,6 +639,7 @@ def main() -> int:
     parser.add_argument("--w2-rootfs-tar", type=Path)
     parser.add_argument("--w2-image-id")
     parser.add_argument("--w2-base-image-digest")
+    parser.add_argument("--network-namespace-path", type=Path)
     args = parser.parse_args()
 
     if args.runs < 1:
@@ -599,6 +658,7 @@ def main() -> int:
             w2_rootfs_tar=args.w2_rootfs_tar,
             w2_image_id=args.w2_image_id,
             w2_base_image_digest=args.w2_base_image_digest,
+            network_namespace_path=args.network_namespace_path,
         )
     except ValueError as error:
         parser.error(str(error))
@@ -633,7 +693,7 @@ def main() -> int:
 
         samples: list[float] = []
         guest_isolation_samples: list[dict[str, bool]] = []
-        process_evidence_samples: list[dict[str, int | bool | str | list[int]]] = []
+        process_evidence_samples: list[dict[str, int | bool | str | list[int] | list[str]]] = []
         cgroup_evidence_samples: list[dict[str, str]] = []
         firecracker_version: dict[str, Any] = {}
         for run_index in range(1, args.runs + 1):
@@ -656,6 +716,7 @@ def main() -> int:
                 log_path=log_dir / f"firecracker-jailer-{run_index}.log",
                 timeout_seconds=args.timeout_seconds,
                 profile=args.profile,
+                network_namespace_path=args.network_namespace_path,
             )
             samples.append(boot_time)
             guest_isolation_samples.append(guest_isolation)
