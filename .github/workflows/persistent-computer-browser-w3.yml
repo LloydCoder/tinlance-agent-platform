@@ -60,7 +60,7 @@ jobs:
           sudo env \
             PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" \
             PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" \
-            python scripts/smoke_browser_environment.py \
+            "$pythonLocation/bin/python" scripts/smoke_browser_environment.py \
               --artifacts "$GITHUB_WORKSPACE/artifacts" \
               --allowed-domain example.com
           test -s artifacts/browser-w3.json
