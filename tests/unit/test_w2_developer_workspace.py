@@ -112,6 +112,8 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
         assert "Build pinned W2 developer-workspace image" not in workflow
         assert "--profile W2" not in workflow
         assert "Run 30" in workflow
+
+
 def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None:
     image = "ubuntu@sha256:" + "a" * 64
     w1 = build_docker_command(image_digest=image, payload="true")
