@@ -1,6 +1,6 @@
 # Persistent Computer Phase 2 Acceptance Record
 
-**Status as of 2026-11-07:** Phase 2 is not complete. W2 reproducible-rootfs evidence is merged. W2 execution through the Firecracker jailer is implemented in PR #190 and remains gated on exact-head workflows and artifact review.
+**Status as of 2026-11-07:** Phase 2 is not complete. W2 implementation and acceptance are complete at the repository feasibility/acceptance level after PR #190 merged and its exact-head workflows, artifacts and post-merge mainline gates passed. W3 is the next serial phase. Production certification remains explicitly out of scope for these ephemeral CI artifacts.
 
 This document is the implementation-side acceptance record. The canonical TSIC tracking issue is [tinlance-system-integration#102](https://github.com/LloydCoder/tinlance-system-integration/issues/102).
 
@@ -10,7 +10,7 @@ This document is the implementation-side acceptance record. The canonical TSIC t
 |---|---|---|
 | PR #185 — Firecracker W2 developer workspace | Merged | `c351b15e9c3ff7dfc200bcca017f8336dfb9c2cd` |
 | PR #187 — reproducible W2 rootfs | Merged | `eed697eea29e6cfb5a55a8dd1674b5611d592535` |
-| PR #190 — W2 developer workspace through Firecracker jailer | Open; acceptance pending | [PR #190](https://github.com/LloydCoder/tinlance-agent-platform/pull/190) |
+| PR #190 — W2 developer workspace through Firecracker jailer | Merged; W2 acceptance passed | [PR #190](https://github.com/LloydCoder/tinlance-agent-platform/pull/190), merge `80578f79ca1abbd4a10c5d5965e719438478ffb1` |
 
 PR #187 exact-head CI, CodeQL, Secret Scan, R10, TSIC conformance, Firecracker W2, gVisor W2, Kata W2 and Reference Agents workflows passed before merge.
 
@@ -30,32 +30,40 @@ The Firecracker, gVisor and Kata W2 artifacts independently reported the same no
 
 **Important distinction:** the 30-sample Firecracker W2 artifact is a direct-VMM ephemeral workload. It records `jailer_executed=false`. It is not W2-through-jailer evidence and does not establish production certification.
 
-## 3. W2 jailer acceptance gate — PR #190
+## 3. W2 jailer acceptance — completed
 
-PR #190 extends the existing jailer runner with a W2 profile and adds a dedicated W2 job to the shared-rootfs workflow. The jailer job downloads the exact normalized rootfs artifact produced by the direct Firecracker W2 job in the same workflow run.
+PR #190 merged to `main` as `80578f79ca1abbd4a10c5d5965e719438478ffb1`. Exact-head CI, CodeQL, Secret Scan, R10, TSIC conformance, Reference Agents, direct W2, jailed W2, gVisor W2, Kata W2 and the independent rootfs rebuild gate passed. The subsequent post-merge mainline CI, CodeQL, Supply Chain Attestation, Secret Scan, Reference Agents and R10 workflows also passed.
 
-The W2 jailer job must pass all of the following for **3/3** executions:
+### Independent artifact audit
 
-1. Real W2 developer workspace operations: Git clone/edit, Python compile/unit tests, Node edit/build/unit tests, and local-package `npm ci --offline`; host-surface probes; guest readiness markers. No guest network is available.
-2. Independent rootfs reproducibility: two `docker build --platform=linux/amd64 --pull --no-cache` builds from identical pinned inputs must produce byte-identical normalized rootfs tar files. The report records platform, Docker Engine/Buildx versions, base digest, apt snapshot and both image/rootfs digests. The normalizer excludes the volatile `var/cache/ldconfig/aux-cache` file, validates volatile entries before dropping them, and records both build digests in `w2-rootfs-reproducibility.json`.
-3. Rootfs and guest boundary: read-only rootfs, no guest non-loopback NIC, non-root guest UID/GID, no sensitive host devices/sockets, denied privilege escalation and mount operations, read-only proc/sys and bounded tmpfs workspace.
-4. Firecracker process identity: dedicated non-root UID/GID, chroot identity, dedicated cgroup v2, PID and mount namespace isolation, zero effective capabilities and `NoNewPrivs=1`.
-5. Seccomp: filter mode 2 on the Firecracker process and every observed Firecracker thread.
-6. Network namespace: jailer joins a dedicated root-owned namespace handle through the upstream `--netns` option; the workflow rejects symlink handles and verifies both the handle and parent directory are root-owned and not group/world writable. The Firecracker process namespace inode must differ from the host namespace and `/proc/<pid>/net/dev` must expose only `lo`.
-7. Resource limits: W2 is 2 vCPU / 2,048 MiB; its jailer cgroup allows `memory.max=3221225472` (3 GiB including VMM overhead), `pids.max=128`, and `cpu.max=200000 100000`. The separate W1 regression retains `memory.max=805306368`, `pids.max=128`, and `cpu.max=100000 100000`.
-8. Provenance: jailed W2 report rootfs SHA-256 must equal the exact `w2-rootfs.sha256` artifact; image ID and base-image digest must be content-addressed.
-9. Provenance: both package-manifest and npm-lock digests must be 64-character lowercase SHA-256 values; Git/Python/Node/npm version markers must be non-empty.
-10. All CI, CodeQL, Secret Scan, R10, TSIC conformance, W1 jailer regression, direct W2, gVisor W2 and Kata W2 workflows must be green.
+The artifacts from workflow run [42355933920](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42355933920) were downloaded and inspected independently.
 
-The W1 jailer smoke is a separate regression check, not a substitute for W2 jailer evidence. Its inspected artifact showed 3/3 W1 boots, seccomp mode 2 across every observed Firecracker thread, no-new-privileges, zero effective capabilities, PID/mount namespace isolation, chroot identity and the configured cgroup limits.
+| Evidence | Result |
+|---|---|
+| Direct Firecracker W2 | 30/30 developer-workspace runs passed; `jailer_executed=false` as expected for the direct-VMM cohort |
+| Firecracker W2 through jailer | 3/3 jailed developer workspaces passed; `jailer_executed=true` |
+| gVisor W2 | 30/30 workloads passed |
+| Kata W2 | 30/30 workloads passed |
+| Shared normalized rootfs | All three runtime reports reference SHA-256 `3d11116add5c77482c8041eb5fd1e6ba4bd5bdc0fc76d990da747c28ad389088` |
+| Independent rootfs rebuild | Two no-cache linux/amd64 builds produced byte-identical normalized tar archives |
+| Rootfs archive inspection | 37,823 entries: 5,206 directories, 31,418 regular files and 1,199 symlinks; no traversal paths, relative symlink escapes, device nodes, FIFOs or other special entries |
+| Jailer process confinement | UID 999/GID 987, zero effective capabilities, `NoNewPrivs=1`, seccomp mode 2 on all five observed Firecracker threads, isolated PID/mount/network namespaces, loopback-only network and chroot identity |
+| Jailer cgroups | W2: `cpu.max=200000 100000`, `memory.max=3221225472`, `pids.max=128` across all three runs |
+| Guest boundary | Read-only rootfs, no guest network beyond loopback, non-root guest UID/GID 65532, bounded noexec/nosuid/nodev tmpfs, sensitive-file/device/socket denial, denied privilege escalation and mount operations |
+| Workspace behavior | Git clone/edit, Python compile/unit tests, Node edit/build/tests and local-package `npm ci --offline`; package-manifest and npm-lock digests plus tool versions recorded |
 
-### Explicit evidence limitations
+The rootfs archive SHA-256 was recomputed from the downloaded tar and matched the recorded digest. The archive contained 158 absolute guest symlinks; these are guest-root paths and are converted to in-root relative symlinks by the extraction implementation. No relative symlink escaped the root. The normalizer rejects unsafe archive paths, links and special files; the independent rebuild report records `byte_identical=true`, matching primary/rebuild image provenance, and matching rootfs digests.
 
-- The W2 host probe reports `seccomp_active=false` for the runner host while `seccomp_filter_supported=true`. This must not be misreported as proof that the Firecracker process has no seccomp filter. The process-level W2 evidence must independently show seccomp mode 2 on every thread.
-- W2 artifacts and this workflow are feasibility/acceptance evidence only. The report must retain `production_certification=false`.
-- The acceptance harness retains serial-console output to collect guest markers. Production must bound or rate-limit guest-controlled serial output, or disable the serial device where operationally possible.
-- The CA bootstrap installs pinned CA/OpenSSL packages from the signed Ubuntu archive over HTTP while preserving APT signature and package-hash verification, then uses the pinned Ubuntu snapshot over HTTPS with normal peer verification. It must not disable HTTPS certificate verification.
-- The W2 guest kernel reports SRSO as `Vulnerable: Safe RET, no microcode`, Speculative Store Bypass as vulnerable on the baseline, and TSA as `Vulnerable: No microcode`. The guest now explicitly requests `spec_rstack_overflow=safe-ret`, `tsa=on` and `spec_store_bypass_disable=on`; the resulting kernel status is captured as machine-readable evidence. Reports must not equate requested mitigations with successful mitigations: the observed sysfs/kernel status is authoritative. This does not invalidate functional W2 runs, but it blocks production side-channel sign-off until physical host CPU identity, microcode revision, SMT state and host `/sys/devices/system/cpu/vulnerabilities/*` statuses are attested. Guest-visible CPUID is not proof of the physical host SKU; the infrastructure provider must confirm host firmware/microcode mitigation state. Require `cpu_security_mitigations_ready=true` on the production host and independent reviewer approval before production certification.
+The direct Firecracker report and the jailed Firecracker report are distinct evidence cohorts. The direct-VMM report is not described as jailed execution. The jailed report independently records all three successful jailer executions and process/thread confinement evidence.
+
+### Explicit production limitations
+
+- Both the host and guest reports record `cpu_security_mitigations_ready=false`. The host reports an unavailable/sentinel microcode revision and vulnerable status for speculative-return-stack-overflow, speculative-store-bypass and TSA mitigations; SMT is active on the CI host. This is an explicit production side-channel/security sign-off blocker, not a failed W2 functional acceptance test. Production acceptance requires provider-attested physical host SKU/firmware/microcode, SMT policy, observed host vulnerability status, `cpu_security_mitigations_ready=true`, and independent reviewer approval.
+- The jailed W2 artifact records `production_certification=false`. Ephemeral CI does not establish production host hardening, multi-tenant hostile isolation, bounded production serial logging, operational ownership or deployed infrastructure.
+- The CI host probe's `seccomp_active=false` is a host fact. The jailed process evidence independently proves seccomp mode 2 on every observed Firecracker thread; these facts must not be conflated.
+- The CA bootstrap installs pinned CA/OpenSSL packages from the signed Ubuntu archive over HTTP while preserving APT signature and package-hash verification, then uses the immutable Ubuntu snapshot over HTTPS with normal peer verification. HTTPS certificate verification is not disabled.
+
+**W2 disposition:** W2 reproducible rootfs, independent-build reproducibility, direct multi-runtime developer-workspace execution and Firecracker jailer-path acceptance are complete for the repository's ephemeral feasibility scope. W2 is closed for this acceptance programme. Production CPU/microcode side-channel sign-off remains a separate production gate and is not implied by W2 closure.
 
 ## 4. Remaining serial phases
 
