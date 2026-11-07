@@ -581,6 +581,8 @@ jobs:
               or item.get("pid_namespace_isolated") is not True
               or item.get("mount_namespace_isolated") is not True
               or item.get("network_namespace_isolated") is not True
+              or not item.get("host_network_namespace")
+              or item.get("host_network_namespace") == item.get("process_network_namespace")
               or item.get("network_interfaces") != ["lo"]
               for item in processes
           ):
