@@ -398,7 +398,7 @@ def verify_guest_boot_markers(
             ("node_version_reported", "TINLANCE_W2_NODE_VERSION="),
             ("npm_version_reported", "TINLANCE_W2_NPM_VERSION="),
         ):
-            if re.search(rf"{re.escape(marker)}[^\r\n]+", log_text) is None:
+            if re.search(rf"{re.escape(marker)}\S+", log_text) is None:
                 missing.append(name)
         for name, marker in (
             ("package_manifest_reported", "TINLANCE_W2_PACKAGE_MANIFEST_SHA256="),
