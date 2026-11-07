@@ -196,6 +196,18 @@ jobs:
           if not report_path.is_file():
               raise SystemExit("Required Firecracker W2 guest report is missing; acceptance cannot pass.")
           report = json.loads(report_path.read_text(encoding="utf-8"))
+          reproducibility_path = Path("artifacts/w2-rootfs-reproducibility.json")
+          if not reproducibility_path.is_file():
+              raise SystemExit("Independent W2 rootfs rebuild evidence is missing.")
+          reproducibility = json.loads(reproducibility_path.read_text(encoding="utf-8"))
+          if (
+              reproducibility.get("byte_identical") is not True
+              or reproducibility.get("primary_rootfs_sha256")
+              != reproducibility.get("rebuild_rootfs_sha256")
+              or report.get("w2_rootfs_tar_sha256")
+              != reproducibility.get("primary_rootfs_sha256")
+          ):
+              raise SystemExit("Independent W2 rootfs builds are not byte-identical.")
           if report.get("sample_count") != 30:
               raise SystemExit(f"Expected exactly 30 W2 guest boots, got {report.get('sample_count')!r}")
           if report.get("w2_rootfs_tar_sha256") is None:
