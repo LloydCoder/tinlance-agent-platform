@@ -541,7 +541,9 @@ def _run_jailer_guest(
             if not cgroup_path.startswith("/") or cgroup_path == "/":
                 raise PermissionError("jailed Firecracker has no dedicated cgroup v2")
             if jailer_id not in Path(cgroup_path).parts:
-                raise PermissionError("jailed Firecracker cgroup does not contain its unique jailer id")
+                raise PermissionError(
+                    "jailed Firecracker cgroup does not contain its unique jailer id"
+                )
             guest_kernel, guest_rootfs = _stage_guest_assets(
                 chroot_root,
                 kernel_path,
