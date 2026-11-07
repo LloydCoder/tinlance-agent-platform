@@ -13,11 +13,11 @@ from scripts.smoke_firecracker_guest_boot import (
     _stop_firecracker,
     extract_guest_cpu_vulnerability_statuses,
     extract_w2_rootfs_tar,
-    summarize_guest_cpu_vulnerability_samples,
     load_asset_manifest,
     parse_latest_artifact_prefix,
     select_latest_versioned_key,
     summarize_boot_times,
+    summarize_guest_cpu_vulnerability_samples,
 )
 
 
