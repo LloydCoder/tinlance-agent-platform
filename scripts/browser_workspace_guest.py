@@ -56,16 +56,59 @@ def chromium_process_security() -> dict[str, object]:
     no_new_privs = status.get("NoNewPrivs") == "1"
     cap_eff = status.get("CapEff", "ffffffffffffffff")
     cap_eff_zero = int(cap_eff, 16) == 0
-    sandbox_enabled = "--no-sandbox" not in command
+    forbidden_sandbox_flags = {
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-namespace-sandbox",
+    }
+    sandbox_enabled = not any(argument in forbidden_sandbox_flags for argument in command)
     if not no_new_privs or not cap_eff_zero or not sandbox_enabled:
         raise SystemExit(
             "Chromium process did not retain the required sandbox/no-new-privileges boundary"
         )
+
+    renderer_processes = [
+        (renderer_pid, renderer_status)
+        for renderer_pid, renderer_command, renderer_status in chromium
+        if "--type=renderer" in renderer_command
+    ]
+    if not renderer_processes:
+        raise SystemExit("Chromium did not create an isolated renderer process")
+    host_user_namespace = os.readlink("/proc/1/ns/user")
+    renderer_checks = []
+    for renderer_pid, renderer_status in renderer_processes:
+        renderer_user_namespace = os.readlink(f"/proc/{renderer_pid}/ns/user")
+        renderer_seccomp = renderer_status.get("Seccomp") == "2"
+        renderer_no_new_privs = renderer_status.get("NoNewPrivs") == "1"
+        renderer_cap_eff_zero = int(
+            renderer_status.get("CapEff", "ffffffffffffffff"),
+            16,
+        ) == 0
+        renderer_user_namespace_isolated = renderer_user_namespace != host_user_namespace
+        if not all(
+            (
+                renderer_seccomp,
+                renderer_no_new_privs,
+                renderer_cap_eff_zero,
+                renderer_user_namespace_isolated,
+            )
+        ):
+            raise SystemExit(
+                "Chromium renderer lacks user-namespace, seccomp, or privilege-drop isolation"
+            )
+        renderer_checks.append(renderer_pid)
+
     return {
         "chromium_pid": pid,
         "chromium_sandbox_enabled": sandbox_enabled,
         "browser_process_no_new_privs": no_new_privs,
         "browser_process_cap_eff_zero": cap_eff_zero,
+        "chromium_renderer_count": len(renderer_processes),
+        "chromium_renderer_seccomp_enabled": True,
+        "chromium_renderer_no_new_privs": True,
+        "chromium_renderer_cap_eff_zero": True,
+        "chromium_renderer_user_namespace_isolated": True,
+        "chromium_renderer_pids": renderer_checks,
     }
 
 
