@@ -177,6 +177,7 @@ def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(
         assert all("SCHILY.ino" not in member.pax_headers for member in members)
         assert all("SCHILY.nlink" not in member.pax_headers for member in members)
 
+
 def test_normalizer_drops_volatile_ldconfig_aux_cache_from_reproducible_rootfs(
     tmp_path: Path,
 ) -> None:
