@@ -9,6 +9,7 @@ TLS remains end-to-end between Chromium and the destination.
 from __future__ import annotations
 
 import ipaddress
+import math
 import select
 import socket
 import socketserver
@@ -47,13 +48,26 @@ class EgressPolicy:
         if not self.allowed_ports or any(port != 443 for port in self.allowed_ports):
             raise ValueError("browser egress is HTTPS-only on TCP port 443")
         if (
-            self.connect_timeout_seconds <= 0
-            or self.tunnel_idle_timeout_seconds <= 0
-            or self.tunnel_max_seconds <= 0
-            or self.tunnel_max_bytes < 1
-            or self.max_connections < 1
+            not math.isfinite(self.connect_timeout_seconds)
+            or not math.isfinite(self.tunnel_idle_timeout_seconds)
+            or not math.isfinite(self.tunnel_max_seconds)
+            or not 0 < self.connect_timeout_seconds <= 30
+            or not 0 < self.tunnel_idle_timeout_seconds <= 300
+            or not 0 < self.tunnel_max_seconds <= 3600
+            or not isinstance(self.tunnel_max_bytes, int)
+            or not 1 <= self.tunnel_max_bytes <= 1_073_741_824
+            or not isinstance(self.max_connections, int)
+            or not 1 <= self.max_connections <= 1024
         ):
             raise ValueError("invalid egress resource limits")
+        normalized_rules: set[str] = set()
+        for raw_rule in self.allowed_domains:
+            if not isinstance(raw_rule, str):
+                raise ValueError("egress allowlist entries must be strings")
+            wildcard = raw_rule.startswith("*.")
+            domain = normalize_hostname(raw_rule[2:] if wildcard else raw_rule)
+            normalized_rules.add("*." + domain if wildcard else domain)
+        object.__setattr__(self, "allowed_domains", frozenset(normalized_rules))
 
 
 Resolver = Callable[[str], tuple[str, ...]]
@@ -152,6 +166,8 @@ def resolve_public_target(
     answers = (resolver or _system_resolve)(normalized)
     if not answers:
         raise EgressDenied("destination has no address records")
+    if len(answers) > 32:
+        raise EgressDenied("destination returned too many DNS addresses")
 
     validated: list[str] = []
     for raw_address in answers:
@@ -179,11 +195,28 @@ def connect_pinned_target(
     target: ResolvedTarget, *, timeout_seconds: float
 ) -> socket.socket:
     """Connect only to a validated IP literal; no second DNS lookup occurs."""
+    if target.port != 443 or not target.addresses:
+        raise EgressDenied("connector received an invalid validated target")
     last_error: OSError | None = None
-    for address in target.addresses:
+    for raw_address in target.addresses:
+        try:
+            address = ipaddress.ip_address(raw_address)
+        except ValueError as exc:
+            raise EgressDenied("connector refuses to resolve a hostname") from exc
+        if (
+            not address.is_global
+            or address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_reserved
+            or address.is_unspecified
+            or getattr(address, "ipv4_mapped", None) is not None
+        ):
+            raise EgressDenied("connector refuses a non-public address")
         try:
             return socket.create_connection(
-                (address, target.port),
+                (str(address), target.port),
                 timeout=timeout_seconds,
             )
         except OSError as exc:
