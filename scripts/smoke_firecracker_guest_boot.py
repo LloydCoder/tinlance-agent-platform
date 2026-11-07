@@ -387,11 +387,19 @@ def verify_guest_boot_markers(
                 "node_version_reported": "TINLANCE_W2_NODE_VERSION=",
                 "npm_version_reported": "TINLANCE_W2_NPM_VERSION=",
                 "package_manifest_reported": "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+                "npm_lock_sha256_reported": "TINLANCE_W2_NPM_LOCK_SHA256=",
             }
         )
     missing = [name for name, marker in required.items() if marker not in log_text]
+    if profile == "W2":
+        for name, marker in (
+            ("package_manifest_reported", "TINLANCE_W2_PACKAGE_MANIFEST_SHA256="),
+            ("npm_lock_sha256_reported", "TINLANCE_W2_NPM_LOCK_SHA256="),
+        ):
+            if re.search(rf"{re.escape(marker)}[a-f0-9]{{64}}(?:\\r?\\n|$)", log_text) is None:
+                missing.append(name)
     if missing:
-        raise ValueError(f"guest isolation markers are missing: {missing}")
+        raise ValueError(f"guest isolation markers are missing or malformed: {sorted(set(missing))}")
     return {name: True for name in required}
 
 
