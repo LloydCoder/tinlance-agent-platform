@@ -203,7 +203,9 @@ def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(
 
 
 
-def test_cpu_security_attestation_rejects_sentinel_microcode_revision(tmp_path: Path) -> None:
+def test_cpu_security_attestation_rejects_sentinel_microcode_revision(
+    tmp_path: Path,
+) -> None:
     write_probe_fixture(tmp_path, kvm=True)
     cpuinfo = tmp_path / "proc/cpuinfo"
     cpuinfo.write_text(

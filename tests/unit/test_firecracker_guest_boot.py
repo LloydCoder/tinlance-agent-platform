@@ -642,7 +642,6 @@ def test_stop_firecracker_waits_for_process_exit_before_removing_socket(
     assert commands[-1] == ["sudo", "-n", "rm", "-f", "--", str(socket_path)]
 
 
-
 def test_guest_cpu_summary_keeps_unmitigated_status_as_a_security_warning() -> None:
     summary = summarize_guest_cpu_vulnerability_samples(
         [

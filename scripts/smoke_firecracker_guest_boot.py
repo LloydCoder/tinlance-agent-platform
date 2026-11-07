@@ -22,9 +22,7 @@ from urllib.parse import urlencode
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 FIRECRACKER_VERSION = "1.17.0"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
-GUEST_KERNEL_SECURITY_ARGS = (
-    "spec_rstack_overflow=safe-ret tsa=on spec_store_bypass_disable=on"
-)
+GUEST_KERNEL_SECURITY_ARGS = "spec_rstack_overflow=safe-ret tsa=on spec_store_bypass_disable=on"
 GUEST_READ_ONLY_MARKER = "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED"
 GUEST_NO_NIC_MARKER = "TINLANCE_NO_NIC_CONFIRMED"
 GUEST_WRITE_UNEXPECTED_MARKER = "TINLANCE_ROOTFS_WRITE_UNEXPECTED"
