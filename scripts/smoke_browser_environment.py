@@ -197,8 +197,6 @@ def main() -> int:
                 guest_if,
             ]
         )
-        run(["ip", "netns", "exec", namespace, "ip", "link", "set", guest_if, "up"])
-        run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
         run(
             [
                 "ip",
@@ -221,6 +219,31 @@ def main() -> int:
                 "net.ipv6.conf.default.disable_ipv6=1",
             ]
         )
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
+                f"net.ipv6.conf.{guest_if}.disable_ipv6=1",
+            ]
+        )
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
+                "net.ipv6.conf.lo.disable_ipv6=1",
+            ]
+        )
+        run(["ip", "netns", "exec", namespace, "ip", "-6", "route", "flush", "default"])
+        run(["ip", "netns", "exec", namespace, "ip", "link", "set", guest_if, "up"])
+        run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
 
         firewall_script = (
             f"table inet {nft_table} {{\n"
