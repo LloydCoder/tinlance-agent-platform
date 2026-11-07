@@ -82,6 +82,7 @@ jobs:
               "workspace_profile_isolation",
               "tenant_profile_root_binding",
               "proxy_unavailable_fail_closed",
+              "tenant_uid_separation",
           ]
           guest = report.get("guest", {})
           missing = [name for name in required if guest.get(name) is not True and report.get(name) is not True]
