@@ -147,18 +147,12 @@ def test_proxy_revalidates_each_connect_and_rejects_redirect_target(
     try:
         host, port = proxy.address
         with socket.create_connection((host, port), timeout=3) as client:
-            client.sendall(
-                b"CONNECT example.com:443 HTTP/1.1\r\n"
-                b"Host: example.com:443\r\n\r\n"
-            )
+            client.sendall(b"CONNECT example.com:443 HTTP/1.1\\r\\nHost: example.com:443\\r\\n\\r\\n")
             first_response = client.recv(1024)
         assert first_response.startswith(b"HTTP/1.1 200")
 
         with socket.create_connection((host, port), timeout=3) as redirected:
-            redirected.sendall(
-                b"CONNECT 169.254.169.254:443 HTTP/1.1\r\n"
-                b"Host: 169.254.169.254:443\r\n\r\n"
-            )
+            redirected.sendall(b"CONNECT 169.254.169.254:443 HTTP/1.1\\r\\nHost: 169.254.169.254:443\\r\\n\\r\\n")
             redirect_response = redirected.recv(1024)
         assert redirect_response.startswith(b"HTTP/1.1 403")
     finally:
@@ -233,18 +227,12 @@ def test_same_allowlisted_hostname_is_revalidated_against_dns_rebinding(
     try:
         host, port = proxy.address
         with socket.create_connection((host, port), timeout=3) as first:
-            first.sendall(
-                b"CONNECT example.com:443 HTTP/1.1\r\n"
-                b"Host: example.com:443\r\n\r\n"
-            )
+            first.sendall(b"CONNECT example.com:443 HTTP/1.1\\r\\nHost: example.com:443\\r\\n\\r\\n")
             first_response = first.recv(1024)
         assert first_response.startswith(b"HTTP/1.1 200")
 
         with socket.create_connection((host, port), timeout=3) as rebound:
-            rebound.sendall(
-                b"CONNECT example.com:443 HTTP/1.1\r\n"
-                b"Host: example.com:443\r\n\r\n"
-            )
+            rebound.sendall(b"CONNECT example.com:443 HTTP/1.1\\r\\nHost: example.com:443\\r\\n\\r\\n")
             rebound_response = rebound.recv(1024)
         assert rebound_response.startswith(b"HTTP/1.1 403")
         assert resolver_calls == ["example.com", "example.com"]
@@ -276,10 +264,7 @@ def test_proxy_close_terminates_active_tunnels(
     proxy.start()
     client = socket.create_connection(proxy.address, timeout=3)
     try:
-        client.sendall(
-            b"CONNECT example.com:443 HTTP/1.1\r\n"
-            b"Host: example.com:443\r\n\r\n"
-        )
+        client.sendall(b"CONNECT example.com:443 HTTP/1.1\\r\\nHost: example.com:443\\r\\n\\r\\n")
         assert client.recv(1024).startswith(b"HTTP/1.1 200")
 
         proxy.close()
