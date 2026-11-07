@@ -566,6 +566,8 @@ jobs:
           if len(guest) != 3 or any(
               item.get("developer_workspace_passed") is not True
               or item.get("npm_install_passed") is not True
+              or item.get("package_manifest_reported") is not True
+              or item.get("npm_lock_sha256_reported") is not True
               or item.get("host_surface_probes_passed") is not True
               or item.get("rootfs_read_only_confirmed") is not True
               or item.get("no_non_loopback_network_interfaces") is not True
