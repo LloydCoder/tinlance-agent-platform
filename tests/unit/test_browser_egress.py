@@ -298,3 +298,46 @@ def test_proxy_close_terminates_active_tunnels(
         proxy.close()
         upstream.close()
         peer.close()
+
+
+def test_connector_uses_one_deadline_across_all_validated_addresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tinlance_agent_platform_sandbox.egress_proxy as proxy_module
+
+    class FakeClock:
+        current = 0.0
+
+        @classmethod
+        def monotonic(cls) -> float:
+            return cls.current
+
+    fake_socket = socket.socket()
+    calls: list[tuple[tuple[str, int], float]] = []
+
+    def fake_create_connection(
+        address: tuple[str, int],
+        timeout: float,
+    ) -> socket.socket:
+        calls.append((address, timeout))
+        if len(calls) == 1:
+            FakeClock.current = 2.0
+            raise TimeoutError("first validated address timed out")
+        return fake_socket
+
+    monkeypatch.setattr(proxy_module, "time", FakeClock)
+    monkeypatch.setattr(proxy_module.socket, "create_connection", fake_create_connection)
+    target = ResolvedTarget(
+        "example.com",
+        443,
+        ("93.184.216.34", "93.184.216.35"),
+    )
+    try:
+        result = connect_pinned_target(target, timeout_seconds=3.0)
+        assert result is fake_socket
+        assert calls == [
+            (("93.184.216.34", 443), 3.0),
+            (("93.184.216.35", 443), 1.0),
+        ]
+    finally:
+        fake_socket.close()
