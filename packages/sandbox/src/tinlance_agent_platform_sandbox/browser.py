@@ -44,7 +44,9 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
     except ValueError as exc:
         raise BrowserIsolationError("browser proxy must use an IP literal") from exc
     if (
-        not proxy_ip.is_private
+        not isinstance(proxy_ip, ipaddress.IPv4Address)
+        or not 1 <= parsed.port <= 65_535
+        or not proxy_ip.is_private
         or proxy_ip.is_loopback
         or proxy_ip.is_link_local
         or proxy_ip.is_unspecified
