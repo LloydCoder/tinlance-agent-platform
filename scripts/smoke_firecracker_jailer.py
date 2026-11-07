@@ -14,13 +14,17 @@ from pathlib import Path
 from typing import Any
 
 from scripts.smoke_firecracker_guest_boot import (
+    _OCI_IMAGE_DIGEST,
+    _OCI_IMAGE_ID,
     FIRECRACKER_ARCHIVE_SHA256,
     GUEST_NIC_UNEXPECTED_MARKER,
     GUEST_READY_MARKER,
+    GUEST_W2_UNEXPECTED_MARKERS,
     GUEST_WRITE_UNEXPECTED_MARKER,
     _api_request,
     _download_pinned_guest_assets,
     load_asset_manifest,
+    machine_config_for_profile,
     summarize_boot_times,
     verify_guest_boot_markers,
 )
@@ -77,6 +81,28 @@ def build_jailer_command(
         ]
     )
     return command
+
+
+def validate_jailer_profile_inputs(
+    *,
+    profile: str,
+    w2_rootfs_tar: Path | None,
+    w2_image_id: str | None,
+    w2_base_image_digest: str | None,
+) -> None:
+    """Fail closed unless the selected jailer profile has its required immutable inputs."""
+    if profile not in {"W1", "W2"}:
+        raise ValueError("profile must be W1 or W2")
+    if profile == "W1":
+        if any((w2_rootfs_tar, w2_image_id, w2_base_image_digest)):
+            raise ValueError("W2 rootfs inputs are only valid with the W2 profile")
+        return
+    if w2_rootfs_tar is None or not w2_rootfs_tar.is_file():
+        raise ValueError("a normalized W2 rootfs tar is required")
+    if w2_image_id is None or not _OCI_IMAGE_ID.fullmatch(w2_image_id):
+        raise ValueError("a content-addressed W2 image ID is required")
+    if w2_base_image_digest is None or not _OCI_IMAGE_DIGEST.fullmatch(w2_base_image_digest):
+        raise ValueError("a digest-pinned W2 base image is required")
 
 
 def _parse_proc_status(status_text: str) -> dict[str, str]:
@@ -395,6 +421,7 @@ def _run_jailer_guest(
     rootfs_path: Path,
     log_path: Path,
     timeout_seconds: float,
+    profile: str = "W1",
 ) -> tuple[
     float,
     dict[str, int | bool | str | list[int]],
@@ -455,7 +482,7 @@ def _run_jailer_guest(
                 socket_path,
                 "PUT",
                 "/machine-config",
-                {"vcpu_count": 1, "mem_size_mib": 512, "smt": False},
+                machine_config_for_profile(profile),
             )
             _api_request(
                 socket_path,
@@ -490,10 +517,11 @@ def _run_jailer_guest(
                     GUEST_WRITE_UNEXPECTED_MARKER in log_text
                     or GUEST_NIC_UNEXPECTED_MARKER in log_text
                     or "TINLANCE_SYSFS_MOUNT_FAILED" in log_text
+                    or any(marker in log_text for marker in GUEST_W2_UNEXPECTED_MARKERS)
                 ):
-                    verify_guest_boot_markers(log_text)
+                    verify_guest_boot_markers(log_text, profile)
                 if GUEST_READY_MARKER in log_text:
-                    guest_isolation = verify_guest_boot_markers(log_text)
+                    guest_isolation = verify_guest_boot_markers(log_text, profile)
                     process_evidence = _read_process_evidence(
                         firecracker_pid,
                         uid,
@@ -549,6 +577,10 @@ def main() -> int:
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--timeout-seconds", type=float, default=45)
+    parser.add_argument("--profile", choices=("W1", "W2"), default="W1")
+    parser.add_argument("--w2-rootfs-tar", type=Path)
+    parser.add_argument("--w2-image-id")
+    parser.add_argument("--w2-base-image-digest")
     args = parser.parse_args()
 
     if args.runs < 1:
@@ -561,6 +593,15 @@ def main() -> int:
         parser.error("pinned Firecracker release archive must exist")
     if not args.chroot_base_dir.is_absolute():
         parser.error("jailer chroot base directory must be absolute")
+    try:
+        validate_jailer_profile_inputs(
+            profile=args.profile,
+            w2_rootfs_tar=args.w2_rootfs_tar,
+            w2_image_id=args.w2_image_id,
+            w2_base_image_digest=args.w2_base_image_digest,
+        )
+    except ValueError as error:
+        parser.error(str(error))
     archive_sha256 = _run(
         ["sha256sum", str(args.firecracker_archive)],
         capture_output=True,
@@ -575,7 +616,12 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="fc-jailer-assets-", dir="/tmp") as temporary:
         work_dir = Path(temporary)
-        assets = _download_pinned_guest_assets(work_dir, manifest)
+        assets = _download_pinned_guest_assets(
+            work_dir,
+            manifest,
+            profile=args.profile,
+            w2_rootfs_tar=args.w2_rootfs_tar,
+        )
         kernel_path = assets["kernel_path"]
         rootfs_path = assets["rootfs_path"]
         if not isinstance(kernel_path, Path) or not isinstance(rootfs_path, Path):
@@ -587,8 +633,8 @@ def main() -> int:
 
         samples: list[float] = []
         guest_isolation_samples: list[dict[str, bool]] = []
-        process_evidence: dict[str, int | bool | str | list[int]] = {}
-        cgroup_evidence: dict[str, str] = {}
+        process_evidence_samples: list[dict[str, int | bool | str | list[int]]] = []
+        cgroup_evidence_samples: list[dict[str, str]] = []
         firecracker_version: dict[str, Any] = {}
         for run_index in range(1, args.runs + 1):
             jailer_id = f"fc-{os.environ.get('GITHUB_RUN_ID', 'local')}-{run_index}"
@@ -609,13 +655,28 @@ def main() -> int:
                 rootfs_path=rootfs_path,
                 log_path=log_dir / f"firecracker-jailer-{run_index}.log",
                 timeout_seconds=args.timeout_seconds,
+                profile=args.profile,
             )
             samples.append(boot_time)
             guest_isolation_samples.append(guest_isolation)
+            process_evidence_samples.append(process_evidence)
+            cgroup_evidence_samples.append(cgroup_evidence)
+
+        if args.profile == "W2" and any(
+            not sample.get("developer_workspace_passed", False)
+            or not sample.get("host_surface_probes_passed", False)
+            for sample in guest_isolation_samples
+        ):
+            raise PermissionError("every jailed W2 guest must prove the full developer workspace")
 
         report = {
             "status": "passed",
-            "execution_mode": "firecracker-jailer-ephemeral-smoke",
+            "execution_mode": (
+                "firecracker-jailer-w2-ephemeral-acceptance"
+                if args.profile == "W2"
+                else "firecracker-jailer-ephemeral-smoke"
+            ),
+            "profile": args.profile,
             "production_certification": False,
             "jailer_executed": True,
             "jailer_binary_sha256": _run(
@@ -635,6 +696,9 @@ def main() -> int:
             "guest_kernel_sha256": assets["kernel_sha256"],
             "guest_rootfs_squashfs_sha256": assets["rootfs_squashfs_sha256"],
             "guest_rootfs_ext4_sha256": assets["rootfs_ext4_sha256"],
+            "w2_base_image_digest": args.w2_base_image_digest,
+            "w2_image_id": args.w2_image_id,
+            "w2_rootfs_tar_sha256": assets["w2_rootfs_tar_sha256"],
             "guest_rootfs_read_only": all(
                 sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
             ),
@@ -642,8 +706,10 @@ def main() -> int:
             "guest_isolation_checks": guest_isolation_samples,
             "boot_time_samples_ms": samples,
             **summarize_boot_times(samples),
-            "process_isolation": process_evidence,
-            "cgroup_limits": cgroup_evidence,
+            "process_isolation": process_evidence_samples[-1],
+            "process_isolation_samples": process_evidence_samples,
+            "cgroup_limits": cgroup_evidence_samples[-1],
+            "cgroup_limit_samples": cgroup_evidence_samples,
         }
         args.output.write_text(
             json.dumps(report, indent=2, sort_keys=True) + "\n",
