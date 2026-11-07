@@ -96,6 +96,10 @@ jobs:
               raise SystemExit("Ephemeral W3 CI must not claim production certification.")
           if report.get("cleanup_verified") is not True:
               raise SystemExit("W3 network namespace and firewall cleanup was not verified.")
+          if report.get("proxy_process_uid") == report.get("browser_process_uid"):
+              raise SystemExit("Browser and egress proxy must run under separate OS identities.")
+          if report.get("browser_process_uid") == report.get("other_tenant_uid"):
+              raise SystemExit("Distinct tenants must use distinct OS identities.")
           print("PASS: W3 browser environment, persistent profiles and enforced proxy egress.")
           print(json.dumps(report, sort_keys=True, indent=2))
           PY
