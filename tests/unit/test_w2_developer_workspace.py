@@ -47,6 +47,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     fixture = fixture_root / "fixtures" / "w2-developer-workspace" / "Dockerfile"
     dockerfile = fixture.read_text(encoding="utf-8")
     assert "ARG APT_SNAPSHOT" in dockerfile
+    assert "ARG BASE_IMAGE=ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852" in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
@@ -90,6 +91,8 @@ def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
         assert "docker import" in workflow
         assert "artifacts/w2-rootfs.tar" in workflow
         assert "org.tinlance.w2.rootfs.tar.sha256" in workflow
+        assert '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' in workflow
+        assert r'\"org.tinlance.w2.rootfs.tar.sha256\"' not in workflow
         assert "image_id=$normalized_image_id" in workflow
         assert "rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar" in workflow
     firecracker = (workflow_root / names[0]).read_text(encoding="utf-8")
