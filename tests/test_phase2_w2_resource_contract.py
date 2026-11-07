@@ -37,9 +37,7 @@ def test_w2_jailer_cgroup_limits_match_two_vcpu_two_gib_guest() -> None:
     )
 
     cgroups = [
-        command[index + 1]
-        for index, value in enumerate(command[:-1])
-        if value == "--cgroup"
+        command[index + 1] for index, value in enumerate(command[:-1]) if value == "--cgroup"
     ]
     assert cgroups == [
         "memory.max=3221225472",
