@@ -309,7 +309,8 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_PYTHON_VERSION=Python",
         "TINLANCE_W2_NODE_VERSION=v",
         "TINLANCE_W2_NPM_VERSION=",
-        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64,
+        "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
@@ -443,7 +444,8 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_PYTHON_VERSION=",
         "TINLANCE_W2_NODE_VERSION=",
         "TINLANCE_W2_NPM_VERSION=",
-        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64,
+        "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
         "TINLANCE_GUEST_READY",
     ]
     evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
@@ -573,3 +575,21 @@ def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(
     extract_w2_rootfs_tar(source, destination)
     assert stat.S_IMODE((destination / "root-only").stat().st_mode) == 0o700
     assert stat.S_IMODE((destination / "root-only" / "secret").stat().st_mode) == 0o600
+
+
+
+def test_guest_boot_w2_verifier_rejects_malformed_package_digests() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(ValueError, match="package_manifest_reported"):
+        verify_guest_boot_markers(
+            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=not-a-digest\\n"
+            "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
+            "W2",
+        )
+    with pytest.raises(ValueError, match="npm_lock_sha256_reported"):
+        verify_guest_boot_markers(
+            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64 + "\\n"
+            "TINLANCE_W2_NPM_LOCK_SHA256=not-a-digest",
+            "W2",
+        )
