@@ -23,6 +23,12 @@ def main() -> None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
+    if report["cpu_security_mitigations_ready"]:
+        print("PHASE2_HOST_CPU_SECURITY=READY")
+    else:
+        print("PHASE2_HOST_CPU_SECURITY=NOT_ATTESTED")
+        for warning in report["cpu_security_warnings"]:
+            print(f"PHASE2_HOST_CPU_SECURITY_WARNING={warning}")
     if not report["microvm_ready"]:
         print("PHASE2_HOST_GATE=BLOCKED: KVM-backed microVM execution is unavailable")
     else:

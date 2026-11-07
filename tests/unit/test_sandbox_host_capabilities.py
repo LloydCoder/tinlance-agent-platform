@@ -12,8 +12,26 @@ def write_probe_fixture(root: Path, *, kvm: bool = False) -> None:
     (root / "proc/sys/kernel/seccomp").mkdir(parents=True)
     (root / "sys/fs/cgroup").mkdir(parents=True)
     (root / "sys/module/apparmor/parameters").mkdir(parents=True)
+    (root / "sys/devices/system/cpu/vulnerabilities").mkdir(parents=True)
+    (root / "sys/devices/system/cpu/smt").mkdir(parents=True)
+    (root / "sys/class/dmi/id").mkdir(parents=True)
     (root / "dev").mkdir(parents=True)
-    (root / "proc/cpuinfo").write_text("processor: 0\nflags: fpu vmx sse4_2\n", encoding="utf-8")
+    (root / "proc/cpuinfo").write_text(
+        "processor: 0\nvendor_id: GenuineIntel\nmodel name: Intel Xeon Test\n"
+        "cpu family: 6\nmodel: 158\nstepping: 10\nmicrocode: 0x12345678\n"
+        "flags: fpu vmx sse4_2\n",
+        encoding="utf-8",
+    )
+    (root / "sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow").write_text(
+        "Not affected\n", encoding="utf-8"
+    )
+    (root / "sys/devices/system/cpu/vulnerabilities/tsa").write_text(
+        "Not affected\n", encoding="utf-8"
+    )
+    (root / "sys/devices/system/cpu/smt/active").write_text("0\n", encoding="utf-8")
+    (root / "sys/class/dmi/id/sys_vendor").write_text("Test Vendor\n", encoding="utf-8")
+    (root / "sys/class/dmi/id/product_name").write_text("Test Platform\n", encoding="utf-8")
+    (root / "sys/class/dmi/id/bios_version").write_text("1.2.3\n", encoding="utf-8")
     (root / "proc/sys/user/max_user_namespaces").write_text("65536\n", encoding="utf-8")
     (root / "proc/self/status").write_text("Name:\tpython\nSeccomp:\t2\n", encoding="utf-8")
     (root / "proc/sys/kernel/seccomp/actions_avail").write_text(
@@ -155,3 +173,28 @@ def test_microvm_readiness_requires_cpu_memory_and_process_cgroup_controllers(
 
     assert result.microvm_ready is False
     assert "required cgroup v2 controllers are unavailable: cpu, pids" in result.microvm_blockers
+
+
+
+def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(tmp_path: Path) -> None:
+    write_probe_fixture(tmp_path, kvm=True)
+    vulnerability = tmp_path / "sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow"
+    vulnerability.write_text("Vulnerable: Safe RET, no microcode\n", encoding="utf-8")
+
+    result = probe_host_capabilities(
+        root=tmp_path,
+        architecture="x86_64",
+        kernel_release="test-kernel",
+        binary_lookup=lambda _: None,
+        access_check=lambda *_: True,
+    )
+
+    payload = result.to_dict()
+    assert result.microvm_ready is True
+    assert result.cpu_security_mitigations_ready is False
+    assert "spec_rstack_overflow: Vulnerable: Safe RET, no microcode" in payload[
+        "cpu_security_warnings"
+    ]
+    assert payload["microcode_revision"] == "0x12345678"
+    assert payload["cpu_smt_active"] is False
+    assert payload["platform_firmware_version"] == "1.2.3"

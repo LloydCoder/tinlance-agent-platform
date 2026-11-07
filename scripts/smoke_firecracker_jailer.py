@@ -24,9 +24,11 @@ from scripts.smoke_firecracker_guest_boot import (
     GUEST_WRITE_UNEXPECTED_MARKER,
     _api_request,
     _download_pinned_guest_assets,
+    extract_guest_cpu_vulnerability_statuses,
     load_asset_manifest,
     machine_config_for_profile,
     summarize_boot_times,
+    summarize_guest_cpu_vulnerability_samples,
     verify_guest_boot_markers,
 )
 
@@ -497,6 +499,7 @@ def _run_jailer_guest(
     dict[str, str],
     dict[str, str],
     dict[str, bool],
+    dict[str, str],
 ]:
     command = build_jailer_command(
         jailer_binary=str(jailer_binary),
@@ -599,6 +602,7 @@ def _run_jailer_guest(
                     verify_guest_boot_markers(log_text, profile)
                 if GUEST_READY_MARKER in log_text:
                     guest_isolation = verify_guest_boot_markers(log_text, profile)
+                    guest_cpu_vulnerabilities = extract_guest_cpu_vulnerability_statuses(log_text)
                     process_evidence = _read_process_evidence(
                         firecracker_pid,
                         uid,
@@ -613,6 +617,7 @@ def _run_jailer_guest(
                         cgroup_evidence,
                         version,
                         guest_isolation,
+                        guest_cpu_vulnerabilities,
                     )
                 if not _is_process_alive(firecracker_pid):
                     raise RuntimeError(
@@ -739,6 +744,7 @@ def main() -> int:
 
         samples: list[float] = []
         guest_isolation_samples: list[dict[str, bool]] = []
+        guest_cpu_vulnerability_samples: list[dict[str, str]] = []
         process_evidence_samples: list[dict[str, int | bool | str | list[int] | list[str]]] = []
         cgroup_evidence_samples: list[dict[str, str]] = []
         firecracker_version: dict[str, Any] = {}
@@ -750,6 +756,7 @@ def main() -> int:
                 cgroup_evidence,
                 firecracker_version,
                 guest_isolation,
+                guest_cpu_vulnerabilities,
             ) = _run_jailer_guest(
                 jailer_binary=args.jailer,
                 firecracker_binary=args.firecracker,
@@ -766,6 +773,7 @@ def main() -> int:
             )
             samples.append(boot_time)
             guest_isolation_samples.append(guest_isolation)
+            guest_cpu_vulnerability_samples.append(guest_cpu_vulnerabilities)
             process_evidence_samples.append(process_evidence)
             cgroup_evidence_samples.append(cgroup_evidence)
 
@@ -776,6 +784,9 @@ def main() -> int:
         ):
             raise PermissionError("every jailed W2 guest must prove the full developer workspace")
 
+        guest_cpu_summary = summarize_guest_cpu_vulnerability_samples(
+            guest_cpu_vulnerability_samples
+        )
         report = {
             "status": "passed",
             "execution_mode": (
@@ -811,6 +822,8 @@ def main() -> int:
             ),
             "guest_network_configured": False,
             "guest_isolation_checks": guest_isolation_samples,
+            "guest_cpu_vulnerability_samples": guest_cpu_vulnerability_samples,
+            **guest_cpu_summary,
             "boot_time_samples_ms": samples,
             **summarize_boot_times(samples),
             "process_isolation": process_evidence_samples[-1],

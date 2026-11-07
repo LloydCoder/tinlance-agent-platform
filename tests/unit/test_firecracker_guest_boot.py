@@ -7,7 +7,10 @@ import tarfile
 from pathlib import Path
 
 import pytest
+import scripts.smoke_firecracker_guest_boot as guest_boot
 from scripts.smoke_firecracker_guest_boot import (
+    _stop_firecracker,
+    extract_guest_cpu_vulnerability_statuses,
     extract_w2_rootfs_tar,
     load_asset_manifest,
     parse_latest_artifact_prefix,
@@ -599,3 +602,38 @@ def test_guest_boot_w2_verifier_rejects_empty_toolchain_version_markers() -> Non
 
     with pytest.raises(ValueError, match="npm_version_reported"):
         verify_guest_boot_markers("TINLANCE_W2_NPM_VERSION= \n", "W2")
+
+
+
+def test_extract_guest_cpu_vulnerability_statuses_parses_srso_and_tsa() -> None:
+    log = """
+    [    0.100] Speculative Return Stack Overflow: Vulnerable: Safe RET, no microcode
+    [    0.101] Transient Scheduler Attacks: Vulnerable: No microcode
+    [    0.102] Speculative Return Stack Overflow: WARNING: mitigation details
+    """
+    assert extract_guest_cpu_vulnerability_statuses(log) == {
+        "spec_rstack_overflow": "Vulnerable: Safe RET, no microcode",
+        "tsa": "Vulnerable: No microcode",
+    }
+
+
+def test_stop_firecracker_waits_for_process_exit_before_removing_socket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    socket_path = tmp_path / "firecracker.sock"
+    pids = iter(([1234], []))
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(guest_boot, "_firecracker_pids", lambda: next(pids))
+    monkeypatch.setattr(guest_boot.subprocess, "run", fake_run)
+    monkeypatch.setattr(guest_boot.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(guest_boot.time, "sleep", lambda _: None)
+
+    _stop_firecracker(socket_path)
+
+    assert commands[0] == ["sudo", "-n", "pkill", "-TERM", "-x", "firecracker"]
+    assert commands[-1] == ["sudo", "-n", "rm", "-f", "--", str(socket_path)]

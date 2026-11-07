@@ -656,6 +656,63 @@ def _api_request(
     return _run(command, capture_output=True).stdout
 
 
+def extract_guest_cpu_vulnerability_statuses(log_text: str) -> dict[str, str]:
+    """Parse machine-readable SRSO/TSA mitigation status from the guest kernel log."""
+    prefixes = {
+        "spec_rstack_overflow": "Speculative Return Stack Overflow:",
+        "tsa": "Transient Scheduler Attacks:",
+    }
+    statuses: dict[str, str] = {}
+    for line in log_text.splitlines():
+        for key, prefix in prefixes.items():
+            if prefix not in line:
+                continue
+            status = line.split(prefix, 1)[1].strip()
+            if status.startswith(("Vulnerable:", "Mitigation:", "Not affected")):
+                statuses[key] = status
+    return statuses
+
+
+def summarize_guest_cpu_vulnerability_samples(
+    samples: Sequence[dict[str, str]],
+) -> dict[str, object]:
+    required = ("spec_rstack_overflow", "tsa")
+    keys = sorted({key for sample in samples for key in sample})
+    statuses = {
+        key: sorted({sample[key] for sample in samples if key in sample})
+        for key in keys
+    }
+    warnings = [f"{key}: status unavailable" for key in required if key not in statuses]
+    for key, values in statuses.items():
+        for value in values:
+            if not value.lower().startswith(("mitigation:", "not affected")):
+                warnings.append(f"{key}: {value}")
+    return {
+        "guest_cpu_vulnerability_statuses": statuses,
+        "guest_cpu_security_warnings": sorted(set(warnings)),
+        "guest_cpu_security_mitigations_ready": (
+            bool(samples) and all(key in statuses for key in required) and not warnings
+        ),
+    }
+
+
+def _firecracker_pids() -> list[int]:
+    result = subprocess.run(
+        ["sudo", "-n", "pgrep", "-x", "firecracker"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 1:
+        return []
+    if result.returncode != 0:
+        raise RuntimeError(f"could not verify Firecracker process cleanup: {result.stderr.strip()}")
+    try:
+        return [int(value) for value in result.stdout.split()]
+    except ValueError as error:
+        raise RuntimeError("pgrep returned a non-numeric Firecracker PID") from error
+
+
 def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float = 10) -> None:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -672,18 +729,32 @@ def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float =
 
 
 def _stop_firecracker(socket_path: Path) -> None:
-    subprocess.run(
-        ["sudo", "-n", "pkill", "-x", "firecracker"],
+    stopped = False
+    for signal_name in ("TERM", "KILL"):
+        subprocess.run(
+            ["sudo", "-n", "pkill", f"-{signal_name}", "-x", "firecracker"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if not _firecracker_pids():
+                stopped = True
+                break
+            time.sleep(0.1)
+        if stopped:
+            break
+    if not stopped:
+        raise RuntimeError("Firecracker process remained alive after SIGTERM and SIGKILL")
+    result = subprocess.run(
+        ["sudo", "-n", "rm", "-f", "--", str(socket_path)],
         check=False,
         capture_output=True,
         text=True,
     )
-    subprocess.run(
-        ["sudo", "-n", "rm", "-f", str(socket_path)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    if result.returncode != 0:
+        raise RuntimeError(f"could not remove Firecracker API socket: {result.stderr.strip()}")
 
 
 def _run_guest(
@@ -695,7 +766,7 @@ def _run_guest(
     log_dir: Path,
     timeout_seconds: float,
     profile: str = "W1",
-) -> tuple[float, dict[str, str], dict[str, bool]]:
+) -> tuple[float, dict[str, str], dict[str, bool], dict[str, str]]:
     socket_path = work_dir / f"api-{run_index}.sock"
     log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
     _stop_firecracker(socket_path)
@@ -766,7 +837,13 @@ def _run_guest(
                     verify_guest_boot_markers(log_text, profile)
                 if GUEST_READY_MARKER in log_text:
                     guest_isolation = verify_guest_boot_markers(log_text, profile)
-                    return (time.monotonic() - started) * 1000, version, guest_isolation
+                    guest_cpu_vulnerabilities = extract_guest_cpu_vulnerability_statuses(log_text)
+                    return (
+                        (time.monotonic() - started) * 1000,
+                        version,
+                        guest_isolation,
+                        guest_cpu_vulnerabilities,
+                    )
                 running = subprocess.run(
                     ["sudo", "-n", "pgrep", "-x", "firecracker"],
                     check=False,
@@ -983,9 +1060,15 @@ def main() -> int:
 
         samples: list[float] = []
         guest_isolation_samples: list[dict[str, bool]] = []
+        guest_cpu_vulnerability_samples: list[dict[str, str]] = []
         firecracker_version: dict[str, str] = {}
         for run_index in range(1, args.runs + 1):
-            boot_time_ms, version, guest_isolation = _run_guest(
+            (
+                boot_time_ms,
+                version,
+                guest_isolation,
+                guest_cpu_vulnerabilities,
+            ) = _run_guest(
                 firecracker_binary,
                 kernel_path,
                 rootfs_path,
@@ -997,9 +1080,13 @@ def main() -> int:
             )
             samples.append(boot_time_ms)
             guest_isolation_samples.append(guest_isolation)
+            guest_cpu_vulnerability_samples.append(guest_cpu_vulnerabilities)
             firecracker_version = version
 
         summary = summarize_boot_times(samples)
+        guest_cpu_summary = summarize_guest_cpu_vulnerability_samples(
+            guest_cpu_vulnerability_samples
+        )
         report = {
             "status": "passed",
             "execution_mode": "direct-vmm-ephemeral-smoke",
@@ -1010,6 +1097,8 @@ def main() -> int:
                 sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
             ),
             "guest_isolation_checks": guest_isolation_samples,
+            "guest_cpu_vulnerability_samples": guest_cpu_vulnerability_samples,
+            **guest_cpu_summary,
             "guest_workload": {
                 "profile": (
                     "W1-minimal-agent"

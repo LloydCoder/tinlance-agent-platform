@@ -100,14 +100,18 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
           base_digest="ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
-          docker pull "$base_digest"
-          docker build --pull --no-cache \
+          docker pull --platform linux/amd64 "$base_digest"
+          docker_engine_version="$(docker version --format '{{.Server.Version}}')"
+          buildx_version="$(docker buildx version | awk '{print $2}')"
+          docker build --platform=linux/amd64 --pull --no-cache \
             --build-arg BASE_IMAGE="$base_digest" \
             --build-arg APT_SNAPSHOT=20261106T000000Z \
             --file tests/fixtures/w2-developer-workspace/Dockerfile \
             --tag tinlance-w2-developer-workspace:firecracker \
             tests/fixtures/w2-developer-workspace
           image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:firecracker)"
+          image_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image_id")"
+          test "$image_platform" = "linux/amd64"
           case "$image_id" in
             sha256:????????????????????????????????????????????????????????????????) ;;
             *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
@@ -118,13 +122,15 @@ jobs:
           python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.raw.tar --output artifacts/w2-rootfs.tar
           rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
 
-          docker build --pull --no-cache \
+          docker build --platform=linux/amd64 --pull --no-cache \
             --build-arg BASE_IMAGE="$base_digest" \
             --build-arg APT_SNAPSHOT=20261106T000000Z \
             --file tests/fixtures/w2-developer-workspace/Dockerfile \
             --tag tinlance-w2-developer-workspace:rebuild \
             tests/fixtures/w2-developer-workspace
           rebuild_image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:rebuild)"
+          rebuild_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$rebuild_image_id")"
+          test "$rebuild_platform" = "$image_platform"
           case "$rebuild_image_id" in
             sha256:????????????????????????????????????????????????????????????????) ;;
             *) echo "Independent W2 rebuild image ID is not content-addressed: $rebuild_image_id"; exit 1 ;;
@@ -146,6 +152,9 @@ jobs:
 
           report = {
               "base_image_digest": "$base_digest",
+              "platform": "$image_platform",
+              "docker_engine_version": "$docker_engine_version",
+              "buildx_version": "$buildx_version",
               "apt_snapshot": "20261106T000000Z",
               "build_cache_disabled": True,
               "primary_image_id": "$image_id",

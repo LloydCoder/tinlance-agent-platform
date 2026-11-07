@@ -37,7 +37,7 @@ PR #190 extends the existing jailer runner with a W2 profile and adds a dedicate
 The W2 jailer job must pass all of the following for **3/3** executions:
 
 1. Real W2 developer workspace operations: Git clone/edit, Python compile/unit tests, Node edit/build/unit tests, and local-package `npm ci --offline`; host-surface probes; guest readiness markers. No guest network is available.
-2. Independent rootfs reproducibility: two `docker build --pull --no-cache` builds from identical pinned inputs must produce byte-identical normalized rootfs tar files. The normalizer excludes the volatile `var/cache/ldconfig/aux-cache` file, validates volatile entries before dropping them, and records both build digests in `w2-rootfs-reproducibility.json`.
+2. Independent rootfs reproducibility: two `docker build --platform=linux/amd64 --pull --no-cache` builds from identical pinned inputs must produce byte-identical normalized rootfs tar files. The report records platform, Docker Engine/Buildx versions, base digest, apt snapshot and both image/rootfs digests. The normalizer excludes the volatile `var/cache/ldconfig/aux-cache` file, validates volatile entries before dropping them, and records both build digests in `w2-rootfs-reproducibility.json`.
 3. Rootfs and guest boundary: read-only rootfs, no guest non-loopback NIC, non-root guest UID/GID, no sensitive host devices/sockets, denied privilege escalation and mount operations, read-only proc/sys and bounded tmpfs workspace.
 4. Firecracker process identity: dedicated non-root UID/GID, chroot identity, dedicated cgroup v2, PID and mount namespace isolation, zero effective capabilities and `NoNewPrivs=1`.
 5. Seccomp: filter mode 2 on the Firecracker process and every observed Firecracker thread.
@@ -55,6 +55,7 @@ The W1 jailer smoke is a separate regression check, not a substitute for W2 jail
 - W2 artifacts and this workflow are feasibility/acceptance evidence only. The report must retain `production_certification=false`.
 - The acceptance harness retains serial-console output to collect guest markers. Production must bound or rate-limit guest-controlled serial output, or disable the serial device where operationally possible.
 - The CA bootstrap installs pinned CA/OpenSSL packages from the signed Ubuntu archive over HTTP while preserving APT signature and package-hash verification, then uses the pinned Ubuntu snapshot over HTTPS with normal peer verification. It must not disable HTTPS certificate verification.
+- The W2 guest kernel reports SRSO as `Vulnerable: Safe RET, no microcode` and TSA as `Vulnerable: No microcode`. Reports preserve these statuses as machine-readable evidence. This does not invalidate functional W2 runs, but it blocks production side-channel sign-off until physical host CPU identity, microcode revision, SMT state and host `/sys/devices/system/cpu/vulnerabilities/*` statuses are attested. Guest-visible CPUID is not proof of the physical host SKU; the infrastructure provider must confirm host firmware/microcode mitigation state. Require `cpu_security_mitigations_ready=true` on the production host and independent reviewer approval before production certification.
 
 ## 4. Remaining serial phases
 
