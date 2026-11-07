@@ -380,6 +380,7 @@ def verify_guest_boot_markers(
                 "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
                 "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
                 "workspace_tmpfs_mounted": "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+                "npm_install_passed": "TINLANCE_W2_NPM_INSTALL_OK",
                 "developer_workspace_passed": "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
                 "git_version_reported": "TINLANCE_W2_GIT_VERSION=",
                 "python_version_reported": "TINLANCE_W2_PYTHON_VERSION=",
