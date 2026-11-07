@@ -208,6 +208,7 @@ def test_normalizer_drops_volatile_ldconfig_aux_cache_from_reproducible_rootfs(
     with tarfile.open(first_output, "r:") as archive:
         assert "var/cache/ldconfig/aux-cache" not in archive.getnames()
 
+
 def test_normalizer_validates_volatile_symlinks_before_dropping_them(tmp_path: Path) -> None:
     source = tmp_path / "unsafe-volatile-symlink.tar"
     output = tmp_path / "unsafe-volatile-symlink.normalized.tar"
