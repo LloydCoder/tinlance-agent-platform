@@ -18,13 +18,19 @@ from pathlib import Path
 PROXY_PORT = 3128
 
 
-def run(command: list[str], *, timeout: int = 30) -> str:
+def run(
+    command: list[str],
+    *,
+    timeout: int = 30,
+    env: dict[str, str] | None = None,
+) -> str:
     result = subprocess.run(
         command,
         check=True,
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=env,
     )
     return result.stdout.strip()
 
@@ -110,12 +116,15 @@ def main() -> int:
         created_users.append(other_tenant_user)
         work_root = Path(tempfile.mkdtemp(prefix="tinlance-browser-w3-"))
         profile_root = work_root / "profile"
+        home_root = work_root / "home"
+        tmp_root = work_root / "tmp"
         evidence_path = work_root / "guest-evidence.json"
         profile_root.mkdir(mode=0o700)
-        os.chown(work_root, browser_uid, browser_gid)
-        os.chown(profile_root, browser_uid, browser_gid)
-        os.chmod(work_root, 0o700)
-        os.chmod(profile_root, 0o700)
+        home_root.mkdir(mode=0o700)
+        tmp_root.mkdir(mode=0o700)
+        for directory in (work_root, profile_root, home_root, tmp_root):
+            os.chown(directory, browser_uid, browser_gid)
+            os.chmod(directory, 0o700)
     except BaseException:
         for username in created_users:
             subprocess.run(["userdel", username], check=False, capture_output=True)
@@ -190,6 +199,8 @@ def main() -> int:
             }
         )
 
+        proxy_env = os.environ.copy()
+        proxy_env.update({"HOME": "/tmp", "TMPDIR": "/tmp"})
         with proxy_log.open("wb") as log_file:
             proxy_process = subprocess.Popen(
                 [
@@ -213,6 +224,7 @@ def main() -> int:
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 cwd=Path(__file__).resolve().parents[1],
+                env=proxy_env,
                 start_new_session=True,
             )
         wait_for_proxy(host_ip, PROXY_PORT, proxy_process)
@@ -232,7 +244,16 @@ def main() -> int:
             "--workspace-id", "workspace-a",
             "--evidence", str(evidence_path),
         ]
-        run(guest_command, timeout=180)
+        guest_env = os.environ.copy()
+        guest_env.update(
+            {
+                "HOME": str(home_root),
+                "XDG_CONFIG_HOME": str(home_root / ".config"),
+                "XDG_CACHE_HOME": str(home_root / ".cache"),
+                "TMPDIR": str(tmp_root),
+            }
+        )
+        run(guest_command, timeout=180, env=guest_env)
         guest_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
         if guest_evidence.get("status") != "passed":
             raise RuntimeError("browser guest acceptance did not report passed")
@@ -258,7 +279,9 @@ def main() -> int:
             "--workspace-id",
             "workspace-a",
         ]
-        run(tenant_probe, timeout=15)
+        probe_env = os.environ.copy()
+        probe_env["HOME"] = "/tmp"
+        run(tenant_probe, timeout=15, env=probe_env)
         evidence["tenant_uid_separation"] = True
         evidence["status"] = "passed"
 
