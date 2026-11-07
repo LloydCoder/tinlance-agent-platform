@@ -20,6 +20,9 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     dockerfile = fixture.with_name("Dockerfile").read_text(encoding="utf-8")
     node_package = (fixture.parent / "node" / "package.json").read_text(encoding="utf-8")
     node_app = (fixture.parent / "node" / "src" / "app.js").read_text(encoding="utf-8")
+    local_package = (
+        fixture.parent / "node" / "vendor" / "w2-fixture-package" / "package.json"
+    ).read_text(encoding="utf-8")
     for marker in (
         "TINLANCE_W2_GIT_CLONE_OK",
         "TINLANCE_W2_PYTHON_EDIT_OK",
@@ -46,6 +49,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     assert "TINLANCE_W2_NPM_INSTALL_OK" in script
     assert "TINLANCE_W2_NPM_LOCK_SHA256=" in script
     assert '"@tinlance/w2-fixture-package": "file:vendor/w2-fixture-package"' in node_package
+    assert '"name": "@tinlance/w2-fixture-package"' in local_package
     assert 'from "@tinlance/w2-fixture-package"' in node_app
     assert "npm test" in script
     assert "w2-package-manifest.lock" in script
