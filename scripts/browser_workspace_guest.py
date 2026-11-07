@@ -126,6 +126,23 @@ def main() -> int:
     else:
         raise SystemExit("a different tenant reused the same profile root")
 
+    fail_closed_manager = BrowserWorkspaceManager(
+        args.profile_root + "-failclosed",
+        f"http://{proxy_ip}:{proxy_port + 1}",
+        tenant_id=args.tenant_id + "-failclosed",
+        expected_uid=os.geteuid(),
+        navigation_timeout_ms=5_000,
+    )
+    proxy_unavailable_failed_closed = False
+    with fail_closed_manager.open(args.workspace_id) as fail_closed_session:
+        try:
+            fail_closed_session.navigate("https://example.com/")
+        except Exception:
+            proxy_unavailable_failed_closed = True
+    if not proxy_unavailable_failed_closed:
+        raise SystemExit("browser did not fail closed when its configured proxy was unavailable")
+    evidence["proxy_unavailable_fail_closed"] = True
+
     evidence["status"] = "passed"
     output = Path(args.evidence)
     output.parent.mkdir(parents=True, exist_ok=True)
