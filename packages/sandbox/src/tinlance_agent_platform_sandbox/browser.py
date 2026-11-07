@@ -214,6 +214,10 @@ class BrowserSession:
     def profile_path(self) -> Path:
         return self._lease.profile_path
 
+    @property
+    def context(self) -> Any:
+        return self._context
+
     def navigate(self, url: str) -> Any:
         parsed = urlsplit(url)
         if (
