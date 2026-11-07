@@ -165,3 +165,34 @@ def test_proxy_revalidates_each_connect_and_rejects_redirect_target(
     finally:
         proxy.close()
         upstream.close()
+
+
+
+def test_proxy_cannot_bind_public_or_wildcard_interfaces() -> None:
+    with pytest.raises(ValueError, match="specific private"):
+        BrowserEgressProxy(
+            "0.0.0.0",
+            3128,
+            policy(),
+            allowed_client_network="127.0.0.1/32",
+        )
+    with pytest.raises(ValueError, match="private workspace"):
+        BrowserEgressProxy(
+            "10.253.0.1",
+            3128,
+            policy(),
+            allowed_client_network="0.0.0.0/0",
+        )
+
+
+def test_egress_policy_rejects_unbounded_resource_limits() -> None:
+    with pytest.raises(ValueError, match="resource limits"):
+        EgressPolicy(
+            allowed_domains=frozenset({"example.com"}),
+            tunnel_max_seconds=float("inf"),
+        )
+    with pytest.raises(ValueError, match="resource limits"):
+        EgressPolicy(
+            allowed_domains=frozenset({"example.com"}),
+            max_connections=10_000,
+        )
