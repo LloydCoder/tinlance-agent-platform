@@ -198,3 +198,61 @@ def test_egress_policy_rejects_unbounded_resource_limits() -> None:
             allowed_domains=frozenset({"example.com"}),
             max_connections=10_000,
         )
+
+
+def test_same_allowlisted_hostname_is_revalidated_against_dns_rebinding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tinlance_agent_platform_sandbox.egress_proxy as proxy_module
+
+    upstream, peer = socket.socketpair()
+    peer.close()
+    dns_answers = iter(
+        [
+            ("93.184.216.34",),
+            ("169.254.169.254",),
+        ]
+    )
+    resolver_calls: list[str] = []
+    connector_calls: list[ResolvedTarget] = []
+
+    def changing_resolver(hostname: str) -> tuple[str, ...]:
+        resolver_calls.append(hostname)
+        return next(dns_answers)
+
+    def pinned_connector(target: ResolvedTarget, *, timeout_seconds: float) -> socket.socket:
+        connector_calls.append(target)
+        return upstream
+
+    monkeypatch.setattr(proxy_module, "_system_resolve", changing_resolver)
+    monkeypatch.setattr(proxy_module, "connect_pinned_target", pinned_connector)
+    proxy = BrowserEgressProxy(
+        "127.0.0.1",
+        0,
+        policy(),
+        allowed_client_network="127.0.0.1/32",
+    )
+    proxy.start()
+    try:
+        host, port = proxy.address
+        with socket.create_connection((host, port), timeout=3) as first:
+            first.sendall(
+                b"CONNECT example.com:443 HTTP/1.1\\r\\n"
+                b"Host: example.com:443\\r\\n\\r\\n"
+            )
+            first_response = first.recv(1024)
+        assert first_response.startswith(b"HTTP/1.1 200")
+
+        with socket.create_connection((host, port), timeout=3) as rebound:
+            rebound.sendall(
+                b"CONNECT example.com:443 HTTP/1.1\\r\\n"
+                b"Host: example.com:443\\r\\n\\r\\n"
+            )
+            rebound_response = rebound.recv(1024)
+        assert rebound_response.startswith(b"HTTP/1.1 403")
+        assert resolver_calls == ["example.com", "example.com"]
+        assert len(connector_calls) == 1
+        assert connector_calls[0].addresses == ("93.184.216.34",)
+    finally:
+        proxy.close()
+        upstream.close()
