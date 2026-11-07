@@ -257,3 +257,45 @@ def test_same_allowlisted_hostname_is_revalidated_against_dns_rebinding(
     finally:
         proxy.close()
         upstream.close()
+
+
+def test_proxy_close_terminates_active_tunnels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tinlance_agent_platform_sandbox.egress_proxy as proxy_module
+
+    upstream, peer = socket.socketpair()
+    monkeypatch.setattr(proxy_module, "_system_resolve", lambda _: ("93.184.216.34",))
+    monkeypatch.setattr(
+        proxy_module,
+        "connect_pinned_target",
+        lambda *_args, **_kwargs: upstream,
+    )
+    proxy = BrowserEgressProxy(
+        "127.0.0.1",
+        0,
+        policy(),
+        allowed_client_network="127.0.0.1/32",
+    )
+    proxy.start()
+    client = socket.create_connection(proxy.address, timeout=3)
+    try:
+        client.sendall(
+            b"CONNECT example.com:443 HTTP/1.1\\r\\n"
+            b"Host: example.com:443\\r\\n\\r\\n"
+        )
+        assert client.recv(1024).startswith(b"HTTP/1.1 200")
+
+        proxy.close()
+        client.settimeout(1)
+        try:
+            assert client.recv(1) == b""
+        except ConnectionResetError:
+            pass
+        peer.settimeout(1)
+        assert peer.recv(1) == b""
+    finally:
+        client.close()
+        proxy.close()
+        upstream.close()
+        peer.close()
