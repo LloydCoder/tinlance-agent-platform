@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import stat
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from tinlance_agent_platform_sandbox.browser import (
     BrowserIsolationError,
     BrowserProfileLease,
     BrowserSession,
+    BrowserWorkspaceManager,
 )
 
 
@@ -112,3 +114,14 @@ def test_session_close_is_idempotent(tmp_path: Path) -> None:
     session.close()
     assert closed.context == 1
     assert closed.playwright == 1
+
+
+def test_workspace_manager_rejects_wrong_tenant_uid(tmp_path: Path) -> None:
+    manager = BrowserWorkspaceManager(
+        tmp_path / "tenant-a",
+        "http://10.253.0.1:3128",
+        tenant_id="tenant-a",
+        expected_uid=os.geteuid() + 1,
+    )
+    with pytest.raises(BrowserIsolationError, match="UID"):
+        manager.open("workspace-1")
