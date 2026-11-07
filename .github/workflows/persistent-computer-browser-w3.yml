@@ -10,6 +10,7 @@ on:
       - "packages/sandbox/src/tinlance_agent_platform_sandbox/__init__.py"
       - "scripts/browser_egress_proxy.py"
       - "scripts/browser_workspace_guest.py"
+      - "scripts/browser_tenant_isolation_probe.py"
       - "scripts/smoke_browser_environment.py"
       - "tests/unit/test_browser_egress.py"
       - "tests/unit/test_browser_workspace.py"
@@ -83,6 +84,9 @@ jobs:
               "tenant_profile_root_binding",
               "proxy_unavailable_fail_closed",
               "tenant_uid_separation",
+              "chromium_sandbox_enabled",
+              "browser_process_cap_eff_zero",
+              "browser_process_no_new_privs",
           ]
           guest = report.get("guest", {})
           missing = [name for name in required if guest.get(name) is not True and report.get(name) is not True]
