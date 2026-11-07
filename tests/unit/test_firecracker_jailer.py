@@ -315,7 +315,6 @@ def test_w2_jailer_profile_accepts_content_addressed_inputs(tmp_path: Path) -> N
     )
 
 
-
 def test_w2_jailer_profile_requires_network_namespace_handle(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
