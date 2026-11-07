@@ -32,7 +32,7 @@ def chromium_process_security() -> dict[str, object]:
         try:
             command = [
                 value.decode("utf-8", errors="replace")
-                for value in command_file.read_bytes().split(b"\\x00")
+                for value in command_file.read_bytes().split(b"\x00")
                 if value
             ]
             status = {}
