@@ -13,6 +13,61 @@ from tinlance_agent_platform_sandbox.browser import (
 )
 
 
+def chromium_process_security() -> dict[str, object]:
+    pending = [os.getpid()]
+    seen: set[int] = set()
+    chromium: list[tuple[int, list[str], dict[str, str]]] = []
+    while pending:
+        parent = pending.pop()
+        if parent in seen:
+            continue
+        seen.add(parent)
+        children_file = Path(f"/proc/{parent}/task/{parent}/children")
+        try:
+            pending.extend(int(value) for value in children_file.read_text().split())
+        except (FileNotFoundError, PermissionError, ValueError):
+            pass
+        command_file = Path(f"/proc/{parent}/cmdline")
+        status_file = Path(f"/proc/{parent}/status")
+        try:
+            command = [
+                value.decode("utf-8", errors="replace")
+                for value in command_file.read_bytes().split(b"\\x00")
+                if value
+            ]
+            status = {}
+            for line in status_file.read_text(encoding="ascii").splitlines():
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    status[key] = value.strip()
+        except (FileNotFoundError, PermissionError):
+            continue
+        executable = command[0].lower() if command else ""
+        if "chrome" in executable or "chromium" in executable:
+            chromium.append((parent, command, status))
+
+    main_processes = [
+        (pid, command, status)
+        for pid, command, status in chromium
+        if any(argument.startswith("--user-data-dir=") for argument in command)
+    ]
+    if not main_processes:
+        raise SystemExit("could not identify the Chromium browser process")
+    pid, command, status = main_processes[0]
+    no_new_privs = status.get("NoNewPrivs") == "1"
+    cap_eff = status.get("CapEff", "ffffffffffffffff")
+    cap_eff_zero = int(cap_eff, 16) == 0
+    sandbox_enabled = "--no-sandbox" not in command
+    if not no_new_privs or not cap_eff_zero or not sandbox_enabled:
+        raise SystemExit("Chromium process did not retain the required sandbox/no-new-privileges boundary")
+    return {
+        "chromium_pid": pid,
+        "chromium_sandbox_enabled": sandbox_enabled,
+        "browser_process_no_new_privs": no_new_privs,
+        "browser_process_cap_eff_zero": cap_eff_zero,
+    }
+
+
 def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
     with socket.create_connection((proxy_ip, proxy_port), timeout=3) as connection:
         connection.settimeout(3)
@@ -89,6 +144,7 @@ def main() -> int:
         first_profile = session.profile_path
         browser = session.context.browser
         evidence["browser_version"] = browser.version if browser is not None else "persistent-context"
+        evidence.update(chromium_process_security())
         evidence["allowlisted_https_navigation"] = True
 
     with manager.open(args.workspace_id) as resumed:
