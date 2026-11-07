@@ -407,7 +407,9 @@ def verify_guest_boot_markers(
             if re.search(rf"{re.escape(marker)}[a-f0-9]{{64}}(?:\r?\n|$)", log_text) is None:
                 missing.append(name)
     if missing:
-        raise ValueError(f"guest isolation markers are missing or malformed: {sorted(set(missing))}")
+        raise ValueError(
+            f"guest isolation markers are missing or malformed: {sorted(set(missing))}"
+        )
     return {name: True for name in required}
 
 
