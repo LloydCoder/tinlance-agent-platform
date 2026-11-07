@@ -89,8 +89,16 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
     if ipv6_route.is_file():
         for line in ipv6_route.read_text(encoding="ascii").splitlines():
             fields = line.split()
-            if len(fields) >= 10 and fields[0] == "0" * 32 and fields[1] == "00":
-                raise BrowserIsolationError("default IPv6 route is forbidden in browser namespace")
+            if len(fields) < 10 or fields[0] != "0" * 32 or fields[1] != "00":
+                continue
+            try:
+                route_flags = int(fields[8], 16)
+            except ValueError:
+                raise BrowserIsolationError("malformed IPv6 route table") from None
+            if route_flags & 0x1:
+                raise BrowserIsolationError(
+                    "active default IPv6 route is forbidden in browser namespace"
+                )
 
     interfaces = {entry.name for entry in Path("/sys/class/net").iterdir()}
     if "lo" not in interfaces or len(interfaces) != 2:
