@@ -231,7 +231,9 @@ def connect_pinned_target(target: ResolvedTarget, *, timeout_seconds: float) -> 
             )
         except OSError as exc:
             last_error = exc
-    raise ConnectionError("validated destination addresses exceeded the connect deadline") from last_error
+    raise ConnectionError(
+        "validated destination addresses exceeded the connect deadline"
+    ) from last_error
 
 
 def _relay_tunnel(
