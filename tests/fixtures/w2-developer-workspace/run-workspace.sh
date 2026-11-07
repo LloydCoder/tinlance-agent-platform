@@ -48,6 +48,9 @@ echo TINLANCE_W2_NODE_EDIT_OK
 node --check "$workspace/node/src/app.js"
 echo TINLANCE_W2_NODE_BUILD_OK
 cd "$workspace/node"
+test -s package-lock.json
+npm_lock_sha256="$(sha256sum package-lock.json | awk '{print $1}')"
+echo "TINLANCE_W2_NPM_LOCK_SHA256=$npm_lock_sha256"
 npm ci --offline --ignore-scripts --no-audit --no-fund
 test -f node_modules/@tinlance/w2-fixture-package/index.js
 echo "TINLANCE_W2_NPM_INSTALL_OK"
