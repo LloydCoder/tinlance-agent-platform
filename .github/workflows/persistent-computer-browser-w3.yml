@@ -44,7 +44,7 @@ jobs:
       - name: Install project, test and browser dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test,browser]"
+          python -m pip install -e ".[test,browser,security]"
           python -m playwright install chromium
           sudo "$pythonLocation/bin/python" -m playwright install-deps chromium
           chmod o+x "$HOME" "$HOME/.cache" "$HOME/.cache/ms-playwright"
@@ -53,6 +53,14 @@ jobs:
       - name: Run browser policy and profile lifecycle tests
         run: |
           pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py tests/unit/test_browser_smoke_environment.py
+
+      - name: Audit browser optional dependencies and generate SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python -m pip freeze | grep -vE '^(tinlance-agent-platform==|-e )' > /tmp/browser-w3-requirements.txt
+          pip-audit --strict -r /tmp/browser-w3-requirements.txt
+          cyclonedx-py environment --output-format JSON --output-file artifacts/browser-w3-sbom.json
 
       - name: Run isolated network namespace and real Chromium acceptance
         run: |
