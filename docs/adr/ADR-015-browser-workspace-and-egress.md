@@ -21,6 +21,7 @@ Domain allowlisting alone is insufficient for SSRF. DNS answers must be validate
 - Use Playwright's persistent browser context with a profile root dedicated to one tenant and a workspace-specific profile directory.
 - Profile roots and workspace profiles are owned by the tenant UID and mode `0700`; marker files bind a profile root to one tenant; an exclusive `flock` lease prevents concurrent reuse.
 - Disable downloads, service workers, extensions, sync, component updates, background networking and QUIC for this baseline. Browser navigation accepts credential-free HTTPS URLs only.
+- Construct child environments from an explicit allowlist. Do not pass GitHub Actions, AWS, application secrets, ambient HTTP proxy variables or unrelated host environment. Only the browser child receives the Playwright browser-cache path; the proxy child does not.
 
 ### Network boundary
 
@@ -70,7 +71,8 @@ The W3 workflow must prove, on its exact PR head:
 
 ## Limitations and follow-on phases
 
-- W3 CI demonstrates a single-tenant ephemeral browser feasibility boundary. It is not a production multi-tenant hostile-browser certification.
+- W3 CI demonstrates an ephemeral browser feasibility boundary with separate browser, proxy and second-tenant OS identities. It is not a production multi-tenant hostile-browser certification.
+- The W3 harness currently runs the unprivileged egress proxy in the host network namespace. Browser workloads cannot route to host services, but a compromised proxy process could attempt host-local connections. W4 must move the proxy into a dedicated egress-only network namespace and enforce public TCP/443 plus explicitly approved DNS forwarding before production sign-off.
 - Production requires a trusted supervisor that provisions distinct tenant UIDs, per-tenant profile mounts, isolated network namespaces, nftables policy, durable encrypted profile storage, lifecycle recovery and operational audit.
 - Browser process cgroups, hostile multi-tenant adversarial isolation, eight-hour persistence, snapshot/restore and independent security review remain later acceptance work (W4–W6 and final assurance).
 - The proxy's domain allowlist must be issued by Platform policy. A browser task cannot expand its own allowlist or mutate network policy.
