@@ -25,7 +25,8 @@ def test_profile_is_persistent_and_workspace_scoped(tmp_path: Path) -> None:
 
     reopened = BrowserProfileLease.acquire(root, "tenant-a", "workspace-1")
     assert reopened.profile_path == first_path
-    assert (reopened.profile_path / "persistent-marker").read_text(encoding="utf-8") == "survives-close"
+    marker = (reopened.profile_path / "persistent-marker").read_text(encoding="utf-8")
+    assert marker == "survives-close"
     reopened.close()
 
     other_workspace = BrowserProfileLease.acquire(root, "tenant-a", "workspace-2")
