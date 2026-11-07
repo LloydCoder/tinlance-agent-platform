@@ -74,9 +74,7 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
             )
         except (ValueError, OSError):
             raise BrowserIsolationError("malformed IPv4 route table") from None
-        network = ipaddress.IPv4Network(
-            (str(network_address), str(network_mask)), strict=False
-        )
+        network = ipaddress.IPv4Network((str(network_address), str(network_mask)), strict=False)
         route_count += 1
         if proxy_ip not in network:
             raise BrowserIsolationError("unexpected non-proxy route exists in browser namespace")
