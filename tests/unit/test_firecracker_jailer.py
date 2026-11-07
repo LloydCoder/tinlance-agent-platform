@@ -354,6 +354,8 @@ def test_verify_jailer_network_namespace_requires_separate_loopback_only_namespa
     )
     assert result == {
         "network_namespace_isolated": True,
+        "host_network_namespace": "net:[4026531840]",
+        "process_network_namespace": "net:[4026532444]",
         "network_interfaces": ["lo"],
     }
 
