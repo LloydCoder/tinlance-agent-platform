@@ -207,3 +207,23 @@ def test_normalizer_drops_volatile_ldconfig_aux_cache_from_reproducible_rootfs(
     assert first_digest == second_digest
     with tarfile.open(first_output, "r:") as archive:
         assert "var/cache/ldconfig/aux-cache" not in archive.getnames()
+
+def test_normalizer_validates_volatile_symlinks_before_dropping_them(tmp_path: Path) -> None:
+    source = tmp_path / "unsafe-volatile-symlink.tar"
+    output = tmp_path / "unsafe-volatile-symlink.normalized.tar"
+    _write_archive(
+        source,
+        [("symlink", "var/cache/ldconfig/aux-cache", "../../../../etc/passwd")],
+    )
+
+    with pytest.raises(ValueError, match="unsafe symlink"):
+        normalize_rootfs_tar(source, output)
+
+
+def test_normalizer_rejects_special_files_at_volatile_paths(tmp_path: Path) -> None:
+    source = tmp_path / "volatile-fifo.tar"
+    output = tmp_path / "volatile-fifo.normalized.tar"
+    _write_archive(source, [("fifo", "var/cache/ldconfig/aux-cache", b"")])
+
+    with pytest.raises(ValueError, match="unsupported special file"):
+        normalize_rootfs_tar(source, output)
