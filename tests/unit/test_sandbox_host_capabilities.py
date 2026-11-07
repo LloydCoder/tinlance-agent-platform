@@ -175,7 +175,6 @@ def test_microvm_readiness_requires_cpu_memory_and_process_cgroup_controllers(
     assert "required cgroup v2 controllers are unavailable: cpu, pids" in result.microvm_blockers
 
 
-
 def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(
     tmp_path: Path,
 ) -> None:
@@ -194,9 +193,10 @@ def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(
     payload = result.to_dict()
     assert result.microvm_ready is True
     assert result.cpu_security_mitigations_ready is False
-    assert "spec_rstack_overflow: Vulnerable: Safe RET, no microcode" in payload[
-        "cpu_security_warnings"
-    ]
+    assert (
+        "spec_rstack_overflow: Vulnerable: Safe RET, no microcode"
+        in payload["cpu_security_warnings"]
+    )
     assert payload["microcode_revision"] == "0x12345678"
     assert payload["cpu_smt_active"] is False
     assert payload["platform_firmware_version"] == "1.2.3"
