@@ -201,6 +201,9 @@ def connect_pinned_target(target: ResolvedTarget, *, timeout_seconds: float) -> 
     """Connect only to a validated IP literal; no second DNS lookup occurs."""
     if target.port != 443 or not target.addresses:
         raise EgressDenied("connector received an invalid validated target")
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise ValueError("connector timeout must be finite and positive")
+    deadline = time.monotonic() + timeout_seconds
     last_error: OSError | None = None
     for raw_address in target.addresses:
         try:
@@ -218,14 +221,17 @@ def connect_pinned_target(target: ResolvedTarget, *, timeout_seconds: float) -> 
             or getattr(address, "ipv4_mapped", None) is not None
         ):
             raise EgressDenied("connector refuses a non-public address")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
         try:
             return socket.create_connection(
                 (str(address), target.port),
-                timeout=timeout_seconds,
+                timeout=remaining,
             )
         except OSError as exc:
             last_error = exc
-    raise ConnectionError("all validated destination addresses failed") from last_error
+    raise ConnectionError("validated destination addresses exceeded the connect deadline") from last_error
 
 
 def _relay_tunnel(
