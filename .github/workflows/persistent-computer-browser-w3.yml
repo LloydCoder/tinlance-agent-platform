@@ -128,6 +128,8 @@ jobs:
               "network_namespace_created",
               "browser_network_has_only_proxy_link",
               "host_firewall_proxy_only",
+              "proxy_listener_ready",
+              "guest_proxy_probe_passed",
               "direct_public_egress_blocked",
               "metadata_ip_denied",
               "unallowlisted_hostname_denied",
@@ -151,6 +153,9 @@ jobs:
               raise SystemExit(f"W3 acceptance evidence is incomplete: {missing}")
           if guest.get("chromium_renderer_count", 0) < 1:
               raise SystemExit("W3 evidence must contain at least one Chromium renderer process.")
+          proxy_uid = report.get("proxy_process_uid")
+          if proxy_uid in (None, 0, guest.get("browser_process_uid"), guest.get("other_tenant_uid")):
+              raise SystemExit("W3 proxy must run under a distinct non-root UID.")
           if report.get("production_certification") is not False:
               raise SystemExit("Ephemeral W3 CI must not claim production certification.")
           if report.get("cleanup_verified") is not True:
