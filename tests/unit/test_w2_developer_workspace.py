@@ -120,6 +120,10 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert 'npm_install_passed' in firecracker
     assert 'package_manifest_reported' in firecracker
     assert 'npm_lock_sha256_reported' in firecracker
+    assert 'git_version_reported' in firecracker
+    assert 'python_version_reported' in firecracker
+    assert 'node_version_reported' in firecracker
+    assert 'npm_version_reported' in firecracker
     assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
