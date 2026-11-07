@@ -72,7 +72,7 @@ def verify_browser_network_isolation(proxy_url: str) -> str:
         except (ValueError, OSError):
             raise BrowserIsolationError("malformed IPv4 route table") from None
         network = ipaddress.IPv4Network(
-            (network_address, network_mask), strict=False
+            (str(network_address), str(network_mask)), strict=False
         )
         if "0001" in flags and proxy_ip in network:
             connected_to_proxy = True
@@ -260,7 +260,6 @@ class BrowserWorkspaceManager:
         proxy_url: str,
         *,
         tenant_id: str,
-        *,
         expected_uid: int | None = None,
         navigation_timeout_ms: int = 30_000,
     ) -> None:
