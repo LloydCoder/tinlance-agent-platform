@@ -15,7 +15,6 @@ import tempfile
 import time
 from pathlib import Path
 
-
 PROXY_PORT = 3128
 
 
