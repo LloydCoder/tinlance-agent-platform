@@ -7,6 +7,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Sequence
@@ -29,11 +30,25 @@ from scripts.smoke_firecracker_guest_boot import (
     verify_guest_boot_markers,
 )
 
-CGROUP_LIMITS = (
-    ("memory.max", "805306368"),
-    ("pids.max", "128"),
-    ("cpu.max", "100000 100000"),
-)
+CGROUP_LIMITS_BY_PROFILE = {
+    "W1": (
+        ("memory.max", "805306368"),
+        ("pids.max", "128"),
+        ("cpu.max", "100000 100000"),
+    ),
+    "W2": (
+        ("memory.max", "3221225472"),
+        ("pids.max", "128"),
+        ("cpu.max", "200000 100000"),
+    ),
+}
+
+
+def cgroup_limits_for_profile(profile: str) -> tuple[tuple[str, str], ...]:
+    try:
+        return CGROUP_LIMITS_BY_PROFILE[profile]
+    except KeyError as error:
+        raise ValueError("profile must be W1 or W2") from error
 
 
 def build_jailer_command(
@@ -44,6 +59,7 @@ def build_jailer_command(
     uid: int,
     gid: int,
     chroot_base_dir: str,
+    profile: str = "W1",
     network_namespace_path: str | None = None,
 ) -> list[str]:
     if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", jailer_id):
@@ -73,7 +89,7 @@ def build_jailer_command(
     ]
     if network_namespace_path is not None:
         command.extend(["--netns", network_namespace_path])
-    for name, value in CGROUP_LIMITS:
+    for name, value in cgroup_limits_for_profile(profile):
         command.extend(["--cgroup", f"{name}={value}"])
     command.extend(
         [
@@ -359,16 +375,12 @@ def _read_process_evidence(
     return evidence
 
 
-def _verify_cgroup_limits(cgroup_path: str) -> dict[str, str]:
+def _verify_cgroup_limits(cgroup_path: str, profile: str = "W1") -> dict[str, str]:
     root = Path("/sys/fs/cgroup").resolve()
     candidate = (root / cgroup_path.lstrip("/")).resolve()
     if root not in candidate.parents:
         raise PermissionError("jailer cgroup escaped the cgroup v2 mount")
-    expected = {
-        "memory.max": "805306368",
-        "pids.max": "128",
-        "cpu.max": "100000 100000",
-    }
+    expected = dict(cgroup_limits_for_profile(profile))
     observed: dict[str, str] = {}
     for filename, expected_value in expected.items():
         path = candidate / filename
@@ -493,6 +505,7 @@ def _run_jailer_guest(
         uid=uid,
         gid=gid,
         chroot_base_dir=str(chroot_base_dir),
+        profile=profile,
         network_namespace_path=(
             str(network_namespace_path) if network_namespace_path is not None else None
         ),
@@ -527,6 +540,8 @@ def _run_jailer_guest(
             )
             if not cgroup_path.startswith("/") or cgroup_path == "/":
                 raise PermissionError("jailed Firecracker has no dedicated cgroup v2")
+            if jailer_id not in Path(cgroup_path).parts:
+                raise PermissionError("jailed Firecracker cgroup does not contain its unique jailer id")
             guest_kernel, guest_rootfs = _stage_guest_assets(
                 chroot_root,
                 kernel_path,
@@ -589,7 +604,7 @@ def _run_jailer_guest(
                         chroot_root,
                         require_network_namespace=profile == "W2",
                     )
-                    cgroup_evidence = _verify_cgroup_limits(cgroup_path)
+                    cgroup_evidence = _verify_cgroup_limits(cgroup_path, profile)
                     return (
                         (time.monotonic() - started) * 1000,
                         process_evidence,
@@ -605,22 +620,48 @@ def _run_jailer_guest(
             log_text = log_path.read_text(encoding="utf-8", errors="replace")
             raise TimeoutError(f"jailed guest did not reach readiness: {log_text[-5000:]}")
     finally:
+        active_exception = sys.exc_info()[1]
+        cleanup_errors: list[str] = []
         if process is not None:
-            _stop_process(process, firecracker_pid)
-        if cgroup_path is not None:
-            cgroup_dir = Path("/sys/fs/cgroup") / cgroup_path.lstrip("/")
-            subprocess.run(
+            try:
+                _stop_process(process, firecracker_pid)
+            except Exception as error:
+                cleanup_errors.append(f"jailer process cleanup failed: {error}")
+
+        cgroup_dir = (
+            Path("/sys/fs/cgroup") / cgroup_path.lstrip("/")
+            if cgroup_path is not None
+            else Path("/sys/fs/cgroup/firecracker") / jailer_id
+        )
+        if cgroup_dir.exists():
+            result = subprocess.run(
                 ["sudo", "-n", "rmdir", "--", str(cgroup_dir)],
                 check=False,
                 capture_output=True,
                 text=True,
             )
-        subprocess.run(
-            ["sudo", "-n", "rm", "-rf", "--", str(chroot_base_dir / "firecracker" / jailer_id)],
+            if result.returncode != 0 or cgroup_dir.exists():
+                cleanup_errors.append(
+                    f"jailer cgroup was not removed: {cgroup_dir}: {result.stderr.strip()}"
+                )
+
+        jailer_root = chroot_base_dir / "firecracker" / jailer_id
+        result = subprocess.run(
+            ["sudo", "-n", "rm", "-rf", "--", str(jailer_root)],
             check=False,
             capture_output=True,
             text=True,
         )
+        if result.returncode != 0 or jailer_root.exists():
+            cleanup_errors.append(
+                f"jailer chroot was not removed: {jailer_root}: {result.stderr.strip()}"
+            )
+
+        if cleanup_errors:
+            cleanup_error = RuntimeError("; ".join(cleanup_errors))
+            if active_exception is not None:
+                raise cleanup_error from active_exception
+            raise cleanup_error
 
 
 def main() -> int:

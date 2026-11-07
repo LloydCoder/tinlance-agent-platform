@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import io
-import stat
 import tarfile
 from pathlib import Path
 
 import pytest
-from scripts.smoke_firecracker_guest_boot import extract_w2_rootfs_tar
+from scripts.smoke_firecracker_guest_boot import (
+    _rootfs_tar_filter,
+    extract_w2_rootfs_tar,
+)
 from scripts.smoke_firecracker_jailer import build_jailer_command
 
 
@@ -57,15 +59,14 @@ def test_w2_rootfs_extractor_rejects_libarchive_acl_metadata(tmp_path: Path) -> 
         extract_w2_rootfs_tar(archive, tmp_path / "rootfs")
 
 
-def test_w2_rootfs_extractor_strips_setuid_and_setgid_bits(tmp_path: Path) -> None:
-    archive = tmp_path / "setuid.tar"
-    _write_single_file_archive(archive, mode=0o6755)
+def test_w2_rootfs_filter_strips_setuid_and_setgid_bits(tmp_path: Path) -> None:
+    member = tarfile.TarInfo("usr/bin/tool")
+    member.mode = 0o6755
 
-    destination = tmp_path / "rootfs"
-    extract_w2_rootfs_tar(archive, destination)
+    filtered = _rootfs_tar_filter(member, str(tmp_path / "rootfs"))
 
-    observed_mode = stat.S_IMODE((destination / "usr/bin/tool").stat().st_mode)
-    assert observed_mode & 0o6000 == 0
+    assert filtered.mode is not None
+    assert filtered.mode & 0o6000 == 0
 
 
 def test_w2_rootfs_extractor_rejects_duplicate_canonical_paths(tmp_path: Path) -> None:

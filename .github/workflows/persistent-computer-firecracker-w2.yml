@@ -649,7 +649,7 @@ jobs:
           ):
               raise SystemExit("Every jailed W2 Firecracker process and thread must prove confinement.")
           cgroups = report.get("cgroup_limit_samples", [])
-          expected = {"memory.max": "805306368", "pids.max": "128", "cpu.max": "100000 100000"}
+          expected = {"memory.max": "3221225472", "pids.max": "128", "cpu.max": "200000 100000"}
           if len(cgroups) != 3 or any(item != expected for item in cgroups):
               raise SystemExit("Every jailed W2 run must prove the configured cgroup v2 limits.")
           expected_rootfs = Path("artifacts/w2-rootfs.sha256").read_text(encoding="utf-8").strip()
@@ -670,10 +670,33 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Remove ephemeral jailer identity and chroot
+      - name: Remove and verify ephemeral jailer resources
         if: always()
         run: |
+          set -euo pipefail
+          namespace="tinlance-fc-w2-${GITHUB_RUN_ID}"
           sudo rm -rf -- /srv/tinlance-jailer-w2
-          sudo ip netns del "tinlance-fc-w2-${GITHUB_RUN_ID}" || true
-          sudo userdel "tinlance-fc-w2-${GITHUB_RUN_ID}" || true
-          sudo groupdel "tinlance-fc-w2-${GITHUB_RUN_ID}" || true
+          if sudo ip netns list | awk '{print $1}' | grep -Fxq "${namespace}"; then
+            namespace_pids="$(sudo ip netns pids "${namespace}")"
+            if [[ -n "${namespace_pids}" ]]; then
+              echo "network namespace still contains processes: ${namespace_pids}" >&2
+              exit 1
+            fi
+            sudo ip netns del "${namespace}"
+          fi
+          if getent passwd "${namespace}" >/dev/null; then
+            sudo userdel "${namespace}"
+          fi
+          if getent group "${namespace}" >/dev/null; then
+            sudo groupdel "${namespace}"
+          fi
+          test ! -e "/var/run/netns/${namespace}"
+          ! getent passwd "${namespace}" >/dev/null
+          ! getent group "${namespace}" >/dev/null
+          test ! -e /srv/tinlance-jailer-w2
+          leftovers="$(sudo find /sys/fs/cgroup -type d -name "fc-${GITHUB_RUN_ID}-*" -print)"
+          if [[ -n "${leftovers}" ]]; then
+            echo "orphaned jailer cgroups remain: ${leftovers}" >&2
+            exit 1
+          fi
+          echo "PASS: jailer process, cgroup, chroot, namespace, UID and GID resources removed."

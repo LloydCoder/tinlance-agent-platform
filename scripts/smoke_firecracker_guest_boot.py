@@ -413,25 +413,54 @@ def verify_guest_boot_markers(
     return {name: True for name in required}
 
 
+def _rootfs_tar_filter(member: tarfile.TarInfo, destination: str) -> tarfile.TarInfo:
+    """Apply Python's data-only extraction policy, including mode and link sanitization."""
+    try:
+        filtered = tarfile.data_filter(member, destination)
+    except tarfile.FilterError as error:
+        raise ValueError(f"unsafe rootfs archive member {member.name}: {error}") from error
+    if filtered is None:
+        raise ValueError(f"rootfs archive filter rejected member: {member.name}")
+    return filtered
+
+
 def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
-    """Safely extract the trusted OCI export while rejecting path and link escapes."""
+    """Safely extract a normalized OCI export with data-only permissions and link checks."""
     if not archive_path.is_file():
         raise ValueError("W2 rootfs tar does not exist")
     destination.mkdir(parents=True, exist_ok=True)
     try:
         with tarfile.open(archive_path, "r:*") as archive:
             members = archive.getmembers()
+            seen_paths: set[str] = set()
             for member in members:
                 if any(
-                    key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr."))
+                    key.startswith(
+                        (
+                            "SCHILY.xattr.",
+                            "SCHILY.acl.",
+                            "LIBARCHIVE.xattr.",
+                            "LIBARCHIVE.acl.",
+                        )
+                    )
                     for key in member.pax_headers
                 ):
                     raise ValueError(f"unsupported rootfs extended metadata: {member.name}")
                 member_path = PurePosixPath(member.name)
                 if member_path.is_absolute() or ".." in member_path.parts:
                     raise ValueError(f"unsafe rootfs archive path: {member.name}")
+                canonical_path = member_path.as_posix()
+                if canonical_path in {"", "."}:
+                    if member.isdir():
+                        continue
+                    raise ValueError(f"invalid rootfs archive path: {member.name}")
+                if canonical_path in seen_paths:
+                    raise ValueError(f"duplicate rootfs archive path: {canonical_path}")
+                seen_paths.add(canonical_path)
                 if member.isdev() or member.isfifo():
                     raise ValueError(f"unsupported special file in rootfs archive: {member.name}")
+                if not (member.isdir() or member.isfile() or member.issym() or member.islnk()):
+                    raise ValueError(f"unsupported rootfs archive entry type: {member.name}")
                 if member.issym():
                     target = PurePosixPath(member.linkname)
                     if target.is_absolute():
@@ -462,7 +491,7 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     0 if item.isdir() else 1 if item.isfile() else 2 if item.issym() else 3
                 ),
             )
-            archive.extractall(destination, members=ordered, filter="tar")
+            archive.extractall(destination, members=ordered, filter=_rootfs_tar_filter)
     except (tarfile.TarError, OSError, ValueError) as error:
         raise ValueError(f"unsafe rootfs archive: {error}") from error
 
