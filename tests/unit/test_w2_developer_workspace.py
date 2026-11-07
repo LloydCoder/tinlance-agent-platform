@@ -26,6 +26,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
         "TINLANCE_W2_NODE_EDIT_OK",
         "TINLANCE_W2_NODE_BUILD_OK",
         "TINLANCE_W2_NODE_TESTS_OK",
+        "TINLANCE_W2_NPM_INSTALL_OK",
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
     ):
@@ -38,6 +39,8 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     assert "python3 -m compileall" in script
     assert "python3 -m unittest" in script
     assert "node --check" in script
+    assert "npm ci --offline --ignore-scripts --no-audit --no-fund" in script
+    assert "TINLANCE_W2_NPM_INSTALL_OK" in script
     assert "npm test" in script
     assert "w2-package-manifest.lock" in script
     assert "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" in script
@@ -57,6 +60,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
+    assert "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund" in dockerfile
     assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     bootstrap_update_index = dockerfile.index("apt-get \\\n        -o Acquire::Retries=5")
