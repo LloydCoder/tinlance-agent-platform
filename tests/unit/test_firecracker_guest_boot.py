@@ -577,7 +577,6 @@ def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(
     assert stat.S_IMODE((destination / "root-only" / "secret").stat().st_mode) == 0o600
 
 
-
 def test_guest_boot_w2_verifier_rejects_malformed_package_digests() -> None:
     from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
 
@@ -593,7 +592,6 @@ def test_guest_boot_w2_verifier_rejects_malformed_package_digests() -> None:
             "TINLANCE_W2_NPM_LOCK_SHA256=not-a-digest",
             "W2",
         )
-
 
 
 def test_guest_boot_w2_verifier_rejects_empty_toolchain_version_markers() -> None:
