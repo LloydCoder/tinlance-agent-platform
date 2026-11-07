@@ -99,16 +99,25 @@ def main() -> int:
 
     browser_user = f"tnlbr-a-{suffix}"
     other_tenant_user = f"tnlbr-b-{suffix}"
-    browser_uid, browser_gid = create_browser_user(browser_user, 51_000)
-    other_tenant_uid, other_tenant_gid = create_browser_user(other_tenant_user, 52_000)
-    work_root = Path(tempfile.mkdtemp(prefix="tinlance-browser-w3-"))
-    profile_root = work_root / "profile"
-    evidence_path = work_root / "guest-evidence.json"
-    profile_root.mkdir(mode=0o700)
-    os.chown(work_root, browser_uid, browser_gid)
-    os.chown(profile_root, browser_uid, browser_gid)
-    os.chmod(work_root, 0o700)
-    os.chmod(profile_root, 0o700)
+    created_users: list[str] = []
+    try:
+        browser_uid, browser_gid = create_browser_user(browser_user, 51_000)
+        created_users.append(browser_user)
+        other_tenant_uid, other_tenant_gid = create_browser_user(other_tenant_user, 52_000)
+        created_users.append(other_tenant_user)
+        work_root = Path(tempfile.mkdtemp(prefix="tinlance-browser-w3-"))
+        profile_root = work_root / "profile"
+        evidence_path = work_root / "guest-evidence.json"
+        profile_root.mkdir(mode=0o700)
+        os.chown(work_root, browser_uid, browser_gid)
+        os.chown(profile_root, browser_uid, browser_gid)
+        os.chmod(work_root, 0o700)
+        os.chmod(profile_root, 0o700)
+    except BaseException:
+        for username in created_users:
+            subprocess.run(["userdel", username], check=False, capture_output=True)
+            subprocess.run(["groupdel", username], check=False, capture_output=True)
+        raise
 
     proxy_log = work_root / "proxy.log"
     proxy_process: subprocess.Popen[bytes] | None = None
@@ -339,7 +348,7 @@ def main() -> int:
             encoding="utf-8",
         )
         shutil.rmtree(work_root, ignore_errors=True)
-        for username in (browser_user, other_tenant_user):
+        for username in created_users:
             deleted_user = subprocess.run(
                 ["userdel", username],
                 check=False,
