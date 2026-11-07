@@ -76,19 +76,24 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
 def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
     workflow_root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
     base_digest = "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
-    for name in (
+    names = (
         "persistent-computer-firecracker-w2.yml",
         "persistent-computer-gvisor-benchmark.yml",
         "persistent-computer-kata-benchmark.yml",
-    ):
+    )
+    for name in names:
         workflow = (workflow_root / name).read_text(encoding="utf-8")
         assert base_digest in workflow
         assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in workflow
+    for name in names[1:]:
+        workflow = (workflow_root / name).read_text(encoding="utf-8")
         assert "docker import" in workflow
         assert "artifacts/w2-rootfs.tar" in workflow
         assert "org.tinlance.w2.rootfs.tar.sha256" in workflow
-        assert 'image_id=$normalized_image_id' in workflow
+        assert "image_id=$normalized_image_id" in workflow
         assert "rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar" in workflow
+    firecracker = (workflow_root / names[0]).read_text(encoding="utf-8")
+    assert "--w2-rootfs-tar" in firecracker
 
 
 def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None:
