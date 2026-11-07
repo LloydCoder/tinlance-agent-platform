@@ -124,7 +124,7 @@ jobs:
             --change "WORKDIR /tmp" \
             artifacts/w2-rootfs.tar tinlance-w2-developer-workspace:normalized
           normalized_image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:normalized)"
-          imported_rootfs_sha256="$(docker image inspect --format '{{index .Config.Labels \"org.tinlance.w2.rootfs.tar.sha256\"}}' "$normalized_image_id")"
+          imported_rootfs_sha256="$(docker image inspect --format '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' "$normalized_image_id")"
           test "$imported_rootfs_sha256" = "$rootfs_sha256"
           rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar
           echo "build_image_id=$image_id" >> "$GITHUB_OUTPUT"
