@@ -32,13 +32,14 @@ def test_exact_allowlist_and_pinned_public_addresses() -> None:
 
 def test_explicit_wildcard_allows_subdomain_but_not_apex() -> None:
     wildcard = policy(frozenset({"*.example.com"}))
-    assert resolve_public_target(
-        "docs.example.com", 443, wildcard, resolver=lambda _: ("93.184.216.34",)
-    ).hostname == "docs.example.com"
-    with pytest.raises(EgressDenied):
+    assert (
         resolve_public_target(
-            "example.com", 443, wildcard, resolver=lambda _: ("93.184.216.34",)
-        )
+            "docs.example.com", 443, wildcard, resolver=lambda _: ("93.184.216.34",)
+        ).hostname
+        == "docs.example.com"
+    )
+    with pytest.raises(EgressDenied):
+        resolve_public_target("example.com", 443, wildcard, resolver=lambda _: ("93.184.216.34",))
 
 
 @pytest.mark.parametrize(
