@@ -5,6 +5,7 @@ import contextlib
 import ipaddress
 import json
 import os
+from pathlib import Path
 import secrets
 import shutil
 import signal
@@ -13,7 +14,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from pathlib import Path
 
 
 PROXY_PORT = 3128
