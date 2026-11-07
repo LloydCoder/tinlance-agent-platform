@@ -228,8 +228,7 @@ CapEff:\t0000000000000000
         )
 
 
-
-def test_w1_jailer_profile_rejects_w2_rootfs_inputs(tmp_path):
+def test_w1_jailer_profile_rejects_w2_rootfs_inputs(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
     with pytest.raises(ValueError, match="W2 rootfs inputs are only valid"):
@@ -241,7 +240,7 @@ def test_w1_jailer_profile_rejects_w2_rootfs_inputs(tmp_path):
         )
 
 
-def test_w2_jailer_profile_requires_normalized_rootfs_tar():
+def test_w2_jailer_profile_requires_normalized_rootfs_tar() -> None:
     with pytest.raises(ValueError, match="normalized W2 rootfs tar is required"):
         validate_jailer_profile_inputs(
             profile="W2",
@@ -251,7 +250,7 @@ def test_w2_jailer_profile_requires_normalized_rootfs_tar():
         )
 
 
-def test_w2_jailer_profile_rejects_non_content_addressed_image_id(tmp_path):
+def test_w2_jailer_profile_rejects_non_content_addressed_image_id(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
     with pytest.raises(ValueError, match="content-addressed W2 image ID"):
@@ -263,7 +262,7 @@ def test_w2_jailer_profile_rejects_non_content_addressed_image_id(tmp_path):
         )
 
 
-def test_w2_jailer_profile_requires_digest_pinned_base_image(tmp_path):
+def test_w2_jailer_profile_requires_digest_pinned_base_image(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
     with pytest.raises(ValueError, match="digest-pinned W2 base image"):
@@ -275,7 +274,7 @@ def test_w2_jailer_profile_requires_digest_pinned_base_image(tmp_path):
         )
 
 
-def test_w2_jailer_profile_accepts_content_addressed_inputs(tmp_path):
+def test_w2_jailer_profile_accepts_content_addressed_inputs(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
     validate_jailer_profile_inputs(
