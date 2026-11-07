@@ -19,6 +19,8 @@ _VOLATILE_PATHS = {
     "etc/resolv.conf",
     "var/lib/dbus/machine-id",
     "var/lib/systemd/random-seed",
+    # ldconfig's auxiliary cache embeds build-specific state and is regenerated when needed.
+    "var/cache/ldconfig/aux-cache",
     "var/log/alternatives.log",
     "var/log/dpkg.log",
 }
@@ -62,12 +64,10 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
     name = path.as_posix()
     if name in {"", "."}:
         return None
-    if _is_volatile_path(name):
-        return None
     if member.isdev() or member.isfifo():
         raise ValueError(f"unsupported special file in rootfs archive: {name}")
     if any(
-        key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr."))
+        key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr.", "LIBARCHIVE.acl."))
         for key in member.pax_headers
     ):
         raise ValueError(f"unsupported extended metadata in rootfs archive: {name}")
@@ -81,12 +81,17 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
             if resolved == ".." or resolved.startswith("../"):
                 raise ValueError(f"unsafe symlink in rootfs archive: {name}")
     elif member.islnk():
+        if _is_volatile_path(name):
+            raise ValueError(f"hardlink at volatile rootfs path is unsupported: {name}")
         target = PurePosixPath(member.linkname)
         if target.is_absolute() or ".." in target.parts:
             raise ValueError(f"unsafe hardlink in rootfs archive: {name}")
         member.linkname = target.as_posix()
     elif not (member.isdir() or member.isfile()):
         raise ValueError(f"unsupported rootfs archive entry type: {name}")
+
+    if _is_volatile_path(name):
+        return None
 
     member.name = name
     member.uid = 0

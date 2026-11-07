@@ -18,6 +18,11 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     )
     script = fixture.read_text(encoding="utf-8")
     dockerfile = fixture.with_name("Dockerfile").read_text(encoding="utf-8")
+    node_package = (fixture.parent / "node" / "package.json").read_text(encoding="utf-8")
+    node_app = (fixture.parent / "node" / "src" / "app.js").read_text(encoding="utf-8")
+    local_package = (
+        fixture.parent / "node" / "vendor" / "w2-fixture-package" / "package.json"
+    ).read_text(encoding="utf-8")
     for marker in (
         "TINLANCE_W2_GIT_CLONE_OK",
         "TINLANCE_W2_PYTHON_EDIT_OK",
@@ -26,6 +31,7 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
         "TINLANCE_W2_NODE_EDIT_OK",
         "TINLANCE_W2_NODE_BUILD_OK",
         "TINLANCE_W2_NODE_TESTS_OK",
+        "TINLANCE_W2_NPM_INSTALL_OK",
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
     ):
@@ -38,6 +44,13 @@ def test_w2_developer_workspace_runs_git_python_and_node_acceptance_contract() -
     assert "python3 -m compileall" in script
     assert "python3 -m unittest" in script
     assert "node --check" in script
+    assert "npm ci --offline --ignore-scripts --no-audit --no-fund" in script
+    assert script.index("npm ci --offline") < script.index("npm test")
+    assert "TINLANCE_W2_NPM_INSTALL_OK" in script
+    assert "TINLANCE_W2_NPM_LOCK_SHA256=" in script
+    assert '"@tinlance/w2-fixture-package": "file:vendor/w2-fixture-package"' in node_package
+    assert '"name": "@tinlance/w2-fixture-package"' in local_package
+    assert 'from "@tinlance/w2-fixture-package"' in node_app
     assert "npm test" in script
     assert "w2-package-manifest.lock" in script
     assert "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" in script
@@ -57,6 +70,10 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
+    assert (
+        "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund"
+        in dockerfile
+    )
     assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     bootstrap_update_index = dockerfile.index("apt-get \\\n        -o Acquire::Retries=5")
@@ -90,15 +107,41 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert base_digest in firecracker
     assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in firecracker
     assert "artifacts/w2-rootfs.tar" in firecracker
+    assert firecracker.count("docker build --platform=linux/amd64 --pull --no-cache") == 2
+    assert "docker pull --platform linux/amd64" in firecracker
+    assert '"platform": "$image_platform"' in firecracker
+    assert '"docker_engine_version": "$docker_engine_version"' in firecracker
+    assert '"buildx_version": "$buildx_version"' in firecracker
+    assert "artifacts/w2-rootfs.rebuild.tar" in firecracker
+    assert "cmp --silent artifacts/w2-rootfs.tar artifacts/w2-rootfs.rebuild.tar" in firecracker
+    assert "w2-rootfs-reproducibility.json" in firecracker
+    assert "rebuild_rootfs_sha256" in firecracker
+    assert "byte_identical" in firecracker
     assert "firecracker-w2-${{ github.run_id }}" in firecracker
     assert "path: artifacts/" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
-    assert firecracker.count("needs: guest-boot") == 2
+    assert firecracker.count("needs: guest-boot") == 3
     assert (
-        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093") == 2
+        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093") == 3
     )
     assert "gvisor-w2:" in firecracker
     assert "kata-w2:" in firecracker
+    assert "firecracker-jailer-w2:" in firecracker
+    assert "firecracker-jailer-w2.json" in firecracker
+    assert "--profile W2" in firecracker
+    assert "--network-namespace-path" in firecracker
+    assert "ip netns add" in firecracker
+    assert "network_namespace_isolated" in firecracker
+    assert "host_network_namespace" in firecracker
+    assert "process_network_namespace" in firecracker
+    assert "npm_install_passed" in firecracker
+    assert "package_manifest_reported" in firecracker
+    assert "npm_lock_sha256_reported" in firecracker
+    assert "git_version_reported" in firecracker
+    assert "python_version_reported" in firecracker
+    assert "node_version_reported" in firecracker
+    assert "npm_version_reported" in firecracker
+    assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
     for name in (

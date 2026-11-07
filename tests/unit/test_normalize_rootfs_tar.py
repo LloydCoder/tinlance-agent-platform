@@ -176,3 +176,67 @@ def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(
         assert all(member.isfile() for member in members)
         assert all("SCHILY.ino" not in member.pax_headers for member in members)
         assert all("SCHILY.nlink" not in member.pax_headers for member in members)
+
+
+def test_normalizer_drops_volatile_ldconfig_aux_cache_from_reproducible_rootfs(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first-ldconfig.tar"
+    second = tmp_path / "second-ldconfig.tar"
+    stable = ("file", "etc/issue", b"Ubuntu 24.04")
+    _write_archive(
+        first,
+        [stable, ("file", "var/cache/ldconfig/aux-cache", b"cache-from-build-one")],
+        uid=1234,
+        gid=5678,
+        mtime=1_700_000_000,
+    )
+    _write_archive(
+        second,
+        [stable, ("file", "var/cache/ldconfig/aux-cache", b"cache-from-build-two")],
+        uid=9999,
+        gid=8888,
+        mtime=1_800_000_000,
+    )
+
+    first_output = tmp_path / "first-ldconfig.normalized.tar"
+    second_output = tmp_path / "second-ldconfig.normalized.tar"
+    first_digest, _ = normalize_rootfs_tar(first, first_output)
+    second_digest, _ = normalize_rootfs_tar(second, second_output)
+
+    assert first_digest == second_digest
+    with tarfile.open(first_output, "r:") as archive:
+        assert "var/cache/ldconfig/aux-cache" not in archive.getnames()
+
+
+def test_normalizer_validates_volatile_symlinks_before_dropping_them(tmp_path: Path) -> None:
+    source = tmp_path / "unsafe-volatile-symlink.tar"
+    output = tmp_path / "unsafe-volatile-symlink.normalized.tar"
+    _write_archive(
+        source,
+        [("symlink", "var/cache/ldconfig/aux-cache", "../../../../etc/passwd")],
+    )
+
+    with pytest.raises(ValueError, match="unsafe symlink"):
+        normalize_rootfs_tar(source, output)
+
+
+def test_normalizer_rejects_special_files_at_volatile_paths(tmp_path: Path) -> None:
+    source = tmp_path / "volatile-fifo.tar"
+    output = tmp_path / "volatile-fifo.normalized.tar"
+    _write_archive(source, [("fifo", "var/cache/ldconfig/aux-cache", b"")])
+
+    with pytest.raises(ValueError, match="unsupported special file"):
+        normalize_rootfs_tar(source, output)
+
+
+def test_normalizer_rejects_libarchive_acl_metadata(tmp_path: Path) -> None:
+    source = tmp_path / "libarchive-acl.tar"
+    with tarfile.open(source, "w", format=tarfile.PAX_FORMAT) as archive:
+        member = tarfile.TarInfo("usr/bin/ping")
+        member.size = 1
+        member.pax_headers = {"LIBARCHIVE.acl.access": "user::rwx,group::r-x,other::r-x"}
+        archive.addfile(member, io.BytesIO(b"x"))
+
+    with pytest.raises(ValueError, match="unsupported extended metadata"):
+        normalize_rootfs_tar(source, tmp_path / "libarchive-acl.normalized.tar")

@@ -3,16 +3,21 @@ from __future__ import annotations
 import io
 import json
 import stat
+import subprocess
 import tarfile
 from pathlib import Path
 
 import pytest
+import scripts.smoke_firecracker_guest_boot as guest_boot
 from scripts.smoke_firecracker_guest_boot import (
+    _stop_firecracker,
+    extract_guest_cpu_vulnerability_statuses,
     extract_w2_rootfs_tar,
     load_asset_manifest,
     parse_latest_artifact_prefix,
     select_latest_versioned_key,
     summarize_boot_times,
+    summarize_guest_cpu_vulnerability_samples,
 )
 
 
@@ -248,7 +253,7 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
 
     with pytest.raises(ValueError, match="nonroot_uid_confirmed"):
         verify_guest_boot_markers(
-            "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
+            "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\nTINLANCE_GUEST_READY"
         )
 
 
@@ -303,15 +308,17 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_PROC_SYS_READONLY",
         "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
         "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        "TINLANCE_W2_NPM_INSTALL_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
         "TINLANCE_W2_GIT_VERSION=git version",
         "TINLANCE_W2_PYTHON_VERSION=Python",
         "TINLANCE_W2_NODE_VERSION=v",
-        "TINLANCE_W2_NPM_VERSION=",
-        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+        "TINLANCE_W2_NPM_VERSION=9.2.0",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64,
+        "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
         "TINLANCE_GUEST_READY",
     ]
-    evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
+    evidence = verify_guest_boot_markers("\n".join(markers), "W2")
     assert evidence["host_surface_probes_passed"] is True
     assert evidence["no_new_privileges"] is True
 
@@ -331,10 +338,10 @@ def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
 
     with pytest.raises(ValueError, match="host_surface_probes_passed"):
         verify_guest_boot_markers(
-            "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\n"
-            "TINLANCE_NO_NIC_CONFIRMED\\n"
-            "TINLANCE_NONROOT_UID_CONFIRMED\\n"
-            "TINLANCE_W1_WORKLOAD_OK\\n"
+            "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\n"
+            "TINLANCE_NO_NIC_CONFIRMED\n"
+            "TINLANCE_NONROOT_UID_CONFIRMED\n"
+            "TINLANCE_W1_WORKLOAD_OK\n"
             "TINLANCE_GUEST_READY",
             "W2",
         )
@@ -398,6 +405,7 @@ def test_guest_init_w2_runs_real_developer_workspace_in_bounded_tmpfs() -> None:
         "TINLANCE_W2_NODE_EDIT_OK",
         "TINLANCE_W2_NODE_BUILD_OK",
         "TINLANCE_W2_NODE_TESTS_OK",
+        "TINLANCE_W2_NPM_INSTALL_OK",
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
     ):
@@ -427,6 +435,7 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_PROC_SYS_READONLY",
         "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
         "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+        "TINLANCE_W2_NPM_INSTALL_OK",
         "TINLANCE_W2_GIT_CLONE_OK",
         "TINLANCE_W2_PYTHON_EDIT_OK",
         "TINLANCE_W2_PYTHON_BUILD_OK",
@@ -436,14 +445,15 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_NODE_TESTS_OK",
         "TINLANCE_W2_WORKTREE_DIRTY_OK",
         "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
-        "TINLANCE_W2_GIT_VERSION=",
-        "TINLANCE_W2_PYTHON_VERSION=",
-        "TINLANCE_W2_NODE_VERSION=",
-        "TINLANCE_W2_NPM_VERSION=",
-        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+        "TINLANCE_W2_GIT_VERSION=git version 2.43.0",
+        "TINLANCE_W2_PYTHON_VERSION=Python 3.12.3",
+        "TINLANCE_W2_NODE_VERSION=v18.19.1",
+        "TINLANCE_W2_NPM_VERSION=9.2.0",
+        "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64,
+        "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
         "TINLANCE_GUEST_READY",
     ]
-    evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
+    evidence = verify_guest_boot_markers("\n".join(markers), "W2")
     assert evidence["developer_workspace_passed"] is True
 
 
@@ -570,3 +580,89 @@ def test_w2_rootfs_extractor_preserves_private_directory_and_file_modes(
     extract_w2_rootfs_tar(source, destination)
     assert stat.S_IMODE((destination / "root-only").stat().st_mode) == 0o700
     assert stat.S_IMODE((destination / "root-only" / "secret").stat().st_mode) == 0o600
+
+
+def test_guest_boot_w2_verifier_rejects_malformed_package_digests() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(ValueError, match="package_manifest_reported"):
+        verify_guest_boot_markers(
+            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=not-a-digest\n"
+            "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
+            "W2",
+        )
+    with pytest.raises(ValueError, match="npm_lock_sha256_reported"):
+        verify_guest_boot_markers(
+            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64 + "\n"
+            "TINLANCE_W2_NPM_LOCK_SHA256=not-a-digest",
+            "W2",
+        )
+
+
+def test_guest_boot_w2_verifier_rejects_empty_toolchain_version_markers() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(ValueError, match="npm_version_reported"):
+        verify_guest_boot_markers("TINLANCE_W2_NPM_VERSION= \n", "W2")
+
+
+def test_extract_guest_cpu_vulnerability_statuses_parses_srso_and_tsa() -> None:
+    log = """
+    [    0.100] Speculative Return Stack Overflow: Vulnerable: Safe RET, no microcode
+    [    0.101] Speculative Store Bypass: Mitigation: Speculative Store Bypass disabled
+    [    0.102] Transient Scheduler Attacks: Vulnerable: No microcode
+    [    0.103] Speculative Return Stack Overflow: WARNING: mitigation details
+    """
+    assert extract_guest_cpu_vulnerability_statuses(log) == {
+        "spec_rstack_overflow": "Vulnerable: Safe RET, no microcode",
+        "spec_store_bypass": "Mitigation: Speculative Store Bypass disabled",
+        "tsa": "Vulnerable: No microcode",
+    }
+
+
+def test_stop_firecracker_waits_for_process_exit_before_removing_socket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    socket_path = tmp_path / "firecracker.sock"
+    pids = iter(([1234], []))
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(guest_boot, "_firecracker_pids", lambda: next(pids))
+    monkeypatch.setattr(guest_boot.subprocess, "run", fake_run)
+    monkeypatch.setattr(guest_boot.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(guest_boot.time, "sleep", lambda _: None)
+
+    _stop_firecracker(socket_path)
+
+    assert commands[0] == ["sudo", "-n", "pkill", "-TERM", "-x", "firecracker"]
+    assert commands[-1] == ["sudo", "-n", "rm", "-f", "--", str(socket_path)]
+
+
+def test_guest_cpu_summary_keeps_unmitigated_status_as_a_security_warning() -> None:
+    summary = summarize_guest_cpu_vulnerability_samples(
+        [
+            {
+                "spec_rstack_overflow": "Vulnerable: Safe RET, no microcode",
+                "spec_store_bypass": "Mitigation: Speculative Store Bypass disabled",
+                "tsa": "Vulnerable: No microcode",
+            }
+        ]
+    )
+
+    assert summary["guest_cpu_security_mitigations_ready"] is False
+    assert summary["guest_cpu_security_warnings"] == [
+        "spec_rstack_overflow: Vulnerable: Safe RET, no microcode",
+        "tsa: Vulnerable: No microcode",
+    ]
+
+
+def test_guest_kernel_boot_args_request_cpu_side_channel_mitigations() -> None:
+    from scripts.smoke_firecracker_guest_boot import GUEST_KERNEL_SECURITY_ARGS
+
+    assert "spec_rstack_overflow=safe-ret" in GUEST_KERNEL_SECURITY_ARGS
+    assert "tsa=on" in GUEST_KERNEL_SECURITY_ARGS
+    assert "spec_store_bypass_disable=on" in GUEST_KERNEL_SECURITY_ARGS

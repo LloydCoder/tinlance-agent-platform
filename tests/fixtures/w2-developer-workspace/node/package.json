@@ -4,5 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test"
+  },
+  "dependencies": {
+    "@tinlance/w2-fixture-package": "file:vendor/w2-fixture-package"
   }
 }

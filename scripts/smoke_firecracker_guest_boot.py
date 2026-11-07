@@ -22,6 +22,7 @@ from urllib.parse import urlencode
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 FIRECRACKER_VERSION = "1.17.0"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
+GUEST_KERNEL_SECURITY_ARGS = "spec_rstack_overflow=safe-ret tsa=on spec_store_bypass_disable=on"
 GUEST_READ_ONLY_MARKER = "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED"
 GUEST_NO_NIC_MARKER = "TINLANCE_NO_NIC_CONFIRMED"
 GUEST_WRITE_UNEXPECTED_MARKER = "TINLANCE_ROOTFS_WRITE_UNEXPECTED"
@@ -380,39 +381,91 @@ def verify_guest_boot_markers(
                 "proc_sys_readonly": "TINLANCE_W2_PROC_SYS_READONLY",
                 "host_surface_probes_passed": "TINLANCE_W2_HOST_SURFACE_PROBES_OK",
                 "workspace_tmpfs_mounted": "TINLANCE_W2_WORKSPACE_TMPFS_MOUNTED",
+                "npm_install_passed": "TINLANCE_W2_NPM_INSTALL_OK",
                 "developer_workspace_passed": "TINLANCE_W2_DEVELOPER_WORKSPACE_OK",
                 "git_version_reported": "TINLANCE_W2_GIT_VERSION=",
                 "python_version_reported": "TINLANCE_W2_PYTHON_VERSION=",
                 "node_version_reported": "TINLANCE_W2_NODE_VERSION=",
                 "npm_version_reported": "TINLANCE_W2_NPM_VERSION=",
                 "package_manifest_reported": "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=",
+                "npm_lock_sha256_reported": "TINLANCE_W2_NPM_LOCK_SHA256=",
             }
         )
     missing = [name for name, marker in required.items() if marker not in log_text]
+    if profile == "W2":
+        for name, marker in (
+            ("git_version_reported", "TINLANCE_W2_GIT_VERSION="),
+            ("python_version_reported", "TINLANCE_W2_PYTHON_VERSION="),
+            ("node_version_reported", "TINLANCE_W2_NODE_VERSION="),
+            ("npm_version_reported", "TINLANCE_W2_NPM_VERSION="),
+        ):
+            if re.search(rf"{re.escape(marker)}\S+", log_text) is None:
+                missing.append(name)
+        for name, marker in (
+            ("package_manifest_reported", "TINLANCE_W2_PACKAGE_MANIFEST_SHA256="),
+            ("npm_lock_sha256_reported", "TINLANCE_W2_NPM_LOCK_SHA256="),
+        ):
+            if re.search(rf"{re.escape(marker)}[a-f0-9]{{64}}(?:\r?\n|$)", log_text) is None:
+                missing.append(name)
     if missing:
-        raise ValueError(f"guest isolation markers are missing: {missing}")
+        raise ValueError(
+            f"guest isolation markers are missing or malformed: {sorted(set(missing))}"
+        )
     return {name: True for name in required}
 
 
+def _rootfs_tar_filter(member: tarfile.TarInfo, destination: str) -> tarfile.TarInfo:
+    """Apply Python's data-only extraction policy, including mode and link sanitization."""
+    original_mode = member.mode
+    try:
+        filtered = tarfile.data_filter(member, destination)
+    except tarfile.FilterError as error:
+        raise ValueError(f"unsafe rootfs archive member {member.name}: {error}") from error
+    if filtered is None:
+        raise ValueError(f"rootfs archive filter rejected member: {member.name}")
+    if original_mode is not None:
+        filtered.mode = original_mode & 0o755
+    return filtered
+
+
 def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
-    """Safely extract the trusted OCI export while rejecting path and link escapes."""
+    """Safely extract a normalized OCI export with data-only permissions and link checks."""
     if not archive_path.is_file():
         raise ValueError("W2 rootfs tar does not exist")
     destination.mkdir(parents=True, exist_ok=True)
     try:
         with tarfile.open(archive_path, "r:*") as archive:
             members = archive.getmembers()
+            safe_members: list[tarfile.TarInfo] = []
+            seen_paths: set[str] = set()
             for member in members:
                 if any(
-                    key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr."))
+                    key.startswith(
+                        (
+                            "SCHILY.xattr.",
+                            "SCHILY.acl.",
+                            "LIBARCHIVE.xattr.",
+                            "LIBARCHIVE.acl.",
+                        )
+                    )
                     for key in member.pax_headers
                 ):
                     raise ValueError(f"unsupported rootfs extended metadata: {member.name}")
                 member_path = PurePosixPath(member.name)
                 if member_path.is_absolute() or ".." in member_path.parts:
                     raise ValueError(f"unsafe rootfs archive path: {member.name}")
+                canonical_path = member_path.as_posix()
+                if canonical_path in {"", "."}:
+                    if member.isdir():
+                        continue
+                    raise ValueError(f"invalid rootfs archive path: {member.name}")
+                if canonical_path in seen_paths:
+                    raise ValueError(f"duplicate rootfs archive path: {canonical_path}")
+                seen_paths.add(canonical_path)
                 if member.isdev() or member.isfifo():
                     raise ValueError(f"unsupported special file in rootfs archive: {member.name}")
+                if not (member.isdir() or member.isfile() or member.issym() or member.islnk()):
+                    raise ValueError(f"unsupported rootfs archive entry type: {member.name}")
                 if member.issym():
                     target = PurePosixPath(member.linkname)
                     if target.is_absolute():
@@ -434,6 +487,8 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     target = PurePosixPath(member.linkname)
                     if target.is_absolute() or ".." in target.parts:
                         raise ValueError(f"unsafe hardlink in rootfs archive: {member.name}")
+                safe_members.append(member)
+            members = safe_members
             for member in members:
                 member.uid = member.gid = None
                 member.uname = member.gname = None
@@ -443,7 +498,7 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     0 if item.isdir() else 1 if item.isfile() else 2 if item.issym() else 3
                 ),
             )
-            archive.extractall(destination, members=ordered, filter="tar")
+            archive.extractall(destination, members=ordered, filter=_rootfs_tar_filter)
     except (tarfile.TarError, OSError, ValueError) as error:
         raise ValueError(f"unsafe rootfs archive: {error}") from error
 
@@ -602,6 +657,61 @@ def _api_request(
     return _run(command, capture_output=True).stdout
 
 
+def extract_guest_cpu_vulnerability_statuses(log_text: str) -> dict[str, str]:
+    """Parse machine-readable SRSO/TSA mitigation status from the guest kernel log."""
+    prefixes = {
+        "spec_rstack_overflow": "Speculative Return Stack Overflow:",
+        "spec_store_bypass": "Speculative Store Bypass:",
+        "tsa": "Transient Scheduler Attacks:",
+    }
+    statuses: dict[str, str] = {}
+    for line in log_text.splitlines():
+        for key, prefix in prefixes.items():
+            if prefix not in line:
+                continue
+            status = line.split(prefix, 1)[1].strip()
+            if status.startswith(("Vulnerable:", "Mitigation:", "Not affected")):
+                statuses[key] = status
+    return statuses
+
+
+def summarize_guest_cpu_vulnerability_samples(
+    samples: Sequence[dict[str, str]],
+) -> dict[str, object]:
+    required = ("spec_rstack_overflow", "spec_store_bypass", "tsa")
+    keys = sorted({key for sample in samples for key in sample})
+    statuses = {key: sorted({sample[key] for sample in samples if key in sample}) for key in keys}
+    warnings = [f"{key}: status unavailable" for key in required if key not in statuses]
+    for key, values in statuses.items():
+        for value in values:
+            if not value.lower().startswith(("mitigation:", "not affected")):
+                warnings.append(f"{key}: {value}")
+    return {
+        "guest_cpu_vulnerability_statuses": statuses,
+        "guest_cpu_security_warnings": sorted(set(warnings)),
+        "guest_cpu_security_mitigations_ready": (
+            bool(samples) and all(key in statuses for key in required) and not warnings
+        ),
+    }
+
+
+def _firecracker_pids() -> list[int]:
+    result = subprocess.run(
+        ["sudo", "-n", "pgrep", "-x", "firecracker"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 1:
+        return []
+    if result.returncode != 0:
+        raise RuntimeError(f"could not verify Firecracker process cleanup: {result.stderr.strip()}")
+    try:
+        return [int(value) for value in result.stdout.split()]
+    except ValueError as error:
+        raise RuntimeError("pgrep returned a non-numeric Firecracker PID") from error
+
+
 def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float = 10) -> None:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -618,18 +728,32 @@ def _wait_for_socket(socket_path: Path, log_path: Path, timeout_seconds: float =
 
 
 def _stop_firecracker(socket_path: Path) -> None:
-    subprocess.run(
-        ["sudo", "-n", "pkill", "-x", "firecracker"],
+    stopped = False
+    for signal_name in ("TERM", "KILL"):
+        subprocess.run(
+            ["sudo", "-n", "pkill", f"-{signal_name}", "-x", "firecracker"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if not _firecracker_pids():
+                stopped = True
+                break
+            time.sleep(0.1)
+        if stopped:
+            break
+    if not stopped:
+        raise RuntimeError("Firecracker process remained alive after SIGTERM and SIGKILL")
+    result = subprocess.run(
+        ["sudo", "-n", "rm", "-f", "--", str(socket_path)],
         check=False,
         capture_output=True,
         text=True,
     )
-    subprocess.run(
-        ["sudo", "-n", "rm", "-f", str(socket_path)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    if result.returncode != 0:
+        raise RuntimeError(f"could not remove Firecracker API socket: {result.stderr.strip()}")
 
 
 def _run_guest(
@@ -641,7 +765,7 @@ def _run_guest(
     log_dir: Path,
     timeout_seconds: float,
     profile: str = "W1",
-) -> tuple[float, dict[str, str], dict[str, bool]]:
+) -> tuple[float, dict[str, str], dict[str, bool], dict[str, str]]:
     socket_path = work_dir / f"api-{run_index}.sock"
     log_path = log_dir / f"firecracker-guest-boot-{run_index}.log"
     _stop_firecracker(socket_path)
@@ -680,7 +804,7 @@ def _run_guest(
                 {
                     "kernel_image_path": str(kernel_path),
                     "boot_args": (
-                        "console=ttyS0 reboot=k panic=1 "
+                        f"console=ttyS0 reboot=k panic=1 {GUEST_KERNEL_SECURITY_ARGS} "
                         "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
                     ),
                 },
@@ -712,7 +836,13 @@ def _run_guest(
                     verify_guest_boot_markers(log_text, profile)
                 if GUEST_READY_MARKER in log_text:
                     guest_isolation = verify_guest_boot_markers(log_text, profile)
-                    return (time.monotonic() - started) * 1000, version, guest_isolation
+                    guest_cpu_vulnerabilities = extract_guest_cpu_vulnerability_statuses(log_text)
+                    return (
+                        (time.monotonic() - started) * 1000,
+                        version,
+                        guest_isolation,
+                        guest_cpu_vulnerabilities,
+                    )
                 running = subprocess.run(
                     ["sudo", "-n", "pgrep", "-x", "firecracker"],
                     check=False,
@@ -929,9 +1059,15 @@ def main() -> int:
 
         samples: list[float] = []
         guest_isolation_samples: list[dict[str, bool]] = []
+        guest_cpu_vulnerability_samples: list[dict[str, str]] = []
         firecracker_version: dict[str, str] = {}
         for run_index in range(1, args.runs + 1):
-            boot_time_ms, version, guest_isolation = _run_guest(
+            (
+                boot_time_ms,
+                version,
+                guest_isolation,
+                guest_cpu_vulnerabilities,
+            ) = _run_guest(
                 firecracker_binary,
                 kernel_path,
                 rootfs_path,
@@ -943,9 +1079,13 @@ def main() -> int:
             )
             samples.append(boot_time_ms)
             guest_isolation_samples.append(guest_isolation)
+            guest_cpu_vulnerability_samples.append(guest_cpu_vulnerabilities)
             firecracker_version = version
 
         summary = summarize_boot_times(samples)
+        guest_cpu_summary = summarize_guest_cpu_vulnerability_samples(
+            guest_cpu_vulnerability_samples
+        )
         report = {
             "status": "passed",
             "execution_mode": "direct-vmm-ephemeral-smoke",
@@ -956,6 +1096,8 @@ def main() -> int:
                 sample["rootfs_read_only_confirmed"] for sample in guest_isolation_samples
             ),
             "guest_isolation_checks": guest_isolation_samples,
+            "guest_cpu_vulnerability_samples": guest_cpu_vulnerability_samples,
+            **guest_cpu_summary,
             "guest_workload": {
                 "profile": (
                     "W1-minimal-agent"

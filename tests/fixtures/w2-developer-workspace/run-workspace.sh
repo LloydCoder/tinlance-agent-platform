@@ -41,13 +41,19 @@ source = root / "node/src/app.js"
 tests = root / "node/test/app.test.js"
 source_text = source.read_text(encoding="utf-8")
 test_text = tests.read_text(encoding="utf-8")
-source.write_text(source_text.replace("Tinlance Agent Workspace", "Tinlance W2 Developer Workspace"), encoding="utf-8")
-tests.write_text(test_text.replace("Tinlance Agent Workspace", "Tinlance W2 Developer Workspace"), encoding="utf-8")
+source.write_text(source_text.replace(" v1", " W2"), encoding="utf-8")
+tests.write_text(test_text.replace(" v1", " W2"), encoding="utf-8")
 PY
 echo TINLANCE_W2_NODE_EDIT_OK
 node --check "$workspace/node/src/app.js"
 echo TINLANCE_W2_NODE_BUILD_OK
 cd "$workspace/node"
+test -s package-lock.json
+npm_lock_sha256="$(sha256sum package-lock.json | awk '{print $1}')"
+echo "TINLANCE_W2_NPM_LOCK_SHA256=$npm_lock_sha256"
+npm ci --offline --ignore-scripts --no-audit --no-fund
+test -f node_modules/@tinlance/w2-fixture-package/index.js
+echo "TINLANCE_W2_NPM_INSTALL_OK"
 npm test
 echo TINLANCE_W2_NODE_TESTS_OK
 test -n "$(git -C "$workspace" status --short)"
