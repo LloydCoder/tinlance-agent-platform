@@ -98,12 +98,17 @@ def normalize_hostname(hostname: str) -> str:
         for label in labels
     ):
         raise EgressDenied("destination hostname is malformed")
-    if normalized in {
-        "metadata",
-        "metadata.google.internal",
-        "metadata.azure.internal",
-        "instance-data.ec2.internal",
-    } or normalized.endswith(".localhost") or normalized.endswith(".local"):
+    if (
+        normalized
+        in {
+            "metadata",
+            "metadata.google.internal",
+            "metadata.azure.internal",
+            "instance-data.ec2.internal",
+        }
+        or normalized.endswith(".localhost")
+        or normalized.endswith(".local")
+    ):
         raise EgressDenied("special-use destination hostname is forbidden")
     return normalized
 
@@ -191,9 +196,7 @@ def resolve_public_target(
     return ResolvedTarget(normalized, port, tuple(dict.fromkeys(validated)))
 
 
-def connect_pinned_target(
-    target: ResolvedTarget, *, timeout_seconds: float
-) -> socket.socket:
+def connect_pinned_target(target: ResolvedTarget, *, timeout_seconds: float) -> socket.socket:
     """Connect only to a validated IP literal; no second DNS lookup occurs."""
     if target.port != 443 or not target.addresses:
         raise EgressDenied("connector received an invalid validated target")
@@ -279,12 +282,9 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
         allowed_client_network: str,
     ) -> None:
         self.policy = policy
-        self.allowed_client_network = ipaddress.ip_network(
-            allowed_client_network, strict=True
-        )
+        self.allowed_client_network = ipaddress.ip_network(allowed_client_network, strict=True)
         if self.allowed_client_network.version != 4 or not (
-            self.allowed_client_network.is_private
-            or self.allowed_client_network.is_loopback
+            self.allowed_client_network.is_private or self.allowed_client_network.is_loopback
         ):
             raise ValueError("browser proxy clients must come from a private workspace network")
         self._slots = threading.BoundedSemaphore(policy.max_connections)
