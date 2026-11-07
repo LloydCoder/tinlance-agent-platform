@@ -96,7 +96,7 @@ def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
         assert "artifacts/w2-rootfs.tar" in workflow
         assert "org.tinlance.w2.rootfs.tar.sha256" in workflow
         assert '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' in workflow
-        assert r'\"org.tinlance.w2.rootfs.tar.sha256\"' not in workflow
+        assert r"\"org.tinlance.w2.rootfs.tar.sha256\"" not in workflow
         assert "image_id=$normalized_image_id" in workflow
         assert "rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar" in workflow
     firecracker = (workflow_root / names[0]).read_text(encoding="utf-8")
