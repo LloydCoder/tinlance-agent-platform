@@ -19,6 +19,7 @@ _VOLATILE_PATHS = {
     "etc/resolv.conf",
     "var/lib/dbus/machine-id",
     "var/lib/systemd/random-seed",
+    # ldconfig's auxiliary cache embeds build-specific state and is regenerated when needed.
     "var/cache/ldconfig/aux-cache",
     "var/log/alternatives.log",
     "var/log/dpkg.log",
