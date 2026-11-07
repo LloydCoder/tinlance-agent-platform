@@ -105,6 +105,8 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "--network-namespace-path" in firecracker
     assert "ip netns add" in firecracker
     assert 'network_namespace_isolated' in firecracker
+    assert 'host_network_namespace' in firecracker
+    assert 'process_network_namespace' in firecracker
     assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
