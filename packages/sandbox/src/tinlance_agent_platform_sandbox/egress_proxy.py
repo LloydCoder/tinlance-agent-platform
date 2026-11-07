@@ -8,6 +8,7 @@ TLS remains end-to-end between Chromium and the destination.
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import math
 import select
@@ -311,14 +312,10 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
             connections = tuple(self._active_sockets)
             self._active_sockets.clear()
         for connection in connections:
-            try:
+            with contextlib.suppress(OSError):
                 connection.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-            try:
+            with contextlib.suppress(OSError):
                 connection.close()
-            except OSError:
-                pass
 
     def process_request(self, request: socket.socket, client_address: tuple[str, int]) -> None:
         if not self._slots.acquire(blocking=False):
@@ -387,10 +384,8 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
                 upstream.close()
                 raise EgressDenied("browser egress proxy is shutting down")
         except (EgressDenied, ValueError, OSError, ConnectionError):
-            try:
+            with contextlib.suppress(OSError):
                 self.send_error(403, "Destination denied by browser egress policy")
-            except OSError:
-                pass
             return
 
         try:
