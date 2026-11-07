@@ -325,7 +325,13 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
             with contextlib.suppress(OSError):
                 connection.close()
 
-    def process_request(self, request: socket.socket, client_address: tuple[str, int]) -> None:
+    def process_request(
+        self,
+        request: socket.socket | tuple[bytes, socket.socket],
+        client_address: tuple[str, int],
+    ) -> None:
+        if not isinstance(request, socket.socket):
+            raise TypeError("browser proxy requires TCP stream sockets")
         if not self._slots.acquire(blocking=False):
             request.close()
             return
@@ -341,8 +347,12 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
             raise
 
     def process_request_thread(
-        self, request: socket.socket, client_address: tuple[str, int]
+        self,
+        request: socket.socket | tuple[bytes, socket.socket],
+        client_address: tuple[str, int],
     ) -> None:
+        if not isinstance(request, socket.socket):
+            raise TypeError("browser proxy requires TCP stream sockets")
         try:
             super().process_request_thread(request, client_address)
         finally:
