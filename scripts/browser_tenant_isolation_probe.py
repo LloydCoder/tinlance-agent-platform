@@ -9,7 +9,9 @@ from tinlance_agent_platform_sandbox.browser import (
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prove another tenant UID cannot access a browser profile root.")
+    parser = argparse.ArgumentParser(
+        description="Prove another tenant UID cannot access a browser profile root."
+    )
     parser.add_argument("--profile-root", required=True)
     parser.add_argument("--tenant-id", required=True)
     parser.add_argument("--workspace-id", required=True)
