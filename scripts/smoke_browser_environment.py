@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ipaddress
 import json
 import os
@@ -84,7 +85,9 @@ def wait_for_proxy(host: str, port: int, process: subprocess.Popen[bytes]) -> No
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create and audit the W3 isolated browser network.")
+    parser = argparse.ArgumentParser(
+        description="Create and audit the W3 isolated browser network."
+    )
     parser.add_argument("--artifacts", default="artifacts")
     parser.add_argument("--allowed-domain", action="append", default=["example.com"])
     args = parser.parse_args()
@@ -156,11 +159,26 @@ def main() -> int:
         run(["ip", "link", "set", guest_if, "netns", namespace])
         run(["ip", "addr", "add", f"{host_ip}/30", "dev", host_if])
         run(["ip", "link", "set", host_if, "up"])
-        run(["ip", "netns", "exec", namespace, "ip", "addr", "add", f"{guest_ip}/30", "dev", guest_if])
+        run(
+            [
+                "ip", "netns", "exec", namespace, "ip", "addr", "add",
+                f"{guest_ip}/30", "dev", guest_if,
+            ]
+        )
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", guest_if, "up"])
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
-        run(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=1"])
-        run(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=1"])
+        run(
+            [
+                "ip", "netns", "exec", namespace, "sysctl", "-w",
+                "net.ipv6.conf.all.disable_ipv6=1",
+            ]
+        )
+        run(
+            [
+                "ip", "netns", "exec", namespace, "sysctl", "-w",
+                "net.ipv6.conf.default.disable_ipv6=1",
+            ]
+        )
 
         firewall_script = (
             f"table inet {nft_table} {{\n"
@@ -186,7 +204,9 @@ def main() -> int:
             raise RuntimeError("browser network namespace unexpectedly has a default route")
         interfaces = run(["ip", "netns", "exec", namespace, "ip", "-o", "link", "show"])
         if len(interfaces.splitlines()) != 2:
-            raise RuntimeError("browser network namespace must contain only loopback and its proxy veth")
+            raise RuntimeError(
+                "browser network namespace must contain only loopback and its proxy veth"
+            )
         evidence.update(
             {
                 "network_namespace_created": True,
@@ -219,7 +239,11 @@ def main() -> int:
                     str(PROXY_PORT),
                     "--client-network",
                     client_network,
-                    *sum((["--allowed-domain", domain] for domain in sorted(set(args.allowed_domain))), []),
+                    *[
+                        argument
+                        for domain in sorted(set(args.allowed_domain))
+                        for argument in ("--allowed-domain", domain)
+                    ],
                 ],
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
@@ -323,10 +347,8 @@ def main() -> int:
                 text=True,
             )
             for raw_pid in listed_pids.stdout.split():
-                try:
+                with contextlib.suppress(ProcessLookupError):
                     os.kill(int(raw_pid), signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
             if listed_pids.stdout.strip():
                 time.sleep(1)
                 remaining = subprocess.run(
@@ -336,10 +358,8 @@ def main() -> int:
                     text=True,
                 )
                 for raw_pid in remaining.stdout.split():
-                    try:
+                    with contextlib.suppress(ProcessLookupError):
                         os.kill(int(raw_pid), signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
             deleted = subprocess.run(
                 ["ip", "netns", "del", namespace],
                 check=False,
