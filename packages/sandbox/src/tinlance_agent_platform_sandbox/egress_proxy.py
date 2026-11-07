@@ -17,7 +17,7 @@ import threading
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
-from typing import Callable
+from collections.abc import Callable
 from urllib.parse import urlsplit
 
 
@@ -400,7 +400,9 @@ class BrowserEgressProxy:
             or (not bind_ip.is_private and not bind_ip.is_loopback)
             or not 0 <= port <= 65_535
         ):
-            raise ValueError("browser proxy must bind to a specific private or loopback IPv4 address")
+            raise ValueError(
+                "browser proxy must bind to a specific private or loopback IPv4 address"
+            )
         self._server = _BrowserProxyServer(
             (bind_host, port),
             policy,
