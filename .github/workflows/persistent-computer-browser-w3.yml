@@ -14,6 +14,7 @@ on:
       - "scripts/smoke_browser_environment.py"
       - "tests/unit/test_browser_egress.py"
       - "tests/unit/test_browser_workspace.py"
+      - "tests/unit/test_browser_smoke_environment.py"
       - "pyproject.toml"
   workflow_dispatch:
 
@@ -51,7 +52,7 @@ jobs:
 
       - name: Run browser policy and profile lifecycle tests
         run: |
-          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py
+          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py tests/unit/test_browser_smoke_environment.py
 
       - name: Run isolated network namespace and real Chromium acceptance
         run: |
