@@ -47,7 +47,11 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     fixture = fixture_root / "fixtures" / "w2-developer-workspace" / "Dockerfile"
     dockerfile = fixture.read_text(encoding="utf-8")
     assert "ARG APT_SNAPSHOT" in dockerfile
-    assert "ARG BASE_IMAGE=ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852" in dockerfile
+    base_image = (
+        "ARG BASE_IMAGE=ubuntu@"
+        "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+    )
+    assert base_image in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
