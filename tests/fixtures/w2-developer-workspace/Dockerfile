@@ -21,6 +21,8 @@ RUN sed -i 's|https://archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu
         -o Acquire::http::Timeout=30 \
         install --yes --no-install-recommends \
         ca-certificates=20260816ubuntu0.24.04.2 \
+        openssl=3.0.13-0ubuntu3.16 \
+        libssl3t64=3.0.13-0ubuntu3.16 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::http::Timeout=30 \
