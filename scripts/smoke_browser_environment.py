@@ -28,11 +28,7 @@ def build_child_environment(
     allowed = {"PATH", "PYTHONPATH", "LD_LIBRARY_PATH", "LANG", "LC_ALL"}
     if include_playwright:
         allowed.add("PLAYWRIGHT_BROWSERS_PATH")
-    environment = {
-        key: os.environ[key]
-        for key in allowed
-        if key in os.environ
-    }
+    environment = {key: os.environ[key] for key in allowed if key in os.environ}
     environment["HOME"] = str(home)
     environment["TMPDIR"] = str(tmpdir)
     if include_playwright:
@@ -65,17 +61,23 @@ def require_root() -> None:
 
 def create_browser_user(username: str, start_uid: int) -> tuple[int, int]:
     for uid in range(start_uid, start_uid + 1000):
-        if subprocess.run(
-            ["getent", "passwd", str(uid)],
-            check=False,
-            capture_output=True,
-        ).returncode == 0:
+        if (
+            subprocess.run(
+                ["getent", "passwd", str(uid)],
+                check=False,
+                capture_output=True,
+            ).returncode
+            == 0
+        ):
             continue
-        if subprocess.run(
-            ["getent", "group", str(uid)],
-            check=False,
-            capture_output=True,
-        ).returncode == 0:
+        if (
+            subprocess.run(
+                ["getent", "group", str(uid)],
+                check=False,
+                capture_output=True,
+            ).returncode
+            == 0
+        ):
             continue
         run(
             [
@@ -183,21 +185,39 @@ def main() -> int:
         run(["ip", "link", "set", host_if, "up"])
         run(
             [
-                "ip", "netns", "exec", namespace, "ip", "addr", "add",
-                f"{guest_ip}/30", "dev", guest_if,
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "ip",
+                "addr",
+                "add",
+                f"{guest_ip}/30",
+                "dev",
+                guest_if,
             ]
         )
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", guest_if, "up"])
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
         run(
             [
-                "ip", "netns", "exec", namespace, "sysctl", "-w",
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
                 "net.ipv6.conf.all.disable_ipv6=1",
             ]
         )
         run(
             [
-                "ip", "netns", "exec", namespace, "sysctl", "-w",
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
                 "net.ipv6.conf.default.disable_ipv6=1",
             ]
         )
@@ -219,7 +239,6 @@ def main() -> int:
             text=True,
         )
         firewall_created = True
-
 
         routes = run(["ip", "netns", "exec", namespace, "ip", "-4", "route", "show"])
         if any(line.split()[:1] == ["default"] for line in routes.splitlines()):
@@ -275,19 +294,29 @@ def main() -> int:
         wait_for_proxy(host_ip, PROXY_PORT, proxy_process)
 
         guest_command = [
-            "ip", "netns", "exec", namespace,
+            "ip",
+            "netns",
+            "exec",
+            namespace,
             "setpriv",
-            "--reuid", str(browser_uid),
-            "--regid", str(browser_gid),
+            "--reuid",
+            str(browser_uid),
+            "--regid",
+            str(browser_gid),
             "--clear-groups",
             "--no-new-privs",
             sys.executable,
             "scripts/browser_workspace_guest.py",
-            "--profile-root", str(profile_root),
-            "--proxy-url", proxy_url,
-            "--tenant-id", "phase2-w3-tenant-a",
-            "--workspace-id", "workspace-a",
-            "--evidence", str(evidence_path),
+            "--profile-root",
+            str(profile_root),
+            "--proxy-url",
+            proxy_url,
+            "--tenant-id",
+            "phase2-w3-tenant-a",
+            "--workspace-id",
+            "workspace-a",
+            "--evidence",
+            str(evidence_path),
         ]
         guest_env = build_child_environment(
             home=home_root,
@@ -335,9 +364,9 @@ def main() -> int:
             if exc.stderr:
                 evidence["failure_stderr"] = str(exc.stderr)[-4_000:]
         if proxy_log.is_file():
-            evidence["proxy_log_tail"] = proxy_log.read_text(
-                encoding="utf-8", errors="replace"
-            )[-2_000:]
+            evidence["proxy_log_tail"] = proxy_log.read_text(encoding="utf-8", errors="replace")[
+                -2_000:
+            ]
         raise
     finally:
         cleanup_errors: list[str] = []
@@ -392,21 +421,29 @@ def main() -> int:
             )
             if deleted.returncode != 0:
                 cleanup_errors.append("browser network namespace could not be deleted")
-        if firewall_created and subprocess.run(
-            ["nft", "list", "table", "inet", nft_table],
-            check=False,
-            capture_output=True,
-        ).returncode == 0:
+        if (
+            firewall_created
+            and subprocess.run(
+                ["nft", "list", "table", "inet", nft_table],
+                check=False,
+                capture_output=True,
+            ).returncode
+            == 0
+        ):
             cleanup_errors.append("browser nftables table remains after cleanup")
         if namespace_created and namespace in {
             line.split()[0] for line in run(["ip", "netns", "list"]).splitlines() if line.split()
         }:
             cleanup_errors.append("browser network namespace remains after cleanup")
-        if link_created and subprocess.run(
-            ["ip", "link", "show", host_if],
-            check=False,
-            capture_output=True,
-        ).returncode == 0:
+        if (
+            link_created
+            and subprocess.run(
+                ["ip", "link", "show", host_if],
+                check=False,
+                capture_output=True,
+            ).returncode
+            == 0
+        ):
             cleanup_errors.append("browser host veth remains after cleanup")
         evidence["cleanup_verified"] = not cleanup_errors
         if cleanup_errors:
@@ -425,22 +462,29 @@ def main() -> int:
                 check=False,
                 capture_output=True,
             )
-            if deleted_user.returncode != 0 or subprocess.run(
-                ["getent", "passwd", username],
-                check=False,
-                capture_output=True,
-            ).returncode == 0:
+            if (
+                deleted_user.returncode != 0
+                or subprocess.run(
+                    ["getent", "passwd", username],
+                    check=False,
+                    capture_output=True,
+                ).returncode
+                == 0
+            ):
                 cleanup_errors.append(f"temporary browser user {username} could not be deleted")
             subprocess.run(
                 ["groupdel", username],
                 check=False,
                 capture_output=True,
             )
-            if subprocess.run(
-                ["getent", "group", username],
-                check=False,
-                capture_output=True,
-            ).returncode == 0:
+            if (
+                subprocess.run(
+                    ["getent", "group", username],
+                    check=False,
+                    capture_output=True,
+                ).returncode
+                == 0
+            ):
                 cleanup_errors.append(f"temporary browser group {username} could not be deleted")
         if cleanup_errors:
             evidence["cleanup_verified"] = False
