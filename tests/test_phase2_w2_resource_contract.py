@@ -95,6 +95,8 @@ def test_w2_rootfs_extractor_ignores_archive_root_directory_metadata(tmp_path: P
         handle.addfile(member, io.BytesIO(b"x"))
 
     destination = tmp_path / "rootfs"
+    destination.mkdir()
+    destination.chmod(0o755)
     extract_w2_rootfs_tar(archive, destination)
 
     assert stat.S_IMODE(destination.stat().st_mode) == 0o755

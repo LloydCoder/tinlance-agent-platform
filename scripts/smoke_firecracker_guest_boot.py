@@ -421,6 +421,8 @@ def _rootfs_tar_filter(member: tarfile.TarInfo, destination: str) -> tarfile.Tar
         raise ValueError(f"unsafe rootfs archive member {member.name}: {error}") from error
     if filtered is None:
         raise ValueError(f"rootfs archive filter rejected member: {member.name}")
+    if member.mode is not None:
+        filtered.mode = member.mode & 0o755
     return filtered
 
 
