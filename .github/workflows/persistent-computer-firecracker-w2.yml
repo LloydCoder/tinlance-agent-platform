@@ -491,12 +491,39 @@ jobs:
           echo "JAILER_GID=$(id -g "${user}")" >> "${GITHUB_ENV}"
           sudo install -d -o root -g root -m 0755 /srv/tinlance-jailer-w2
 
-      - name: Install guest filesystem tooling
+      - name: Install guest filesystem and network namespace tooling
         run: |
-          if ! command -v mkfs.ext4 >/dev/null 2>&1; then
+          set -euo pipefail
+          if ! command -v mkfs.ext4 >/dev/null 2>&1 || ! command -v ip >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y e2fsprogs
+            sudo apt-get install -y e2fsprogs iproute2
           fi
+
+      - name: Create dedicated loopback-only network namespace
+        run: |
+          set -euo pipefail
+          namespace="tinlance-fc-w2-${GITHUB_RUN_ID}"
+          sudo ip netns add "${namespace}"
+          sudo ip -n "${namespace}" link set lo up
+          interfaces="$(sudo ip -n "${namespace}" -o link show | awk -F': ' '{print $2}' | cut -d'@' -f1 | sort)"
+          test "${interfaces}" = "lo"
+          namespace_path="/var/run/netns/${namespace}"
+          sudo test -e "${namespace_path}"
+          sudo test ! -L "${namespace_path}"
+          python - "${namespace_path}" <<'PY'
+          import os
+          import stat
+          import sys
+          from pathlib import Path
+          handle = Path(sys.argv[1])
+          for path in (handle, handle.parent):
+              info = os.stat(path)
+              if info.st_uid != 0 or info.st_gid != 0:
+                  raise SystemExit(f"network namespace path is not root-owned: {path}")
+              if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+                  raise SystemExit(f"network namespace path is group/world writable: {path}")
+          PY
+          echo "NETWORK_NAMESPACE_PATH=${namespace_path}" >> "${GITHUB_ENV}"
 
       - name: Boot three W2 developer workspaces through the Firecracker jailer
         run: |
@@ -510,6 +537,7 @@ jobs:
             --gid "${JAILER_GID}" \
             --chroot-base-dir /srv/tinlance-jailer-w2 \
             --profile W2 \
+            --network-namespace-path "${NETWORK_NAMESPACE_PATH}" \
             --w2-rootfs-tar artifacts/w2-rootfs.tar \
             --w2-image-id "${W2_IMAGE_ID}" \
             --w2-base-image-digest "${W2_BASE_IMAGE_DIGEST}" \
@@ -552,6 +580,8 @@ jobs:
               or item.get("capabilities_effective") != "0000000000000000"
               or item.get("pid_namespace_isolated") is not True
               or item.get("mount_namespace_isolated") is not True
+              or item.get("network_namespace_isolated") is not True
+              or item.get("network_interfaces") != ["lo"]
               for item in processes
           ):
               raise SystemExit("Every jailed W2 Firecracker process and thread must prove confinement.")
@@ -581,5 +611,6 @@ jobs:
         if: always()
         run: |
           sudo rm -rf -- /srv/tinlance-jailer-w2
+          sudo ip netns del "tinlance-fc-w2-${GITHUB_RUN_ID}" || true
           sudo userdel "tinlance-fc-w2-${GITHUB_RUN_ID}" || true
           sudo groupdel "tinlance-fc-w2-${GITHUB_RUN_ID}" || true
