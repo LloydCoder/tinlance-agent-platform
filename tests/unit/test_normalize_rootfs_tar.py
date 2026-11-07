@@ -228,3 +228,16 @@ def test_normalizer_rejects_special_files_at_volatile_paths(tmp_path: Path) -> N
 
     with pytest.raises(ValueError, match="unsupported special file"):
         normalize_rootfs_tar(source, output)
+
+def test_normalizer_rejects_libarchive_acl_metadata(tmp_path: Path) -> None:
+    source = tmp_path / "libarchive-acl.tar"
+    with tarfile.open(source, "w", format=tarfile.PAX_FORMAT) as archive:
+        member = tarfile.TarInfo("usr/bin/ping")
+        member.size = 1
+        member.pax_headers = {
+            "LIBARCHIVE.acl.access": "user::rwx,group::r-x,other::r-x"
+        }
+        archive.addfile(member, io.BytesIO(b"x"))
+
+    with pytest.raises(ValueError, match="unsupported extended metadata"):
+        normalize_rootfs_tar(source, tmp_path / "libarchive-acl.normalized.tar")
