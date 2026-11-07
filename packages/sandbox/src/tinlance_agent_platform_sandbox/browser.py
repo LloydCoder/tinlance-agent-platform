@@ -122,9 +122,8 @@ class BrowserProfileLease:
             raise BrowserIsolationError("browser profile root is not owned by the browser user")
         os.chmod(root, 0o700)
 
-        identity = hashlib.sha256(
-            (tenant_id + "\x00" + workspace_id).encode("utf-8")
-        ).hexdigest()
+        tenant_identity = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()
+        workspace_identity = hashlib.sha256(workspace_id.encode("utf-8")).hexdigest()
         tenant_marker = root / ".tenant-id"
         marker_flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
         try:
@@ -140,17 +139,17 @@ class BrowserProfileLease:
             if (
                 marker_info.st_uid != os.geteuid()
                 or not stat.S_ISREG(marker_info.st_mode)
-                or marker_value != identity
+                or marker_value != tenant_identity
             ):
                 raise BrowserIsolationError("profile root is already bound to another tenant")
         else:
             try:
-                os.write(marker_fd, identity.encode("ascii"))
+                os.write(marker_fd, tenant_identity.encode("ascii"))
                 os.fsync(marker_fd)
             finally:
                 os.close(marker_fd)
 
-        profile_path = root / identity
+        profile_path = root / workspace_identity
         if profile_path.is_symlink():
             raise BrowserIsolationError("browser profile path cannot be a symlink")
         profile_path.mkdir(mode=0o700, exist_ok=True)
