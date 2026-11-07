@@ -282,7 +282,7 @@ class _BrowserProxyServer(socketserver.ThreadingTCPServer):
         self.allowed_client_network = ipaddress.ip_network(
             allowed_client_network, strict=True
         )
-        if not (
+        if self.allowed_client_network.version != 4 or not (
             self.allowed_client_network.is_private
             or self.allowed_client_network.is_loopback
         ):
