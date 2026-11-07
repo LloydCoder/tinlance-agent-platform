@@ -46,7 +46,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test,browser,security]"
           python -m playwright install chromium
-          sudo "$pythonLocation/bin/python" -m playwright install-deps chromium
+          sudo env LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$pythonLocation/bin/python" -m playwright install-deps chromium
           chmod o+x "$HOME" "$HOME/.cache" "$HOME/.cache/ms-playwright"
           chmod -R a+rX "$HOME/.cache/ms-playwright"
 
@@ -69,6 +69,8 @@ jobs:
           sudo apt-get install -y iproute2 nftables util-linux
           mkdir -p artifacts
           sudo env \
+            PATH="$PATH" \
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" \
             PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" \
             PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" \
             "$pythonLocation/bin/python" scripts/smoke_browser_environment.py \
