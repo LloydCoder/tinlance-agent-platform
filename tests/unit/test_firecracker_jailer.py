@@ -6,6 +6,7 @@ import pytest
 from scripts.smoke_firecracker_jailer import (
     build_jailer_command,
     validate_jailer_profile_inputs,
+    verify_jailer_network_namespace_evidence,
     verify_jailer_process_evidence,
 )
 
@@ -47,6 +48,20 @@ def test_build_jailer_command_uses_unique_id_unprivileged_identity_and_v2_limits
         "--api-sock",
         "/run/firecracker.socket",
     ]
+
+
+def test_build_jailer_command_joins_the_requested_network_namespace() -> None:
+    command = build_jailer_command(
+        jailer_binary="/usr/local/libexec/firecracker/jailer",
+        firecracker_binary="/usr/local/libexec/firecracker/firecracker",
+        jailer_id="fc-smoke-421",
+        uid=987,
+        gid=987,
+        chroot_base_dir="/srv/tinlance-jailer",
+        network_namespace_path="/var/run/netns/tinlance-fc-w2-421",
+    )
+
+    assert command[command.index("--netns") + 1] == "/var/run/netns/tinlance-fc-w2-421"
 
 
 def test_build_jailer_command_rejects_root_identity() -> None:
@@ -239,49 +254,123 @@ def test_w1_jailer_profile_rejects_w2_rootfs_inputs(tmp_path: Path) -> None:
             w2_rootfs_tar=rootfs_tar,
             w2_image_id="sha256:" + "a" * 64,
             w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+            network_namespace_path=tmp_path / "netns",
         )
 
 
-def test_w2_jailer_profile_requires_normalized_rootfs_tar() -> None:
+def test_w2_jailer_profile_requires_normalized_rootfs_tar(tmp_path: Path) -> None:
+    netns = tmp_path / "netns"
+    netns.write_bytes(b"namespace-handle")
     with pytest.raises(ValueError, match="normalized W2 rootfs tar is required"):
         validate_jailer_profile_inputs(
             profile="W2",
             w2_rootfs_tar=None,
             w2_image_id="sha256:" + "a" * 64,
             w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+            network_namespace_path=netns,
         )
 
 
 def test_w2_jailer_profile_rejects_non_content_addressed_image_id(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
+    netns = tmp_path / "netns"
+    netns.write_bytes(b"namespace-handle")
     with pytest.raises(ValueError, match="content-addressed W2 image ID"):
         validate_jailer_profile_inputs(
             profile="W2",
             w2_rootfs_tar=rootfs_tar,
             w2_image_id="latest",
             w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+            network_namespace_path=netns,
         )
 
 
 def test_w2_jailer_profile_requires_digest_pinned_base_image(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
+    netns = tmp_path / "netns"
+    netns.write_bytes(b"namespace-handle")
     with pytest.raises(ValueError, match="digest-pinned W2 base image"):
         validate_jailer_profile_inputs(
             profile="W2",
             w2_rootfs_tar=rootfs_tar,
             w2_image_id="sha256:" + "a" * 64,
             w2_base_image_digest="ubuntu:latest",
+            network_namespace_path=netns,
         )
 
 
 def test_w2_jailer_profile_accepts_content_addressed_inputs(tmp_path: Path) -> None:
     rootfs_tar = tmp_path / "rootfs.tar"
     rootfs_tar.write_bytes(b"normalized")
+    netns = tmp_path / "netns"
+    netns.write_bytes(b"namespace-handle")
     validate_jailer_profile_inputs(
         profile="W2",
         w2_rootfs_tar=rootfs_tar,
         w2_image_id="sha256:" + "a" * 64,
         w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+        network_namespace_path=netns,
     )
+
+
+
+def test_w2_jailer_profile_requires_network_namespace_handle(tmp_path: Path) -> None:
+    rootfs_tar = tmp_path / "rootfs.tar"
+    rootfs_tar.write_bytes(b"normalized")
+    with pytest.raises(ValueError, match="trusted W2 network namespace handle is required"):
+        validate_jailer_profile_inputs(
+            profile="W2",
+            w2_rootfs_tar=rootfs_tar,
+            w2_image_id="sha256:" + "a" * 64,
+            w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+            network_namespace_path=None,
+        )
+
+
+def test_w2_jailer_profile_rejects_symlink_network_namespace_handle(tmp_path: Path) -> None:
+    rootfs_tar = tmp_path / "rootfs.tar"
+    rootfs_tar.write_bytes(b"normalized")
+    netns_target = tmp_path / "netns-target"
+    netns_target.write_bytes(b"namespace-handle")
+    netns_link = tmp_path / "netns"
+    netns_link.symlink_to(netns_target)
+    with pytest.raises(ValueError, match="trusted W2 network namespace handle"):
+        validate_jailer_profile_inputs(
+            profile="W2",
+            w2_rootfs_tar=rootfs_tar,
+            w2_image_id="sha256:" + "a" * 64,
+            w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+            network_namespace_path=netns_link,
+        )
+
+
+def test_verify_jailer_network_namespace_requires_separate_loopback_only_namespace() -> None:
+    result = verify_jailer_network_namespace_evidence(
+        host_network_namespace="net:[4026531840]",
+        process_network_namespace="net:[4026532444]",
+        process_network_interfaces=["lo"],
+    )
+    assert result == {
+        "network_namespace_isolated": True,
+        "network_interfaces": ["lo"],
+    }
+
+
+def test_verify_jailer_network_namespace_rejects_host_namespace_reuse() -> None:
+    with pytest.raises(PermissionError, match="network namespace"):
+        verify_jailer_network_namespace_evidence(
+            host_network_namespace="net:[4026531840]",
+            process_network_namespace="net:[4026531840]",
+            process_network_interfaces=["lo"],
+        )
+
+
+def test_verify_jailer_network_namespace_rejects_non_loopback_interfaces() -> None:
+    with pytest.raises(PermissionError, match="non-loopback"):
+        verify_jailer_network_namespace_evidence(
+            host_network_namespace="net:[4026531840]",
+            process_network_namespace="net:[4026532444]",
+            process_network_interfaces=["eth0", "lo"],
+        )
