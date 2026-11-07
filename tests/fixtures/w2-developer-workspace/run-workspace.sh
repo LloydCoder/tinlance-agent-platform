@@ -5,7 +5,9 @@ workspace=/workspace/project
 test -s /usr/share/tinlance/w2-package-manifest.lock
 package_manifest_sha256="$(sha256sum /usr/share/tinlance/w2-package-manifest.lock | awk '{print $1}')"
 echo "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=$package_manifest_sha256"
-git -c safe.directory=/opt/tinlance-fixture/.git clone --no-hardlinks /opt/tinlance-fixture "$workspace"
+export HOME=/tmp
+git config --global --add safe.directory /opt/tinlance-fixture/.git
+git clone --no-hardlinks /opt/tinlance-fixture "$workspace"
 test "$(git -C "$workspace" rev-parse --is-inside-work-tree)" = true
 test -n "$(git -C "$workspace" rev-parse HEAD)"
 echo "TINLANCE_W2_GIT_VERSION=$(git --version)"
