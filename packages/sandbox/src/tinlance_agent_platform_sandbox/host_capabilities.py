@@ -109,9 +109,7 @@ def probe_host_capabilities(
     cpu_family = _cpuinfo_value(cpuinfo_text, "cpu family") or _cpuinfo_value(
         cpuinfo_text, "CPU architecture"
     )
-    cpu_model = _cpuinfo_value(cpuinfo_text, "model") or _cpuinfo_value(
-        cpuinfo_text, "CPU part"
-    )
+    cpu_model = _cpuinfo_value(cpuinfo_text, "model") or _cpuinfo_value(cpuinfo_text, "CPU part")
     cpu_stepping = _cpuinfo_value(cpuinfo_text, "stepping") or _cpuinfo_value(
         cpuinfo_text, "CPU revision"
     )

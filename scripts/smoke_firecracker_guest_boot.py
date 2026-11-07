@@ -678,10 +678,7 @@ def summarize_guest_cpu_vulnerability_samples(
 ) -> dict[str, object]:
     required = ("spec_rstack_overflow", "tsa")
     keys = sorted({key for sample in samples for key in sample})
-    statuses = {
-        key: sorted({sample[key] for sample in samples if key in sample})
-        for key in keys
-    }
+    statuses = {key: sorted({sample[key] for sample in samples if key in sample}) for key in keys}
     warnings = [f"{key}: status unavailable" for key in required if key not in statuses]
     for key, values in statuses.items():
         for value in values:

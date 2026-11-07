@@ -605,7 +605,6 @@ def test_guest_boot_w2_verifier_rejects_empty_toolchain_version_markers() -> Non
         verify_guest_boot_markers("TINLANCE_W2_NPM_VERSION= \n", "W2")
 
 
-
 def test_extract_guest_cpu_vulnerability_statuses_parses_srso_and_tsa() -> None:
     log = """
     [    0.100] Speculative Return Stack Overflow: Vulnerable: Safe RET, no microcode

@@ -176,7 +176,9 @@ def test_microvm_readiness_requires_cpu_memory_and_process_cgroup_controllers(
 
 
 
-def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(tmp_path: Path) -> None:
+def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(
+    tmp_path: Path,
+) -> None:
     write_probe_fixture(tmp_path, kvm=True)
     vulnerability = tmp_path / "sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow"
     vulnerability.write_text("Vulnerable: Safe RET, no microcode\n", encoding="utf-8")
