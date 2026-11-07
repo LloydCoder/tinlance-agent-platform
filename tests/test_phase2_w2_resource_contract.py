@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import stat
 import tarfile
 from pathlib import Path
 
@@ -79,3 +80,22 @@ def test_w2_rootfs_extractor_rejects_duplicate_canonical_paths(tmp_path: Path) -
 
     with pytest.raises(ValueError, match="duplicate rootfs archive path"):
         extract_w2_rootfs_tar(archive, tmp_path / "rootfs")
+
+
+
+def test_w2_rootfs_extractor_ignores_archive_root_directory_metadata(tmp_path: Path) -> None:
+    archive = tmp_path / "root-entry.tar"
+    with tarfile.open(archive, "w") as handle:
+        root = tarfile.TarInfo(".")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o000
+        handle.addfile(root)
+        member = tarfile.TarInfo("usr/bin/tool")
+        member.size = 1
+        handle.addfile(member, io.BytesIO(b"x"))
+
+    destination = tmp_path / "rootfs"
+    extract_w2_rootfs_tar(archive, destination)
+
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o755
+    assert (destination / "usr/bin/tool").read_bytes() == b"x"

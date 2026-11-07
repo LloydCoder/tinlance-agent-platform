@@ -432,6 +432,7 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
     try:
         with tarfile.open(archive_path, "r:*") as archive:
             members = archive.getmembers()
+            safe_members: list[tarfile.TarInfo] = []
             seen_paths: set[str] = set()
             for member in members:
                 if any(
@@ -482,6 +483,8 @@ def extract_w2_rootfs_tar(archive_path: Path, destination: Path) -> None:
                     target = PurePosixPath(member.linkname)
                     if target.is_absolute() or ".." in target.parts:
                         raise ValueError(f"unsafe hardlink in rootfs archive: {member.name}")
+                safe_members.append(member)
+            members = safe_members
             for member in members:
                 member.uid = member.gid = None
                 member.uname = member.gname = None
