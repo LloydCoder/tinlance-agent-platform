@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from scripts.smoke_firecracker_jailer import (
     build_jailer_command,
