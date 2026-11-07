@@ -67,7 +67,7 @@ def _normalized_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
     if member.isdev() or member.isfifo():
         raise ValueError(f"unsupported special file in rootfs archive: {name}")
     if any(
-        key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr."))
+        key.startswith(("SCHILY.xattr.", "SCHILY.acl.", "LIBARCHIVE.xattr.", "LIBARCHIVE.acl."))
         for key in member.pax_headers
     ):
         raise ValueError(f"unsupported extended metadata in rootfs archive: {name}")
