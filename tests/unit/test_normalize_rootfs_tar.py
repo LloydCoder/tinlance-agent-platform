@@ -125,7 +125,7 @@ def test_normalizer_rejects_special_files(tmp_path: Path) -> None:
         normalize_rootfs_tar(source, tmp_path / "normalized.tar")
 
 
-def test_normalizer_preserves_semantic_pax_xattrs_and_strips_volatile_metadata(
+def test_normalizer_rejects_xattrs_and_acls_until_runtime_parity_is_proven(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "xattrs.tar"
@@ -133,25 +133,13 @@ def test_normalizer_preserves_semantic_pax_xattrs_and_strips_volatile_metadata(
         member = tarfile.TarInfo("usr/bin/ping")
         member.size = 1
         member.pax_headers = {
-            "SCHILY.xattr.security.capability": "\\x01\\x00\\x00\\x02",
+            "SCHILY.xattr.security.capability": "\\\\x01\\\\x00\\\\x00\\\\x02",
             "SCHILY.acl.access": "user::rwx,group::r-x,other::r-x",
-            "mtime": "1800000000",
-            "atime": "1800000000",
-            "ctime": "1800000000",
         }
         archive.addfile(member, io.BytesIO(b"x"))
 
-    output = tmp_path / "xattrs.normalized.tar"
-    normalize_rootfs_tar(source, output)
-
-    with tarfile.open(output, "r:") as archive:
-        normalized = archive.getmember("usr/bin/ping")
-        assert normalized.pax_headers["SCHILY.xattr.security.capability"] == "\\x01\\x00\\x00\\x02"
-        assert normalized.pax_headers["SCHILY.acl.access"] == "user::rwx,group::r-x,other::r-x"
-        assert list(normalized.pax_headers) == sorted(normalized.pax_headers)
-        assert not {"mtime", "atime", "ctime"} & normalized.pax_headers.keys()
-        assert normalized.mtime == SOURCE_DATE_EPOCH
-
+    with pytest.raises(ValueError, match="unsupported extended metadata"):
+        normalize_rootfs_tar(source, tmp_path / "xattrs.normalized.tar")
 
 def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(
     tmp_path: Path,
