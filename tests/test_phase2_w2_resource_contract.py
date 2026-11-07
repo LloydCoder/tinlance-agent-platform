@@ -82,7 +82,6 @@ def test_w2_rootfs_extractor_rejects_duplicate_canonical_paths(tmp_path: Path) -
         extract_w2_rootfs_tar(archive, tmp_path / "rootfs")
 
 
-
 def test_w2_rootfs_extractor_ignores_archive_root_directory_metadata(tmp_path: Path) -> None:
     archive = tmp_path / "root-entry.tar"
     with tarfile.open(archive, "w") as handle:
