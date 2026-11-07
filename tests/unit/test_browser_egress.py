@@ -7,6 +7,7 @@ import pytest
 
 from tinlance_agent_platform_sandbox.egress_proxy import (
     EgressDenied,
+    BrowserEgressProxy,
     EgressPolicy,
     ResolvedTarget,
     connect_pinned_target,
@@ -122,3 +123,46 @@ def test_connector_uses_validated_ip_literal_without_hostname_lookup(monkeypatch
     assert isinstance(result, FakeSocket)
     assert calls == [(("93.184.216.34", 443), 3.0)]
     assert ipaddress.ip_address(calls[0][0][0]).is_global
+
+
+
+def test_proxy_revalidates_each_connect_and_rejects_redirect_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tinlance_agent_platform_sandbox.egress_proxy as proxy_module
+
+    upstream, peer = socket.socketpair()
+    peer.close()
+    monkeypatch.setattr(proxy_module, "_system_resolve", lambda _: ("93.184.216.34",))
+    monkeypatch.setattr(
+        proxy_module,
+        "connect_pinned_target",
+        lambda *_args, **_kwargs: upstream,
+    )
+    proxy = BrowserEgressProxy(
+        "127.0.0.1",
+        0,
+        policy(),
+        allowed_client_network="127.0.0.1/32",
+    )
+    proxy.start()
+    try:
+        host, port = proxy.address
+        with socket.create_connection((host, port), timeout=3) as client:
+            client.sendall(
+                b"CONNECT example.com:443 HTTP/1.1\\r\\n"
+                b"Host: example.com:443\\r\\n\\r\\n"
+            )
+            first_response = client.recv(1024)
+        assert first_response.startswith(b"HTTP/1.1 200")
+
+        with socket.create_connection((host, port), timeout=3) as redirected:
+            redirected.sendall(
+                b"CONNECT 169.254.169.254:443 HTTP/1.1\\r\\n"
+                b"Host: 169.254.169.254:443\\r\\n\\r\\n"
+            )
+            redirect_response = redirected.recv(1024)
+        assert redirect_response.startswith(b"HTTP/1.1 403")
+    finally:
+        proxy.close()
+        upstream.close()
