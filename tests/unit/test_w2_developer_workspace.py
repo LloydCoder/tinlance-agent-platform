@@ -70,7 +70,10 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
     assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
     assert "dpkg-query -W" in dockerfile
-    assert "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund" in dockerfile
+    assert (
+        "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund"
+        in dockerfile
+    )
     assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     bootstrap_update_index = dockerfile.index("apt-get \\\n        -o Acquire::Retries=5")
