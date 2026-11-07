@@ -109,13 +109,13 @@ def main() -> int:
         run(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=1"])
 
         firewall_script = (
-            f"table inet {nft_table} {{\\n"
-            "  chain input {\\n"
-            "    type filter hook input priority -50; policy accept;\\n"
-            f'    iifname "{host_if}" ip saddr {guest_ip} tcp dport {PROXY_PORT} accept\\n'
-            f'    iifname "{host_if}" drop\\n'
-            "  }\\n"
-            "}\\n"
+            f"table inet {nft_table} {{\n"
+            "  chain input {\n"
+            "    type filter hook input priority -50; policy accept;\n"
+            f'    iifname "{host_if}" ip saddr {guest_ip} tcp dport {PROXY_PORT} accept\n'
+            f'    iifname "{host_if}" drop\n'
+            "  }\n"
+            "}\n"
         )
         subprocess.run(
             ["nft", "-f", "-"],
