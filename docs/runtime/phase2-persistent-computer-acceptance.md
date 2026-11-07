@@ -37,6 +37,7 @@ PR #190 extends the existing jailer runner with a W2 profile and adds a dedicate
 The W2 jailer job must pass all of the following for **3/3** executions:
 
 1. Real W2 developer workspace operations: Git clone/edit, Python compile/unit tests, Node edit/build/unit tests, and local-package `npm ci --offline`; host-surface probes; guest readiness markers. No guest network is available.
+2. Independent rootfs reproducibility: two `docker build --pull --no-cache` builds from identical pinned inputs must produce byte-identical normalized rootfs tar files. The normalizer excludes the volatile `var/cache/ldconfig/aux-cache` file, validates volatile entries before dropping them, and records both build digests in `w2-rootfs-reproducibility.json`.
 2. Rootfs and guest boundary: read-only rootfs, no guest non-loopback NIC, non-root guest UID/GID, no sensitive host devices/sockets, denied privilege escalation and mount operations, read-only proc/sys and bounded tmpfs workspace.
 3. Firecracker process identity: dedicated non-root UID/GID, chroot identity, dedicated cgroup v2, PID and mount namespace isolation, zero effective capabilities and `NoNewPrivs=1`.
 4. Seccomp: filter mode 2 on the Firecracker process and every observed Firecracker thread.
