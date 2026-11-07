@@ -277,9 +277,34 @@ def main() -> int:
         run(["ip", "netns", "exec", namespace, "ip", "-6", "route", "flush", "default"])
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", guest_if, "up"])
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
-        run(["ip", "netns", "exec", namespace, "ip", "-6", "route", "flush", "table", "all", "default"])
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "ip",
+                "-6",
+                "route",
+                "flush",
+                "table",
+                "all",
+                "default",
+            ]
+        )
         evidence["ipv6_route_table"] = run(
-            ["ip", "netns", "exec", namespace, "ip", "-6", "route", "show", "table", "all"]
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "ip",
+                "-6",
+                "route",
+                "show",
+                "table",
+                "all",
+            ]
         )
 
         firewall_script = (
