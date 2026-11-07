@@ -160,7 +160,7 @@ jobs:
           )
           PY
           rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.rebuild.raw.tar artifacts/w2-rootfs.rebuild.tar
-          docker image rm "$image_id" "$rebuild_image_id"
+          docker image rm tinlance-w2-developer-workspace:firecracker tinlance-w2-developer-workspace:rebuild
           echo "W2 base image: $base_digest"
           echo "W2 image ID: $image_id"
           echo "W2 normalized rootfs tar SHA-256: $rootfs_sha256"
