@@ -19,6 +19,29 @@ import time
 PROXY_PORT = 3128
 
 
+def build_child_environment(
+    *,
+    home: str | Path,
+    tmpdir: str | Path,
+    include_playwright: bool = False,
+) -> dict[str, str]:
+    """Pass only runtime dependencies to less-trusted browser/proxy identities."""
+    allowed = {"PATH", "PYTHONPATH", "LD_LIBRARY_PATH", "LANG", "LC_ALL"}
+    if include_playwright:
+        allowed.add("PLAYWRIGHT_BROWSERS_PATH")
+    environment = {
+        key: os.environ[key]
+        for key in allowed
+        if key in os.environ
+    }
+    environment["HOME"] = str(home)
+    environment["TMPDIR"] = str(tmpdir)
+    if include_playwright:
+        environment["XDG_CONFIG_HOME"] = str(Path(home) / ".config")
+        environment["XDG_CACHE_HOME"] = str(Path(home) / ".cache")
+    return environment
+
+
 def run(
     command: list[str],
     *,
@@ -219,8 +242,7 @@ def main() -> int:
             }
         )
 
-        proxy_env = os.environ.copy()
-        proxy_env.update({"HOME": "/tmp", "TMPDIR": "/tmp"})
+        proxy_env = build_child_environment(home="/tmp", tmpdir="/tmp")
         with proxy_log.open("wb") as log_file:
             proxy_process = subprocess.Popen(
                 [
@@ -268,14 +290,10 @@ def main() -> int:
             "--workspace-id", "workspace-a",
             "--evidence", str(evidence_path),
         ]
-        guest_env = os.environ.copy()
-        guest_env.update(
-            {
-                "HOME": str(home_root),
-                "XDG_CONFIG_HOME": str(home_root / ".config"),
-                "XDG_CACHE_HOME": str(home_root / ".cache"),
-                "TMPDIR": str(tmp_root),
-            }
+        guest_env = build_child_environment(
+            home=home_root,
+            tmpdir=tmp_root,
+            include_playwright=True,
         )
         run(guest_command, timeout=180, env=guest_env)
         guest_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
@@ -303,8 +321,7 @@ def main() -> int:
             "--workspace-id",
             "workspace-a",
         ]
-        probe_env = os.environ.copy()
-        probe_env["HOME"] = "/tmp"
+        probe_env = build_child_environment(home="/tmp", tmpdir="/tmp")
         run(tenant_probe, timeout=15, env=probe_env)
         evidence["tenant_uid_separation"] = True
         evidence["status"] = "passed"
