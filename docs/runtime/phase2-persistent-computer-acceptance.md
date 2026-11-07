@@ -40,7 +40,7 @@ The W2 jailer job must pass all of the following for **3/3** executions:
 2. Rootfs and guest boundary: read-only rootfs, no guest non-loopback NIC, non-root guest UID/GID, no sensitive host devices/sockets, denied privilege escalation and mount operations, read-only proc/sys and bounded tmpfs workspace.
 3. Firecracker process identity: dedicated non-root UID/GID, chroot identity, dedicated cgroup v2, PID and mount namespace isolation, zero effective capabilities and `NoNewPrivs=1`.
 4. Seccomp: filter mode 2 on the Firecracker process and every observed Firecracker thread.
-5. Network namespace: jailer joins a dedicated root-owned namespace handle through the upstream `--netns` option; the namespace inode must differ from the host namespace and expose only `lo`.
+5. Network namespace: jailer joins a dedicated root-owned namespace handle through the upstream `--netns` option; the workflow rejects symlink handles and verifies both the handle and parent directory are root-owned and not group/world writable. The Firecracker process namespace inode must differ from the host namespace and `/proc/<pid>/net/dev` must expose only `lo`.
 6. Resource limits: `memory.max=805306368`, `pids.max=128`, `cpu.max=100000 100000`.
 7. Provenance: jailed W2 report rootfs SHA-256 must equal the exact `w2-rootfs.sha256` artifact; image ID and base-image digest must be content-addressed.
 8. All CI, CodeQL, Secret Scan, R10, TSIC conformance, W1 jailer regression, direct W2, gVisor W2 and Kata W2 workflows must be green.
