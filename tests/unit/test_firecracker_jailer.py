@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from scripts.smoke_firecracker_jailer import (
     build_jailer_command,
+    validate_jailer_profile_inputs,
     verify_jailer_process_evidence,
 )
 
@@ -225,3 +226,61 @@ CapEff:\t0000000000000000
             process_root_identity="8:12345",
             thread_seccomp_modes=[2, 0, 2],
         )
+
+
+
+def test_w1_jailer_profile_rejects_w2_rootfs_inputs(tmp_path):
+    rootfs_tar = tmp_path / "rootfs.tar"
+    rootfs_tar.write_bytes(b"normalized")
+    with pytest.raises(ValueError, match="W2 rootfs inputs are only valid"):
+        validate_jailer_profile_inputs(
+            profile="W1",
+            w2_rootfs_tar=rootfs_tar,
+            w2_image_id="sha256:" + "a" * 64,
+            w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+        )
+
+
+def test_w2_jailer_profile_requires_normalized_rootfs_tar():
+    with pytest.raises(ValueError, match="normalized W2 rootfs tar is required"):
+        validate_jailer_profile_inputs(
+            profile="W2",
+            w2_rootfs_tar=None,
+            w2_image_id="sha256:" + "a" * 64,
+            w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+        )
+
+
+def test_w2_jailer_profile_rejects_non_content_addressed_image_id(tmp_path):
+    rootfs_tar = tmp_path / "rootfs.tar"
+    rootfs_tar.write_bytes(b"normalized")
+    with pytest.raises(ValueError, match="content-addressed W2 image ID"):
+        validate_jailer_profile_inputs(
+            profile="W2",
+            w2_rootfs_tar=rootfs_tar,
+            w2_image_id="latest",
+            w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+        )
+
+
+def test_w2_jailer_profile_requires_digest_pinned_base_image(tmp_path):
+    rootfs_tar = tmp_path / "rootfs.tar"
+    rootfs_tar.write_bytes(b"normalized")
+    with pytest.raises(ValueError, match="digest-pinned W2 base image"):
+        validate_jailer_profile_inputs(
+            profile="W2",
+            w2_rootfs_tar=rootfs_tar,
+            w2_image_id="sha256:" + "a" * 64,
+            w2_base_image_digest="ubuntu:latest",
+        )
+
+
+def test_w2_jailer_profile_accepts_content_addressed_inputs(tmp_path):
+    rootfs_tar = tmp_path / "rootfs.tar"
+    rootfs_tar.write_bytes(b"normalized")
+    validate_jailer_profile_inputs(
+        profile="W2",
+        w2_rootfs_tar=rootfs_tar,
+        w2_image_id="sha256:" + "a" * 64,
+        w2_base_image_digest="ubuntu@sha256:" + "b" * 64,
+    )
