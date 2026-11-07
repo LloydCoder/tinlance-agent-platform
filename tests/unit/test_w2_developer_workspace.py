@@ -52,27 +52,25 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert "dpkg-query -W" in dockerfile
     assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
+    bootstrap_update_index = dockerfile.index(" apt-get \\\\n        -o Acquire::Retries=5")
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert update_index < install_index
+    assert bootstrap_update_index < update_index < install_index
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" not in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" not in dockerfile
     assert "Acquire::Retries=5" in dockerfile
     assert "APT::Update::Error-Mode=any" in dockerfile
-    assert dockerfile.count("Acquire::Retries=5") == 3
-    assert dockerfile.count("Acquire::http::Timeout=30") == 3
-    assert dockerfile.count("Acquire::https::Timeout=30") == 3
-    assert dockerfile.count("APT::Update::Error-Mode=any") == 1
-    assert dockerfile.count("--snapshot=") == 3
-    assert dockerfile.count("Acquire::https::Verify-Peer=false") == 2
+    assert dockerfile.count("Acquire::Retries=5") == 4
+    assert dockerfile.count("Acquire::http::Timeout=30") == 4
+    assert dockerfile.count("Acquire::https::Timeout=30") == 2
+    assert dockerfile.count("APT::Update::Error-Mode=any") == 2
+    assert dockerfile.count("--snapshot=") == 2
+    assert "Acquire::https::Verify-Peer=false" not in dockerfile
+    assert "http://archive.ubuntu.com/ubuntu" in dockerfile
     assert "RUN --network=none" in dockerfile
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
-    assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
-    assert dockerfile.index("Acquire::Retries=5") < dockerfile.index(
-        '--snapshot="${APT_SNAPSHOT}" update'
-    )
 
 
 def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
