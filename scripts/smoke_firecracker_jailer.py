@@ -323,11 +323,7 @@ def _read_thread_seccomp_modes(pid: int) -> tuple[int, ...]:
 def _read_process_network_interfaces(pid: int) -> tuple[str, ...]:
     network_dev = Path("/proc") / str(pid) / "net/dev"
     content = _run(["sudo", "-n", "cat", str(network_dev)], capture_output=True).stdout
-    return tuple(
-        line.partition(":")[0].strip()
-        for line in content.splitlines()[2:]
-        if ":" in line
-    )
+    return tuple(line.partition(":")[0].strip() for line in content.splitlines()[2:] if ":" in line)
 
 
 def _read_process_evidence(
