@@ -15,9 +15,9 @@ import socket
 import socketserver
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
-from collections.abc import Callable
 from urllib.parse import urlsplit
 
 
