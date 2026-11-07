@@ -19,6 +19,7 @@ _VOLATILE_PATHS = {
     "etc/resolv.conf",
     "var/lib/dbus/machine-id",
     "var/lib/systemd/random-seed",
+    "var/cache/ldconfig/aux-cache",
     "var/log/alternatives.log",
     "var/log/dpkg.log",
 }
