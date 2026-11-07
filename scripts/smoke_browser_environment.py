@@ -109,6 +109,7 @@ def main() -> int:
         run(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=1"])
 
         run(["nft", "add", "table", "inet", nft_table])
+        firewall_created = True
         run(
             [
                 "nft", "add", "chain", "inet", nft_table, "input",
@@ -123,7 +124,7 @@ def main() -> int:
             ]
         )
         run(["nft", "add", "rule", "inet", nft_table, "input", "iifname", host_if, "drop"])
-        firewall_created = True
+
 
         routes = run(["ip", "netns", "exec", namespace, "ip", "-4", "route", "show"])
         if any(line.split()[:1] == ["default"] for line in routes.splitlines()):
