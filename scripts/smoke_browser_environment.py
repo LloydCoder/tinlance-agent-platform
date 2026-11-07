@@ -380,6 +380,41 @@ def main() -> int:
                 start_new_session=True,
             )
         wait_for_proxy(host_ip, PROXY_PORT, proxy_process)
+        evidence["proxy_process_pid"] = proxy_process.pid
+        evidence["proxy_process_uid"] = proxy_uid
+        evidence["proxy_listener_ready"] = True
+
+        proxy_probe_script = (
+            "import socket; "
+            f"connection = socket.create_connection(({host_ip!r}, {PROXY_PORT}), timeout=3); "
+            "connection.sendall(b'CONNECT example.com:443 HTTP/1.1\\r\\n"
+            "Host: example.com:443\\r\\n\\r\\n'); "
+            "response = connection.recv(1024); "
+            "assert response.startswith(b'HTTP/1.1 200'), response; "
+            "connection.close(); "
+            "print('GUEST_PROXY_PROBE_OK')"
+        )
+        proxy_probe_output = run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "setpriv",
+                "--reuid",
+                str(browser_uid),
+                "--regid",
+                str(browser_gid),
+                "--clear-groups",
+                "--no-new-privs",
+                sys.executable,
+                "-c",
+                proxy_probe_script,
+            ],
+            timeout=10,
+            env=build_child_environment(home=home_root, tmpdir=tmp_root),
+        )
+        evidence["guest_proxy_probe_passed"] = "GUEST_PROXY_PROBE_OK" in proxy_probe_output
 
         guest_command = [
             "ip",
