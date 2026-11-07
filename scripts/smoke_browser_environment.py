@@ -98,12 +98,15 @@ def main() -> int:
     proxy_url = f"http://{host_ip}:{PROXY_PORT}"
 
     browser_user = f"tnlbr-a-{suffix}"
+    proxy_user = f"tnlbr-p-{suffix}"
     other_tenant_user = f"tnlbr-b-{suffix}"
     created_users: list[str] = []
     try:
         browser_uid, browser_gid = create_browser_user(browser_user, 51_000)
         created_users.append(browser_user)
-        other_tenant_uid, other_tenant_gid = create_browser_user(other_tenant_user, 52_000)
+        proxy_uid, proxy_gid = create_browser_user(proxy_user, 52_000)
+        created_users.append(proxy_user)
+        other_tenant_uid, other_tenant_gid = create_browser_user(other_tenant_user, 53_000)
         created_users.append(other_tenant_user)
         work_root = Path(tempfile.mkdtemp(prefix="tinlance-browser-w3-"))
         profile_root = work_root / "profile"
@@ -192,9 +195,9 @@ def main() -> int:
                 [
                     "setpriv",
                     "--reuid",
-                    str(browser_uid),
+                    str(proxy_uid),
                     "--regid",
-                    str(browser_gid),
+                    str(proxy_gid),
                     "--clear-groups",
                     "--no-new-privs",
                     sys.executable,
@@ -234,7 +237,7 @@ def main() -> int:
         if guest_evidence.get("status") != "passed":
             raise RuntimeError("browser guest acceptance did not report passed")
         evidence["guest"] = guest_evidence
-        evidence["proxy_process_uid"] = browser_uid
+        evidence["proxy_process_uid"] = proxy_uid
         evidence["browser_process_uid"] = browser_uid
         evidence["other_tenant_uid"] = other_tenant_uid
 
