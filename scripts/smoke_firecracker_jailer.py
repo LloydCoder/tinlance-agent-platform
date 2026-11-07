@@ -207,7 +207,7 @@ def verify_jailer_network_namespace_evidence(
     host_network_namespace: str,
     process_network_namespace: str,
     process_network_interfaces: Sequence[str],
-) -> dict[str, bool | list[str]]:
+) -> dict[str, bool | list[str] | str]:
     """Require a distinct Firecracker network namespace with loopback only."""
     if (
         not host_network_namespace
@@ -220,7 +220,12 @@ def verify_jailer_network_namespace_evidence(
         raise PermissionError(
             f"jailer network namespace exposes non-loopback interfaces: {interfaces}"
         )
-    return {"network_namespace_isolated": True, "network_interfaces": interfaces}
+    return {
+        "network_namespace_isolated": True,
+        "host_network_namespace": host_network_namespace,
+        "process_network_namespace": process_network_namespace,
+        "network_interfaces": interfaces,
+    }
 
 
 def _run(
