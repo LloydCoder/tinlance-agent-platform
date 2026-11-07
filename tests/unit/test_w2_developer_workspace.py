@@ -112,6 +112,7 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "cmp --silent artifacts/w2-rootfs.tar artifacts/w2-rootfs.rebuild.tar" in firecracker
     assert "w2-rootfs-reproducibility.json" in firecracker
     assert "rebuild_rootfs_sha256" in firecracker
+    assert "byte_identical" in firecracker
     assert "firecracker-w2-${{ github.run_id }}" in firecracker
     assert "path: artifacts/" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
