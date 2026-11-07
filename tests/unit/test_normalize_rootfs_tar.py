@@ -235,9 +235,7 @@ def test_normalizer_rejects_libarchive_acl_metadata(tmp_path: Path) -> None:
     with tarfile.open(source, "w", format=tarfile.PAX_FORMAT) as archive:
         member = tarfile.TarInfo("usr/bin/ping")
         member.size = 1
-        member.pax_headers = {
-            "LIBARCHIVE.acl.access": "user::rwx,group::r-x,other::r-x"
-        }
+        member.pax_headers = {"LIBARCHIVE.acl.access": "user::rwx,group::r-x,other::r-x"}
         archive.addfile(member, io.BytesIO(b"x"))
 
     with pytest.raises(ValueError, match="unsupported extended metadata"):
