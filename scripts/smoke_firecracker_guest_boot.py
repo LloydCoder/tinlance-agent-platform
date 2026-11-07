@@ -396,7 +396,7 @@ def verify_guest_boot_markers(
             ("package_manifest_reported", "TINLANCE_W2_PACKAGE_MANIFEST_SHA256="),
             ("npm_lock_sha256_reported", "TINLANCE_W2_NPM_LOCK_SHA256="),
         ):
-            if re.search(rf"{re.escape(marker)}[a-f0-9]{{64}}(?:\\r?\\n|$)", log_text) is None:
+            if re.search(rf"{re.escape(marker)}[a-f0-9]{{64}}(?:\r?\n|$)", log_text) is None:
                 missing.append(name)
     if missing:
         raise ValueError(f"guest isolation markers are missing or malformed: {sorted(set(missing))}")
