@@ -141,6 +141,7 @@ def test_normalizer_rejects_xattrs_and_acls_until_runtime_parity_is_proven(
     with pytest.raises(ValueError, match="unsupported extended metadata"):
         normalize_rootfs_tar(source, tmp_path / "xattrs.normalized.tar")
 
+
 def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(
     tmp_path: Path,
 ) -> None:
