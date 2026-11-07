@@ -111,8 +111,15 @@ class BrowserProfileLease:
         tenant_id: str,
         workspace_id: str,
     ) -> BrowserProfileLease:
-        if not tenant_id or not workspace_id or "\x00" in tenant_id or "\x00" in workspace_id:
-            raise ValueError("tenant and workspace identifiers are required")
+        if (
+            not tenant_id
+            or not workspace_id
+            or len(tenant_id) > 256
+            or len(workspace_id) > 256
+            or "\x00" in tenant_id
+            or "\x00" in workspace_id
+        ):
+            raise ValueError("tenant and workspace identifiers must be 1–256 safe characters")
         root = Path(profile_root)
         if not root.is_absolute() or ".." in root.parts:
             raise ValueError("browser profile root must be an absolute traversal-free path")
