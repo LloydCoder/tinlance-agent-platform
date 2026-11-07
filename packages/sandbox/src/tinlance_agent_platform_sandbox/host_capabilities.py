@@ -131,8 +131,13 @@ def probe_host_capabilities(
         cpu_security_warnings.append("CPU SMT state is unavailable")
     if not platform_vendor or not platform_product_name or not platform_firmware_version:
         cpu_security_warnings.append("Platform firmware identity is incomplete")
-    if not microcode_revision or microcode_revision.lower() in {"0", "0x0"}:
-        cpu_security_warnings.append("CPU microcode revision is unavailable or zero")
+    if not microcode_revision or microcode_revision.lower() in {
+        "0",
+        "0x0",
+        "0xffffffff",
+        "0xffffffffffffffff",
+    }:
+        cpu_security_warnings.append("CPU microcode revision is unavailable, zero or sentinel")
     if not cpu_vulnerabilities:
         cpu_security_warnings.append("CPU vulnerability sysfs statuses are unavailable")
     for name, status in cpu_vulnerabilities.items():

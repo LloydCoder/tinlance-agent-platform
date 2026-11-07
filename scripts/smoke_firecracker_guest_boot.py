@@ -22,6 +22,9 @@ from urllib.parse import urlencode
 S3_BASE = "https://s3.amazonaws.com/spec.ccfc.min"
 FIRECRACKER_VERSION = "1.17.0"
 GUEST_READY_MARKER = "TINLANCE_GUEST_READY"
+GUEST_KERNEL_SECURITY_ARGS = (
+    "spec_rstack_overflow=safe-ret tsa=on spec_store_bypass_disable=on"
+)
 GUEST_READ_ONLY_MARKER = "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED"
 GUEST_NO_NIC_MARKER = "TINLANCE_NO_NIC_CONFIRMED"
 GUEST_WRITE_UNEXPECTED_MARKER = "TINLANCE_ROOTFS_WRITE_UNEXPECTED"
@@ -660,6 +663,7 @@ def extract_guest_cpu_vulnerability_statuses(log_text: str) -> dict[str, str]:
     """Parse machine-readable SRSO/TSA mitigation status from the guest kernel log."""
     prefixes = {
         "spec_rstack_overflow": "Speculative Return Stack Overflow:",
+        "spec_store_bypass": "Speculative Store Bypass:",
         "tsa": "Transient Scheduler Attacks:",
     }
     statuses: dict[str, str] = {}
@@ -676,7 +680,7 @@ def extract_guest_cpu_vulnerability_statuses(log_text: str) -> dict[str, str]:
 def summarize_guest_cpu_vulnerability_samples(
     samples: Sequence[dict[str, str]],
 ) -> dict[str, object]:
-    required = ("spec_rstack_overflow", "tsa")
+    required = ("spec_rstack_overflow", "spec_store_bypass", "tsa")
     keys = sorted({key for sample in samples for key in sample})
     statuses = {key: sorted({sample[key] for sample in samples if key in sample}) for key in keys}
     warnings = [f"{key}: status unavailable" for key in required if key not in statuses]
@@ -802,7 +806,7 @@ def _run_guest(
                 {
                     "kernel_image_path": str(kernel_path),
                     "boot_args": (
-                        "console=ttyS0 reboot=k panic=1 "
+                        f"console=ttyS0 reboot=k panic=1 {GUEST_KERNEL_SECURITY_ARGS} "
                         "root=/dev/vda ro init=/usr/local/sbin/tinlance-guest-init"
                     ),
                 },

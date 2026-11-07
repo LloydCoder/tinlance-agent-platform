@@ -13,6 +13,7 @@ from scripts.smoke_firecracker_guest_boot import (
     _stop_firecracker,
     extract_guest_cpu_vulnerability_statuses,
     extract_w2_rootfs_tar,
+    summarize_guest_cpu_vulnerability_samples,
     load_asset_manifest,
     parse_latest_artifact_prefix,
     select_latest_versioned_key,
@@ -608,11 +609,13 @@ def test_guest_boot_w2_verifier_rejects_empty_toolchain_version_markers() -> Non
 def test_extract_guest_cpu_vulnerability_statuses_parses_srso_and_tsa() -> None:
     log = """
     [    0.100] Speculative Return Stack Overflow: Vulnerable: Safe RET, no microcode
-    [    0.101] Transient Scheduler Attacks: Vulnerable: No microcode
-    [    0.102] Speculative Return Stack Overflow: WARNING: mitigation details
+    [    0.101] Speculative Store Bypass: Mitigation: Speculative Store Bypass disabled
+    [    0.102] Transient Scheduler Attacks: Vulnerable: No microcode
+    [    0.103] Speculative Return Stack Overflow: WARNING: mitigation details
     """
     assert extract_guest_cpu_vulnerability_statuses(log) == {
         "spec_rstack_overflow": "Vulnerable: Safe RET, no microcode",
+        "spec_store_bypass": "Mitigation: Speculative Store Bypass disabled",
         "tsa": "Vulnerable: No microcode",
     }
 
@@ -637,3 +640,30 @@ def test_stop_firecracker_waits_for_process_exit_before_removing_socket(
 
     assert commands[0] == ["sudo", "-n", "pkill", "-TERM", "-x", "firecracker"]
     assert commands[-1] == ["sudo", "-n", "rm", "-f", "--", str(socket_path)]
+
+
+
+def test_guest_cpu_summary_keeps_unmitigated_status_as_a_security_warning() -> None:
+    summary = summarize_guest_cpu_vulnerability_samples(
+        [
+            {
+                "spec_rstack_overflow": "Vulnerable: Safe RET, no microcode",
+                "spec_store_bypass": "Mitigation: Speculative Store Bypass disabled",
+                "tsa": "Vulnerable: No microcode",
+            }
+        ]
+    )
+
+    assert summary["guest_cpu_security_mitigations_ready"] is False
+    assert summary["guest_cpu_security_warnings"] == [
+        "spec_rstack_overflow: Vulnerable: Safe RET, no microcode",
+        "tsa: Vulnerable: No microcode",
+    ]
+
+
+def test_guest_kernel_boot_args_request_cpu_side_channel_mitigations() -> None:
+    from scripts.smoke_firecracker_guest_boot import GUEST_KERNEL_SECURITY_ARGS
+
+    assert "spec_rstack_overflow=safe-ret" in GUEST_KERNEL_SECURITY_ARGS
+    assert "tsa=on" in GUEST_KERNEL_SECURITY_ARGS
+    assert "spec_store_bypass_disable=on" in GUEST_KERNEL_SECURITY_ARGS

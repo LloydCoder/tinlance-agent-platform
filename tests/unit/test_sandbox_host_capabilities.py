@@ -200,3 +200,24 @@ def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(
     assert payload["microcode_revision"] == "0x12345678"
     assert payload["cpu_smt_active"] is False
     assert payload["platform_firmware_version"] == "1.2.3"
+
+
+
+def test_cpu_security_attestation_rejects_sentinel_microcode_revision(tmp_path: Path) -> None:
+    write_probe_fixture(tmp_path, kvm=True)
+    cpuinfo = tmp_path / "proc/cpuinfo"
+    cpuinfo.write_text(
+        cpuinfo.read_text(encoding="utf-8").replace("0x12345678", "0xffffffff"),
+        encoding="utf-8",
+    )
+
+    result = probe_host_capabilities(
+        root=tmp_path,
+        architecture="x86_64",
+        kernel_release="test-kernel",
+        binary_lookup=lambda _: None,
+        access_check=lambda *_: True,
+    )
+
+    assert result.cpu_security_mitigations_ready is False
+    assert "CPU microcode revision is unavailable, zero or sentinel" in result.cpu_security_warnings
