@@ -101,7 +101,7 @@ jobs:
           mkdir -p artifacts
           base_digest="ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
           docker pull "$base_digest"
-          docker build \
+          docker build --pull --no-cache \
             --build-arg BASE_IMAGE="$base_digest" \
             --build-arg APT_SNAPSHOT=20261106T000000Z \
             --file tests/fixtures/w2-developer-workspace/Dockerfile \
@@ -117,8 +117,50 @@ jobs:
           docker rm "$container_id"
           python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.raw.tar --output artifacts/w2-rootfs.tar
           rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
+
+          docker build --pull --no-cache \
+            --build-arg BASE_IMAGE="$base_digest" \
+            --build-arg APT_SNAPSHOT=20261106T000000Z \
+            --file tests/fixtures/w2-developer-workspace/Dockerfile \
+            --tag tinlance-w2-developer-workspace:rebuild \
+            tests/fixtures/w2-developer-workspace
+          rebuild_image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:rebuild)"
+          case "$rebuild_image_id" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "Independent W2 rebuild image ID is not content-addressed: $rebuild_image_id"; exit 1 ;;
+          esac
+          rebuild_container_id="$(docker create "$rebuild_image_id")"
+          docker export --output artifacts/w2-rootfs.rebuild.raw.tar "$rebuild_container_id"
+          docker rm "$rebuild_container_id"
+          python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.rebuild.raw.tar --output artifacts/w2-rootfs.rebuild.tar
+          rebuild_sha256="$(sha256sum artifacts/w2-rootfs.rebuild.tar | awk '{print $1}')"
+          if ! cmp --silent artifacts/w2-rootfs.tar artifacts/w2-rootfs.rebuild.tar; then
+            echo "Independent W2 image builds produced different normalized rootfs archives."
+            echo "primary=$rootfs_sha256 rebuild=$rebuild_sha256"
+            exit 1
+          fi
           printf '%s\n' "$rootfs_sha256" > artifacts/w2-rootfs.sha256
-          rm -f artifacts/w2-rootfs.raw.tar
+          python - <<PY
+          import json
+          from pathlib import Path
+
+          report = {
+              "base_image_digest": "$base_digest",
+              "apt_snapshot": "20261106T000000Z",
+              "build_cache_disabled": True,
+              "primary_image_id": "$image_id",
+              "rebuild_image_id": "$rebuild_image_id",
+              "primary_rootfs_sha256": "$rootfs_sha256",
+              "rebuild_rootfs_sha256": "$rebuild_sha256",
+              "byte_identical": True,
+          }
+          Path("artifacts/w2-rootfs-reproducibility.json").write_text(
+              json.dumps(report, sort_keys=True, indent=2) + "\\n",
+              encoding="utf-8",
+          )
+          PY
+          rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.rebuild.raw.tar artifacts/w2-rootfs.rebuild.tar
+          docker image rm "$image_id" "$rebuild_image_id"
           echo "W2 base image: $base_digest"
           echo "W2 image ID: $image_id"
           echo "W2 normalized rootfs tar SHA-256: $rootfs_sha256"
