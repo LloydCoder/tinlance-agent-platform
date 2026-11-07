@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from scripts.smoke_browser_environment import build_child_environment
 
 
 def test_browser_child_environment_is_explicitly_allowlisted(
-    monkeypatch,
-    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("PATH", "/usr/bin")
     monkeypatch.setenv("PYTHONPATH", "/workspace/packages")
@@ -43,8 +47,8 @@ def test_browser_child_environment_is_explicitly_allowlisted(
 
 
 def test_proxy_child_environment_does_not_include_browser_cache(
-    monkeypatch,
-    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("PATH", "/usr/bin")
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", "/runner/browser-cache")
