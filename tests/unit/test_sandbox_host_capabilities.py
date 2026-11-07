@@ -202,7 +202,6 @@ def test_cpu_security_attestation_surfaces_unmitigated_vulnerability(
     assert payload["platform_firmware_version"] == "1.2.3"
 
 
-
 def test_cpu_security_attestation_rejects_sentinel_microcode_revision(
     tmp_path: Path,
 ) -> None:
