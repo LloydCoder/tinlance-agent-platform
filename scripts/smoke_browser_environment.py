@@ -357,13 +357,23 @@ def main() -> int:
                 check=False,
                 capture_output=True,
             )
-            if deleted_user.returncode != 0:
+            if deleted_user.returncode != 0 or subprocess.run(
+                ["getent", "passwd", username],
+                check=False,
+                capture_output=True,
+            ).returncode == 0:
                 cleanup_errors.append(f"temporary browser user {username} could not be deleted")
             subprocess.run(
                 ["groupdel", username],
                 check=False,
                 capture_output=True,
             )
+            if subprocess.run(
+                ["getent", "group", username],
+                check=False,
+                capture_output=True,
+            ).returncode == 0:
+                cleanup_errors.append(f"temporary browser group {username} could not be deleted")
         if cleanup_errors:
             evidence["cleanup_verified"] = False
             evidence["status"] = "failed"
