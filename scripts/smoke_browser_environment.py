@@ -125,7 +125,7 @@ def main() -> int:
     network = ipaddress.IPv4Network(f"10.253.{subnet_octet}.{subnet_base}/30")
     host_ip = str(network.network_address + 1)
     guest_ip = str(network.network_address + 2)
-    client_network = str(network)
+    client_network = f"{guest_ip}/32"
     proxy_url = f"http://{host_ip}:{PROXY_PORT}"
 
     browser_user = f"tnlbr-a-{suffix}"
