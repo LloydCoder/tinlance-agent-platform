@@ -162,7 +162,6 @@ def test_proxy_revalidates_each_connect_and_rejects_redirect_target(
         upstream.close()
 
 
-
 def test_proxy_cannot_bind_public_or_wildcard_interfaces() -> None:
     with pytest.raises(ValueError, match="specific private"):
         BrowserEgressProxy(
