@@ -52,7 +52,9 @@ def build_jailer_command(
         raise ValueError("jailer must run under a non-root uid and gid")
     for path in (jailer_binary, firecracker_binary, chroot_base_dir, network_namespace_path):
         if path is not None and not Path(path).is_absolute():
-            raise ValueError("jailer executable, chroot and network namespace paths must be absolute")
+            raise ValueError(
+                "jailer executable, chroot and network namespace paths must be absolute"
+            )
 
     command = [
         "sudo",
