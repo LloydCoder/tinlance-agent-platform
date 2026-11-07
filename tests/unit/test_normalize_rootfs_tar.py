@@ -176,3 +176,33 @@ def test_normalizer_canonicalizes_hardlinks_and_drops_inode_pax_metadata(
         assert all(member.isfile() for member in members)
         assert all("SCHILY.ino" not in member.pax_headers for member in members)
         assert all("SCHILY.nlink" not in member.pax_headers for member in members)
+
+def test_normalizer_drops_volatile_ldconfig_aux_cache_from_reproducible_rootfs(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first-ldconfig.tar"
+    second = tmp_path / "second-ldconfig.tar"
+    stable = ("file", "etc/issue", b"Ubuntu 24.04")
+    _write_archive(
+        first,
+        [stable, ("file", "var/cache/ldconfig/aux-cache", b"cache-from-build-one")],
+        uid=1234,
+        gid=5678,
+        mtime=1_700_000_000,
+    )
+    _write_archive(
+        second,
+        [stable, ("file", "var/cache/ldconfig/aux-cache", b"cache-from-build-two")],
+        uid=9999,
+        gid=8888,
+        mtime=1_800_000_000,
+    )
+
+    first_output = tmp_path / "first-ldconfig.normalized.tar"
+    second_output = tmp_path / "second-ldconfig.normalized.tar"
+    first_digest, _ = normalize_rootfs_tar(first, first_output)
+    second_digest, _ = normalize_rootfs_tar(second, second_output)
+
+    assert first_digest == second_digest
+    with tarfile.open(first_output, "r:") as archive:
+        assert "var/cache/ldconfig/aux-cache" not in archive.getnames()
