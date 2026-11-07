@@ -306,6 +306,9 @@ def main() -> int:
                 "all",
             ]
         )
+        evidence["ipv6_proc_route_table"] = run(
+            ["ip", "netns", "exec", namespace, "cat", "/proc/net/ipv6_route"]
+        )
 
         firewall_script = (
             f"table inet {nft_table} {{\n"
