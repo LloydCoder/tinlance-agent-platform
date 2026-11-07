@@ -224,6 +224,8 @@ class BrowserSession:
         return self._context
 
     def navigate(self, url: str) -> Any:
+        if not url or len(url) > 16_384:
+            raise BrowserIsolationError("browser navigation URL is empty or too large")
         parsed = urlsplit(url)
         if (
             parsed.scheme != "https"
@@ -272,8 +274,8 @@ class BrowserWorkspaceManager:
         expected_uid: int,
         navigation_timeout_ms: int = 30_000,
     ) -> None:
-        if not tenant_id or "\\x00" in tenant_id:
-            raise ValueError("browser manager must be bound to one tenant")
+        if not tenant_id or len(tenant_id) > 256 or "\\x00" in tenant_id:
+            raise ValueError("browser manager must be bound to one valid tenant identifier")
         if navigation_timeout_ms < 1 or navigation_timeout_ms > 300_000:
             raise ValueError("browser navigation timeout is outside policy")
         self.profile_root = Path(profile_root)
