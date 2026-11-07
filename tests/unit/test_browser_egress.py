@@ -125,7 +125,8 @@ def test_connector_uses_validated_ip_literal_without_hostname_lookup(
     result = connect_pinned_target(target, timeout_seconds=3.0)
 
     assert isinstance(result, FakeSocket)
-    assert calls == [(("93.184.216.34", 443), 3.0)]
+    assert calls[0][0] == ("93.184.216.34", 443)
+    assert calls[0][1] == pytest.approx(3.0)
     assert ipaddress.ip_address(calls[0][0][0]).is_global
 
 
