@@ -142,6 +142,7 @@ class BrowserProfileLease:
                 or marker_value != tenant_identity
             ):
                 raise BrowserIsolationError("profile root is already bound to another tenant")
+            os.chmod(tenant_marker, 0o600)
         else:
             try:
                 os.write(marker_fd, tenant_identity.encode("ascii"))
@@ -264,7 +265,7 @@ class BrowserWorkspaceManager:
         proxy_url: str,
         *,
         tenant_id: str,
-        expected_uid: int | None = None,
+        expected_uid: int,
         navigation_timeout_ms: int = 30_000,
     ) -> None:
         if not tenant_id or "\\x00" in tenant_id:
@@ -274,7 +275,9 @@ class BrowserWorkspaceManager:
         self.profile_root = Path(profile_root)
         self.proxy_url = proxy_url
         self.tenant_id = tenant_id
-        self.expected_uid = os.geteuid() if expected_uid is None else expected_uid
+        if expected_uid < 1:
+            raise ValueError("browser tenant UID must be a dedicated non-root identity")
+        self.expected_uid = expected_uid
         self.navigation_timeout_ms = navigation_timeout_ms
 
     def open(self, workspace_id: str) -> BrowserSession:
