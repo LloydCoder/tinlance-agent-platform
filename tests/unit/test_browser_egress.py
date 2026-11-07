@@ -57,9 +57,7 @@ def test_explicit_wildcard_allows_subdomain_but_not_apex() -> None:
 )
 def test_unapproved_or_special_use_hosts_are_rejected(hostname: str) -> None:
     with pytest.raises(EgressDenied):
-        resolve_public_target(
-            hostname, 443, policy(), resolver=lambda _: ("93.184.216.34",)
-        )
+        resolve_public_target(hostname, 443, policy(), resolver=lambda _: ("93.184.216.34",))
 
 
 @pytest.mark.parametrize(
@@ -81,9 +79,7 @@ def test_unapproved_or_special_use_hosts_are_rejected(hostname: str) -> None:
 )
 def test_non_public_dns_answers_are_rejected(address: str) -> None:
     with pytest.raises(EgressDenied):
-        resolve_public_target(
-            "example.com", 443, policy(), resolver=lambda _: (address,)
-        )
+        resolve_public_target("example.com", 443, policy(), resolver=lambda _: (address,))
 
 
 def test_mixed_public_and_private_dns_answers_fail_closed() -> None:
@@ -98,9 +94,7 @@ def test_mixed_public_and_private_dns_answers_fail_closed() -> None:
 
 def test_only_https_port_is_allowed() -> None:
     with pytest.raises(EgressDenied):
-        resolve_public_target(
-            "example.com", 80, policy(), resolver=lambda _: ("93.184.216.34",)
-        )
+        resolve_public_target("example.com", 80, policy(), resolver=lambda _: ("93.184.216.34",))
 
 
 def test_invalid_idna_hostname_is_rejected() -> None:
