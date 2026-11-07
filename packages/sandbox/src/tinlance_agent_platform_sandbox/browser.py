@@ -125,6 +125,31 @@ class BrowserProfileLease:
         identity = hashlib.sha256(
             (tenant_id + "\x00" + workspace_id).encode("utf-8")
         ).hexdigest()
+        tenant_marker = root / ".tenant-id"
+        marker_flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            marker_fd = os.open(tenant_marker, marker_flags, 0o600)
+        except FileExistsError:
+            marker_fd = os.open(
+                tenant_marker,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            )
+            marker_info = os.fstat(marker_fd)
+            marker_value = os.read(marker_fd, 128).decode("ascii", errors="strict")
+            os.close(marker_fd)
+            if (
+                marker_info.st_uid != os.geteuid()
+                or not stat.S_ISREG(marker_info.st_mode)
+                or marker_value != identity
+            ):
+                raise BrowserIsolationError("profile root is already bound to another tenant")
+        else:
+            try:
+                os.write(marker_fd, identity.encode("ascii"))
+                os.fsync(marker_fd)
+            finally:
+                os.close(marker_fd)
+
         profile_path = root / identity
         if profile_path.is_symlink():
             raise BrowserIsolationError("browser profile path cannot be a symlink")
@@ -235,19 +260,28 @@ class BrowserWorkspaceManager:
         profile_root: str | Path,
         proxy_url: str,
         *,
+        tenant_id: str,
+        *,
+        expected_uid: int | None = None,
         navigation_timeout_ms: int = 30_000,
     ) -> None:
+        if not tenant_id or "\\x00" in tenant_id:
+            raise ValueError("browser manager must be bound to one tenant")
         if navigation_timeout_ms < 1 or navigation_timeout_ms > 300_000:
             raise ValueError("browser navigation timeout is outside policy")
         self.profile_root = Path(profile_root)
         self.proxy_url = proxy_url
+        self.tenant_id = tenant_id
+        self.expected_uid = os.geteuid() if expected_uid is None else expected_uid
         self.navigation_timeout_ms = navigation_timeout_ms
 
-    def open(self, tenant_id: str, workspace_id: str) -> BrowserSession:
+    def open(self, workspace_id: str) -> BrowserSession:
+        if os.geteuid() != self.expected_uid:
+            raise BrowserIsolationError("browser process UID does not match tenant supervisor binding")
         verify_browser_network_isolation(self.proxy_url)
         lease = BrowserProfileLease.acquire(
             self.profile_root,
-            tenant_id,
+            self.tenant_id,
             workspace_id,
         )
         playwright: Any | None = None
