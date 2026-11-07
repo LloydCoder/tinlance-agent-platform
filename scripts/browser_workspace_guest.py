@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ipaddress
 import json
 import os
@@ -23,10 +24,8 @@ def chromium_process_security() -> dict[str, object]:
             continue
         seen.add(parent)
         children_file = Path(f"/proc/{parent}/task/{parent}/children")
-        try:
+        with contextlib.suppress(FileNotFoundError, PermissionError, ValueError):
             pending.extend(int(value) for value in children_file.read_text().split())
-        except (FileNotFoundError, PermissionError, ValueError):
-            pass
         command_file = Path(f"/proc/{parent}/cmdline")
         status_file = Path(f"/proc/{parent}/status")
         try:
@@ -59,7 +58,9 @@ def chromium_process_security() -> dict[str, object]:
     cap_eff_zero = int(cap_eff, 16) == 0
     sandbox_enabled = "--no-sandbox" not in command
     if not no_new_privs or not cap_eff_zero or not sandbox_enabled:
-        raise SystemExit("Chromium process did not retain the required sandbox/no-new-privileges boundary")
+        raise SystemExit(
+            "Chromium process did not retain the required sandbox/no-new-privileges boundary"
+        )
     return {
         "chromium_pid": pid,
         "chromium_sandbox_enabled": sandbox_enabled,
@@ -83,7 +84,9 @@ def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run W3 browser workspace acceptance inside its netns.")
+    parser = argparse.ArgumentParser(
+        description="Run W3 browser workspace acceptance inside its netns."
+    )
     parser.add_argument("--profile-root", required=True)
     parser.add_argument("--proxy-url", required=True)
     parser.add_argument("--tenant-id", required=True)
@@ -127,7 +130,9 @@ def main() -> int:
     with manager.open(args.workspace_id) as session:
         response = session.navigate("https://example.com/")
         if response is None or response.status != 200:
-            raise SystemExit("browser could not load the allowlisted HTTPS origin through the proxy")
+            raise SystemExit(
+                "browser could not load the allowlisted HTTPS origin through the proxy"
+            )
         session.context.add_cookies(
             [
                 {
@@ -143,7 +148,9 @@ def main() -> int:
         )
         first_profile = session.profile_path
         browser = session.context.browser
-        evidence["browser_version"] = browser.version if browser is not None else "persistent-context"
+        evidence["browser_version"] = (
+            browser.version if browser is not None else "persistent-context"
+        )
         evidence.update(chromium_process_security())
         evidence["allowlisted_https_navigation"] = True
 
