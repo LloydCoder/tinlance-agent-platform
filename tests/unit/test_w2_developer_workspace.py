@@ -85,10 +85,7 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     firecracker = (workflow_root / "persistent-computer-firecracker-w2.yml").read_text(
         encoding="utf-8"
     )
-    base_digest = (
-        "ubuntu@sha256:"
-        "fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
-    )
+    base_digest = "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
     assert firecracker.count("Build digest-pinned W2 developer image and export rootfs") == 1
     assert base_digest in firecracker
     assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in firecracker
@@ -97,9 +94,10 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "path: artifacts/" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
     assert firecracker.count("needs: guest-boot") == 2
-    assert firecracker.count(
-        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
-    ) == 2
+    assert (
+        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093")
+        == 2
+    )
     assert "gvisor-w2:" in firecracker
     assert "kata-w2:" in firecracker
     assert "docker import" in firecracker
