@@ -195,14 +195,13 @@ def main() -> int:
         evidence["browser_process_uid"] = BROWSER_UID
         evidence["status"] = "passed"
 
-        output = Path(args.artifacts)
-        output.mkdir(parents=True, exist_ok=True)
-        (output / "browser-w3.json").write_text(
-            json.dumps(evidence, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        return 0
+    except BaseException as exc:
+        evidence["status"] = "failed"
+        evidence["failure_type"] = type(exc).__name__
+        evidence["failure_message"] = str(exc)[:512]
+        raise
     finally:
+        cleanup_errors: list[str] = []
         if proxy_process is not None:
             proxy_process.terminate()
             try:
@@ -211,16 +210,82 @@ def main() -> int:
                 proxy_process.kill()
                 proxy_process.wait(timeout=5)
         if firewall_created:
-            subprocess.run(
+            deleted = subprocess.run(
                 ["nft", "delete", "table", "inet", nft_table],
                 check=False,
                 capture_output=True,
             )
+            if deleted.returncode != 0:
+                cleanup_errors.append("nftables browser table could not be deleted")
         if link_created:
-            subprocess.run(["ip", "link", "del", host_if], check=False, capture_output=True)
+            deleted = subprocess.run(
+                ["ip", "link", "del", host_if],
+                check=False,
+                capture_output=True,
+            )
+            if deleted.returncode != 0:
+                cleanup_errors.append("browser host veth could not be deleted")
         if namespace_created:
-            subprocess.run(["ip", "netns", "del", namespace], check=False, capture_output=True)
+            listed_pids = subprocess.run(
+                ["ip", "netns", "pids", namespace],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            for raw_pid in listed_pids.stdout.split():
+                try:
+                    os.kill(int(raw_pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            if listed_pids.stdout.strip():
+                time.sleep(1)
+                remaining = subprocess.run(
+                    ["ip", "netns", "pids", namespace],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                for raw_pid in remaining.stdout.split():
+                    try:
+                        os.kill(int(raw_pid), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            deleted = subprocess.run(
+                ["ip", "netns", "del", namespace],
+                check=False,
+                capture_output=True,
+            )
+            if deleted.returncode != 0:
+                cleanup_errors.append("browser network namespace could not be deleted")
+        if firewall_created and subprocess.run(
+            ["nft", "list", "table", "inet", nft_table],
+            check=False,
+            capture_output=True,
+        ).returncode == 0:
+            cleanup_errors.append("browser nftables table remains after cleanup")
+        if namespace_created and namespace in {
+            line.split()[0] for line in run(["ip", "netns", "list"]).splitlines() if line.split()
+        }:
+            cleanup_errors.append("browser network namespace remains after cleanup")
+        if link_created and subprocess.run(
+            ["ip", "link", "show", host_if],
+            check=False,
+            capture_output=True,
+        ).returncode == 0:
+            cleanup_errors.append("browser host veth remains after cleanup")
+        evidence["cleanup_verified"] = not cleanup_errors
+        if cleanup_errors:
+            evidence["status"] = "failed"
+            evidence["cleanup_errors"] = cleanup_errors
+        output = Path(args.artifacts)
+        output.mkdir(parents=True, exist_ok=True)
+        (output / "browser-w3.json").write_text(
+            json.dumps(evidence, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
         shutil.rmtree(work_root, ignore_errors=True)
+        if cleanup_errors and evidence.get("failure_type") is None:
+            raise RuntimeError(f"W3 cleanup failed: {cleanup_errors}")
 
 
 if __name__ == "__main__":
