@@ -93,12 +93,16 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "firecracker-w2-${{ github.run_id }}" in firecracker
     assert "path: artifacts/" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
-    assert firecracker.count("needs: guest-boot") == 2
+    assert firecracker.count("needs: guest-boot") == 3
     assert (
-        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093") == 2
+        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093") == 3
     )
     assert "gvisor-w2:" in firecracker
     assert "kata-w2:" in firecracker
+    assert "firecracker-jailer-w2:" in firecracker
+    assert "firecracker-jailer-w2.json" in firecracker
+    assert "--profile W2" in firecracker
+    assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
     for name in (
