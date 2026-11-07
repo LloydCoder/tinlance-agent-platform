@@ -47,7 +47,10 @@ RUN --network=none \
 
 COPY --chown=0:0 . /opt/tinlance-fixture/
 RUN --network=none mkdir -p /workspace
-RUN --network=none git -C /opt/tinlance-fixture init --quiet --initial-branch=main \
+RUN --network=none cd /opt/tinlance-fixture/node \
+    && npm_config_cache=/tmp/w2-npm-cache npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund \
+    && rm -rf /tmp/w2-npm-cache /root/.npm \
+    && git -C /opt/tinlance-fixture init --quiet --initial-branch=main \
     && git -C /opt/tinlance-fixture config user.name "Tinlance W2 Fixture" \
     && git -C /opt/tinlance-fixture config user.email "fixture@invalid.example" \
     && git -C /opt/tinlance-fixture add . \
