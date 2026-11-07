@@ -1,0 +1,103 @@
+name: Persistent Computer W3 Browser Environment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/persistent-computer-browser-w3.yml"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/browser.py"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/egress_proxy.py"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/__init__.py"
+      - "scripts/browser_egress_proxy.py"
+      - "scripts/browser_workspace_guest.py"
+      - "scripts/smoke_browser_environment.py"
+      - "tests/unit/test_browser_egress.py"
+      - "tests/unit/test_browser_workspace.py"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-computer-browser-w3-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-w3:
+    name: W3 isolated persistent Chromium workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Install project, test and browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test,browser]"
+          python -m playwright install chromium
+          sudo python -m playwright install-deps chromium
+          chmod o+x "$HOME" "$HOME/.cache" "$HOME/.cache/ms-playwright"
+          chmod -R a+rX "$HOME/.cache/ms-playwright"
+
+      - name: Run browser policy and profile lifecycle tests
+        run: |
+          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py
+
+      - name: Run isolated network namespace and real Chromium acceptance
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y iproute2 nftables util-linux
+          mkdir -p artifacts
+          sudo env \
+            PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" \
+            PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" \
+            python scripts/smoke_browser_environment.py \
+              --artifacts "$GITHUB_WORKSPACE/artifacts" \
+              --allowed-domain example.com
+          test -s artifacts/browser-w3.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/browser-w3.json").read_text(encoding="utf-8"))
+          if report.get("status") != "passed":
+              raise SystemExit(f"W3 browser acceptance did not pass: {report}")
+          required = [
+              "network_namespace_created",
+              "browser_network_has_only_proxy_link",
+              "host_firewall_proxy_only",
+              "direct_public_egress_blocked",
+              "metadata_ip_denied",
+              "unallowlisted_hostname_denied",
+              "allowlisted_https_navigation",
+              "profile_persisted_across_restart",
+              "workspace_profile_isolation",
+              "tenant_profile_root_binding",
+          ]
+          guest = report.get("guest", {})
+          missing = [name for name in required if guest.get(name) is not True and report.get(name) is not True]
+          if missing:
+              raise SystemExit(f"W3 acceptance evidence is incomplete: {missing}")
+          if report.get("production_certification") is not False:
+              raise SystemExit("Ephemeral W3 CI must not claim production certification.")
+          print("PASS: W3 browser environment, persistent profiles and enforced proxy egress.")
+          print(json.dumps(report, sort_keys=True, indent=2))
+          PY
+          chmod -R a+rX artifacts
+
+      - name: Upload W3 browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-w3-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 90
