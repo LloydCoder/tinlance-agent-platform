@@ -6,8 +6,8 @@ import socket
 import pytest
 
 from tinlance_agent_platform_sandbox.egress_proxy import (
-    EgressDenied,
     BrowserEgressProxy,
+    EgressDenied,
     EgressPolicy,
     ResolvedTarget,
     connect_pinned_target,
@@ -106,7 +106,9 @@ def test_invalid_idna_hostname_is_rejected() -> None:
         normalize_hostname("bad..example.com")
 
 
-def test_connector_uses_validated_ip_literal_without_hostname_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_connector_uses_validated_ip_literal_without_hostname_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[tuple[object, ...]] = []
 
     class FakeSocket:
