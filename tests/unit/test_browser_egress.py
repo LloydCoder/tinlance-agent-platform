@@ -153,8 +153,7 @@ def test_proxy_revalidates_each_connect_and_rejects_redirect_target(
 
         with socket.create_connection((host, port), timeout=3) as redirected:
             redirected.sendall(
-                b"CONNECT 169.254.169.254:443 HTTP/1.1\r\n"
-                b"Host: 169.254.169.254:443\r\n\r\n"
+                b"CONNECT 169.254.169.254:443 HTTP/1.1\r\nHost: 169.254.169.254:443\r\n\r\n"
             )
             redirect_response = redirected.recv(1024)
         assert redirect_response.startswith(b"HTTP/1.1 403")
