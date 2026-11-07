@@ -238,12 +238,49 @@ def main() -> int:
                 namespace,
                 "sysctl",
                 "-w",
+                "net.ipv6.conf.all.accept_ra=0",
+            ]
+        )
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
+                "net.ipv6.conf.default.accept_ra=0",
+            ]
+        )
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
+                f"net.ipv6.conf.{guest_if}.accept_ra=0",
+            ]
+        )
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                namespace,
+                "sysctl",
+                "-w",
                 "net.ipv6.conf.lo.disable_ipv6=1",
             ]
         )
         run(["ip", "netns", "exec", namespace, "ip", "-6", "route", "flush", "default"])
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", guest_if, "up"])
         run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
+        run(["ip", "netns", "exec", namespace, "ip", "-6", "route", "flush", "table", "all", "default"])
+        evidence["ipv6_route_table"] = run(
+            ["ip", "netns", "exec", namespace, "ip", "-6", "route", "show", "table", "all"]
+        )
 
         firewall_script = (
             f"table inet {nft_table} {{\n"
