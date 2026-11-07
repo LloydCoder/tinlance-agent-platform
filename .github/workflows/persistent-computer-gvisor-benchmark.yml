@@ -1,4 +1,4 @@
-name: Persistent Computer gVisor W1 and W2 Benchmark
+name: Persistent Computer gVisor W1 Benchmark
 
 on:
   pull_request:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   gvisor-w1:
-    name: gVisor W1 and W2 restricted workloads (ephemeral runner)
+    name: gVisor W1 restricted workloads (ephemeral runner)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -59,68 +59,22 @@ jobs:
           docker pull "$image_digest"
           echo "image_digest=$image_digest" >> "$GITHUB_OUTPUT"
           echo "Pinned benchmark image: $image_digest"
-      - name: Build pinned W2 developer-workspace image
-        id: workspace
-        run: |
-          set -euo pipefail
-          docker build \
-            --build-arg BASE_IMAGE='${{ steps.image.outputs.image_digest }}' \
-            --build-arg APT_SNAPSHOT=20261106T000000Z \
-            --file tests/fixtures/w2-developer-workspace/Dockerfile \
-            --tag tinlance-w2-developer-workspace:ci \
-            tests/fixtures/w2-developer-workspace
-          image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:ci)"
-          case "$image_id" in
-            sha256:????????????????????????????????????????????????????????????????) ;;
-            *) echo "W2 image ID is not content-addressed: $image_id"; exit 1 ;;
-          esac
-          mkdir -p artifacts
-          container_id="$(docker create "$image_id")"
-          docker export --output artifacts/w2-rootfs.raw.tar "$container_id"
-          docker rm "$container_id"
-          python scripts/normalize_rootfs_tar.py --input artifacts/w2-rootfs.raw.tar --output artifacts/w2-rootfs.tar
-          rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
-          printf '%s\n' "$rootfs_sha256" > artifacts/w2-rootfs.sha256
-          docker import \
-            --change "LABEL org.tinlance.w2.rootfs.tar.sha256=$rootfs_sha256" \
-            --change "USER 65532:65532" \
-            --change "WORKDIR /tmp" \
-            artifacts/w2-rootfs.tar tinlance-w2-developer-workspace:normalized
-          normalized_image_id="$(docker image inspect --format '{{.Id}}' tinlance-w2-developer-workspace:normalized)"
-          imported_rootfs_sha256="$(docker image inspect --format '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' "$normalized_image_id")"
-          test "$imported_rootfs_sha256" = "$rootfs_sha256"
-          rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar
-          echo "build_image_id=$image_id" >> "$GITHUB_OUTPUT"
-          echo "image_id=$normalized_image_id" >> "$GITHUB_OUTPUT"
-          rootfs_digest="sha256:${rootfs_sha256}"
-          echo "rootfs_sha256=$rootfs_digest" >> "$GITHUB_OUTPUT"
-          echo "W2 build image: $image_id"
-          echo "W2 runtime image imported from normalized rootfs: $normalized_image_id"
-          echo "W2 normalized rootfs SHA-256: $rootfs_sha256"
       - name: Run 30 isolated W1 workloads
         run: |
           python scripts/benchmark_gvisor.py --image-digest '${{ steps.image.outputs.image_digest }}' --runs 30 --output artifacts/gvisor-w1.json
-      - name: Run 30 isolated W2 developer-workspace workloads
-        run: |
-          python scripts/benchmark_gvisor.py --image-digest '${{ steps.workspace.outputs.image_id }}' --runs 30 --profile W2 --rootfs-sha256 '${{ steps.workspace.outputs.rootfs_sha256 }}' --output artifacts/gvisor-w2.json
       - name: Publish benchmark summary
         if: always()
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          for profile in ("w1", "w2"):
-              path = Path(f"artifacts/gvisor-{profile}.json")
-              if not path.exists():
-                  raise SystemExit(f"Missing gVisor {profile.upper()} benchmark report.")
-              report = json.loads(path.read_text(encoding="utf-8"))
-              latency = report["latency"]
-              print(f"gVisor {profile.upper()}: {latency['sample_count']} samples")
-              print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
-              print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
-              if profile == "w2":
-                  print(f"normalized_rootfs_sha256={report['rootfs_tar_sha256']}")
-          print("Feasibility benchmark only; not production isolation certification.")
+          report = json.loads(Path("artifacts/gvisor-w1.json").read_text(encoding="utf-8"))
+          latency = report["latency"]
+          assert latency["sample_count"] == 30
+          print(f"gVisor W1: {latency['sample_count']} samples")
+          print(f"median={latency['median_ms']:.1f} ms; p95={latency['p95_ms']:.1f} ms; p99={latency['p99_ms']:.1f} ms")
+          print(f"Runtime={report['runtime_version']}; image={report['image_digest']}")
+          print("W2 is executed by the shared-rootfs cross-runtime workflow.")
           PY
       - name: Upload gVisor benchmark evidence
         if: always()
