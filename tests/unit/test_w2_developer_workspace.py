@@ -80,31 +80,38 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
 
-def test_w2_build_workflows_share_a_digest_pinned_base_and_snapshot() -> None:
+def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     workflow_root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-    base_digest = "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
-    names = (
-        "persistent-computer-firecracker-w2.yml",
+    firecracker = (workflow_root / "persistent-computer-firecracker-w2.yml").read_text(
+        encoding="utf-8"
+    )
+    base_digest = (
+        "ubuntu@sha256:"
+        "fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+    )
+    assert firecracker.count("Build digest-pinned W2 developer image and export rootfs") == 1
+    assert base_digest in firecracker
+    assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in firecracker
+    assert "artifacts/w2-rootfs.tar" in firecracker
+    assert "firecracker-w2-${{ github.run_id }}" in firecracker
+    assert "path: artifacts/" in firecracker
+    assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
+    assert firecracker.count("needs: guest-boot") == 2
+    assert firecracker.count(
+        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
+    ) == 2
+    assert "gvisor-w2:" in firecracker
+    assert "kata-w2:" in firecracker
+    assert "docker import" in firecracker
+    assert firecracker.count("--runs 30") >= 3
+    for name in (
         "persistent-computer-gvisor-benchmark.yml",
         "persistent-computer-kata-benchmark.yml",
-    )
-    for name in names:
+    ):
         workflow = (workflow_root / name).read_text(encoding="utf-8")
-        assert base_digest in workflow
-        assert "--build-arg APT_SNAPSHOT=20261106T000000Z" in workflow
-    for name in names[1:]:
-        workflow = (workflow_root / name).read_text(encoding="utf-8")
-        assert "docker import" in workflow
-        assert "artifacts/w2-rootfs.tar" in workflow
-        assert "org.tinlance.w2.rootfs.tar.sha256" in workflow
-        assert '{{index .Config.Labels "org.tinlance.w2.rootfs.tar.sha256"}}' in workflow
-        assert r"\"org.tinlance.w2.rootfs.tar.sha256\"" not in workflow
-        assert "image_id=$normalized_image_id" in workflow
-        assert "rm -f artifacts/w2-rootfs.raw.tar artifacts/w2-rootfs.tar" in workflow
-    firecracker = (workflow_root / names[0]).read_text(encoding="utf-8")
-    assert "--w2-rootfs-tar" in firecracker
-
-
+        assert "Build pinned W2 developer-workspace image" not in workflow
+        assert "--profile W2" not in workflow
+        assert "Run 30" in workflow
 def test_w2_developer_workspace_mount_is_bounded_and_unavailable_to_w1() -> None:
     image = "ubuntu@sha256:" + "a" * 64
     w1 = build_docker_command(image_digest=image, payload="true")
