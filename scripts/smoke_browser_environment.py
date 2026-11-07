@@ -208,8 +208,8 @@ def main() -> int:
         guest_command = [
             "ip", "netns", "exec", namespace,
             "setpriv",
-            "--reuid", str(BROWSER_UID),
-            "--regid", str(BROWSER_UID),
+            "--reuid", str(browser_uid),
+            "--regid", str(browser_gid),
             "--clear-groups",
             "--no-new-privs",
             sys.executable,
