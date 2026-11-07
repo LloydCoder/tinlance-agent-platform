@@ -83,11 +83,18 @@ jobs:
             userns_restriction="$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)"
           fi
           if [[ "$userns_restriction" == "1" ]]; then
-            chromium_bin="$("$pythonLocation/bin/python" -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
-            case "$chromium_bin" in
-              "$HOME"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell) ;;
-              *) echo "Unexpected Playwright Chromium executable path: $chromium_bin"; exit 1 ;;
+            chromium_executable="$("$pythonLocation/bin/python" -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+            chromium_revision_dir="$(basename "$(dirname "$(dirname "$chromium_executable")")")"
+            case "$chromium_revision_dir" in
+              chromium-[0-9]*) ;;
+              *) echo "Unexpected Playwright Chromium executable path: $chromium_executable"; exit 1 ;;
             esac
+            chromium_revision="${chromium_revision_dir#chromium-}"
+            chromium_bin="$HOME/.cache/ms-playwright/chromium_headless_shell-$chromium_revision/chrome-headless-shell-linux64/chrome-headless-shell"
+            if [[ ! -x "$chromium_bin" ]]; then
+              echo "Playwright headless shell executable is missing: $chromium_bin"
+              exit 1
+            fi
             sudo tee "$apparmor_profile" >/dev/null <<EOF
           abi <abi/4.0>,
           include <tunables/global>
