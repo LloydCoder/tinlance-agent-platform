@@ -593,3 +593,11 @@ def test_guest_boot_w2_verifier_rejects_malformed_package_digests() -> None:
             "TINLANCE_W2_NPM_LOCK_SHA256=not-a-digest",
             "W2",
         )
+
+
+
+def test_guest_boot_w2_verifier_rejects_empty_toolchain_version_markers() -> None:
+    from scripts.smoke_firecracker_guest_boot import verify_guest_boot_markers
+
+    with pytest.raises(ValueError, match="npm_version_reported"):
+        verify_guest_boot_markers("TINLANCE_W2_NPM_VERSION= \\n", "W2")
