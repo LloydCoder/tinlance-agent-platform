@@ -248,7 +248,7 @@ def test_guest_boot_marker_verifier_rejects_missing_nonroot_w1_evidence() -> Non
 
     with pytest.raises(ValueError, match="nonroot_uid_confirmed"):
         verify_guest_boot_markers(
-            "TINLANCE_NO_NIC_CONFIRMED\\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\nTINLANCE_GUEST_READY"
+            "TINLANCE_NO_NIC_CONFIRMED\nTINLANCE_ROOTFS_READ_ONLY_CONFIRMED\nTINLANCE_GUEST_READY"
         )
 
 
@@ -313,7 +313,7 @@ def test_guest_boot_w2_verifier_requires_every_host_surface_marker() -> None:
         "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
         "TINLANCE_GUEST_READY",
     ]
-    evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
+    evidence = verify_guest_boot_markers("\n".join(markers), "W2")
     assert evidence["host_surface_probes_passed"] is True
     assert evidence["no_new_privileges"] is True
 
@@ -333,10 +333,10 @@ def test_guest_boot_w2_verifier_rejects_missing_and_violating_markers() -> None:
 
     with pytest.raises(ValueError, match="host_surface_probes_passed"):
         verify_guest_boot_markers(
-            "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\\n"
-            "TINLANCE_NO_NIC_CONFIRMED\\n"
-            "TINLANCE_NONROOT_UID_CONFIRMED\\n"
-            "TINLANCE_W1_WORKLOAD_OK\\n"
+            "TINLANCE_ROOTFS_READ_ONLY_CONFIRMED\n"
+            "TINLANCE_NO_NIC_CONFIRMED\n"
+            "TINLANCE_NONROOT_UID_CONFIRMED\n"
+            "TINLANCE_W1_WORKLOAD_OK\n"
             "TINLANCE_GUEST_READY",
             "W2",
         )
@@ -448,7 +448,7 @@ def test_guest_boot_w2_verifier_requires_developer_workspace_markers() -> None:
         "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
         "TINLANCE_GUEST_READY",
     ]
-    evidence = verify_guest_boot_markers("\\n".join(markers), "W2")
+    evidence = verify_guest_boot_markers("\n".join(markers), "W2")
     assert evidence["developer_workspace_passed"] is True
 
 
@@ -583,13 +583,13 @@ def test_guest_boot_w2_verifier_rejects_malformed_package_digests() -> None:
 
     with pytest.raises(ValueError, match="package_manifest_reported"):
         verify_guest_boot_markers(
-            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=not-a-digest\\n"
+            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=not-a-digest\n"
             "TINLANCE_W2_NPM_LOCK_SHA256=" + "b" * 64,
             "W2",
         )
     with pytest.raises(ValueError, match="npm_lock_sha256_reported"):
         verify_guest_boot_markers(
-            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64 + "\\n"
+            "TINLANCE_W2_PACKAGE_MANIFEST_SHA256=" + "a" * 64 + "\n"
             "TINLANCE_W2_NPM_LOCK_SHA256=not-a-digest",
             "W2",
         )
