@@ -313,6 +313,15 @@ def main() -> int:
         evidence["status"] = "failed"
         evidence["failure_type"] = type(exc).__name__
         evidence["failure_message"] = str(exc)[:512]
+        if isinstance(exc, subprocess.CalledProcessError):
+            if exc.stdout:
+                evidence["failure_stdout"] = str(exc.stdout)[-4_000:]
+            if exc.stderr:
+                evidence["failure_stderr"] = str(exc.stderr)[-4_000:]
+        if proxy_log.is_file():
+            evidence["proxy_log_tail"] = proxy_log.read_text(
+                encoding="utf-8", errors="replace"
+            )[-2_000:]
         raise
     finally:
         cleanup_errors: list[str] = []
