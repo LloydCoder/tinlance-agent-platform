@@ -466,7 +466,6 @@ def test_mcp_replay_request_identity_helper_matches_protocol_contract() -> None:
     )
 
 
-
 def test_extensions_action_purpose_is_bound_to_exact_resource_and_idempotency_key() -> None:
     cancel_purpose = extensions_action_purpose(
         tenant_id="tenant-a",
