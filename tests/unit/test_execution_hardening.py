@@ -400,3 +400,62 @@ def test_sandbox_exec_guard_cannot_be_shadowed_by_workspace_code(tmp_path: Path)
     assert result.exit_code == 0
     assert result.stdout.strip() == "trusted-target"
     assert not marker.exists(), "workspace code must not shadow the trusted exec guard"
+
+
+def test_bubblewrap_provider_mounts_sysfs_read_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BubblewrapProvider()
+    monkeypatch.setattr(provider, "available", lambda: True)
+
+    command = provider.command(
+        ["/usr/bin/python3", "-c", "print('ok')"],
+        SandboxLimits(),
+        ("/workspace",),
+    )
+
+    read_only_mounts = {
+        tuple(command[index + 1 : index + 3])
+        for index, token in enumerate(command[:-2])
+        if token == "--ro-bind"
+    }
+    assert ("/sys", "/sys") in read_only_mounts
+
+
+def test_bubblewrap_provider_mounts_etc_read_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BubblewrapProvider()
+    monkeypatch.setattr(provider, "available", lambda: True)
+
+    command = provider.command(
+        ["/usr/bin/python3", "-c", "print('ok')"],
+        SandboxLimits(),
+        ("/workspace",),
+    )
+
+    read_only_mounts = {
+        tuple(command[index + 1 : index + 3])
+        for index, token in enumerate(command[:-2])
+        if token == "--ro-bind"
+    }
+    assert ("/etc", "/etc") in read_only_mounts
+
+
+def test_exec_guard_limits_data_memory_without_capping_virtual_address_space(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tinlance_agent_platform_sandbox import exec_guard
+
+    applied: list[tuple[int, tuple[int, int]]] = []
+    monkeypatch.setattr(
+        exec_guard.resource,
+        "setrlimit",
+        lambda resource_id, limits: applied.append((resource_id, limits)),
+    )
+
+    exec_guard._apply_resource_limits(
+        cpu_seconds=60,
+        memory_bytes=1_610_612_736,
+        file_size_bytes=1_000_000,
+        max_processes=64,
+    )
+
+    assert (exec_guard.resource.RLIMIT_DATA, (1_610_612_736, 1_610_612_736)) in applied
+    assert all(resource_id != exec_guard.resource.RLIMIT_AS for resource_id, _ in applied)

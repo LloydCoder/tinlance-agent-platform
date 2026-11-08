@@ -34,6 +34,27 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _apply_resource_limits(
+    *,
+    cpu_seconds: int,
+    memory_bytes: int,
+    file_size_bytes: int,
+    max_processes: int,
+) -> None:
+    """Apply per-process limits without constraining virtual address reservations.
+
+    RLIMIT_AS is incompatible with browsers and runtimes that reserve large sparse
+    virtual address ranges. RLIMIT_DATA constrains data-segment/heap allocations
+    (including eligible anonymous mmap allocations on supported Linux kernels).
+    Production deployments must additionally enforce aggregate resident memory
+    with a delegated cgroup-v2 memory.max boundary.
+    """
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
+    resource.setrlimit(resource.RLIMIT_DATA, (memory_bytes, memory_bytes))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (file_size_bytes, file_size_bytes))
+    resource.setrlimit(resource.RLIMIT_NPROC, (max_processes, max_processes))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Apply limits and parent-death containment, then replace this process."""
     args = _parser().parse_args(argv)
@@ -59,16 +80,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if os.getppid() != args.parent_pid:
         os.kill(os.getpid(), signal.SIGKILL)
 
-    cpu = args.cpu_seconds
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
-    resource.setrlimit(resource.RLIMIT_AS, (args.memory_bytes, args.memory_bytes))
-    resource.setrlimit(
-        resource.RLIMIT_FSIZE,
-        (args.file_size_bytes, args.file_size_bytes),
-    )
-    resource.setrlimit(
-        resource.RLIMIT_NPROC,
-        (args.max_processes, args.max_processes),
+    _apply_resource_limits(
+        cpu_seconds=args.cpu_seconds,
+        memory_bytes=args.memory_bytes,
+        file_size_bytes=args.file_size_bytes,
+        max_processes=args.max_processes,
     )
     os.execvpe(command[0], command, os.environ.copy())
     return 127
