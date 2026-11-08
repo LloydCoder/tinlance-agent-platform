@@ -14,9 +14,9 @@ from .egress_proxy import (
     resolve_public_target,
 )
 from .executor import ProcessResult, SandboxExecutor, WorkspaceLeaseLost
-from .workspace_supervisor import WorkspaceLeaseSupervisor
 from .policy import SandboxPolicy
 from .service import SandboxUnavailable, build_command, validate_request
+from .workspace_supervisor import WorkspaceLeaseSupervisor
 
 __all__ = [
     "BrowserEgressProxy",
