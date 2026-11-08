@@ -53,7 +53,7 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'revoked worker retained active lease authority';
     END IF;
-    IF platform.revoke_workspace_lease(tenant, workspace, lease_one, 1) IS NOT FALSE THEN
+    IF platform.revoke_workspace_lease(tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a') IS NOT FALSE THEN
         RAISE EXCEPTION 'duplicate revocation was not idempotent';
     END IF;
 
