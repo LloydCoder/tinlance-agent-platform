@@ -41,7 +41,10 @@ def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
         proxy_host_interface="tbup0",
         proxy_subnet="10.255.4.0/30",
         dns_server="1.1.1.1",
+        host_dns_ip="10.255.4.1",
     )
+    assert 'iifname "tbup0" ip daddr 10.255.4.1 udp dport 53 accept' in rules
+    assert 'iifname "tbup0" ip daddr 10.255.4.1 tcp dport 53 accept' in rules
     assert 'iifname "tbup0" ip daddr != {' in rules
     assert "tcp dport 443 accept" in rules
     assert 'iifname "tbup0" ip daddr 1.1.1.1 udp dport 53 accept' in rules
