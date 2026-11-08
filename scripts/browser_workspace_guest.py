@@ -169,9 +169,7 @@ def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
         status_line = bytes(headers).split(crlf, 1)[0]
         if not status_line.startswith(b"HTTP/1.1 200 "):
             raise ConnectionError(f"approved CONNECT was rejected: {status_line!r}")
-        tls = ssl.create_default_context().wrap_socket(
-            connection, server_hostname=hostname
-        )
+        tls = ssl.create_default_context().wrap_socket(connection, server_hostname=hostname)
         tls.sendall(
             b"GET / HTTP/1.1"
             + crlf
