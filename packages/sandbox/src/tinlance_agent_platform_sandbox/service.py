@@ -55,6 +55,7 @@ def execute_request(
         max_processes=limits.max_processes,
     )
     command = provider.command(list(request.command), effective_limits, request.allowed_paths)
+
     def assert_request_lease() -> bool:
         return lease_assertion(request)
 
