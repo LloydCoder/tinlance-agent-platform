@@ -553,6 +553,44 @@ def main() -> int:
                 "host_namespace_ids": host_all_namespace_ids,
             }
         )
+        route_probe = subprocess.run(
+            ["ip", "-4", "route", "get", "1.1.1.1"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        evidence["host_egress_route"] = route_probe.stdout.strip()[:1000]
+        for label, command in (
+            ("host_forward_chain", ["iptables", "-S", "FORWARD"]),
+            ("host_input_chain", ["iptables", "-S", "INPUT"]),
+            ("host_nat_chain", ["iptables", "-t", "nat", "-S", "POSTROUTING"]),
+            ("host_nft_ruleset", ["nft", "list", "ruleset"]),
+        ):
+            diagnostic = subprocess.run(
+                command, check=False, capture_output=True, text=True, timeout=5
+            )
+            evidence[label] = (diagnostic.stdout or diagnostic.stderr)[-12000:]
+        host_https_probe = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import socket; s=socket.create_connection(('example.com', 443), timeout=5); s.close(); print('HOST_HTTPS_OK')",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            env=child_environment(Path("/tmp"), Path("/tmp")),
+        )
+        evidence["host_public_https_probe"] = (
+            host_https_probe.returncode == 0
+            and host_https_probe.stdout.strip() == "HOST_HTTPS_OK"
+        )
+        if not evidence["host_public_https_probe"]:
+            evidence["host_public_https_probe_error"] = (
+                host_https_probe.stderr[-1000:] or host_https_probe.stdout[-1000:]
+            )
+
         proxy_network_probe = subprocess.run(
             [
                 "ip",
