@@ -125,3 +125,23 @@ No phase may be skipped. A green unit suite, smoke test or individual runtime wo
 - [gVisor security model](https://github.com/google/gvisor/blob/master/g3doc/architecture_guide/security.md) — host cgroups for resource exhaustion and container-level network policy.
 - [Kata Containers quick start](https://kata-containers.github.io/kata-containers/quick-start-guide/) — per-workload guest kernel and the additional network/storage/control-plane isolation needed for multi-tenancy.
 - [Linux no_new_privs documentation](https://docs.kernel.org/userspace-api/no_new_privs.html) — limits execve privilege gains but is not a replacement for other isolation controls.
+
+
+## 8. W5 implementation in progress — durable workspace lease authority
+
+Platform PR for W5 adds a tenant-scoped PostgreSQL workspace lease authority. It is deliberately separate from the process-local `WorkLeaseStore` reference implementation.
+
+- `platform.workspace_leases` stores one current lease per tenant/workspace, its owner and worker identity, expiry, status, and monotonically increasing fencing token.
+- `platform.workspace_lease_events` records acquisition, renewal, expiry, revocation and release as append-only audit facts.
+- Both tables use forced row-level security and tenant-isolation policies.
+- Database procedures serialize lease acquisition/renewal/revocation/release under row locks. An acquisition after expiry, revocation or release increments the fencing token; a stale token cannot renew, assert, revoke or release the new owner's lease.
+- The Python `PostgresWorkspaceLeaseStore` adapter owns short tenant-scoped transactions and exposes acquire, renew, assert-active, revoke and release operations.
+- SQL integration tests cover concurrent acquisition denial, renewal, explicit revocation, stale-worker fencing, release/reacquisition, expiry/reacquisition, audit continuity, append-only history and tenant-policy presence.
+
+**Security boundary:** a lease assertion is a fencing decision, not proof that every external side effect is atomically fenced. The production supervisor must check the current fencing token at each consequential command boundary and terminate/reap the old worker on revocation or lease loss. This PR does not claim that the browser profile is yet durably encrypted or replicated.
+
+### W5 soak gate — not yet accepted
+
+A genuine continuous eight-hour run remains mandatory. The GitHub-hosted runner ceiling is six hours per job, so the soak must execute on a dedicated controlled persistent host or registered self-hosted runner. It must include real browser/profile persistence across process and supervisor restarts, lease renewal/expiry/revocation, stale-worker fencing, quota admission/overrun behavior, append-only audit continuity, crash/recovery and cleanup. Segmented hosted jobs or a synthetic clock do not count as an eight-hour soak.
+
+The active AWS instances identified during the infrastructure audit are named `fusionops-production` and `tinlyt-api-production`; neither is an acceptable W5 test host and neither was modified. A separately tagged, least-privilege W5 host is required. Until the continuous soak artifact is independently inspected and exact-head W5 workflows plus post-merge mainline checks pass, W5 remains open.
