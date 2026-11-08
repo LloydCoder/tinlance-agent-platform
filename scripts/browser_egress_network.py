@@ -207,3 +207,45 @@ def write_proxy_resolver_config(
         if descriptor >= 0:
             os.close(descriptor)
     return target
+
+
+def build_host_iptables_forward_rules(
+    *, proxy_host_interface: str, egress_interface: str, proxy_ip: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Build narrowly scoped Docker-user rules for the proxy's HTTPS path."""
+    uplink = _interface(proxy_host_interface)
+    if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,15}", egress_interface):
+        raise ValueError("host egress interface name is invalid")
+    address = ipaddress.ip_address(proxy_ip)
+    if not isinstance(address, ipaddress.IPv4Address) or not address.is_private:
+        raise ValueError("proxy egress source must be a private IPv4 address")
+    source = f"{address}/32"
+    outbound = (
+        "-i",
+        uplink,
+        "-o",
+        egress_interface,
+        "-s",
+        source,
+        "-p",
+        "tcp",
+        "--dport",
+        "443",
+        "-j",
+        "ACCEPT",
+    )
+    inbound = (
+        "-i",
+        egress_interface,
+        "-o",
+        uplink,
+        "-d",
+        source,
+        "-m",
+        "conntrack",
+        "--ctstate",
+        "ESTABLISHED,RELATED",
+        "-j",
+        "ACCEPT",
+    )
+    return outbound, inbound
