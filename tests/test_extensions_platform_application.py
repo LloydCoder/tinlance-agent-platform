@@ -469,18 +469,29 @@ def test_mcp_replay_request_identity_helper_matches_protocol_contract() -> None:
 
 def test_extensions_action_purpose_is_bound_to_exact_resource_and_idempotency_key() -> None:
     cancel_purpose = extensions_action_purpose(
-        tenant_id="tenant-a", subject_id="user-a", tool_name="extensions_job_cancel", resource_id=JOB_ID
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_job_cancel",
+        resource_id=JOB_ID,
     )
     assert cancel_purpose.startswith("extensions-action-v1:")
     assert cancel_purpose != extensions_action_purpose(
-        tenant_id="tenant-a", subject_id="user-a", tool_name="extensions_job_cancel",
-        resource_id="b4f6d9e2-1c3b-4a5d-8e7f-9012bc345679"
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_job_cancel",
+        resource_id="b4f6d9e2-1c3b-4a5d-8e7f-9012bc345679",
     )
     replay_purpose = extensions_action_purpose(
-        tenant_id="tenant-a", subject_id="user-a", tool_name="extensions_dead_letter_replay",
-        resource_id=EVENT_ID, idempotency_key=REPLAY_IDEMPOTENCY_KEY
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_dead_letter_replay",
+        resource_id=EVENT_ID,
+        idempotency_key=REPLAY_IDEMPOTENCY_KEY,
     )
     assert replay_purpose != extensions_action_purpose(
-        tenant_id="tenant-a", subject_id="user-a", tool_name="extensions_dead_letter_replay",
-        resource_id=EVENT_ID, idempotency_key="replay-idempotency-0002"
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_dead_letter_replay",
+        resource_id=EVENT_ID,
+        idempotency_key="replay-idempotency-0002",
     )
