@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from tinlance_agent_platform_approvals import PostgresApprovalService
+from tinlance_agent_platform_approvals import ApprovalService, PostgresApprovalService
 from tinlance_agent_platform_contracts import ApprovalRequest, ApprovalStatus
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -290,3 +290,41 @@ def test_postgres_approval_verifier_maps_tenant_binding_failure_to_permission_er
         )
     assert connection.rolled_back is True
     assert connection.closed is True
+
+
+
+def test_reference_approval_authority_rejects_missing_intent_fingerprint() -> None:
+    approvals = ApprovalService()
+    approval = approvals.request(
+        str(TENANT_ID),
+        RUN_ID,
+        "invoice.refund",
+        "invoice:123",
+        "refund requested by account owner",
+        "requester-a",
+        intent_fingerprint=FINGERPRINT,
+    )
+    approvals.decide(
+        approval.approval_id,
+        True,
+        str(TENANT_ID),
+        approver_subject_id="approver-b",
+        intent_fingerprint=FINGERPRINT,
+    )
+    with pytest.raises(PermissionError, match="does not bind"):
+        approvals.require_approved_for(
+            approval.approval_id,
+            str(TENANT_ID),
+            RUN_ID,
+            "invoice.refund",
+            "invoice:123",
+        )
+    approvals.require_approved_for(
+        approval.approval_id,
+        str(TENANT_ID),
+        RUN_ID,
+        "invoice.refund",
+        "invoice:123",
+        intent_fingerprint=FINGERPRINT,
+    )
+    assert approvals.get(approval.approval_id, str(TENANT_ID)).status is ApprovalStatus.CONSUMED
