@@ -117,9 +117,7 @@ class SandboxExecutor:
                             self._kill_and_reap(process)
                             break
                         try:
-                            process.wait(
-                                timeout=min(self._LEASE_POLL_INTERVAL_SECONDS, remaining)
-                            )
+                            process.wait(timeout=min(self._LEASE_POLL_INTERVAL_SECONDS, remaining))
                             break
                         except subprocess.TimeoutExpired:
                             continue
