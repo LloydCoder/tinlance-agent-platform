@@ -908,8 +908,9 @@ def main() -> int:
                     ["ip", "netns", "pids", netns], check=False, capture_output=True, text=True
                 )
                 if remaining.stdout.strip():
+                    remaining_pids = remaining.stdout.strip()[:500]
                     cleanup_errors.append(
-                        f"network namespace {netns} still has processes: {remaining.stdout.strip()[:500]}"
+                        f"network namespace {netns} still has processes: {remaining_pids}"
                     )
             deleted = subprocess.run(
                 ["ip", "netns", "del", netns], check=False, capture_output=True, text=True
