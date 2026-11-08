@@ -195,7 +195,10 @@ def test_postgres_approval_records_authenticated_approver_and_intent():
     assert result.status is ApprovalStatus.APPROVED
     assert result.approved_by == "approver-b"
     assert connection.committed
-    assert any("INSERT INTO platform.action_approval_events" in query for query, _ in connection.queries)
+    assert any(
+        "INSERT INTO platform.action_approval_events" in query
+        for query, _ in connection.queries
+    )
 
 
 def test_postgres_approval_rejects_changed_intent_before_consumption():
