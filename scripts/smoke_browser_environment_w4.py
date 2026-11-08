@@ -425,6 +425,45 @@ def main() -> int:
                 "host_namespace_ids": host_all_namespace_ids,
             }
         )
+        proxy_network_probe = subprocess.run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                proxy_ns,
+                "setpriv",
+                "--reuid",
+                str(proxy_uid),
+                "--regid",
+                str(proxy_gid),
+                "--clear-groups",
+                "--no-new-privs",
+                sys.executable,
+                "-c",
+                (
+                    "import socket; "
+                    "connection = socket.create_connection(('example.com', 443), timeout=5); "
+                    "connection.close(); print('PUBLIC_HTTPS_OK')"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=child_environment(Path("/tmp"), Path("/tmp")),
+        )
+        evidence["proxy_namespace_public_https_probe"] = (
+            proxy_network_probe.returncode == 0
+            and proxy_network_probe.stdout.strip() == "PUBLIC_HTTPS_OK"
+        )
+        if not evidence["proxy_namespace_public_https_probe"]:
+            evidence["proxy_network_probe_error"] = (
+                proxy_network_probe.stderr[-1500:] or proxy_network_probe.stdout[-1500:]
+            )
+            raise RuntimeError(
+                "proxy namespace cannot resolve and reach the approved public HTTPS probe: "
+                f"{evidence['proxy_network_probe_error']}"
+            )
+
         evidence.update(
             {
                 "browser_namespace_has_no_default_route": True,
