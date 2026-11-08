@@ -84,6 +84,16 @@ def test_non_public_dns_answers_are_rejected(address: str) -> None:
         resolve_public_target("example.com", 443, policy(), resolver=lambda _: (address,))
 
 
+def test_nat64_public_ipv4_mapping_is_allowed_but_private_mapping_is_not() -> None:
+    result = resolve_public_target(
+        "example.com",
+        443,
+        policy(),
+        resolver=lambda _: ("64:ff9b::5db8:d822",),
+    )
+    assert result.addresses == ("64:ff9b::5db8:d822",)
+
+
 def test_mixed_public_and_private_dns_answers_fail_closed() -> None:
     with pytest.raises(EgressDenied):
         resolve_public_target(
