@@ -20,6 +20,7 @@ from browser_egress_network import (
     build_host_forwarding_rules,
     build_proxy_namespace_rules,
     validate_proxy_namespace_routes,
+    write_proxy_resolver_config,
 )
 
 PROXY_PORT = 3128
@@ -353,10 +354,20 @@ def main() -> int:
                 raise RuntimeError(f"IPv6 is not fully disabled in namespace {netns}")
 
         resolv_dir.mkdir(parents=True, exist_ok=False)
-        (resolv_dir / "resolv.conf").write_text(
-            f"nameserver {DNS_SERVER}\noptions timeout:2 attempts:1\n", encoding="ascii"
+        resolver_config = write_proxy_resolver_config(
+            resolv_dir,
+            dns_server=DNS_SERVER,
+            proxy_uid=proxy_uid,
+            proxy_gid=proxy_gid,
         )
-        os.chmod(resolv_dir / "resolv.conf", 0o644)
+        resolver_metadata = resolver_config.stat(follow_symlinks=False)
+        evidence["proxy_resolver_config_private"] = (
+            resolver_metadata.st_uid == proxy_uid
+            and resolver_metadata.st_gid == proxy_gid
+            and (resolver_metadata.st_mode & 0o777) == 0o600
+        )
+        if evidence["proxy_resolver_config_private"] is not True:
+            raise RuntimeError("proxy resolver configuration is not private to its workload identity")
 
         proxy_rules = build_proxy_namespace_rules(
             browser_interface=proxy_browser_if,
