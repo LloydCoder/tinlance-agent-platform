@@ -378,3 +378,25 @@ def test_sandbox_executor_avoids_preexec_fn_in_multithreaded_parent(
     command = launch.get("command")
     assert isinstance(command, list)
     assert command[1:3] == ["-m", "tinlance_agent_platform_sandbox.exec_guard"]
+
+
+def test_sandbox_exec_guard_cannot_be_shadowed_by_workspace_code(tmp_path: Path) -> None:
+    shadow_package = tmp_path / "tinlance_agent_platform_sandbox"
+    shadow_package.mkdir()
+    marker = tmp_path / "untrusted-exec-guard-imported"
+    (shadow_package / "__init__.py").write_text("", encoding="utf-8")
+    (shadow_package / "exec_guard.py").write_text(
+        f"from pathlib import Path; Path({str(marker)!r}).touch()",
+        encoding="utf-8",
+    )
+
+    result = SandboxExecutor().execute(
+        ["/usr/bin/python3", "-c", "print('trusted-target')"],
+        cwd=str(tmp_path),
+        limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
+        lease_assertion=lambda: True,
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "trusted-target"
+    assert not marker.exists(), "workspace code must not shadow the trusted exec guard"
