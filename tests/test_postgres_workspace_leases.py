@@ -82,7 +82,7 @@ def test_renew_uses_the_exact_lease_and_fencing_token():
     assert store.renew(lease(), lease_seconds=900) == renewed
     query, params = connection.queries[-1]
     assert "platform.renew_workspace_lease" in query
-    assert params == (TENANT, WORKSPACE, LEASE, 1, 900)
+    assert params == (TENANT, WORKSPACE, LEASE, 1, "owner-a", "worker-a", 900)
 
 
 def test_assert_active_returns_database_fencing_decision():
