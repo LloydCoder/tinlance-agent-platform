@@ -101,6 +101,7 @@ class SandboxExecutor:
                 expected_parent_pid = os.getpid()
                 guarded_argv = [
                     sys.executable,
+                    "-I",
                     "-m",
                     "tinlance_agent_platform_sandbox.exec_guard",
                     "--parent-pid",
