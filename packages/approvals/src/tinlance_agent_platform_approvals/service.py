@@ -1,8 +1,11 @@
 from datetime import UTC, datetime
+import re
 from threading import RLock
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_contracts import ApprovalRequest, ApprovalStatus
+
+_FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ApprovalService:
@@ -29,6 +32,10 @@ class ApprovalService:
             raise ValueError("approval request fields must be normalized and non-empty")
         if expires_at is not None and expires_at <= datetime.now(UTC):
             raise ValueError("approval expiry must be in the future")
+        if intent_fingerprint is not None and (
+            not isinstance(intent_fingerprint, str) or not _FINGERPRINT.fullmatch(intent_fingerprint)
+        ):
+            raise ValueError("approval intent fingerprint must be lowercase SHA-256 hex")
         item = ApprovalRequest(
             uuid4(),
             tenant_id,
@@ -82,6 +89,10 @@ class ApprovalService:
     ) -> ApprovalRequest:
         if approver_subject_id is None or not approver_subject_id.strip():
             raise PermissionError("authenticated approver identity is required")
+        if intent_fingerprint is not None and not _FINGERPRINT.fullmatch(intent_fingerprint):
+            raise ValueError("approval intent fingerprint must be lowercase SHA-256 hex")
+        if intent_fingerprint is not None and not _FINGERPRINT.fullmatch(intent_fingerprint):
+            raise ValueError("approval intent fingerprint must be lowercase SHA-256 hex")
         with self._lock:
             current = self._current(approval_id)
             if current.tenant_id != tenant_id:
@@ -161,10 +172,7 @@ class ApprovalService:
                 or current.run_id != run_id
                 or current.action != action
                 or current.resource != resource
-                or (
-                    intent_fingerprint is not None
-                    and current.intent_fingerprint != intent_fingerprint
-                )
+                or current.intent_fingerprint != intent_fingerprint
             ):
                 raise PermissionError("approval does not bind to this action")
             consumed = ApprovalRequest(
