@@ -7,10 +7,17 @@ import resource
 import signal
 import subprocess
 import tempfile
+from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic, sleep
 
 from .bubblewrap import SandboxLimits
+
+
+class WorkspaceLeaseLost(RuntimeError):
+    """Raised when a persistent workspace loses its current fencing authority."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,15 +39,58 @@ def _limit_process(limits: SandboxLimits) -> None:
 
 
 class SandboxExecutor:
-    """Execute an already-policy-validated sandbox command with hard limits.
+    """Execute a policy-validated sandbox command with hard limits.
 
-    The executor is POSIX-only by design. Unsupported hosts fail closed rather
-    than silently dropping isolation or resource limits.
+    Persistent workspace commands must provide a lease assertion. The process is
+    launched in its own session/process group; lease loss kills and reaps that
+    entire group before control returns to the caller.
     """
 
-    def execute(self, argv: list[str], *, cwd: str, limits: SandboxLimits) -> ProcessResult:
+    _LEASE_POLL_INTERVAL_SECONDS = 0.25
+
+    @staticmethod
+    def _assert_lease(lease_assertion: Callable[[], bool]) -> None:
+        try:
+            active = lease_assertion()
+        except Exception as exc:
+            raise WorkspaceLeaseLost(
+                "workspace lease authority is unavailable; command execution fails closed"
+            ) from exc
+        if active is not True:
+            raise WorkspaceLeaseLost("workspace lease is expired, revoked, or fenced")
+
+    @staticmethod
+    def _has_exited_without_reaping(process: subprocess.Popen[bytes]) -> bool:
+        # WNOWAIT keeps the group leader's PID reserved until descendants are
+        # terminated, preventing a reused process-group ID from being signalled.
+        info = os.waitid(
+            os.P_PID,
+            process.pid,
+            os.WEXITED | os.WNOHANG | os.WNOWAIT,
+        )
+        return info is not None and info.si_pid == process.pid
+
+    @staticmethod
+    def _kill_and_reap(process: subprocess.Popen[bytes]) -> None:
+        # Signal the original process group before reaping its leader so the
+        # process-group ID cannot be reused while cleanup is in progress.
+        with suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+
+    def execute(
+        self,
+        argv: list[str],
+        *,
+        cwd: str,
+        limits: SandboxLimits,
+        lease_assertion: Callable[[], bool],
+    ) -> ProcessResult:
         if os.name != "posix":
             raise RuntimeError("production sandbox execution requires POSIX isolation")
+        required_waitid_features = ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT")
+        if not all(hasattr(os, name) for name in required_waitid_features):
+            raise RuntimeError("safe process-group supervision requires waitid with WNOWAIT")
         if not argv or not Path(cwd).is_absolute():
             raise ValueError("sandbox command and absolute cwd are required")
         if (
@@ -50,6 +100,9 @@ class SandboxExecutor:
             or limits.max_processes < 1
         ):
             raise ValueError("invalid sandbox limits")
+
+        # Check before creating any process or crossing the command boundary.
+        self._assert_lease(lease_assertion)
 
         with tempfile.TemporaryDirectory(prefix="tinlance-sandbox-") as tmp:
             stdout_path = Path(tmp) / "stdout"
@@ -66,18 +119,39 @@ class SandboxExecutor:
                     preexec_fn=lambda: _limit_process(limits),
                 )
                 timed_out = False
+                deadline = monotonic() + limits.timeout_seconds
+                group_cleaned = False
                 try:
-                    process.wait(timeout=limits.timeout_seconds)
-                except subprocess.TimeoutExpired:
-                    timed_out = True
-                    os.killpg(process.pid, signal.SIGKILL)
-                    process.wait()
+                    while True:
+                        self._assert_lease(lease_assertion)
+                        remaining = deadline - monotonic()
+                        if remaining <= 0:
+                            timed_out = True
+                            self._kill_and_reap(process)
+                            group_cleaned = True
+                            break
+                        if self._has_exited_without_reaping(process):
+                            # The leader is still a zombie, keeping its process-group
+                            # ID reserved while any detached descendants are killed.
+                            self._kill_and_reap(process)
+                            group_cleaned = True
+                            break
+                        sleep(min(self._LEASE_POLL_INTERVAL_SECONDS, remaining))
+
+                    # Capture output only after every process in the command group is dead.
+                    stdout_data = stdout_path.read_bytes()[: limits.max_output_bytes]
+                    stderr_budget = max(0, limits.max_output_bytes - len(stdout_data))
+                    stderr_data = stderr_path.read_bytes()[:stderr_budget]
+                    # Recheck after output collection so a revoked lease cannot receive
+                    # a result merely because the command completed before revocation.
+                    self._assert_lease(lease_assertion)
+                except BaseException:
+                    if not group_cleaned:
+                        self._kill_and_reap(process)
+                    raise
 
             # max_output_bytes is an aggregate result budget across both streams.
             # Preserve stdout first, then use only the remaining budget for stderr.
-            stdout_data = stdout_path.read_bytes()[: limits.max_output_bytes]
-            stderr_budget = max(0, limits.max_output_bytes - len(stdout_data))
-            stderr_data = stderr_path.read_bytes()[:stderr_budget]
             return ProcessResult(
                 process.returncode,
                 stdout_data.decode("utf-8", errors="replace"),
