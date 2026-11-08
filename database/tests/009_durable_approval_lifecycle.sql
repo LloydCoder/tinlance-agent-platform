@@ -98,6 +98,20 @@ begin
         null;
     end;
 
+    begin
+        perform platform.consume_approval(
+            '00000000-0000-0000-0000-000000000091',
+            v_approval_id,
+            '40000000-0000-0000-0000-000000000091',
+            'invoice.refund',
+            'invoice:123',
+            null
+        );
+        raise exception 'approval accepted a missing intent fingerprint';
+    exception when insufficient_privilege then
+        null;
+    end;
+
     consumed := platform.consume_approval(
         '00000000-0000-0000-0000-000000000091',
         v_approval_id,
