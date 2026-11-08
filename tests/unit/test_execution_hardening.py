@@ -400,3 +400,21 @@ def test_sandbox_exec_guard_cannot_be_shadowed_by_workspace_code(tmp_path: Path)
     assert result.exit_code == 0
     assert result.stdout.strip() == "trusted-target"
     assert not marker.exists(), "workspace code must not shadow the trusted exec guard"
+
+
+def test_bubblewrap_provider_mounts_sysfs_read_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BubblewrapProvider()
+    monkeypatch.setattr(provider, "available", lambda: True)
+
+    command = provider.command(
+        ["/usr/bin/python3", "-c", "print('ok')"],
+        SandboxLimits(),
+        ("/workspace",),
+    )
+
+    read_only_mounts = {
+        tuple(command[index + 1 : index + 3])
+        for index, token in enumerate(command[:-2])
+        if token == "--ro-bind"
+    }
+    assert ("/sys", "/sys") in read_only_mounts
