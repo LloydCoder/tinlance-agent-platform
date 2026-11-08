@@ -120,6 +120,9 @@ class SandboxExecutor:
                             break
                         except subprocess.TimeoutExpired:
                             continue
+                    # A command may exit while leaving background descendants in its
+                    # process group. Reap the whole group before returning any result.
+                    self._kill_and_reap(process)
                     # Do not return output to a caller whose lease expired at completion.
                     self._assert_lease(lease_assertion)
                 except WorkspaceLeaseLost:
