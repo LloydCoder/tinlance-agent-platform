@@ -296,7 +296,7 @@ def main() -> int:
             proxy_process = subprocess.Popen(
                 [
                     "ip", "netns", "exec", proxy_ns,
-                    "unshare", "--mount", "--pid", "--ipc", "--fork",
+                    "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
                     "--mount-proc", "--propagation", "private",
                     "setpriv", "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
                     "--clear-groups", "--no-new-privs", sys.executable,
@@ -395,7 +395,7 @@ def main() -> int:
 
         guest_command = [
             "ip", "netns", "exec", browser_ns,
-            "unshare", "--mount", "--pid", "--ipc", "--fork",
+            "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
             "--mount-proc", "--propagation", "private",
             "setpriv", "--reuid", str(browser_uid), "--regid", str(browser_gid),
             "--clear-groups", "--no-new-privs", sys.executable,
@@ -448,12 +448,6 @@ def main() -> int:
             listener.close()
         if listener_thread is not None:
             listener_thread.join(timeout=1)
-        if host_rules_created:
-            for family, table in (("inet", host_forward_table), ("ip", host_nat_table)):
-                deleted = subprocess.run(["nft", "delete", "table", family, table],
-                                          check=False, capture_output=True)
-                if deleted.returncode != 0:
-                    cleanup_errors.append(f"host firewall table {table} could not be deleted")
         for netns in reversed(namespaces):
             listed = subprocess.run(["ip", "netns", "pids", netns],
                                     check=False, capture_output=True, text=True)
@@ -476,6 +470,17 @@ def main() -> int:
                                      check=False, capture_output=True)
             if deleted.returncode != 0:
                 cleanup_errors.append("proxy host uplink could not be deleted")
+        if host_rules_created:
+            for family, table in (("inet", host_forward_table), ("ip", host_nat_table)):
+                deleted = subprocess.run(
+                    ["nft", "delete", "table", family, table],
+                    check=False,
+                    capture_output=True,
+                )
+                if deleted.returncode != 0:
+                    cleanup_errors.append(
+                        f"host firewall table {table} could not be deleted"
+                    )
         if resolv_dir.exists():
             shutil.rmtree(resolv_dir, ignore_errors=True)
             if resolv_dir.exists():
