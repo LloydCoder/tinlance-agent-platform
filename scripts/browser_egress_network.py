@@ -14,7 +14,7 @@ _NON_PUBLIC_V4_SET = (
     "224.0.0.0/4, 240.0.0.0/4 }"
 )
 
-_INTERFACE = re.compile(r"^tb[a-z0-9]{2,8}$")
+_INTERFACE = re.compile(r"^tb[a-z0-9]{1,10}$")
 
 
 def _interface(value: str) -> str:
