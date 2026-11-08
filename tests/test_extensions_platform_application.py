@@ -9,8 +9,14 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
 
 from tinlance_agent_platform_api.service import APIRequest, APIResponse
-from tinlance_agent_platform_app import create_extensions_platform_application
-from tinlance_agent_platform_contracts import Principal
+from tinlance_agent_platform_app import (
+    compute_extensions_dead_letter_replay_intent_fingerprint,
+    create_extensions_platform_application,
+    extensions_dead_letter_replay_run_id,
+    extensions_mcp_request_id,
+)
+from tinlance_agent_platform_approvals import ApprovalService
+from tinlance_agent_platform_contracts import ApprovalStatus, Principal
 from tinlance_agent_platform_mcp.extensions import ExtensionsHTTPResponse
 
 ISSUER = "https://platform.identity.tinlance.test/"
@@ -79,7 +85,10 @@ class FakeDelegate:
         return APIResponse("success", {"delegated": request.operation})
 
 
-def _application(http: FakeHTTPClient | None = None):
+def _application(
+    http: FakeHTTPClient | None = None,
+    approval_verifier: ApprovalService | None = None,
+):
     return create_extensions_platform_application(
         delegate=FakeDelegate(),
         environment="test",
@@ -89,6 +98,7 @@ def _application(http: FakeHTTPClient | None = None):
         client_id="tinlance-extensions-platform",
         extensions_base_url="https://extensions.internal",
         http_client=http,
+        approval_verifier=approval_verifier,
     )
 
 
@@ -245,3 +255,202 @@ def test_production_transport_rejects_plain_http() -> None:
         assert "plain HTTP" in str(exc)
     else:
         raise AssertionError("plain HTTP must be rejected by default")
+
+
+# fmt: off
+EVENT_ID = "c4f6d9e2-1c3b-4a5d-8e7f-9012bc345679"
+REPLAY_IDEMPOTENCY_KEY = "replay-idempotency-0001"
+
+
+def _approved_replay_request(approval_service: ApprovalService, request_id: str):
+    run_id = extensions_dead_letter_replay_run_id(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        request_id=request_id,
+    )
+    arguments = {
+        "event_id": EVENT_ID,
+        "idempotency_key": REPLAY_IDEMPOTENCY_KEY,
+    }
+    fingerprint = compute_extensions_dead_letter_replay_intent_fingerprint(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        run_id=str(run_id),
+        arguments=arguments,
+    )
+    approval = approval_service.request(
+        "tenant-a",
+        run_id,
+        "replay",
+        "extensions://outbox/dead-letters/{event_id}",
+        "Replay a previously dead-lettered Extensions event",
+        "user-a",
+        intent_fingerprint=fingerprint,
+    )
+    approval_service.decide(
+        approval.approval_id,
+        True,
+        "tenant-a",
+        approver_subject_id="approver-b",
+        intent_fingerprint=fingerprint,
+    )
+    return run_id, fingerprint, approval.approval_id, {
+        **arguments,
+        "run_id": str(run_id),
+        "approval_id": str(approval.approval_id),
+        "intent_fingerprint": fingerprint,
+    }
+
+
+def test_dead_letter_replay_requires_bound_human_approval_and_scoped_token() -> None:
+    http = FakeHTTPClient(
+        ExtensionsHTTPResponse(
+            200,
+            {"content-type": "application/json"},
+            b'{"status":"requeued"}',
+        )
+    )
+    approvals = ApprovalService()
+    request_id = "platform-extensions-replay-0001"
+    run_id, fingerprint, approval_id, payload = _approved_replay_request(approvals, request_id)
+    payload.pop("idempotency_key")
+    application = _application(http, approval_verifier=approvals)
+    response = application.api.dispatch(
+        APIRequest(
+            tenant_id="tenant-a",
+            subject_id="user-a",
+            operation="extensions.outbox.dead_letter.replay",
+            payload=payload,
+            request_id=request_id,
+            idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+            authenticated_principal=_principal("extensions.outbox.dead_letter.replay"),
+        )
+    )
+
+    assert response.status == "success"
+    assert response.payload == {"status": "requeued"}
+    assert len(http.calls) == 1
+    call = http.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"] == (
+        f"https://extensions.internal/v1/outbox/dead-letters/{EVENT_ID}/replay"
+    )
+    assert call["body"] is None
+    assert call["headers"]["X-Request-ID"] == request_id
+    assert call["headers"]["Idempotency-Key"] == REPLAY_IDEMPOTENCY_KEY
+    token = call["headers"]["Authorization"].removeprefix("Bearer ")
+    claims = jwt.decode(
+        token,
+        application.signer.public_key,
+        algorithms=["RS256"],
+        issuer=ISSUER,
+        audience=AUDIENCE,
+    )
+    assert claims["tenant_id"] == "tenant-a"
+    assert claims["sub"] == "user-a"
+    assert claims["scope"] == "extensions:outbox:replay"
+    assert claims["request_id"] == request_id
+    assert str(run_id) == payload["run_id"]
+    assert fingerprint == payload["intent_fingerprint"]
+    assert approvals.get(approval_id, "tenant-a").status is ApprovalStatus.CONSUMED
+
+
+def test_dead_letter_replay_fails_closed_without_approval_verifier() -> None:
+    http = FakeHTTPClient()
+    approvals = ApprovalService()
+    request_id = "platform-extensions-replay-0002"
+    _run_id, _fingerprint, _approval_id, payload = _approved_replay_request(approvals, request_id)
+    application = _application(http)
+    request = APIRequest(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        operation="extensions.outbox.dead_letter.replay",
+        payload=payload,
+        request_id=request_id,
+        idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+        authenticated_principal=_principal("extensions.outbox.dead_letter.replay"),
+    )
+    try:
+        application.api.dispatch(request)
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError(
+            "dead-letter replay must fail closed without an approval verifier"
+        )
+    assert http.calls == []
+
+
+def test_dead_letter_replay_rejects_approval_for_different_event_intent() -> None:
+    http = FakeHTTPClient()
+    approvals = ApprovalService()
+    request_id = "platform-extensions-replay-0003"
+    _run_id, _fingerprint, _approval_id, payload = _approved_replay_request(approvals, request_id)
+    payload["event_id"] = "d4f6d9e2-1c3b-4a5d-8e7f-9012bc345670"
+    application = _application(http, approval_verifier=approvals)
+    request = APIRequest(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        operation="extensions.outbox.dead_letter.replay",
+        payload=payload,
+        request_id=request_id,
+        idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+        authenticated_principal=_principal("extensions.outbox.dead_letter.replay"),
+    )
+    try:
+        application.api.dispatch(request)
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError("approval must be bound to the exact event and intent")
+    assert http.calls == []
+# fmt: on
+
+
+def test_dead_letter_replay_approval_is_consumed_once() -> None:
+    http = FakeHTTPClient(
+        ExtensionsHTTPResponse(
+            200,
+            {"content-type": "application/json"},
+            b'{"status":"requeued"}',
+        )
+    )
+    approvals = ApprovalService()
+    request_id = "platform-extensions-replay-one-time"
+    _run_id, _fingerprint, _approval_id, payload = _approved_replay_request(approvals, request_id)
+    application = _application(http, approval_verifier=approvals)
+    request = APIRequest(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        operation="extensions.outbox.dead_letter.replay",
+        payload=payload,
+        request_id=request_id,
+        idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+        authenticated_principal=_principal("extensions.outbox.dead_letter.replay"),
+    )
+
+    response = application.api.dispatch(request)
+    assert response.status == "success"
+    assert len(http.calls) == 1
+
+    retry_response = application.api.dispatch(request)
+    assert retry_response.status == "success"
+    assert retry_response.payload == response.payload
+    # The API's idempotency boundary returns the original result without a second
+    # approval consumption or downstream HTTP side effect.
+    assert len(http.calls) == 1
+
+
+def test_mcp_replay_request_identity_helper_matches_protocol_contract() -> None:
+    import hashlib
+
+    request_id = "rpc-replay-0001"
+    expected = "mcp-" + hashlib.sha256(f"tenant-a:user-a:{request_id}".encode()).hexdigest()[:32]
+    assert (
+        extensions_mcp_request_id(
+            tenant_id="tenant-a",
+            subject_id="user-a",
+            jsonrpc_request_id=request_id,
+        )
+        == expected
+    )

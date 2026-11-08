@@ -20,6 +20,7 @@ from uuid import UUID
 from tinlance_agent_platform_contracts import RiskTier
 
 from .gateway import MCPTool, MCPToolGateway, ToolScope
+from .protocol import MCPToolDefinition
 
 EXTENSIONS_AUDIENCE = "tinlance-extensions-api"
 DEFAULT_TIMEOUT_SECONDS = 5.0
@@ -117,7 +118,65 @@ EXTENSIONS_JOB_CANCEL = MCPTool(
     risk=RiskTier.LOW,
 )
 
-EXTENSIONS_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = (EXTENSIONS_JOB_CANCEL,)
+EXTENSIONS_DEAD_LETTER_REPLAY = MCPTool(
+    name="extensions_dead_letter_replay",
+    description="Replay a tenant-owned dead-letter event after explicit human approval.",
+    capability="extensions.outbox.dead_letter.replay",
+    resource_pattern="extensions://outbox/dead-letters/{event_id}",
+    action="replay",
+    risk=RiskTier.HIGH,
+    requires_approval=True,
+    idempotency_argument="idempotency_key",
+)
+
+EXTENSIONS_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = (
+    EXTENSIONS_JOB_CANCEL,
+    EXTENSIONS_DEAD_LETTER_REPLAY,
+)
+
+EXTENSIONS_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = (
+    MCPToolDefinition(
+        name="extensions_job_cancel",
+        description="Request cancellation of a tenant-owned Tinlance Extensions job.",
+        operation="extensions.jobs.cancel",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["job_id"],
+            "properties": {"job_id": {"type": "string", "format": "uuid"}},
+        },
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        name="extensions_dead_letter_replay",
+        description="Replay a dead-lettered Extensions event after bound human approval.",
+        operation="extensions.outbox.dead_letter.replay",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "event_id",
+                "idempotency_key",
+                "run_id",
+                "approval_id",
+                "intent_fingerprint",
+            ],
+            "properties": {
+                "event_id": {"type": "string", "format": "uuid"},
+                "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{16,128}$",
+                },
+                "run_id": {"type": "string", "format": "uuid"},
+                "approval_id": {"type": "string", "format": "uuid"},
+                "intent_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            },
+        },
+        consequential=True,
+        idempotency_argument="idempotency_key",
+        open_world=False,
+    ),
+)
 
 
 def register_extensions_tools(gateway: MCPToolGateway) -> None:
@@ -168,27 +227,72 @@ class ExtensionsHTTPTransport:
         self._timeout = timeout_seconds
 
     def call(
-        self, tool_name: str, arguments: Mapping[str, object], scope: ToolScope
+        self,
+        tool_name: str,
+        arguments: Mapping[str, object],
+        scope: ToolScope,
     ) -> dict[str, object]:
-        if tool_name != "extensions_job_cancel":
+        idempotency_key: str | None = None
+        if tool_name == "extensions_job_cancel":
+            tool = EXTENSIONS_JOB_CANCEL
+            if set(arguments) != {"job_id"}:
+                raise ValueError("Extensions cancellation contains unsupported fields")
+            job_id = arguments.get("job_id")
+            if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
+                raise ValueError("Extensions job ID must be a canonical UUID")
+            if str(UUID(job_id)) != job_id.lower():
+                raise ValueError("Extensions job ID must be normalized")
+            path = f"/v1/jobs/{quote(job_id, safe='')}/cancel"
+            required_scope = "extensions:jobs:cancel"
+            idempotency_key = None
+        elif tool_name == "extensions_dead_letter_replay":
+            tool = EXTENSIONS_DEAD_LETTER_REPLAY
+            required_arguments = {
+                "event_id",
+                "idempotency_key",
+                "run_id",
+                "approval_id",
+                "intent_fingerprint",
+            }
+            if set(arguments) != required_arguments:
+                raise ValueError("Extensions replay contains unsupported or missing fields")
+            event_id = arguments.get("event_id")
+            if not isinstance(event_id, str) or not _JOB_ID.fullmatch(event_id):
+                raise ValueError("Extensions event ID must be a canonical UUID")
+            if str(UUID(event_id)) != event_id.lower():
+                raise ValueError("Extensions event ID must be normalized")
+            idempotency_key_value = arguments.get("idempotency_key")
+            if not isinstance(idempotency_key_value, str) or not re.fullmatch(
+                r"[A-Za-z0-9._:-]{16,128}", idempotency_key_value
+            ):
+                raise ValueError("Extensions replay requires a normalized idempotency key")
+            idempotency_key = idempotency_key_value
+            for field in ("run_id", "approval_id"):
+                value = arguments.get(field)
+                if not isinstance(value, str) or not _JOB_ID.fullmatch(value):
+                    raise ValueError(f"Extensions replay {field} must be a canonical UUID")
+            fingerprint = arguments.get("intent_fingerprint")
+            if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
+                raise ValueError("Extensions replay intent fingerprint is invalid")
+            path = f"/v1/outbox/dead-letters/{quote(event_id, safe='')}/replay"
+            required_scope = "extensions:outbox:replay"
+        else:
             raise LookupError("Extensions tool is not registered")
+
         if (
-            scope.capability != EXTENSIONS_JOB_CANCEL.capability
-            or scope.resource != EXTENSIONS_JOB_CANCEL.resource_pattern
+            scope.capability != tool.capability
+            or scope.resource != tool.resource_pattern
             or not scope.subject_id
             or not scope.request_id
         ):
-            raise PermissionError("Extensions call is missing authenticated subject/request scope")
-        job_id = arguments.get("job_id")
-        if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
-            raise ValueError("Extensions job ID must be a canonical UUID")
-        if str(UUID(job_id)) != job_id.lower():
-            raise ValueError("Extensions job ID must be normalized")
+            raise PermissionError(
+                "Extensions call is missing its authenticated subject/request scope"
+            )
         token = self._issuer.issue_token(
             tenant_id=scope.tenant_id,
             subject_id=scope.subject_id,
             audience=EXTENSIONS_AUDIENCE,
-            scopes=frozenset({"extensions:jobs:cancel"}),
+            scopes=frozenset({required_scope}),
             request_id=scope.request_id,
             traceparent=scope.traceparent,
             expires_in_seconds=60,
@@ -196,15 +300,18 @@ class ExtensionsHTTPTransport:
         )
         if not token or token != token.strip() or any(character.isspace() for character in token):
             raise PermissionError("Platform token issuer returned an invalid Extensions token")
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+            "X-Request-ID": scope.request_id,
+            **({"traceparent": scope.traceparent} if scope.traceparent else {}),
+        }
+        if idempotency_key is not None:
+            headers["Idempotency-Key"] = idempotency_key
         response = self._http.request(
             "POST",
-            f"{self._base_url}/v1/jobs/{quote(job_id, safe='')}/cancel",
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {token}",
-                "X-Request-ID": scope.request_id,
-                **({"traceparent": scope.traceparent} if scope.traceparent else {}),
-            },
+            f"{self._base_url}{path}",
+            headers=headers,
             body=None,
             timeout_seconds=self._timeout,
         )
