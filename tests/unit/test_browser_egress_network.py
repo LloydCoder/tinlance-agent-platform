@@ -116,11 +116,21 @@ def test_interface_names_are_rejected_unless_owned_by_the_harness(name: str) -> 
         )
 
 
-@pytest.mark.parametrize("dns_server", ["127.0.0.1", "10.0.0.2", "::1"])
-def test_dns_forwarder_must_be_an_explicit_global_ipv4_address(dns_server: str) -> None:
+@pytest.mark.parametrize("dns_server", ["127.0.0.1", "169.254.169.254", "::1"])
+def test_dns_forwarder_rejects_unreachable_or_special_addresses(dns_server: str) -> None:
     with pytest.raises(ValueError, match="DNS forwarder"):
         build_proxy_namespace_rules(
             browser_interface="tbbr0",
             uplink_interface="tbup0",
             dns_server=dns_server,
         )
+
+
+def test_explicit_private_dns_resolver_is_allowed_by_exact_destination_policy() -> None:
+    rules = build_proxy_namespace_rules(
+        browser_interface="tbbr0",
+        uplink_interface="tbup0",
+        dns_server="10.0.0.2",
+    )
+    assert "ip daddr 10.0.0.2 udp dport 53 accept" in rules
+    assert "ip daddr 10.0.0.2 tcp dport 53 accept" in rules
