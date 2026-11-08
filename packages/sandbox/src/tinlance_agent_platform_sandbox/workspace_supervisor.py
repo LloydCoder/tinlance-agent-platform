@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from tinlance_agent_platform_durability import WorkspaceLease
+
 from .bubblewrap import SandboxLimits
 from .executor import ProcessResult, SandboxExecutor
-
-from tinlance_agent_platform_durability import WorkspaceLease
 
 
 class WorkspaceLeaseStore(Protocol):
