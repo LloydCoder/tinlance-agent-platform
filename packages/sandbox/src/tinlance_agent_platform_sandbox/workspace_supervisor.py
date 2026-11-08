@@ -6,6 +6,7 @@ from typing import Protocol
 
 from .bubblewrap import SandboxLimits
 from .executor import ProcessResult, SandboxExecutor
+from tinlance_agent_platform_durability import WorkspaceLease
 
 
 class WorkspaceLeaseStore(Protocol):
