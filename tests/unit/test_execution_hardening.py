@@ -361,6 +361,7 @@ def test_sandbox_executor_avoids_preexec_fn_in_multithreaded_parent(
 
     def recording_popen(*args: object, **kwargs: object) -> subprocess.Popen[bytes]:
         launch.update(kwargs)
+        launch["command"] = args[0] if args else kwargs.get("args")
         return original_popen(*args, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(executor_module.subprocess, "Popen", recording_popen)
