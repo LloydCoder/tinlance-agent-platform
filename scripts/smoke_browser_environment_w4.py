@@ -541,6 +541,10 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             tenant_a_probe.kill()
             tenant_a_probe.wait(timeout=5)
+        if tenant_a_probe.stdout is not None:
+            tenant_a_probe.stdout.close()
+        if tenant_a_probe.stderr is not None:
+            tenant_a_probe.stderr.close()
         tenant_a_probe = None
         evidence["status"] = "passed"
     except BaseException as exc:
