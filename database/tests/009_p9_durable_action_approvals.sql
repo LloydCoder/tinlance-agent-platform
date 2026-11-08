@@ -22,6 +22,18 @@ insert into platform.action_approvals (
     repeat('a', 64), 'approver-b', now()
 );
 
+insert into platform.action_approvals (
+    approval_id, tenant_id, run_id, action, resource, reason,
+    requested_by, status, intent_fingerprint, approved_by, decided_at, expires_at
+) values (
+    '50000000-0000-0000-0000-000000000092',
+    '00000000-0000-0000-0000-000000000091',
+    '40000000-0000-0000-0000-000000000092',
+    'replay', 'extensions://outbox/dead-letters/{event_id}',
+    'Expired approved action', 'requester-a', 'approved',
+    repeat('c', 64), 'approver-b', now(), now() - interval '1 second'
+);
+
 insert into platform.action_approval_events (
     event_id, tenant_id, approval_id, event_type, actor_subject_id, intent_fingerprint
 ) values (
@@ -63,6 +75,20 @@ begin
     get diagnostics changed = row_count;
     if changed <> 0 then
         raise exception 'consumed approval was reusable';
+    end if;
+
+    update platform.action_approvals
+       set status = 'expired', decided_at = now()
+     where approval_id = '50000000-0000-0000-0000-000000000092'
+       and tenant_id = '00000000-0000-0000-0000-000000000091'
+       and status = 'approved'
+       and expires_at <= now();
+    if not exists (
+        select 1 from platform.action_approvals
+        where approval_id = '50000000-0000-0000-0000-000000000092'
+          and status = 'expired' and approved_by = 'approver-b'
+    ) then
+        raise exception 'expired approval did not retain its approver audit identity';
     end if;
 
     perform set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000092', true);
