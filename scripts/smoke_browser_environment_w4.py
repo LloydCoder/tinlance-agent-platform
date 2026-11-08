@@ -386,6 +386,11 @@ def main() -> int:
         tenant_a_record = json.loads(tenant_a_line)
         if tenant_a_record.get("status") != "ready":
             raise RuntimeError("tenant A namespace marker did not initialize")
+        if any(
+            tenant_a_record["namespace_ids"][name] == host_namespace_ids[name]
+            for name in host_namespace_ids
+        ):
+            raise RuntimeError("tenant A shares a PID, IPC, mount or network namespace with host")
 
         # A hostile proxy process cannot reach host-local listeners, metadata,
         # private/link-local destinations or arbitrary non-HTTPS ports.
@@ -511,6 +516,8 @@ def main() -> int:
                 "--profile-root", str(profile_root),
                 "--tenant-a-namespaces",
                 json.dumps(tenant_a_record["namespace_ids"], separators=(",", ":")),
+                "--host-namespaces",
+                json.dumps(host_namespace_ids, separators=(",", ":")),
             ],
             capture_output=True,
             text=True,
