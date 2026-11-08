@@ -13,7 +13,7 @@ from .executor import ProcessResult, SandboxExecutor
 class WorkspaceLeaseStore(Protocol):
     """Minimal durable lease authority required by the workspace supervisor."""
 
-    def assert_active(self, lease: object) -> bool: ...
+    def assert_active(self, lease: WorkspaceLease) -> bool: ...
 
 
 class WorkspaceLeaseSupervisor:
