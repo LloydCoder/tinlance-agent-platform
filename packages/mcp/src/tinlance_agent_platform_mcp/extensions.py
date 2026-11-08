@@ -49,21 +49,14 @@ def extensions_action_purpose(
         raise ValueError("Extensions action-token identity must be complete and normalized")
     if tool_name == "extensions_job_cancel":
         if idempotency_key is not None:
-            raise ValueError(
-                "job-cancellation action purpose does not accept an idempotency key"
-            )
+            raise ValueError("job-cancellation action purpose does not accept an idempotency key")
     elif tool_name == "extensions_dead_letter_replay":
-        if (
-            not isinstance(idempotency_key, str)
-            or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key)
-        ):
+        if not isinstance(idempotency_key, str) or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key):
             raise ValueError(
                 "dead-letter replay action purpose requires a normalized idempotency key"
             )
     else:
-        raise ValueError(
-            "Extensions action-token tool is not registered"
-        )
+        raise ValueError("Extensions action-token tool is not registered")
     canonical = json.dumps(
         [tenant_id, subject_id, tool_name, resource_id, idempotency_key],
         separators=(",", ":"),
