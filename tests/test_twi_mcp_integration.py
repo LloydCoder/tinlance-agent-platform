@@ -578,6 +578,19 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             gateway.call(context, scope, "twi_monitor_delete", arguments, request, uuid4())
         self.assertEqual(self.http.calls, [])
 
+        with self.assertRaisesRegex(PermissionError, "intent fingerprint"):
+            gateway.call(
+                context,
+                scope,
+                "twi_monitor_delete",
+                arguments,
+                request,
+                uuid4(),
+                approval_id=uuid4(),
+                approval_verifier=ApprovedIntent(),
+            )
+        self.assertEqual(self.http.calls, [])
+
         approvals = ApprovedIntent()
         gateway.call(
             context,
