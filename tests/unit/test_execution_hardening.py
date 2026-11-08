@@ -348,3 +348,32 @@ def test_bubblewrap_provider_unshares_network_by_default(monkeypatch: pytest.Mon
 
     assert "--unshare-all" in command
     assert "--share-net" not in command
+
+
+def test_sandbox_executor_avoids_preexec_fn_in_multithreaded_parent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from tinlance_agent_platform_sandbox import executor as executor_module
+
+    original_popen = subprocess.Popen
+    launch: dict[str, object] = {}
+
+    def recording_popen(*args: object, **kwargs: object) -> subprocess.Popen[bytes]:
+        launch.update(kwargs)
+        return original_popen(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(executor_module.subprocess, "Popen", recording_popen)
+    result = SandboxExecutor().execute(
+        ["/usr/bin/python3", "-c", "print('thread-safe-launch')"],
+        cwd=str(tmp_path),
+        limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
+        lease_assertion=lambda: True,
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "thread-safe-launch"
+    assert launch.get("preexec_fn") is None
+    command = launch.get("args")
+    assert isinstance(command, list)
+    assert command[1:3] == ["-m", "tinlance_agent_platform_sandbox.exec_guard"]
