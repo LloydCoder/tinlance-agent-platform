@@ -346,23 +346,48 @@ def main() -> int:
         listener_thread = threading.Thread(target=accept_once, daemon=True)
         listener_thread.start()
 
-        host_probe_code = (
-            "import socket; s=socket.socket(); s.settimeout(1); "
-            f"r=s.connect_ex(({host_uplink_ip!r}, 18080)); "
-            "print('REACHED' if r == 0 else 'BLOCKED')"
+        # Temporarily permit the test destination through the proxy namespace
+        # firewall so the independent host INPUT drop is what blocks this probe.
+        run([
+            "ip", "netns", "exec", proxy_ns, "nft", "insert", "rule",
+            "inet", "tnl_proxy", "output",
+            "oifname", proxy_uplink_if,
+            "ip", "daddr", host_uplink_ip,
+            "tcp", "dport", "18080", "accept",
+        ])
+        output_rules = run([
+            "ip", "netns", "exec", proxy_ns, "nft", "-a",
+            "list", "chain", "inet", "tnl_proxy", "output",
+        ])
+        probe_handle = next(
+            int(line.rsplit("# handle ", 1)[1])
+            for line in output_rules.splitlines()
+            if host_uplink_ip in line and "18080" in line and "# handle " in line
         )
-        host_probe = subprocess.run(
-            [
-                "ip", "netns", "exec", proxy_ns, "setpriv",
-                "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
-                "--clear-groups", "--no-new-privs", sys.executable,
-                "-c", host_probe_code,
-            ],
-            capture_output=True, text=True, timeout=4,
-        )
-        if host_probe.returncode != 0 or host_probe.stdout.strip() != "BLOCKED":
-            raise RuntimeError("compromised proxy can reach a host-local service")
-        evidence["proxy_namespace_host_services_blocked"] = True
+        try:
+            host_probe_code = (
+                "import socket; s=socket.socket(); s.settimeout(1); "
+                f"r=s.connect_ex(({host_uplink_ip!r}, 18080)); "
+                "print('REACHED' if r == 0 else 'BLOCKED')"
+            )
+            host_probe = subprocess.run(
+                [
+                    "ip", "netns", "exec", proxy_ns, "setpriv",
+                    "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
+                    "--clear-groups", "--no-new-privs", sys.executable,
+                    "-c", host_probe_code,
+                ],
+                capture_output=True, text=True, timeout=4,
+            )
+            if host_probe.returncode != 0 or host_probe.stdout.strip() != "BLOCKED":
+                raise RuntimeError("host INPUT firewall did not block a proxy-to-host connection")
+            evidence["proxy_namespace_host_services_blocked"] = True
+            evidence["host_local_blocked_by_host_firewall"] = True
+        finally:
+            run([
+                "ip", "netns", "exec", proxy_ns, "nft", "delete", "rule",
+                "inet", "tnl_proxy", "output", "handle", str(probe_handle),
+            ])
         evidence["proxy_namespace_private_egress_blocked"] = probe_blocked(
             proxy_ns, "10.0.0.1", 443
         )
