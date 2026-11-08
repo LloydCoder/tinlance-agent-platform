@@ -58,13 +58,13 @@ def create_user(name: str, start_uid: int) -> tuple[int, int]:
 
 def probe_blocked(namespace: str, destination: str, port: int) -> bool:
     script = (
-        "import socket\\n"
-        f"target = ({destination!r}, {port})\\n"
-        "try:\\n"
-        "    socket.create_connection(target, timeout=1)\\n"
-        "    print('REACHED')\\n"
-        "except OSError:\\n"
-        "    print('BLOCKED')\\n"
+        "import socket\n"
+        f"target = ({destination!r}, {port})\n"
+        "try:\n"
+        "    socket.create_connection(target, timeout=1)\n"
+        "    print('REACHED')\n"
+        "except OSError:\n"
+        "    print('BLOCKED')\n"
     )
     output = run(["ip", "netns", "exec", namespace, sys.executable, "-c", script], timeout=4)
     if output != "BLOCKED":
