@@ -23,7 +23,37 @@ from browser_egress_network import (
 )
 
 PROXY_PORT = 3128
-DNS_SERVER = "1.1.1.1"
+
+
+def select_approved_dns_server() -> tuple[str, str]:
+    for resolver_file in (
+        Path("/etc/resolv.conf"),
+        Path("/run/systemd/resolve/resolv.conf"),
+        Path("/run/NetworkManager/no-stub-resolv.conf"),
+    ):
+        if not resolver_file.is_file():
+            continue
+        for line in resolver_file.read_text(encoding="ascii", errors="replace").splitlines():
+            fields = line.split()
+            if len(fields) < 2 or fields[0] != "nameserver":
+                continue
+            try:
+                address = ipaddress.ip_address(fields[1])
+            except ValueError:
+                continue
+            if (
+                isinstance(address, ipaddress.IPv4Address)
+                and not address.is_loopback
+                and not address.is_link_local
+                and not address.is_multicast
+                and not address.is_unspecified
+                and not address.is_reserved
+            ):
+                return str(address), str(resolver_file)
+    return "1.1.1.1", "explicit Cloudflare fallback"
+
+
+DNS_SERVER, DNS_SERVER_SOURCE = select_approved_dns_server()
 
 
 def run(command: list[str], *, timeout: int = 30, env: dict[str, str] | None = None) -> str:
@@ -479,6 +509,7 @@ def main() -> int:
                 "tenant_b_namespace_interface_count": 1,
                 "tenant_b_namespace_route_table": tenant_b_routes,
                 "proxy_namespace_dns_server": DNS_SERVER,
+        "proxy_namespace_dns_server_source": DNS_SERVER_SOURCE,
                 "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
                 "host_forwarding_policy": (
                     "proxy uplink only; established replies; TCP/443; DNS to approved resolver"
