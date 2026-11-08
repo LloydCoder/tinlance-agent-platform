@@ -1,6 +1,6 @@
 import json
-from copy import deepcopy
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
 from threading import RLock
