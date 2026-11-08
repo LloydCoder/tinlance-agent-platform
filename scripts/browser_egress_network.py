@@ -131,9 +131,11 @@ def validate_proxy_namespace_routes(
         if fields[0] == "default":
             if len(fields) < 4 or fields[1] != "via" or fields[2] != str(gateway):
                 raise ValueError("proxy namespace default route does not use approved gateway")
+            device_index = fields.index("dev") if "dev" in fields else -1
             if (
-                "dev" not in fields
-                or fields[fields.index("dev") + 1] != uplink_interface
+                device_index < 0
+                or device_index + 1 >= len(fields)
+                or fields[device_index + 1] != uplink_interface
             ):
                 raise ValueError("proxy namespace default route does not use the approved uplink")
             default = True
@@ -142,12 +144,17 @@ def validate_proxy_namespace_routes(
             network = ipaddress.ip_network(fields[0], strict=False)
         except ValueError as exc:
             raise ValueError("proxy namespace contains an unexpected route") from exc
-        if network not in {browser, uplink} or "dev" not in fields:
+        device_index = fields.index("dev") if "dev" in fields else -1
+        if (
+            network not in {browser, uplink}
+            or device_index < 0
+            or device_index + 1 >= len(fields)
+        ):
             raise ValueError("proxy namespace contains an unexpected route")
         expected_interface = (
             browser_interface if network == browser else uplink_interface
         )
-        if fields[fields.index("dev") + 1] != expected_interface:
+        if fields[device_index + 1] != expected_interface:
             raise ValueError("proxy namespace connected route uses an unexpected interface")
         connected.add(network)
     if connected != {browser, uplink} or not default:
