@@ -6,6 +6,7 @@ from .extensions_platform_application import (
     compute_extensions_dead_letter_replay_intent_fingerprint,
     create_extensions_platform_application,
     extensions_dead_letter_replay_run_id,
+    extensions_mcp_request_id,
 )
 from .twi_platform_application import (
     PlatformTWIApplication,
@@ -22,6 +23,7 @@ __all__ = [
     "compute_extensions_dead_letter_replay_intent_fingerprint",
     "create_extensions_platform_application",
     "extensions_dead_letter_replay_run_id",
+    "extensions_mcp_request_id",
     "PlatformTWIApplication",
     "create_twi_platform_application",
     "WorldIntelligenceAPIHandler",
