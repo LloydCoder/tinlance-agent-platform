@@ -8,7 +8,9 @@ import time
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Hold tenant A PID/IPC/mount namespaces for concurrent W4 probes.")
+    parser = argparse.ArgumentParser(
+        description="Hold tenant A PID/IPC/mount namespaces for concurrent W4 probes."
+    )
     parser.add_argument("--ipc-key", type=int, required=True)
     parser.add_argument("--hold-seconds", type=int, default=120)
     args = parser.parse_args()
