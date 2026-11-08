@@ -148,34 +148,39 @@ def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
     """Prove an approved CONNECT tunnel carries a verified end-to-end TLS request."""
     connection = socket.create_connection((proxy_ip, proxy_port), timeout=5)
     connection.settimeout(5)
+    crlf = bytes((13, 10))
     try:
         authority = f"{hostname}:443"
         connection.sendall(
-            (
-                f"CONNECT {authority} HTTP/1.1\\r\\n"
-                f"Host: {authority}\\r\\n"
-                "Proxy-Connection: keep-alive\\r\\n\\r\\n"
-            ).encode("ascii")
+            f"CONNECT {authority} HTTP/1.1".encode("ascii")
+            + crlf
+            + f"Host: {authority}".encode("ascii")
+            + crlf
+            + b"Proxy-Connection: keep-alive"
+            + crlf * 2
         )
         headers = bytearray()
-        while b"\\r\\n\\r\\n" not in headers and len(headers) < 8192:
+        while crlf * 2 not in headers and len(headers) < 8192:
             chunk = connection.recv(1024)
             if not chunk:
                 raise ConnectionError("proxy closed before CONNECT response")
             headers.extend(chunk)
-        status_line = bytes(headers).split(b"\\r\\n", 1)[0]
+        status_line = bytes(headers).split(crlf, 1)[0]
         if not status_line.startswith(b"HTTP/1.1 200 "):
             raise ConnectionError(f"approved CONNECT was rejected: {status_line!r}")
         tls = ssl.create_default_context().wrap_socket(
             connection, server_hostname=hostname
         )
         tls.sendall(
-            (
-                f"GET / HTTP/1.1\\r\\nHost: {hostname}\\r\\n"
-                "Connection: close\\r\\n\\r\\n"
-            ).encode("ascii")
+            b"GET / HTTP/1.1"
+            + crlf
+            + f"Host: {hostname}".encode("ascii")
+            + crlf
+            + b"Connection: close"
+            + crlf * 2
         )
-        response_line = tls.makefile("rb").readline(1024)
+        with tls.makefile("rb") as response_stream:
+            response_line = response_stream.readline(1024)
         tls.close()
         return response_line.startswith(b"HTTP/1.1 200 ")
     finally:
