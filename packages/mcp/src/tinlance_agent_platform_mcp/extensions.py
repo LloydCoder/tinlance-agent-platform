@@ -117,7 +117,21 @@ EXTENSIONS_JOB_CANCEL = MCPTool(
     risk=RiskTier.LOW,
 )
 
-EXTENSIONS_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = (EXTENSIONS_JOB_CANCEL,)
+EXTENSIONS_DEAD_LETTER_REPLAY = MCPTool(
+    name="extensions_dead_letter_replay",
+    description="Replay a tenant-owned dead-letter event after explicit human approval.",
+    capability="extensions.outbox.dead_letter.replay",
+    resource_pattern="extensions://outbox/dead-letters/{event_id}",
+    action="replay",
+    risk=RiskTier.HIGH,
+    requires_approval=True,
+    idempotency_argument="idempotency_key",
+)
+
+EXTENSIONS_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = (
+    EXTENSIONS_JOB_CANCEL,
+    EXTENSIONS_DEAD_LETTER_REPLAY,
+)
 
 
 def register_extensions_tools(gateway: MCPToolGateway) -> None:
@@ -170,8 +184,13 @@ class ExtensionsHTTPTransport:
     def call(
         self, tool_name: str, arguments: Mapping[str, object], scope: ToolScope
     ) -> dict[str, object]:
-        if tool_name != "extensions_job_cancel":
-            raise LookupError("Extensions tool is not registered")
+        if tool_name == "extensions_job_cancel":
+            return self._cancel(arguments, scope)
+        if tool_name == "extensions_dead_letter_replay":
+            return self._replay(arguments, scope)
+        raise LookupError("Extensions tool is not registered")
+
+    def _cancel(self, arguments: Mapping[str, object], scope: ToolScope) -> dict[str, object]:
         if (
             scope.capability != EXTENSIONS_JOB_CANCEL.capability
             or scope.resource != EXTENSIONS_JOB_CANCEL.resource_pattern
@@ -194,20 +213,77 @@ class ExtensionsHTTPTransport:
             expires_in_seconds=60,
             principal_type=scope.principal_type,
         )
-        if not token or token != token.strip() or any(character.isspace() for character in token):
-            raise PermissionError("Platform token issuer returned an invalid Extensions token")
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self._validated_token(token)}",
+            "X-Request-ID": scope.request_id,
+            **({"traceparent": scope.traceparent} if scope.traceparent else {}),
+        }
         response = self._http.request(
             "POST",
             f"{self._base_url}/v1/jobs/{quote(job_id, safe='')}/cancel",
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {token}",
-                "X-Request-ID": scope.request_id,
-                **({"traceparent": scope.traceparent} if scope.traceparent else {}),
-            },
+            headers=headers,
             body=None,
             timeout_seconds=self._timeout,
         )
+        return self._decode_response(response)
+
+    def _replay(self, arguments: Mapping[str, object], scope: ToolScope) -> dict[str, object]:
+        if (
+            scope.capability != EXTENSIONS_DEAD_LETTER_REPLAY.capability
+            or scope.resource != EXTENSIONS_DEAD_LETTER_REPLAY.resource_pattern
+            or not scope.subject_id
+            or not scope.request_id
+        ):
+            raise PermissionError("Extensions replay is missing authenticated subject/request scope")
+        event_id = arguments.get("event_id")
+        if not isinstance(event_id, str) or not _JOB_ID.fullmatch(event_id):
+            raise ValueError("Extensions event ID must be a canonical UUID")
+        if str(UUID(event_id)) != event_id.lower():
+            raise ValueError("Extensions event ID must be normalized")
+        idempotency_key = arguments.get("idempotency_key")
+        if (
+            not isinstance(idempotency_key, str)
+            or not 16 <= len(idempotency_key) <= 256
+            or not idempotency_key.isascii()
+            or any(ord(character) < 33 or ord(character) > 126 for character in idempotency_key)
+        ):
+            raise ValueError("Extensions replay requires a normalized idempotency key")
+        token = self._issuer.issue_token(
+            tenant_id=scope.tenant_id,
+            subject_id=scope.subject_id,
+            audience=EXTENSIONS_AUDIENCE,
+            scopes=frozenset({"extensions:outbox:replay"}),
+            request_id=scope.request_id,
+            traceparent=scope.traceparent,
+            expires_in_seconds=60,
+            principal_type=scope.principal_type,
+        )
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self._validated_token(token)}",
+            "X-Request-ID": scope.request_id,
+            "Idempotency-Key": idempotency_key,
+            **({"traceparent": scope.traceparent} if scope.traceparent else {}),
+        }
+        response = self._http.request(
+            "POST",
+            f"{self._base_url}/v1/outbox/dead-letters/{quote(event_id, safe='')}/replay",
+            headers=headers,
+            body=None,
+            timeout_seconds=self._timeout,
+        )
+        return self._decode_response(response)
+
+    @staticmethod
+    def _validated_token(token: str) -> str:
+        if not token or token != token.strip() or any(character.isspace() for character in token):
+            raise PermissionError("Platform token issuer returned an invalid Extensions token")
+        return token
+
+    @staticmethod
+    def _decode_response(response: ExtensionsHTTPResponse) -> dict[str, object]:
+
         if response.status_code not in {200, 201, 202, 204}:
             raise ExtensionsTransportError(
                 response.status_code,
