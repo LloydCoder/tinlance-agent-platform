@@ -14,7 +14,12 @@ class SandboxLimits:
 
 class SandboxProvider(Protocol):
     def command(
-        self, argv: list[str], limits: SandboxLimits, workspace_paths: tuple[str, ...] = ()
+        self,
+        argv: list[str],
+        limits: SandboxLimits,
+        workspace_paths: tuple[str, ...] = (),
+        *,
+        network: bool = False,
     ) -> list[str]: ...
 
 
@@ -26,7 +31,12 @@ class BubblewrapProvider:
         return which(self.binary) is not None
 
     def command(
-        self, argv: list[str], limits: SandboxLimits, workspace_paths: tuple[str, ...] = ()
+        self,
+        argv: list[str],
+        limits: SandboxLimits,
+        workspace_paths: tuple[str, ...] = (),
+        *,
+        network: bool = False,
     ) -> list[str]:
         if (
             not argv
@@ -68,6 +78,10 @@ class BubblewrapProvider:
             "--tmpfs",
             "/tmp",
         ]
+        if network:
+            # Preserve only the caller's already-restricted network namespace.
+            # Bubblewrap documents --share-net as overriding --unshare-all.
+            command.append("--share-net")
         for path in workspace_paths:
             command.extend(("--bind", path, path))
         command.extend(("--chdir", workspace_paths[0] if workspace_paths else "/tmp", "--", *argv))
