@@ -17,12 +17,16 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 from uuid import UUID
 
 from tinlance_agent_platform_contracts import RiskTier
+
 from .gateway import MCPTool, MCPToolGateway, ToolScope
 
 EXTENSIONS_AUDIENCE = "tinlance-extensions-api"
 DEFAULT_TIMEOUT_SECONDS = 5.0
 MAX_RESPONSE_BYTES = 1_048_576
-_JOB_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.I)
+_JOB_ID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.I,
+)
 
 
 class ExtensionsServiceTokenIssuer(Protocol):
@@ -143,14 +147,18 @@ class ExtensionsHTTPTransport:
             or parsed.fragment
             or parsed.path not in {"", "/"}
         ):
-            raise ValueError("Extensions base URL must be an HTTP(S) origin without credentials or path")
+            raise ValueError(
+                "Extensions base URL must be an HTTP(S) origin without credentials or path"
+            )
         if parsed.scheme != "https":
             try:
                 loopback = host.lower() == "localhost" or ipaddress.ip_address(host).is_loopback
             except ValueError:
                 loopback = False
             if not allow_loopback_http or not loopback:
-                raise ValueError("plain HTTP is allowed only for explicitly enabled loopback development")
+                raise ValueError(
+                    "plain HTTP is allowed only for explicitly enabled loopback development"
+                )
         if not 0.1 <= timeout_seconds <= 30:
             raise ValueError("Extensions timeout must be between 0.1 and 30 seconds")
         self._base_url = f"{parsed.scheme}://{parsed.netloc}"
