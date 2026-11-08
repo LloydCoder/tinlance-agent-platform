@@ -13,7 +13,8 @@ from .egress_proxy import (
     ResolvedTarget,
     resolve_public_target,
 )
-from .executor import ProcessResult, SandboxExecutor
+from .executor import ProcessResult, SandboxExecutor, WorkspaceLeaseLost
+from .workspace_supervisor import WorkspaceLeaseSupervisor
 from .policy import SandboxPolicy
 from .service import SandboxUnavailable, build_command, validate_request
 
@@ -29,6 +30,8 @@ __all__ = [
     "BubblewrapProvider",
     "ProcessResult",
     "SandboxExecutor",
+    "WorkspaceLeaseLost",
+    "WorkspaceLeaseSupervisor",
     "SandboxLimits",
     "SandboxPolicy",
     "SandboxProvider",
