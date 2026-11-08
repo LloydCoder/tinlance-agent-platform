@@ -261,9 +261,8 @@ class ExtensionsHTTPTransport:
             if str(UUID(event_id)) != event_id.lower():
                 raise ValueError("Extensions event ID must be normalized")
             idempotency_key = arguments.get("idempotency_key")
-            if (
-                not isinstance(idempotency_key, str)
-                or not re.fullmatch(r"[A-Za-z0-9._:-]{16,128}", idempotency_key)
+            if not isinstance(idempotency_key, str) or not re.fullmatch(
+                r"[A-Za-z0-9._:-]{16,128}", idempotency_key
             ):
                 raise ValueError("Extensions replay requires a normalized idempotency key")
             for field in ("run_id", "approval_id"):
