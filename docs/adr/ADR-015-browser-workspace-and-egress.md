@@ -36,7 +36,7 @@ Domain allowlisting alone is insufficient for SSRF. DNS answers must be validate
 
 - HTTPS CONNECT only; TCP port 443 only. Plain HTTP and arbitrary ports are denied.
 - Destination hostnames are IDNA-normalized and must match a per-workspace exact allowlist. Wildcard subdomains require an explicit `*.` rule.
-- IP-literal destinations, localhost, link-local/special-use names and cloud metadata names are denied. The IPv4-mapped and deprecated IPv4-compatible IPv6 forms, plus the RFC 6052 well-known NAT64 prefix (`64:ff9b::/96`), are also rejected so an IPv4-embedded private or metadata address cannot pass a generic IPv6 global-address check.
+- IP-literal destinations, localhost, link-local/special-use names and cloud metadata names are denied. The IPv4-mapped and deprecated IPv4-compatible IPv6 forms are rejected. For the RFC 6052 well-known NAT64 prefix (`64:ff9b::/96`), the embedded IPv4 address is independently validated; non-global embedded addresses are denied while public mappings remain usable.
 - Resolve A and AAAA records with a bounded DNS lifetime. If any answer is non-global, private, loopback, link-local, multicast, reserved, unspecified or IPv4-mapped, reject the entire destination.
 - Connect to a validated IP literal from the same DNS answer set; never resolve the hostname again for the socket connection.
 - Every CONNECT is evaluated independently. Redirects therefore receive the same allowlist, DNS and IP-range checks as the initial request.
