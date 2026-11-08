@@ -133,9 +133,9 @@ BEGIN
         RETURN;
     END IF;
 
-    SELECT * INTO current_lease
-      FROM platform.workspace_leases
-     WHERE tenant_id = p_tenant_id AND workspace_id = p_workspace_id
+    SELECT wl.* INTO current_lease
+      FROM platform.workspace_leases AS wl
+     WHERE wl.tenant_id = p_tenant_id AND wl.workspace_id = p_workspace_id
      FOR UPDATE;
     IF current_lease.status = 'active' AND current_lease.lease_expires_at > clock_timestamp() THEN
         RETURN;
