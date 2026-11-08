@@ -78,6 +78,36 @@ def test_sandbox_executor_rejects_an_inactive_workspace_lease_before_spawn(tmp_p
     assert not marker.exists()
 
 
+def test_sandbox_executor_kills_descendants_after_process_leader_exits_on_lease_loss(
+    tmp_path: Path,
+) -> None:
+    from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
+
+    marker = tmp_path / "descendant-survived"
+    child_code = f"import time; time.sleep(0.6); open({str(marker)!r}, 'w').write('late')"
+    parent_code = (
+        "import subprocess,sys; "
+        f"subprocess.Popen([sys.executable, '-c', {child_code!r}])"
+    )
+    checks = 0
+
+    def lease_is_active() -> bool:
+        nonlocal checks
+        checks += 1
+        return checks < 3
+
+    with pytest.raises(WorkspaceLeaseLost):
+        SandboxExecutor().execute(
+            ["/usr/bin/python3", "-c", parent_code],
+            cwd=str(tmp_path),
+            limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
+            lease_assertion=lease_is_active,
+        )
+
+    time.sleep(0.8)
+    assert not marker.exists(), "lease loss must kill descendants even after the group leader exits"
+
+
 def test_sandbox_executor_kills_process_group_when_workspace_lease_is_lost(tmp_path: Path) -> None:
     from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
 
