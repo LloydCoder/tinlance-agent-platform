@@ -5,6 +5,7 @@ import contextlib
 import ipaddress
 import json
 import os
+import re
 import secrets
 import shutil
 import signal
@@ -35,6 +36,36 @@ def build_child_environment(
         environment["XDG_CONFIG_HOME"] = str(Path(home) / ".config")
         environment["XDG_CACHE_HOME"] = str(Path(home) / ".cache")
     return environment
+
+
+def _sanitize_diagnostic(value: object, *, limit: int = 4_000) -> str:
+    """Bound diagnostic evidence and redact common credential/token formats."""
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 16_384:
+        raise ValueError("diagnostic limit must be between 1 and 16384 characters")
+    text = str(value)
+    patterns = (
+        (
+            re.compile(r"(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s,;]+"),
+            r"\\1[REDACTED]",
+        ),
+        (
+            re.compile(
+                r"(?i)\\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+                r"password|secret|token|private[_-]?key)\\s*[:=]\\s*)[^\\s,;]+"
+            ),
+            r"\\1[REDACTED]",
+        ),
+        (
+            re.compile(r"\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b"),
+            "[REDACTED]",
+        ),
+        (re.compile(r"\\bAKIA[0-9A-Z]{16}\\b"), "[REDACTED]"),
+        (re.compile(r"\\bgh[pousr]_[A-Za-z0-9_]{20,}\\b"), "[REDACTED]"),
+        (re.compile(r"\\bsk-[A-Za-z0-9_-]{20,}\\b"), "[REDACTED]"),
+    )
+    for pattern, replacement in patterns:
+        text = pattern.sub(replacement, text)
+    return text[-limit:]
 
 
 def run(
@@ -480,16 +511,17 @@ def main() -> int:
     except BaseException as exc:
         evidence["status"] = "failed"
         evidence["failure_type"] = type(exc).__name__
-        evidence["failure_message"] = str(exc)[:512]
+        evidence["failure_message"] = _sanitize_diagnostic(str(exc), limit=512)
         if isinstance(exc, subprocess.CalledProcessError):
             if exc.stdout:
-                evidence["failure_stdout"] = str(exc.stdout)[-4_000:]
+                evidence["failure_stdout"] = _sanitize_diagnostic(exc.stdout)
             if exc.stderr:
-                evidence["failure_stderr"] = str(exc.stderr)[-4_000:]
+                evidence["failure_stderr"] = _sanitize_diagnostic(exc.stderr)
         if proxy_log.is_file():
-            evidence["proxy_log_tail"] = proxy_log.read_text(encoding="utf-8", errors="replace")[
-                -2_000:
-            ]
+            evidence["proxy_log_tail"] = _sanitize_diagnostic(
+                proxy_log.read_text(encoding="utf-8", errors="replace"),
+                limit=2_000,
+            )
         raise
     finally:
         cleanup_errors: list[str] = []
