@@ -132,8 +132,8 @@ def test_profile_lease_rejects_empty_oversized_and_nul_identifiers(tmp_path: Pat
     invalid_pairs = [
         ("", "workspace-1"),
         ("tenant-a", ""),
-        ("tenant\\x00a", "workspace-1"),
-        ("tenant-a", "workspace\\x00-1"),
+        ("tenant\x00a", "workspace-1"),
+        ("tenant-a", "workspace\x00-1"),
         ("t" * 257, "workspace-1"),
         ("tenant-a", "w" * 257),
     ]
