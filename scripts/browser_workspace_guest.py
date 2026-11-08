@@ -5,6 +5,7 @@ import ipaddress
 import json
 import os
 import socket
+import ssl
 import time
 from pathlib import Path
 
@@ -143,6 +144,47 @@ def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
     return b" 403 " in response.split(b"\r\n", 1)[0]
 
 
+def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
+    """Prove an approved CONNECT tunnel carries a verified end-to-end TLS request."""
+    connection = socket.create_connection((proxy_ip, proxy_port), timeout=5)
+    connection.settimeout(5)
+    try:
+        authority = f"{hostname}:443"
+        connection.sendall(
+            (
+                f"CONNECT {authority} HTTP/1.1\\r\\n"
+                f"Host: {authority}\\r\\n"
+                "Proxy-Connection: keep-alive\\r\\n\\r\\n"
+            ).encode("ascii")
+        )
+        headers = bytearray()
+        while b"\\r\\n\\r\\n" not in headers and len(headers) < 8192:
+            chunk = connection.recv(1024)
+            if not chunk:
+                raise ConnectionError("proxy closed before CONNECT response")
+            headers.extend(chunk)
+        status_line = bytes(headers).split(b"\\r\\n", 1)[0]
+        if not status_line.startswith(b"HTTP/1.1 200 "):
+            raise ConnectionError(f"approved CONNECT was rejected: {status_line!r}")
+        tls = ssl.create_default_context().wrap_socket(
+            connection, server_hostname=hostname
+        )
+        tls.sendall(
+            (
+                f"GET / HTTP/1.1\\r\\nHost: {hostname}\\r\\n"
+                "Connection: close\\r\\n\\r\\n"
+            ).encode("ascii")
+        )
+        response_line = tls.makefile("rb").readline(1024)
+        tls.close()
+        return response_line.startswith(b"HTTP/1.1 200 ")
+    finally:
+        try:
+            connection.close()
+        except OSError:
+            pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run W3 browser workspace acceptance inside its netns."
@@ -179,6 +221,9 @@ def main() -> int:
         raise SystemExit("browser egress proxy did not reject an unallowlisted hostname")
     evidence["metadata_ip_denied"] = True
     evidence["unallowlisted_hostname_denied"] = True
+    if not proxy_allows_https(proxy_ip, proxy_port, "example.com"):
+        raise SystemExit("browser egress proxy did not complete the approved HTTPS tunnel")
+    evidence["proxy_allowed_https_tunnel"] = True
 
     manager = BrowserWorkspaceManager(
         args.profile_root,
