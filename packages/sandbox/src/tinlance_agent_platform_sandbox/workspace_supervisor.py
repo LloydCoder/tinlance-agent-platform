@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
-
-if TYPE_CHECKING:
-    from tinlance_agent_platform_durability import WorkspaceLease
+from typing import Protocol
 
 from .bubblewrap import SandboxLimits
 from .executor import ProcessResult, SandboxExecutor
@@ -14,7 +11,7 @@ from .executor import ProcessResult, SandboxExecutor
 class WorkspaceLeaseStore(Protocol):
     """Minimal durable lease authority required by the workspace supervisor."""
 
-    def assert_active(self, lease: WorkspaceLease) -> bool: ...
+    def assert_active(self, lease: object) -> bool: ...
 
 
 class WorkspaceLeaseSupervisor:
