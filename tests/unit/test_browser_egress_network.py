@@ -21,6 +21,7 @@ def test_proxy_namespace_allows_only_https_and_explicit_dns() -> None:
     assert "tcp dport 80 accept" not in rules
     assert "169.254.0.0/16" in rules
     assert "10.0.0.0/8" in rules
+    assert "192.88.99.0/24" in rules
 
 
 def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
@@ -41,7 +42,8 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
     uplink = "10.255.4.0/30 dev tbup0 proto kernel scope link src 10.255.4.2"
     valid = browser + "\n" + uplink + "\ndefault via 10.255.4.1 dev tbup0"
     assert validate_proxy_namespace_routes(
-        valid, "10.254.4.0/30", "10.255.4.0/30", "10.255.4.1"
+        valid, "10.254.4.0/30", "10.255.4.0/30", "10.255.4.1",
+        "tbbr0", "tbup0",
     ) is True
     with pytest.raises(ValueError, match="approved gateway"):
         validate_proxy_namespace_routes(
@@ -49,6 +51,8 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
             "10.254.4.0/30",
             "10.255.4.0/30",
             "10.255.4.1",
+            "tbbr0",
+            "tbup0",
         )
     with pytest.raises(ValueError, match="unexpected route"):
         validate_proxy_namespace_routes(
@@ -57,6 +61,8 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
             "10.254.4.0/30",
             "10.255.4.0/30",
             "10.255.4.1",
+            "tbbr0",
+            "tbup0",
         )
 
 
@@ -67,4 +73,14 @@ def test_interface_names_are_rejected_unless_owned_by_the_harness(name: str) -> 
             browser_interface=name,
             uplink_interface="tbup0",
             dns_server="1.1.1.1",
+        )
+
+
+@pytest.mark.parametrize("dns_server", ["127.0.0.1", "10.0.0.2", "::1"])
+def test_dns_forwarder_must_be_an_explicit_global_ipv4_address(dns_server: str) -> None:
+    with pytest.raises(ValueError, match="DNS forwarder"):
+        build_proxy_namespace_rules(
+            browser_interface="tbbr0",
+            uplink_interface="tbup0",
+            dns_server=dns_server,
         )
