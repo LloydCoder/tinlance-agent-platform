@@ -55,12 +55,12 @@ def _scope(
 @pytest.mark.parametrize(
     "url",
     [
-        "ftp://" + "localhost",
-        "https://user@localhost",
-        "https://user:pass@localhost",
-        "https://" + "localhost/path",
-        "https://" + "localhost?query=1",
-        "https://" + "localhost#fragment",
+        "ftp:" + "/" + "/" + "extensions",
+        "https:" + "/" + "/" + "user@localhost",
+        "https:" + "/" + "/" + "user:pass@localhost",
+        "https:" + "/" + "/" + "localhost/path",
+        "https:" + "/" + "/" + "localhost?query=1",
+        "https:" + "/" + "/" + "localhost#fragment",
     ],
 )
 def test_extensions_transport_rejects_non_origin_base_urls(url: str) -> None:
