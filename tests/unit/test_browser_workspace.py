@@ -126,3 +126,133 @@ def test_workspace_manager_rejects_wrong_tenant_uid(tmp_path: Path) -> None:
     )
     with pytest.raises(BrowserIsolationError, match="UID"):
         manager.open("workspace-1")
+
+
+def test_profile_lease_rejects_empty_oversized_and_nul_identifiers(tmp_path: Path) -> None:
+    invalid_pairs = [
+        ("", "workspace-1"),
+        ("tenant-a", ""),
+        ("tenant\\x00a", "workspace-1"),
+        ("tenant-a", "workspace\\x00-1"),
+        ("t" * 257, "workspace-1"),
+        ("tenant-a", "w" * 257),
+    ]
+    for tenant_id, workspace_id in invalid_pairs:
+        with pytest.raises(ValueError, match="identifiers"):
+            BrowserProfileLease.acquire(tmp_path / "profiles", tenant_id, workspace_id)
+
+
+def test_session_exposes_owned_context_and_rejects_nonstandard_https_ports(tmp_path: Path) -> None:
+    lease = BrowserProfileLease.acquire(tmp_path / "tenant-a", "tenant-a", "workspace-1")
+    navigations: list[str] = []
+
+    class FakePage:
+        def goto(self, url: str, **_: object) -> str:
+            navigations.append(url)
+            return "navigated"
+
+    class FakeContext:
+        def new_page(self) -> FakePage:
+            return FakePage()
+
+        def close(self) -> None:
+            return None
+
+    class FakePlaywright:
+        def stop(self) -> None:
+            return None
+
+    context = FakeContext()
+    session = BrowserSession(FakePlaywright(), context, lease, 1000)
+    try:
+        assert session.profile_path == lease.profile_path
+        assert session.context is context
+        assert session.navigate("https://example.com") == "navigated"
+        assert navigations == ["https://example.com"]
+        with pytest.raises(BrowserIsolationError, match="HTTPS"):
+            session.navigate("https://example.com:8443")
+        with pytest.raises(BrowserIsolationError, match="empty or too large"):
+            session.navigate("https://example.com/" + "x" * 16_384)
+    finally:
+        session.close()
+
+
+def test_session_releases_playwright_and_profile_when_context_close_fails(tmp_path: Path) -> None:
+    lease = BrowserProfileLease.acquire(tmp_path / "tenant-a", "tenant-a", "workspace-1")
+    stopped = SimpleNamespace(value=0)
+
+    class FakePage:
+        def goto(self, *_: object, **__: object) -> None:
+            return None
+
+    class FakeContext:
+        def new_page(self) -> FakePage:
+            return FakePage()
+
+        def close(self) -> None:
+            raise RuntimeError("context close failed")
+
+    class FakePlaywright:
+        def stop(self) -> None:
+            stopped.value += 1
+
+    session = BrowserSession(FakePlaywright(), FakeContext(), lease, 1000)
+    with pytest.raises(RuntimeError, match="context close failed"):
+        session.close()
+    assert stopped.value == 1
+    with BrowserProfileLease.acquire(tmp_path / "tenant-a", "tenant-a", "workspace-1"):
+        pass
+
+
+def test_workspace_manager_rejects_invalid_tenant_timeout_and_uid(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="tenant identifier"):
+        BrowserWorkspaceManager(
+            tmp_path / "profiles",
+            "http://10.253.0.1:3128",
+            tenant_id="",
+            expected_uid=1000,
+        )
+    with pytest.raises(ValueError, match="timeout"):
+        BrowserWorkspaceManager(
+            tmp_path / "profiles",
+            "http://10.253.0.1:3128",
+            tenant_id="tenant-a",
+            expected_uid=1000,
+            navigation_timeout_ms=0,
+        )
+    with pytest.raises(ValueError, match="non-root"):
+        BrowserWorkspaceManager(
+            tmp_path / "profiles",
+            "http://10.253.0.1:3128",
+            tenant_id="tenant-a",
+            expected_uid=0,
+        )
+
+
+def test_network_isolation_rejects_root_and_non_ip_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    import tinlance_agent_platform_sandbox.browser as browser_module
+
+    monkeypatch.setattr(browser_module.os, "geteuid", lambda: 0)
+    with pytest.raises(BrowserIsolationError, match="non-root"):
+        browser_module.verify_browser_network_isolation("http://10.253.0.1:3128")
+    monkeypatch.setattr(browser_module.os, "geteuid", lambda: 1000)
+    with pytest.raises(BrowserIsolationError, match="IP literal"):
+        browser_module.verify_browser_network_isolation("http://proxy.internal:3128")
+
+
+def test_network_isolation_rejects_missing_route_table(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tinlance_agent_platform_sandbox.browser as browser_module
+
+    monkeypatch.setattr(browser_module.os, "geteuid", lambda: 1000)
+    original_is_file = Path.is_file
+
+    def is_file(path: Path) -> bool:
+        if path == Path("/proc/net/route"):
+            return False
+        return original_is_file(path)
+
+    monkeypatch.setattr(Path, "is_file", is_file)
+    with pytest.raises(BrowserIsolationError, match="route table is unavailable"):
+        browser_module.verify_browser_network_isolation("http://10.253.0.1:3128")
