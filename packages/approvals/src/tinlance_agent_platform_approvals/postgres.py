@@ -173,7 +173,15 @@ class PostgresApprovalService:
                 raise RuntimeError("PostgreSQL approval request returned an unexpected ID")
             return self._load(connection, tenant, approval_id)
 
-        return self._transaction(tenant, operation)
+        try:
+            return self._transaction(tenant, operation)
+        except Exception as exc:
+            sqlstate = getattr(exc, "sqlstate", None)
+            if sqlstate == "42501":
+                raise PermissionError("tenant is not authorized to request this approval") from exc
+            if sqlstate == "22023":
+                raise ValueError("PostgreSQL rejected the approval request") from exc
+            raise
 
     def decide(
         self,
@@ -203,7 +211,15 @@ class PostgresApprovalService:
                 raise RuntimeError("PostgreSQL approval decision returned an unexpected status")
             return self._load(connection, tenant, approval_id), row[0]
 
-        approval, decision = self._transaction(tenant, operation)
+        try:
+            approval, decision = self._transaction(tenant, operation)
+        except Exception as exc:
+            sqlstate = getattr(exc, "sqlstate", None)
+            if sqlstate == "42501":
+                raise PermissionError("approval decision is not authorized") from exc
+            if sqlstate == "55000":
+                raise ValueError("approval is no longer pending") from exc
+            raise
         if decision == "expired":
             raise ValueError("approval is no longer pending")
         return approval
@@ -267,7 +283,12 @@ class PostgresApprovalService:
                 raise RuntimeError("PostgreSQL approval consumption returned an unexpected result")
             return row[0]
 
-        consumed = self._transaction(tenant, operation)
+        try:
+            consumed = self._transaction(tenant, operation)
+        except Exception as exc:
+            if getattr(exc, "sqlstate", None) == "42501":
+                raise PermissionError("approval does not bind to this action") from exc
+            raise
         if not consumed:
             raise PermissionError("approved human review is required")
 
