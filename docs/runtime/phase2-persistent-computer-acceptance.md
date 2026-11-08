@@ -127,9 +127,9 @@ No phase may be skipped. A green unit suite, smoke test or individual runtime wo
 - [Linux no_new_privs documentation](https://docs.kernel.org/userspace-api/no_new_privs.html) — limits execve privilege gains but is not a replacement for other isolation controls.
 
 
-## 8. W5 implementation in progress — durable workspace lease authority
+## 8. W5 durable lease implementation — merged; soak acceptance outstanding
 
-Platform PR for W5 adds a tenant-scoped PostgreSQL workspace lease authority. It is deliberately separate from the process-local `WorkLeaseStore` reference implementation.
+The durable lease implementation is merged to Platform `main`. PR [#201](https://github.com/LloydCoder/tinlance-agent-platform/pull/201) merged as `d4fe2537499d30c74d0129bccc33b84f088b4eef`; security follow-up PR [#202](https://github.com/LloydCoder/tinlance-agent-platform/pull/202) merged as `bf115673a7250fca082d9e81d45ab9eb4208fd6b`. The follow-up replaces nullable identity comparisons with PostgreSQL `IS DISTINCT FROM` in renewal/revocation/release guards and adds NULL-input regression assertions. The durable implementation remains separate from the process-local `WorkLeaseStore` reference implementation. Inspected PR-head workflow runs for both changes completed successfully for CI, CodeQL, Secret Scan, R10 Certification and Reference Agents. This confirms the observed PR-head runs, not the separate eight-hour soak or post-merge production acceptance.
 
 - `platform.workspace_leases` stores one current lease per tenant/workspace, its owner and worker identity, expiry, status, and monotonically increasing fencing token.
 - `platform.workspace_lease_events` records acquisition, renewal, expiry, revocation and release as append-only audit facts.
@@ -142,6 +142,6 @@ Platform PR for W5 adds a tenant-scoped PostgreSQL workspace lease authority. It
 
 ### W5 soak gate — not yet accepted
 
-A genuine continuous eight-hour run remains mandatory. The GitHub-hosted runner ceiling is six hours per job, so the soak must execute on a dedicated controlled persistent host or registered self-hosted runner. It must include real browser/profile persistence across process and supervisor restarts, lease renewal/expiry/revocation, stale-worker fencing, quota admission/overrun behavior, append-only audit continuity, crash/recovery and cleanup. Segmented hosted jobs or a synthetic clock do not count as an eight-hour soak.
+A genuine continuous eight-hour run remains mandatory and has not been evidenced by PR #201 or #202. The GitHub-hosted runner ceiling is six hours per job, so the soak must execute on a dedicated controlled persistent host or registered self-hosted runner. It must include real browser/profile persistence across process and supervisor restarts, lease renewal/expiry/revocation, stale-worker fencing, quota admission/overrun behavior, append-only audit continuity, crash/recovery and cleanup. The trusted supervisor must enforce the current fencing token at every consequential command boundary and terminate/reap workers on lease loss. Segmented hosted jobs or a synthetic clock do not count as an eight-hour soak.
 
 The active AWS instances identified during the infrastructure audit are named `fusionops-production` and `tinlyt-api-production`; neither is an acceptable W5 test host and neither was modified. A separately tagged, least-privilege W5 host is required. Until the continuous soak artifact is independently inspected and exact-head W5 workflows plus post-merge mainline checks pass, W5 remains open.
