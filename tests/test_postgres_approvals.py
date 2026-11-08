@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -54,7 +54,7 @@ class Connection:
         if "set_config('platform.tenant_id'" in query:
             return Cursor((params[0],))
         if "platform.request_approval" in query:
-            return Cursor((params[0],))
+            return Cursor((params[1],))
         if "platform.decide_approval" in query:
             return Cursor(("approved",))
         if "platform.expire_approval_if_due" in query:
@@ -188,7 +188,7 @@ def test_postgres_approval_get_expires_before_reading() -> None:
 def test_postgres_approval_rejects_invalid_tenant_and_unbounded_intent() -> None:
     connection = Connection()
     approvals = service(connection)
-    with pytest.raises(ValueError, match="UUID tenant"):
+    with pytest.raises(ValueError, match="tenant ID"):
         approvals.get(APPROVAL_ID, "tenant-a")
     with pytest.raises(ValueError, match="intent fingerprint"):
         approvals.request(
