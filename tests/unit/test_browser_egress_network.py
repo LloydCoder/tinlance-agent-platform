@@ -20,6 +20,8 @@ def test_proxy_namespace_allows_only_https_and_explicit_dns() -> None:
     assert "ip daddr 1.1.1.1 tcp dport 53 accept" in rules
     assert "policy drop" in rules
     assert "tcp dport 80 accept" not in rules
+    assert "169.254.0.0/16" in rules
+    assert "10.0.0.0/8" in rules
 
 
 def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
