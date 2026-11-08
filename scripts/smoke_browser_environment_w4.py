@@ -5,6 +5,7 @@ import ipaddress
 import json
 import os
 import secrets
+import select
 import shutil
 import signal
 import socket
@@ -101,11 +102,13 @@ def main() -> int:
     browser_name = f"tnlbr-a-{suffix}"
     proxy_name = f"tnlbr-p-{suffix}"
     other_name = f"tnlbr-b-{suffix}"
+    tenant_b_ns = f"tnltb-{suffix}"
     users: list[str] = []
     namespaces: list[str] = []
     host_link_created = False
     host_rules_created = False
     proxy_process: subprocess.Popen[bytes] | None = None
+    tenant_a_probe: subprocess.Popen[str] | None = None
     listener: socket.socket | None = None
     listener_thread: threading.Thread | None = None
     resolv_dir = Path("/etc/netns") / proxy_ns
@@ -127,6 +130,8 @@ def main() -> int:
         "proxy_namespace_unapproved_port_blocked": False,
         "browser_direct_egress_blocked": False,
         "cross_tenant_profile_reuse_denied": False,
+        "concurrent_cross_tenant_isolation": False,
+        "namespace_escape_probes_passed": False,
         "cleanup_verified": False,
     }
 
@@ -153,6 +158,8 @@ def main() -> int:
         namespaces.append(browser_ns)
         run(["ip", "netns", "add", proxy_ns])
         namespaces.append(proxy_ns)
+        run(["ip", "netns", "add", tenant_b_ns])
+        namespaces.append(tenant_b_ns)
 
         # Browser-to-proxy traffic uses a direct veth pair; neither endpoint
         # exists in the host namespace.
@@ -189,6 +196,7 @@ def main() -> int:
         for netns, interfaces in (
             (browser_ns, (browser_if,)),
             (proxy_ns, (proxy_browser_if, proxy_uplink_if)),
+            (tenant_b_ns, ()),
         ):
             run(["ip", "netns", "exec", netns, "ip", "link", "set", "lo", "up"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=1"])
@@ -332,6 +340,41 @@ def main() -> int:
         evidence["proxy_process_uid"] = proxy_uid
         evidence["proxy_listener_ready"] = True
 
+        # Keep tenant A alive with a private IPC segment while tenant B runs.
+        # This makes process, IPC, mount and network separation a concurrent test.
+        ipc_key = secrets.randbelow(0x7FFFFFFE) + 1
+        tenant_a_code = subprocess.Popen(
+            [
+                "ip", "netns", "exec", browser_ns,
+                "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
+                "--mount-proc", "--propagation", "private",
+                "setpriv", "--reuid", str(browser_uid), "--regid", str(browser_gid),
+                "--clear-groups", "--no-new-privs", sys.executable,
+                "scripts/browser_w4_tenant_a.py",
+                "--ipc-key", str(ipc_key),
+                "--hold-seconds", "120",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=Path(__file__).resolve().parents[1],
+            env=child_environment(Path("/tmp"), Path("/tmp")),
+            start_new_session=True,
+        )
+        tenant_a_probe = tenant_a_code
+        if tenant_a_probe.stdout is None:
+            raise RuntimeError("tenant A isolation probe did not expose evidence output")
+        ready, _, _ = select.select([tenant_a_probe.stdout], [], [], 10)
+        if not ready:
+            raise TimeoutError("tenant A did not create its IPC and namespace markers")
+        tenant_a_line = tenant_a_probe.stdout.readline()
+        if not tenant_a_line:
+            error_output = tenant_a_probe.stderr.read() if tenant_a_probe.stderr else ""
+            raise RuntimeError(f"tenant A isolation probe exited early: {error_output[-1000:]}")
+        tenant_a_record = json.loads(tenant_a_line)
+        if tenant_a_record.get("status") != "ready":
+            raise RuntimeError("tenant A namespace marker did not initialize")
+
         # A hostile proxy process cannot reach host-local listeners, metadata,
         # private/link-local destinations or arbitrary non-HTTPS ports.
         listener = socket.socket()
@@ -441,18 +484,54 @@ def main() -> int:
         evidence["browser_process_uid"] = browser_uid
         evidence["other_tenant_uid"] = other_uid
 
-        tenant_probe = subprocess.run(
-            ["setpriv", "--reuid", str(other_uid), "--regid", str(other_gid),
-             "--clear-groups", "--no-new-privs", sys.executable,
-             "scripts/browser_tenant_isolation_probe.py",
-             "--profile-root", str(profile_root),
-             "--tenant-id", "phase2-w4-tenant-b", "--workspace-id", "workspace-a"],
-            capture_output=True, text=True, timeout=15,
+        tenant_b_probe = subprocess.run(
+            [
+                "ip", "netns", "exec", tenant_b_ns,
+                "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
+                "--mount-proc", "--propagation", "private",
+                "setpriv", "--reuid", str(other_uid), "--regid", str(other_gid),
+                "--clear-groups", "--no-new-privs", sys.executable,
+                "scripts/browser_w4_tenant_probe.py",
+                "--ipc-key", str(ipc_key),
+                "--hidden-host-pid", str(tenant_a_probe.pid),
+                "--proxy-host", proxy_browser_ip,
+                "--proxy-port", str(PROXY_PORT),
+                "--profile-root", str(profile_root),
+                "--tenant-a-namespaces",
+                json.dumps(tenant_a_record["namespace_ids"], separators=(",", ":")),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
             env=child_environment(Path("/tmp"), Path("/tmp")),
         )
-        if tenant_probe.returncode != 0:
-            raise RuntimeError("cross-tenant profile reuse probe did not complete")
+        if tenant_b_probe.returncode != 0:
+            raise RuntimeError(
+                "concurrent cross-tenant isolation probe failed: "
+                f"{tenant_b_probe.stderr[-1500:]}"
+            )
+        tenant_b_record = json.loads(tenant_b_probe.stdout)
+        if tenant_b_record.get("status") != "passed":
+            raise RuntimeError("tenant B isolation evidence did not pass")
+        evidence["tenant_a_namespace_ids"] = tenant_a_record["namespace_ids"]
+        evidence["tenant_b_probe"] = tenant_b_record
+        evidence["concurrent_cross_tenant_isolation"] = True
         evidence["cross_tenant_profile_reuse_denied"] = True
+        evidence["namespace_escape_probes_passed"] = all(
+            tenant_b_record.get(key) is True
+            for key in (
+                "mount_syscall_denied",
+                "privilege_escalation_denied",
+                "foreign_pid_ptrace_denied",
+            )
+        )
+        tenant_a_probe.terminate()
+        try:
+            tenant_a_probe.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            tenant_a_probe.kill()
+            tenant_a_probe.wait(timeout=5)
+        tenant_a_probe = None
         evidence["status"] = "passed"
     except BaseException as exc:
         evidence["status"] = "failed"
@@ -464,6 +543,18 @@ def main() -> int:
         raise
     finally:
         cleanup_errors: list[str] = []
+        if tenant_a_probe is not None and tenant_a_probe.poll() is None:
+            tenant_a_probe.terminate()
+            try:
+                tenant_a_probe.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                tenant_a_probe.kill()
+                tenant_a_probe.wait(timeout=5)
+        if tenant_a_probe is not None:
+            if tenant_a_probe.stdout is not None:
+                tenant_a_probe.stdout.close()
+            if tenant_a_probe.stderr is not None:
+                tenant_a_probe.stderr.close()
         if proxy_process is not None:
             proxy_process.terminate()
             try:
