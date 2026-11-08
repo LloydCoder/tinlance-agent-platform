@@ -40,14 +40,13 @@ def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
     rules = build_host_forwarding_rules(
         proxy_host_interface="tbup0",
         proxy_subnet="10.255.4.0/30",
-        dns_server="1.1.1.1",
         host_dns_ip="10.255.4.1",
     )
     assert 'iifname "tbup0" ip daddr 10.255.4.1 udp dport 53 accept' in rules
     assert 'iifname "tbup0" ip daddr 10.255.4.1 tcp dport 53 accept' in rules
     assert 'iifname "tbup0" ip daddr != {' in rules
     assert "tcp dport 443 accept" in rules
-    assert 'iifname "tbup0" ip daddr 1.1.1.1 udp dport 53 accept' in rules
+    assert 'iifname "tbup0" ip daddr 1.1.1.1 udp dport 53 accept' not in rules
     assert 'iifname "tbup0" drop' in rules
     assert "type filter hook forward priority -50; policy accept;" in rules
     assert 'ip saddr 10.255.4.0/30 oifname != "tbup0" masquerade' in rules
@@ -158,3 +157,12 @@ def test_proxy_resolver_config_is_readable_only_by_proxy_identity(tmp_path) -> N
         + "options timeout:2 attempts:1"
         + chr(10)
     )
+
+
+def test_host_dns_relay_must_be_on_the_proxy_uplink() -> None:
+    with pytest.raises(ValueError, match="host DNS relay"):
+        build_host_forwarding_rules(
+            proxy_host_interface="tbup0",
+            proxy_subnet="10.255.4.0/30",
+            host_dns_ip="10.0.0.53",
+        )
