@@ -473,7 +473,10 @@ def test_extensions_action_purpose_is_bound_to_exact_resource_and_idempotency_ke
         tool_name="extensions_job_cancel",
         resource_id=JOB_ID,
     )
-    assert cancel_purpose.startswith("extensions-action-v1:")
+    assert cancel_purpose == (
+        "extensions-action-v1:5d803f64204c300b4980e8db91cae8ca"
+        "72072b5710d1155933ba8ce5e1d24acc"
+    )
     assert cancel_purpose != extensions_action_purpose(
         tenant_id="tenant-a",
         subject_id="user-a",
@@ -486,6 +489,10 @@ def test_extensions_action_purpose_is_bound_to_exact_resource_and_idempotency_ke
         tool_name="extensions_dead_letter_replay",
         resource_id=EVENT_ID,
         idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+    )
+    assert replay_purpose == (
+        "extensions-action-v1:5504cf92a97f40cb51f7723dc30bb83a"
+        "0c22ac9cb4158286639a01e735ced975"
     )
     assert replay_purpose != extensions_action_purpose(
         tenant_id="tenant-a",
