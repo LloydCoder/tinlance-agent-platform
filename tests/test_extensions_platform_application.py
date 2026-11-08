@@ -13,6 +13,7 @@ from tinlance_agent_platform_app import (
     compute_extensions_dead_letter_replay_intent_fingerprint,
     create_extensions_platform_application,
     extensions_dead_letter_replay_run_id,
+    extensions_mcp_request_id,
 )
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import ApprovalStatus, Principal
@@ -312,6 +313,7 @@ def test_dead_letter_replay_requires_bound_human_approval_and_scoped_token() -> 
     approvals = ApprovalService()
     request_id = "platform-extensions-replay-0001"
     run_id, fingerprint, approval_id, payload = _approved_replay_request(approvals, request_id)
+    payload.pop("idempotency_key")
     application = _application(http, approval_verifier=approvals)
     response = application.api.dispatch(
         APIRequest(
@@ -440,3 +442,21 @@ def test_dead_letter_replay_approval_is_consumed_once() -> None:
     else:
         raise AssertionError("a consumed replay approval must never authorize a second execution")
     assert len(http.calls) == 1
+
+
+
+def test_mcp_replay_request_identity_helper_matches_protocol_contract() -> None:
+    import hashlib
+
+    request_id = "rpc-replay-0001"
+    expected = "mcp-" + hashlib.sha256(
+        f"tenant-a:user-a:{request_id}".encode()
+    ).hexdigest()[:32]
+    assert (
+        extensions_mcp_request_id(
+            tenant_id="tenant-a",
+            subject_id="user-a",
+            jsonrpc_request_id=request_id,
+        )
+        == expected
+    )
