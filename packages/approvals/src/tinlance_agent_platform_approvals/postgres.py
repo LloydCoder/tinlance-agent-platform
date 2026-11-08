@@ -174,8 +174,7 @@ class PostgresApprovalService:
     def _current(self, connection: Any, approval_id: UUID, tenant_uuid: UUID) -> ApprovalRequest:
         row = connection.execute(
             f"""
-            SELECT {_COLUMNS}
-            FROM platform.action_approvals
+            SELECT {_COLUMNS} FROM platform.action_approvals
             WHERE approval_id = %s AND tenant_id = %s
             FOR UPDATE
             """,
