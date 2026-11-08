@@ -65,7 +65,7 @@ begin
         raise exception 'consumed approval was reusable';
     end if;
 
-    select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000092', true);
+    perform set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000092', true);
     if exists (
         select 1 from platform.action_approvals
         where approval_id = '50000000-0000-0000-0000-000000000091'
