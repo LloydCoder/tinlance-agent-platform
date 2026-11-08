@@ -375,6 +375,6 @@ def test_sandbox_executor_avoids_preexec_fn_in_multithreaded_parent(
     assert result.exit_code == 0
     assert result.stdout.strip() == "thread-safe-launch"
     assert launch.get("preexec_fn") is None
-    command = launch.get("args")
+    command = launch.get("command")
     assert isinstance(command, list)
     assert command[1:3] == ["-m", "tinlance_agent_platform_sandbox.exec_guard"]
