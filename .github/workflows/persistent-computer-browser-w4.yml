@@ -142,6 +142,8 @@ jobs:
               "proxy_namespace_unapproved_port_blocked",
               "browser_direct_egress_blocked",
               "cross_tenant_profile_reuse_denied",
+              "concurrent_cross_tenant_isolation",
+              "namespace_escape_probes_passed",
               "proxy_listener_ready",
               "cleanup_verified",
           ]
@@ -168,6 +170,25 @@ jobs:
           other_uid = report.get("other_tenant_uid")
           if not proxy_uid or not browser_uid or not other_uid or len({proxy_uid, browser_uid, other_uid}) != 3:
               raise SystemExit("W4 browser, proxy and other-tenant OS identities must be distinct.")
+          tenant_b = report.get("tenant_b_probe", {})
+          tenant_requirements = [
+              "pid_namespace_isolated",
+              "ipc_namespace_isolated",
+              "mount_namespace_isolated",
+              "network_namespace_isolated",
+              "foreign_host_pid_invisible",
+              "foreign_ipc_segment_invisible",
+              "tenant_a_proxy_unreachable",
+              "mount_syscall_denied",
+              "privilege_escalation_denied",
+              "foreign_pid_ptrace_denied",
+              "cross_tenant_profile_reuse_denied",
+          ]
+          missing_tenant = [
+              name for name in tenant_requirements if tenant_b.get(name) is not True
+          ]
+          if missing_tenant:
+              raise SystemExit(f"W4 concurrent tenant isolation evidence is incomplete: {missing_tenant}")
           if report.get("production_certification") is not False:
               raise SystemExit("W4 ephemeral CI must not claim production certification.")
           print("PASS: W4 dedicated proxy namespace, hostile egress probes, tenant isolation and Chromium.")
