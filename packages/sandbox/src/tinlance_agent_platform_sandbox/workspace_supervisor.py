@@ -2,51 +2,37 @@
 
 from __future__ import annotations
 
-from typing import Protocol
-
-from tinlance_agent_platform_durability import WorkspaceLease
+from collections.abc import Callable
 
 from .bubblewrap import SandboxLimits
 from .executor import ProcessResult, SandboxExecutor
 
 
-class WorkspaceLeaseStore(Protocol):
-    """Minimal durable lease authority required by the workspace supervisor."""
-
-    def assert_active(self, lease: WorkspaceLease) -> bool: ...
-
-
 class WorkspaceLeaseSupervisor:
-    """Bind sandbox command execution to a durable Platform workspace lease.
+    """Bind each command to a caller-supplied durable Platform lease assertion.
 
-    The lease store is queried before launch and throughout execution by the
-    SandboxExecutor. A database outage, expiry, revocation or fencing-token
-    mismatch is fail-closed and causes the command process group to be killed.
+    The Platform composition layer binds the lease and tenant-scoped lease store
+    into the assertion. The sandbox package deliberately does not depend on the
+    durability package. Assertion failures, expiry, revocation and fencing-token
+    mismatches are fail-closed and cause the process group to be killed and reaped.
     """
 
-    def __init__(
-        self,
-        lease_store: WorkspaceLeaseStore,
-        *,
-        executor: SandboxExecutor | None = None,
-    ) -> None:
-        self._lease_store = lease_store
+    def __init__(self, *, executor: SandboxExecutor | None = None) -> None:
         self._executor = executor or SandboxExecutor()
 
     def execute(
         self,
-        lease: WorkspaceLease,
+        lease_assertion: Callable[[], bool],
         argv: list[str],
         *,
         cwd: str,
         limits: SandboxLimits,
     ) -> ProcessResult:
-        def assertion() -> bool:
-            return self._lease_store.assert_active(lease)
-
+        if not callable(lease_assertion):
+            raise TypeError("lease_assertion must be callable")
         return self._executor.execute(
             argv,
             cwd=cwd,
             limits=limits,
-            lease_assertion=assertion,
+            lease_assertion=lease_assertion,
         )
