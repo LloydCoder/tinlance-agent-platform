@@ -161,3 +161,42 @@ def validate_proxy_namespace_routes(
     if connected != {browser, uplink} or not default:
         raise ValueError("proxy namespace routes do not match the approved topology")
     return True
+
+
+def write_proxy_resolver_config(
+    directory: str | "os.PathLike[str]",
+    *,
+    dns_server: str,
+    proxy_uid: int | None = None,
+    proxy_gid: int | None = None,
+) -> "os.PathLike[str]":
+    """Create a resolver file readable only by the proxy workload identity."""
+    import os
+    from pathlib import Path
+    import stat
+
+    if (proxy_uid is None) != (proxy_gid is None):
+        raise ValueError("proxy resolver ownership requires both UID and GID")
+    target = Path(directory) / "resolv.conf"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(target, flags, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        if proxy_uid is not None and proxy_gid is not None:
+            os.fchown(descriptor, proxy_uid, proxy_gid)
+        with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            descriptor = -1
+            stream.write(f"nameserver {_dns_server(dns_server)}\\noptions timeout:2 attempts:1\\n")
+        metadata = target.stat(follow_symlinks=False)
+        expected_uid = os.geteuid() if proxy_uid is None else proxy_uid
+        expected_gid = os.getegid() if proxy_gid is None else proxy_gid
+        if (
+            stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_uid != expected_uid
+            or metadata.st_gid != expected_gid
+        ):
+            raise PermissionError("proxy resolver config ownership or mode is not private")
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    return target
