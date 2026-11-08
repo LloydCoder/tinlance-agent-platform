@@ -9,6 +9,7 @@ from tinlance_agent_platform_contracts import SandboxRequest
 from tinlance_agent_platform_durability import WorkspaceLease
 from tinlance_agent_platform_runtime import ExecutionTimeout, call_with_timeout
 from tinlance_agent_platform_sandbox import (
+    BubblewrapProvider,
     SandboxExecutor,
     SandboxLimits,
     SandboxPolicy,
@@ -244,17 +245,25 @@ def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path
         "workspace-a",
         ("/usr/bin/python3", "-c", "print('governed-workspace')"),
         3,
+        network=True,
         allowed_paths=(str(tmp_path),),
     )
     policy = SandboxPolicy(
         allowed_commands=frozenset({"/usr/bin/python3"}),
         allowed_workspace_roots=(str(tmp_path),),
+        allow_network=True,
     )
 
     class PassthroughProvider:
         def command(
-            self, argv: list[str], limits: SandboxLimits, workspace_paths: tuple[str, ...] = ()
+            self,
+            argv: list[str],
+            limits: SandboxLimits,
+            workspace_paths: tuple[str, ...] = (),
+            *,
+            network: bool = False,
         ) -> list[str]:
+            assert network is True
             return argv
 
     assertions = 0
@@ -276,3 +285,35 @@ def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path
     assert result.exit_code == 0
     assert result.stdout.strip() == "governed-workspace"
     assert assertions >= 2
+
+
+def test_bubblewrap_provider_shares_only_the_callers_network_namespace_when_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = BubblewrapProvider()
+    monkeypatch.setattr(provider, "available", lambda: True)
+
+    command = provider.command(
+        ["/usr/bin/python3", "-c", "print('ok')"],
+        SandboxLimits(),
+        ("/workspace",),
+        network=True,
+    )
+
+    assert "--unshare-all" in command
+    assert "--share-net" in command
+    assert command.index("--share-net") > command.index("--unshare-all")
+
+
+def test_bubblewrap_provider_unshares_network_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BubblewrapProvider()
+    monkeypatch.setattr(provider, "available", lambda: True)
+
+    command = provider.command(
+        ["/usr/bin/python3", "-c", "print('ok')"],
+        SandboxLimits(),
+        ("/workspace",),
+    )
+
+    assert "--unshare-all" in command
+    assert "--share-net" not in command

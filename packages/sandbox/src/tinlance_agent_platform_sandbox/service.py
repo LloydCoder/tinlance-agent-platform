@@ -25,7 +25,9 @@ def build_command(
     limits: SandboxLimits,
 ) -> list[str]:
     validate_request(request, policy)
-    return provider.command(list(request.command), limits, request.allowed_paths)
+    return provider.command(
+        list(request.command), limits, request.allowed_paths, network=request.network
+    )
 
 
 def execute_request(
@@ -54,7 +56,9 @@ def execute_request(
         max_memory_bytes=limits.max_memory_bytes,
         max_processes=limits.max_processes,
     )
-    command = provider.command(list(request.command), effective_limits, request.allowed_paths)
+    command = provider.command(
+        list(request.command), effective_limits, request.allowed_paths, network=request.network
+    )
 
     def assert_request_lease() -> bool:
         return lease_assertion(request)
