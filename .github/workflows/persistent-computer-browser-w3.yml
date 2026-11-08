@@ -1,0 +1,179 @@
+name: Persistent Computer W3 Browser Environment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/persistent-computer-browser-w3.yml"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/browser.py"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/egress_proxy.py"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/__init__.py"
+      - "scripts/browser_egress_proxy.py"
+      - "scripts/browser_workspace_guest.py"
+      - "scripts/browser_tenant_isolation_probe.py"
+      - "scripts/smoke_browser_environment.py"
+      - "tests/unit/test_browser_egress.py"
+      - "tests/unit/test_browser_workspace.py"
+      - "tests/unit/test_browser_smoke_environment.py"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-computer-browser-w3-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-w3:
+    name: W3 isolated persistent Chromium workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Install project, test and browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test,browser,security]"
+          python -m playwright install chromium
+          sudo env LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$pythonLocation/bin/python" -m playwright install-deps chromium
+          chmod o+x "$HOME" "$HOME/.cache" "$HOME/.cache/ms-playwright"
+          chmod -R a+rX "$HOME/.cache/ms-playwright"
+
+      - name: Run browser policy and profile lifecycle tests
+        run: |
+          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py tests/unit/test_browser_smoke_environment.py
+
+      - name: Audit browser optional dependencies and generate SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python -m pip freeze | grep -vE '^(tinlance-agent-platform==|-e )' > /tmp/browser-w3-requirements.txt
+          pip-audit --strict -r /tmp/browser-w3-requirements.txt
+          cyclonedx-py environment --output-format JSON --output-file artifacts/browser-w3-sbom.json
+
+      - name: Run isolated network namespace and real Chromium acceptance
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y iproute2 nftables util-linux
+          mkdir -p artifacts
+
+          apparmor_profile="/etc/apparmor.d/tinlance-playwright-chromium"
+          cleanup_apparmor() {
+            if [[ -f "$apparmor_profile" ]]; then
+              sudo apparmor_parser -R "$apparmor_profile" >/dev/null 2>&1 || true
+              sudo rm -f "$apparmor_profile"
+            fi
+          }
+          trap cleanup_apparmor EXIT
+
+          userns_restriction=""
+          if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            userns_restriction="$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)"
+          fi
+          if [[ "$userns_restriction" == "1" ]]; then
+            chromium_executable="$("$pythonLocation/bin/python" -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+            chromium_revision_dir="$(basename "$(dirname "$(dirname "$chromium_executable")")")"
+            case "$chromium_revision_dir" in
+              chromium-[0-9]*) ;;
+              *) echo "Unexpected Playwright Chromium executable path: $chromium_executable"; exit 1 ;;
+            esac
+            chromium_revision="${chromium_revision_dir#chromium-}"
+            chromium_bin="$HOME/.cache/ms-playwright/chromium_headless_shell-$chromium_revision/chrome-headless-shell-linux64/chrome-headless-shell"
+            if [[ ! -x "$chromium_bin" ]]; then
+              echo "Playwright headless shell executable is missing: $chromium_bin"
+              exit 1
+            fi
+            sudo tee "$apparmor_profile" >/dev/null <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile tinlance-playwright-chromium $chromium_bin flags=(unconfined) {
+            userns,
+          }
+          EOF
+            sudo apparmor_parser -r "$apparmor_profile"
+            test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = "1"
+            echo "Loaded exact-binary Chromium AppArmor userns allowance; global restriction remains enabled."
+          fi
+
+          sudo env \
+            PATH="$PATH" \
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" \
+            PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" \
+            PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" \
+            "$pythonLocation/bin/python" scripts/smoke_browser_environment.py \
+              --artifacts "$GITHUB_WORKSPACE/artifacts" \
+              --allowed-domain example.com
+          test -s artifacts/browser-w3.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/browser-w3.json").read_text(encoding="utf-8"))
+          if report.get("status") != "passed":
+              raise SystemExit(f"W3 browser acceptance did not pass: {report}")
+          required = [
+              "network_namespace_created",
+              "browser_network_has_only_proxy_link",
+              "host_firewall_proxy_only",
+              "proxy_listener_ready",
+              "guest_proxy_probe_passed",
+              "direct_public_egress_blocked",
+              "metadata_ip_denied",
+              "unallowlisted_hostname_denied",
+              "allowlisted_https_navigation",
+              "profile_persisted_across_restart",
+              "workspace_profile_isolation",
+              "tenant_profile_root_binding",
+              "proxy_unavailable_fail_closed",
+              "tenant_uid_separation",
+              "chromium_sandbox_enabled",
+              "browser_process_cap_eff_zero",
+              "browser_process_no_new_privs",
+              "chromium_renderer_seccomp_enabled",
+              "chromium_renderer_no_new_privs",
+              "chromium_renderer_cap_eff_zero",
+              "chromium_renderer_user_namespace_isolated",
+          ]
+          guest = report.get("guest", {})
+          missing = [name for name in required if guest.get(name) is not True and report.get(name) is not True]
+          if missing:
+              raise SystemExit(f"W3 acceptance evidence is incomplete: {missing}")
+          if guest.get("chromium_renderer_count", 0) < 1:
+              raise SystemExit("W3 evidence must contain at least one Chromium renderer process.")
+          proxy_uid = report.get("proxy_process_uid")
+          if proxy_uid in (None, 0, guest.get("browser_process_uid"), guest.get("other_tenant_uid")):
+              raise SystemExit("W3 proxy must run under a distinct non-root UID.")
+          if report.get("production_certification") is not False:
+              raise SystemExit("Ephemeral W3 CI must not claim production certification.")
+          if report.get("cleanup_verified") is not True:
+              raise SystemExit("W3 network namespace and firewall cleanup was not verified.")
+          if report.get("proxy_process_uid") == report.get("browser_process_uid"):
+              raise SystemExit("Browser and egress proxy must run under separate OS identities.")
+          if report.get("browser_process_uid") == report.get("other_tenant_uid"):
+              raise SystemExit("Distinct tenants must use distinct OS identities.")
+          print("PASS: W3 browser environment, persistent profiles and enforced proxy egress.")
+          print(json.dumps(report, sort_keys=True, indent=2))
+          PY
+          sudo chmod -R a+rX artifacts
+
+      - name: Upload W3 browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-w3-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 90
