@@ -51,6 +51,14 @@ _JOB_ID = re.compile(
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 
 
+def extensions_mcp_request_id(*, tenant_id: str, subject_id: str, jsonrpc_request_id: str) -> str:
+    """Mirror MCPProtocolService request-ID derivation for approval preparation."""
+    if not all((tenant_id, subject_id, jsonrpc_request_id)):
+        raise ValueError("MCP replay request identity is incomplete")
+    fingerprint = sha256(f"{tenant_id}:{subject_id}:{jsonrpc_request_id}".encode()).hexdigest()[:32]
+    return f"mcp-{fingerprint}"
+
+
 def extensions_dead_letter_replay_run_id(
     *, tenant_id: str, subject_id: str, request_id: str
 ) -> UUID:
@@ -168,25 +176,26 @@ class ExtensionsAPIHandler:
                 f"extensions:{request.tenant_id}:{request.subject_id}:{request.request_id}:{tool_name}",
             )
         else:
-            required_fields = {
-                "event_id",
-                "idempotency_key",
-                "run_id",
-                "approval_id",
-                "intent_fingerprint",
-            }
-            if set(request.payload) != required_fields:
+            required_fields = {"event_id", "run_id", "approval_id", "intent_fingerprint"}
+            if set(request.payload) not in {
+                required_fields,
+                required_fields | {"idempotency_key"},
+            }:
                 raise ValueError("Extensions replay requires exact approval-bound fields")
             event_id = request.payload.get("event_id")
             if not isinstance(event_id, str) or not _JOB_ID.fullmatch(event_id):
                 raise ValueError("Extensions event ID must be a canonical UUID")
             if str(UUID(event_id)) != event_id.lower():
                 raise ValueError("Extensions event ID must be normalized")
-            idempotency_key = request.payload.get("idempotency_key")
+            idempotency_key = request.idempotency_key
+            payload_idempotency_key = request.payload.get("idempotency_key")
             if (
                 not isinstance(idempotency_key, str)
                 or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key)
-                or request.idempotency_key != idempotency_key
+                or (
+                    payload_idempotency_key is not None
+                    and payload_idempotency_key != idempotency_key
+                )
             ):
                 raise ValueError("Extensions replay idempotency key is invalid or unbound")
             supplied_run_id = request.payload.get("run_id")
@@ -226,7 +235,10 @@ class ExtensionsAPIHandler:
             risk = RiskTier.HIGH
             reversibility = Reversibility.PARTIALLY_REVERSIBLE
             data_class = DataClass.CONFIDENTIAL
-            arguments = dict(request.payload)
+            arguments = {
+                **request.payload,
+                "idempotency_key": idempotency_key,
+            }
 
         scope = ToolScope(
             tenant_id=request.tenant_id,
