@@ -277,7 +277,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             uuid4(),
             approval_id=uuid4(),
             approval_verifier=approvals,
-            intent_fingerprint="intent-sha256",
+            intent_fingerprint="d" * 64,
         )
         self.assertEqual(result["status"], "candidate")
         self.assertEqual(len(approvals.calls), 1)
