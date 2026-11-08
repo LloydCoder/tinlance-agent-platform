@@ -63,8 +63,9 @@ class SandboxExecutor:
 
     @staticmethod
     def _kill_and_reap(process: subprocess.Popen[bytes]) -> None:
-        if process.poll() is not None:
-            return
+        # The group leader may have exited while descendants still run. Always
+        # signal the original process group; checking only poll() would orphan
+        # those descendants after a fast parent exit.
         with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
         process.wait()
