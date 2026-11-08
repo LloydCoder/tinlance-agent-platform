@@ -34,14 +34,15 @@ def execute_request(
     provider: SandboxProvider,
     limits: SandboxLimits,
     *,
-    lease_assertion: Callable[[], bool],
+    lease_assertion: Callable[[SandboxRequest], bool],
     supervisor: WorkspaceLeaseSupervisor | None = None,
 ) -> ProcessResult:
     """Execute a policy-approved command under a continuously asserted workspace lease.
 
     The lease assertion is supplied by the Platform composition layer, which binds
     the tenant-scoped durable lease store and exact fencing token. The sandbox
-    package does not own or reconstruct that authority.
+    package does not own or reconstruct that authority. The caller must bind the
+    exact request tenant/workspace and fencing token into this assertion.
     """
     validate_request(request, policy)
     effective_timeout = min(limits.timeout_seconds, int(request.timeout_seconds))
@@ -54,8 +55,11 @@ def execute_request(
         max_processes=limits.max_processes,
     )
     command = provider.command(list(request.command), effective_limits, request.allowed_paths)
+    def assert_request_lease() -> bool:
+        return lease_assertion(request)
+
     return (supervisor or WorkspaceLeaseSupervisor()).execute(
-        lease_assertion,
+        assert_request_lease,
         command,
         cwd=request.allowed_paths[0],
         limits=effective_limits,
