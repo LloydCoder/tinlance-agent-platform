@@ -1,87 +1,43 @@
 -- Durable idempotency state for guarded API operations across Platform replicas.
-create table if not exists platform.api_idempotency_records (
-    tenant_id uuid not null references platform.tenants(tenant_id),
-    subject_id text not null check (length(subject_id) between 1 and 512),
-    idempotency_key text not null check (
-        length(idempotency_key) between 1 and 256
-        and idempotency_key ~ '^[!-~]+
-    operation text not null check (length(operation) between 1 and 256),
-    request_fingerprint text not null check (request_fingerprint ~ '^[0-9a-f]{64}$'),
-    status text not null check (status in ('processing', 'completed', 'outcome_unknown')),
+CREATE TABLE IF NOT EXISTS platform.api_idempotency_records (
+    tenant_id uuid NOT NULL REFERENCES platform.tenants(tenant_id),
+    subject_id text NOT NULL CHECK (length(subject_id) BETWEEN 1 AND 512),
+    idempotency_key text NOT NULL CHECK (
+        length(idempotency_key) BETWEEN 1 AND 256
+        AND idempotency_key !~ '[^!-~]'
+    ),
+    operation text NOT NULL CHECK (length(operation) BETWEEN 1 AND 256),
+    request_fingerprint text NOT NULL CHECK (request_fingerprint ~ '^[0-9a-f]{64}$'),
+    status text NOT NULL CHECK (status IN ('processing', 'completed', 'outcome_unknown')),
     response_status text,
     response_payload jsonb,
     lease_expires_at timestamptz,
-    created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     completed_at timestamptz,
-    expires_at timestamptz not null default (now() + interval '30 days'),
-    primary key (tenant_id, subject_id, idempotency_key),
-    check (
+    expires_at timestamptz NOT NULL DEFAULT (now() + interval '30 days'),
+    PRIMARY KEY (tenant_id, subject_id, idempotency_key),
+    CHECK (
         (status = 'completed')
         = (
-            response_status is not null
-            and response_payload is not null
-            and completed_at is not null
+            response_status IS NOT NULL
+            AND response_payload IS NOT NULL
+            AND completed_at IS NOT NULL
         )
     ),
-    check (
-        response_payload is null or jsonb_typeof(response_payload) = 'object'
-    ),
-    check (
-        (status = 'processing') = (lease_expires_at is not null)
-    )
+    CHECK (response_payload IS NULL OR jsonb_typeof(response_payload) = 'object'),
+    CHECK ((status = 'processing') = (lease_expires_at IS NOT NULL))
 );
 
-create index if not exists idx_api_idempotency_expiry
-    on platform.api_idempotency_records (tenant_id, expires_at)
-    where status = 'completed';
-create index if not exists idx_api_idempotency_processing_lease
-    on platform.api_idempotency_records (tenant_id, lease_expires_at)
-    where status = 'processing';
+CREATE INDEX IF NOT EXISTS idx_api_idempotency_expiry
+    ON platform.api_idempotency_records (tenant_id, expires_at)
+    WHERE status = 'completed';
+CREATE INDEX IF NOT EXISTS idx_api_idempotency_processing_lease
+    ON platform.api_idempotency_records (tenant_id, lease_expires_at)
+    WHERE status = 'processing';
 
-alter table platform.api_idempotency_records enable row level security;
-alter table platform.api_idempotency_records force row level security;
-create policy api_idempotency_tenant_isolation on platform.api_idempotency_records
-    using (tenant_id = platform.current_tenant_id())
-    with check (tenant_id = platform.current_tenant_id());
-
-    ),
-    operation text not null check (length(operation) between 1 and 256),
-    request_fingerprint text not null check (request_fingerprint ~ '^[0-9a-f]{64}$'),
-    status text not null check (status in ('processing', 'completed', 'outcome_unknown')),
-    response_status text,
-    response_payload jsonb,
-    lease_expires_at timestamptz,
-    created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(),
-    completed_at timestamptz,
-    expires_at timestamptz not null default (now() + interval '30 days'),
-    primary key (tenant_id, subject_id, idempotency_key),
-    check (
-        (status = 'completed')
-        = (
-            response_status is not null
-            and response_payload is not null
-            and completed_at is not null
-        )
-    ),
-    check (
-        response_payload is null or jsonb_typeof(response_payload) = 'object'
-    ),
-    check (
-        (status = 'processing') = (lease_expires_at is not null)
-    )
-);
-
-create index if not exists idx_api_idempotency_expiry
-    on platform.api_idempotency_records (tenant_id, expires_at)
-    where status = 'completed';
-create index if not exists idx_api_idempotency_processing_lease
-    on platform.api_idempotency_records (tenant_id, lease_expires_at)
-    where status = 'processing';
-
-alter table platform.api_idempotency_records enable row level security;
-alter table platform.api_idempotency_records force row level security;
-create policy api_idempotency_tenant_isolation on platform.api_idempotency_records
-    using (tenant_id = platform.current_tenant_id())
-    with check (tenant_id = platform.current_tenant_id());
+ALTER TABLE platform.api_idempotency_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform.api_idempotency_records FORCE ROW LEVEL SECURITY;
+CREATE POLICY api_idempotency_tenant_isolation ON platform.api_idempotency_records
+    USING (tenant_id = platform.current_tenant_id())
+    WITH CHECK (tenant_id = platform.current_tenant_id());
