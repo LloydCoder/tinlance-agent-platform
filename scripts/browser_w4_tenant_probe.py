@@ -24,6 +24,7 @@ def main() -> int:
     parser.add_argument("--proxy-port", type=int, required=True)
     parser.add_argument("--profile-root", required=True)
     parser.add_argument("--tenant-a-namespaces", required=True)
+    parser.add_argument("--host-namespaces", required=True)
     args = parser.parse_args()
 
     names = ("pid", "ipc", "mnt", "net")
@@ -32,8 +33,11 @@ def main() -> int:
         for name in names
     }
     tenant_a = json.loads(args.tenant_a_namespaces)
+    host = json.loads(args.host_namespaces)
     if any(current[name] == tenant_a[name] for name in names):
         raise SystemExit("tenant B shares a namespace with tenant A")
+    if any(current[name] == host[name] for name in names):
+        raise SystemExit("tenant B shares a namespace with the host")
 
     if Path(f"/proc/{args.hidden_host_pid}").exists():
         raise SystemExit("tenant B can see a foreign host PID")
@@ -102,6 +106,7 @@ def main() -> int:
                 "status": "passed",
                 "namespace_ids": current,
                 "tenant_a_namespace_ids": tenant_a,
+                "host_namespace_ids": host,
                 "pid_namespace_isolated": True,
                 "ipc_namespace_isolated": True,
                 "mount_namespace_isolated": True,
