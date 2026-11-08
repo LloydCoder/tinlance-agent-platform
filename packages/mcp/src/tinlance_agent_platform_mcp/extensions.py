@@ -304,7 +304,7 @@ class ExtensionsHTTPTransport:
             "X-Request-ID": scope.request_id,
             **({"traceparent": scope.traceparent} if scope.traceparent else {}),
         }
-        if idempotency_key is not None:
+        if isinstance(idempotency_key, str):
             headers["Idempotency-Key"] = idempotency_key
         response = self._http.request(
             "POST",
