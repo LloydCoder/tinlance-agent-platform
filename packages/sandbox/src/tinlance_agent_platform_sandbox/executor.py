@@ -7,10 +7,16 @@ import resource
 import signal
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 
 from .bubblewrap import SandboxLimits
+
+
+class WorkspaceLeaseLost(RuntimeError):
+    """Raised when a persistent workspace loses its current fencing authority."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,13 +38,46 @@ def _limit_process(limits: SandboxLimits) -> None:
 
 
 class SandboxExecutor:
-    """Execute an already-policy-validated sandbox command with hard limits.
+    """Execute a policy-validated sandbox command with hard limits.
 
-    The executor is POSIX-only by design. Unsupported hosts fail closed rather
-    than silently dropping isolation or resource limits.
+    Persistent workspace commands must provide a lease assertion. The process is
+    launched in its own session/process group; lease loss kills and reaps that
+    entire group before control returns to the caller.
     """
 
-    def execute(self, argv: list[str], *, cwd: str, limits: SandboxLimits) -> ProcessResult:
+    _LEASE_POLL_INTERVAL_SECONDS = 0.25
+
+    @staticmethod
+    def _assert_lease(lease_assertion: Callable[[], bool] | None) -> None:
+        if lease_assertion is None:
+            return
+        try:
+            active = lease_assertion()
+        except Exception as exc:
+            raise WorkspaceLeaseLost(
+                "workspace lease authority is unavailable; command execution fails closed"
+            ) from exc
+        if active is not True:
+            raise WorkspaceLeaseLost("workspace lease is expired, revoked, or fenced")
+
+    @staticmethod
+    def _kill_and_reap(process: subprocess.Popen[bytes]) -> None:
+        if process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+    def execute(
+        self,
+        argv: list[str],
+        *,
+        cwd: str,
+        limits: SandboxLimits,
+        lease_assertion: Callable[[], bool] | None = None,
+    ) -> ProcessResult:
         if os.name != "posix":
             raise RuntimeError("production sandbox execution requires POSIX isolation")
         if not argv or not Path(cwd).is_absolute():
@@ -50,6 +89,9 @@ class SandboxExecutor:
             or limits.max_processes < 1
         ):
             raise ValueError("invalid sandbox limits")
+
+        # Check before creating any process or crossing the command boundary.
+        self._assert_lease(lease_assertion)
 
         with tempfile.TemporaryDirectory(prefix="tinlance-sandbox-") as tmp:
             stdout_path = Path(tmp) / "stdout"
@@ -66,12 +108,27 @@ class SandboxExecutor:
                     preexec_fn=lambda: _limit_process(limits),
                 )
                 timed_out = False
+                deadline = monotonic() + limits.timeout_seconds
                 try:
-                    process.wait(timeout=limits.timeout_seconds)
-                except subprocess.TimeoutExpired:
-                    timed_out = True
-                    os.killpg(process.pid, signal.SIGKILL)
-                    process.wait()
+                    while True:
+                        self._assert_lease(lease_assertion)
+                        remaining = deadline - monotonic()
+                        if remaining <= 0:
+                            timed_out = True
+                            self._kill_and_reap(process)
+                            break
+                        try:
+                            process.wait(
+                                timeout=min(self._LEASE_POLL_INTERVAL_SECONDS, remaining)
+                            )
+                            break
+                        except subprocess.TimeoutExpired:
+                            continue
+                    # Do not return output to a caller whose lease expired at completion.
+                    self._assert_lease(lease_assertion)
+                except WorkspaceLeaseLost:
+                    self._kill_and_reap(process)
+                    raise
 
             # max_output_bytes is an aggregate result budget across both streams.
             # Preserve stdout first, then use only the remaining budget for stderr.
