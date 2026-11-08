@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import ctypes
 import os
 import resource
 import signal
 import subprocess
+import sys
 import tempfile
 from collections.abc import Callable
 from contextlib import suppress
@@ -14,6 +16,18 @@ from pathlib import Path
 from time import monotonic, sleep
 
 from .bubblewrap import SandboxLimits
+
+_LIBC = ctypes.CDLL(None, use_errno=True)
+_PRCTL = _LIBC.prctl
+_PRCTL.argtypes = [
+    ctypes.c_int,
+    ctypes.c_ulong,
+    ctypes.c_ulong,
+    ctypes.c_ulong,
+    ctypes.c_ulong,
+]
+_PRCTL.restype = ctypes.c_int
+_PR_SET_PDEATHSIG = 1
 
 
 class WorkspaceLeaseLost(RuntimeError):
@@ -28,8 +42,18 @@ class ProcessResult:
     timed_out: bool = False
 
 
-def _limit_process(limits: SandboxLimits) -> None:
-    """Apply hard POSIX resource ceilings before the sandbox process starts."""
+def _limit_process(limits: SandboxLimits, expected_parent_pid: int) -> None:
+    """Apply hard resource ceilings and parent-death containment before exec."""
+    if sys.platform != "linux":
+        raise RuntimeError("sandbox process supervision requires Linux PR_SET_PDEATHSIG")
+    if _PRCTL(_PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+    # Close the fork/preexec race: if the parent died before prctl was installed,
+    # the kernel cannot deliver the parent-death signal retroactively.
+    if os.getppid() != expected_parent_pid:
+        os.kill(os.getpid(), signal.SIGKILL)
+
     cpu = max(1, int(limits.timeout_seconds))
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
     memory = limits.max_memory_bytes
@@ -86,8 +110,8 @@ class SandboxExecutor:
         limits: SandboxLimits,
         lease_assertion: Callable[[], bool],
     ) -> ProcessResult:
-        if os.name != "posix":
-            raise RuntimeError("production sandbox execution requires POSIX isolation")
+        if os.name != "posix" or sys.platform != "linux":
+            raise RuntimeError("production sandbox execution requires Linux isolation")
         required_waitid_features = ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT")
         if not all(hasattr(os, name) for name in required_waitid_features):
             raise RuntimeError("safe process-group supervision requires waitid with WNOWAIT")
@@ -108,6 +132,7 @@ class SandboxExecutor:
             stdout_path = Path(tmp) / "stdout"
             stderr_path = Path(tmp) / "stderr"
             with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+                expected_parent_pid = os.getpid()
                 process = subprocess.Popen(
                     argv,
                     cwd=cwd,
@@ -116,7 +141,7 @@ class SandboxExecutor:
                     stderr=stderr,
                     start_new_session=True,
                     close_fds=True,
-                    preexec_fn=lambda: _limit_process(limits),
+                    preexec_fn=lambda: _limit_process(limits, expected_parent_pid),
                 )
                 timed_out = False
                 deadline = monotonic() + limits.timeout_seconds
