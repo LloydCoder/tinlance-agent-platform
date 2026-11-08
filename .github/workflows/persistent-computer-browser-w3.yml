@@ -167,7 +167,7 @@ jobs:
           print("PASS: W3 browser environment, persistent profiles and enforced proxy egress.")
           print(json.dumps(report, sort_keys=True, indent=2))
           PY
-          chmod -R a+rX artifacts
+          sudo chmod -R a+rX artifacts
 
       - name: Upload W3 browser evidence
         if: always()
