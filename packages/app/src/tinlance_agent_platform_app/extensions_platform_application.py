@@ -99,6 +99,7 @@ def compute_extensions_dead_letter_replay_intent_fingerprint(
     )
     return sha256(canonical.encode("utf-8")).hexdigest()
 
+
 class ExtensionsAPIHandler:
     """Route registered Extensions operations through the Platform tool gateway."""
 
