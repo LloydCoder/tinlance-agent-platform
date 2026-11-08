@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Protocol
 
 from .bubblewrap import SandboxLimits
@@ -40,7 +39,8 @@ class WorkspaceLeaseSupervisor:
         cwd: str,
         limits: SandboxLimits,
     ) -> ProcessResult:
-        assertion: Callable[[], bool] = lambda: self._lease_store.assert_active(lease)
+        def assertion() -> bool:
+            return self._lease_store.assert_active(lease)
         return self._executor.execute(
             argv,
             cwd=cwd,
