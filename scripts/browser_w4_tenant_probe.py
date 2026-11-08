@@ -54,7 +54,9 @@ def main() -> int:
             raise SystemExit("tenant B can reach tenant A's proxy network")
     except OSError as exc:
         if exc.errno != errno.ENETUNREACH:
-            raise SystemExit("tenant B network denial was not caused by its isolated route table")
+            raise SystemExit(
+                "tenant B network denial was not caused by its isolated route table"
+            ) from exc
 
     mount_result = libc.mount(
         ctypes.c_char_p(b"none"),
