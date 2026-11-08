@@ -339,7 +339,6 @@ class BrowserWorkspaceManager:
                 proxy={"server": self.proxy_url},
                 args=[
                     "--proxy-bypass-list=<-loopback>",
-                    "--host-resolver-rules=MAP * ~NOTFOUND",
                     "--disable-quic",
                     "--disable-background-networking",
                     "--disable-component-update",
