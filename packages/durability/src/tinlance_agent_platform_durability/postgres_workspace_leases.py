@@ -158,7 +158,7 @@ class PostgresWorkspaceLeaseStore:
 
         return cast(datetime, self._transaction(lease.tenant_id, operation))
 
-    def assert_active(self, lease: WorkspaceLease) -> bool:
+    def assert_active(self, lease: object) -> bool:
         if not isinstance(lease, WorkspaceLease):
             raise TypeError("lease must be a WorkspaceLease")
 
