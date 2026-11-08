@@ -161,6 +161,7 @@ jobs:
           if guest.get("status") != "passed":
               raise SystemExit("W4 Chromium guest evidence is missing or failed.")
           chromium_requirements = [
+              "proxy_allowed_https_tunnel",
               "chromium_sandbox_enabled",
               "browser_process_cap_eff_zero",
               "browser_process_no_new_privs",
