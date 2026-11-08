@@ -51,9 +51,8 @@ alter table platform.approvals
     add constraint approvals_state_consistency_check
     check (
         (status = 'pending' and decided_at is null and approved_by is null and consumed_at is null)
-        or (status in ('approved', 'rejected')
-            and decided_at is not null and consumed_at is null)
-        or (status = 'expired' and decided_at is not null and approved_by is null and consumed_at is null)
+        or (status in ('approved', 'rejected') and consumed_at is null)
+        or (status = 'expired' and consumed_at is null)
         or (status = 'cancelled' and decided_at is not null and consumed_at is null)
         or (status = 'consumed'
             and decided_at is not null and approved_by is not null and consumed_at is not null)
@@ -102,6 +101,7 @@ drop policy if exists approvals_tenant_isolation on platform.approvals;
 create policy approvals_tenant_isolation on platform.approvals
     using (tenant_id = platform.current_tenant_id())
     with check (tenant_id = platform.current_tenant_id());
+drop policy if exists approval_events_tenant_isolation on platform.approval_events;
 create policy approval_events_tenant_isolation on platform.approval_events
     using (tenant_id = platform.current_tenant_id())
     with check (tenant_id = platform.current_tenant_id());
@@ -127,6 +127,7 @@ alter role platform_approval_executor nologin nosuperuser nobypassrls;
 alter role platform_approval_client nologin nosuperuser nobypassrls;
 
 grant usage on schema platform to platform_approval_executor, platform_approval_client;
+grant execute on function platform.current_tenant_id() to platform_approval_client;
 grant select on platform.tenants, platform.runs to platform_approval_executor;
 grant select, insert, update on platform.approvals to platform_approval_executor;
 grant select, insert on platform.approval_events to platform_approval_executor;
@@ -394,6 +395,8 @@ begin
 end;
 $$;
 
+grant create on schema platform to platform_approval_executor;
+
 alter function platform.request_approval(uuid, uuid, uuid, text, text, text, text, jsonb, timestamptz, text, jsonb)
     owner to platform_approval_executor;
 alter function platform.expire_approval_if_due(uuid, uuid)
@@ -402,6 +405,8 @@ alter function platform.decide_approval(uuid, uuid, boolean, text, text)
     owner to platform_approval_executor;
 alter function platform.consume_approval(uuid, uuid, uuid, text, text, text)
     owner to platform_approval_executor;
+
+revoke create on schema platform from platform_approval_executor;
 
 revoke all on function platform.request_approval(uuid, uuid, uuid, text, text, text, text, jsonb, timestamptz, text, jsonb) from public;
 revoke all on function platform.expire_approval_if_due(uuid, uuid) from public;
