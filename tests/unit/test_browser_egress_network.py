@@ -134,3 +134,21 @@ def test_explicit_private_dns_resolver_is_allowed_by_exact_destination_policy() 
     )
     assert "ip daddr 10.0.0.2 udp dport 53 accept" in rules
     assert "ip daddr 10.0.0.2 tcp dport 53 accept" in rules
+
+
+def test_proxy_resolver_config_is_readable_only_by_proxy_identity(tmp_path) -> None:
+    from scripts.browser_egress_network import write_proxy_resolver_config
+
+    config = write_proxy_resolver_config(
+        tmp_path,
+        dns_server="1.1.1.1",
+        proxy_uid=52000,
+        proxy_gid=52000,
+    )
+    metadata = config.stat()
+    assert metadata.st_uid == 52000
+    assert metadata.st_gid == 52000
+    assert metadata.st_mode & 0o777 == 0o600
+    assert config.read_text(encoding="ascii") == (
+        "nameserver 1.1.1.1\\noptions timeout:2 attempts:1\\n"
+    )
