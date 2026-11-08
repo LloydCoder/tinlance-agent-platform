@@ -29,9 +29,9 @@ def chromium_process_security() -> dict[str, object]:
             status_file = entry / "status"
             try:
                 raw_command = command_file.read_bytes()
-                command = raw_command.replace(b"\x00", b" ").decode(
-                    "utf-8", errors="replace"
-                ).split()
+                command = (
+                    raw_command.replace(b"\x00", b" ").decode("utf-8", errors="replace").split()
+                )
                 status: dict[str, str] = {}
                 for line in status_file.read_text(encoding="ascii").splitlines():
                     if ":" in line:
