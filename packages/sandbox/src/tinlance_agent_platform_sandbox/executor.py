@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import ctypes
 import os
-import resource
 import signal
 import subprocess
 import sys
@@ -17,18 +15,6 @@ from time import monotonic, sleep
 
 from .bubblewrap import SandboxLimits
 
-_LIBC = ctypes.CDLL(None, use_errno=True)
-_PRCTL = _LIBC.prctl
-_PRCTL.argtypes = [
-    ctypes.c_int,
-    ctypes.c_ulong,
-    ctypes.c_ulong,
-    ctypes.c_ulong,
-    ctypes.c_ulong,
-]
-_PRCTL.restype = ctypes.c_int
-_PR_SET_PDEATHSIG = 1
-
 
 class WorkspaceLeaseLost(RuntimeError):
     """Raised when a persistent workspace loses its current fencing authority."""
@@ -40,26 +26,6 @@ class ProcessResult:
     stdout: str
     stderr: str
     timed_out: bool = False
-
-
-def _limit_process(limits: SandboxLimits, expected_parent_pid: int) -> None:
-    """Apply hard resource ceilings and parent-death containment before exec."""
-    if sys.platform != "linux":
-        raise RuntimeError("sandbox process supervision requires Linux PR_SET_PDEATHSIG")
-    if _PRCTL(_PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) != 0:
-        error = ctypes.get_errno()
-        raise OSError(error, os.strerror(error))
-    # Close the fork/preexec race: if the parent died before prctl was installed,
-    # the kernel cannot deliver the parent-death signal retroactively.
-    if os.getppid() != expected_parent_pid:
-        os.kill(os.getpid(), signal.SIGKILL)
-
-    cpu = max(1, int(limits.timeout_seconds))
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
-    memory = limits.max_memory_bytes
-    resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
-    resource.setrlimit(resource.RLIMIT_FSIZE, (limits.max_output_bytes, limits.max_output_bytes))
-    resource.setrlimit(resource.RLIMIT_NPROC, (limits.max_processes, limits.max_processes))
 
 
 class SandboxExecutor:
@@ -133,15 +99,32 @@ class SandboxExecutor:
             stderr_path = Path(tmp) / "stderr"
             with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
                 expected_parent_pid = os.getpid()
+                guarded_argv = [
+                    sys.executable,
+                    "-I",
+                    "-m",
+                    "tinlance_agent_platform_sandbox.exec_guard",
+                    "--parent-pid",
+                    str(expected_parent_pid),
+                    "--cpu-seconds",
+                    str(max(1, int(limits.timeout_seconds))),
+                    "--memory-bytes",
+                    str(limits.max_memory_bytes),
+                    "--file-size-bytes",
+                    str(limits.max_output_bytes),
+                    "--max-processes",
+                    str(limits.max_processes),
+                    "--",
+                    *argv,
+                ]
                 process = subprocess.Popen(
-                    argv,
+                    guarded_argv,
                     cwd=cwd,
                     stdin=subprocess.DEVNULL,
                     stdout=stdout,
                     stderr=stderr,
                     start_new_session=True,
                     close_fds=True,
-                    preexec_fn=lambda: _limit_process(limits, expected_parent_pid),
                 )
                 timed_out = False
                 deadline = monotonic() + limits.timeout_seconds
