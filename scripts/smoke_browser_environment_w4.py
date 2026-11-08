@@ -107,6 +107,7 @@ def main() -> int:
     users: list[str] = []
     namespaces: list[str] = []
     host_link_created = False
+    host_link_deleted = False
     host_rules_created = False
     proxy_process: subprocess.Popen[bytes] | None = None
     tenant_a_probe: subprocess.Popen[str] | None = None
@@ -599,21 +600,35 @@ def main() -> int:
             if deleted.returncode != 0:
                 cleanup_errors.append(f"network namespace {netns} could not be deleted")
         if host_link_created:
-            deleted = subprocess.run(["ip", "link", "del", host_uplink_if],
-                                     check=False, capture_output=True)
-            if deleted.returncode != 0:
+            deleted = subprocess.run(
+                ["ip", "link", "del", host_uplink_if],
+                check=False,
+                capture_output=True,
+            )
+            host_link_deleted = deleted.returncode == 0
+            if not host_link_deleted:
                 cleanup_errors.append("proxy host uplink could not be deleted")
+        remaining_namespaces = {
+            line.split()[0]
+            for line in run(["ip", "netns", "list"]).splitlines()
+            if line.split()
+        }
         if host_rules_created:
-            for family, table in (("inet", host_forward_table), ("ip", host_nat_table)):
-                deleted = subprocess.run(
-                    ["nft", "delete", "table", family, table],
-                    check=False,
-                    capture_output=True,
+            if proxy_ns in remaining_namespaces or not host_link_deleted:
+                cleanup_errors.append(
+                    "host egress firewall retained because proxy namespace teardown was incomplete"
                 )
-                if deleted.returncode != 0:
-                    cleanup_errors.append(
-                        f"host firewall table {table} could not be deleted"
+            else:
+                for family, table in (("inet", host_forward_table), ("ip", host_nat_table)):
+                    deleted = subprocess.run(
+                        ["nft", "delete", "table", family, table],
+                        check=False,
+                        capture_output=True,
                     )
+                    if deleted.returncode != 0:
+                        cleanup_errors.append(
+                            f"host firewall table {table} could not be deleted"
+                        )
         if resolv_dir.exists():
             shutil.rmtree(resolv_dir, ignore_errors=True)
             if resolv_dir.exists():
