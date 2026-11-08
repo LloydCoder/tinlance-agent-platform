@@ -7,6 +7,7 @@ EXECUTE on the lifecycle functions via membership in platform_approval_client.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from collections.abc import Callable
@@ -78,16 +79,12 @@ class PostgresApprovalService:
             connection.commit()
             return result
         except BaseException:
-            try:
+            with contextlib.suppress(Exception):
                 connection.rollback()
-            except Exception:
-                pass
             raise
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 connection.close()
-            except Exception:
-                pass
 
     @staticmethod
     def _row_to_approval(row: Any) -> ApprovalRequest:
@@ -153,7 +150,11 @@ class PostgresApprovalService:
 
         def operation(connection: Any) -> ApprovalRequest:
             row = connection.execute(
-                "SELECT platform.request_approval(%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s::jsonb)",
+                """
+                SELECT platform.request_approval(
+                    %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s::jsonb
+                )
+                """,
                 (
                     tenant,
                     approval_id,
