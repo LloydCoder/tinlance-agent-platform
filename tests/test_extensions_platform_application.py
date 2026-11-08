@@ -403,3 +403,40 @@ def test_dead_letter_replay_rejects_approval_for_different_event_intent() -> Non
         raise AssertionError("approval must be bound to the exact event and intent")
     assert http.calls == []
 # fmt: on
+
+
+def test_dead_letter_replay_approval_is_consumed_once() -> None:
+    http = FakeHTTPClient(
+        ExtensionsHTTPResponse(
+            200,
+            {"content-type": "application/json"},
+            b'{"status":"requeued"}',
+        )
+    )
+    approvals = ApprovalService()
+    request_id = "platform-extensions-replay-one-time"
+    _run_id, _fingerprint, _approval_id, payload = _approved_replay_request(
+        approvals, request_id
+    )
+    application = _application(http, approval_verifier=approvals)
+    request = APIRequest(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        operation="extensions.outbox.dead_letter.replay",
+        payload=payload,
+        request_id=request_id,
+        idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+        authenticated_principal=_principal("extensions.outbox.dead_letter.replay"),
+    )
+
+    response = application.api.dispatch(request)
+    assert response.status == "success"
+    assert len(http.calls) == 1
+
+    try:
+        application.api.dispatch(request)
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError("a consumed replay approval must never authorize a second execution")
+    assert len(http.calls) == 1
