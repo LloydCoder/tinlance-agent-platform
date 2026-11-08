@@ -40,6 +40,7 @@ class EgressPolicy:
     connect_timeout_seconds: float = 5.0
     tunnel_idle_timeout_seconds: float = 30.0
     tunnel_max_seconds: float = 900.0
+    tunnel_write_timeout_seconds: float = 5.0
     tunnel_max_bytes: int = 268_435_456
     max_connections: int = 64
 
@@ -52,9 +53,11 @@ class EgressPolicy:
             not math.isfinite(self.connect_timeout_seconds)
             or not math.isfinite(self.tunnel_idle_timeout_seconds)
             or not math.isfinite(self.tunnel_max_seconds)
+            or not math.isfinite(self.tunnel_write_timeout_seconds)
             or not 0 < self.connect_timeout_seconds <= 30
             or not 0 < self.tunnel_idle_timeout_seconds <= 300
             or not 0 < self.tunnel_max_seconds <= 3600
+            or not 0 < self.tunnel_write_timeout_seconds <= 30
             or not isinstance(self.tunnel_max_bytes, int)
             or not 1 <= self.tunnel_max_bytes <= 1_073_741_824
             or not isinstance(self.max_connections, int)
@@ -243,7 +246,10 @@ def _relay_tunnel(
     idle_timeout_seconds: float,
     max_seconds: float,
     max_bytes: int,
+    write_timeout_seconds: float = 5.0,
 ) -> None:
+    if not math.isfinite(write_timeout_seconds) or not 0 < write_timeout_seconds <= 30:
+        raise ValueError("tunnel write timeout must be finite and between 0 and 30 seconds")
     started = time.monotonic()
     last_activity = started
     transferred = 0
@@ -271,8 +277,18 @@ def _relay_tunnel(
             transferred += len(chunk)
             if transferred > max_bytes:
                 return
+            destination = peers[source]
+            send_started = time.monotonic()
+            send_timeout = min(
+                write_timeout_seconds,
+                max_seconds - (send_started - started),
+                idle_timeout_seconds - (send_started - last_activity),
+            )
+            if send_timeout <= 0:
+                return
             try:
-                peers[source].sendall(chunk)
+                destination.settimeout(send_timeout)
+                destination.sendall(chunk)
             except OSError:
                 return
             last_activity = time.monotonic()
@@ -407,8 +423,8 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            self.connection.settimeout(5.0)
-            upstream.settimeout(5.0)
+            self.connection.settimeout(self.proxy_server.policy.tunnel_write_timeout_seconds)
+            upstream.settimeout(self.proxy_server.policy.tunnel_write_timeout_seconds)
             self.send_response(200, "Connection Established")
             self.end_headers()
             _relay_tunnel(
@@ -417,6 +433,7 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
                 idle_timeout_seconds=self.proxy_server.policy.tunnel_idle_timeout_seconds,
                 max_seconds=self.proxy_server.policy.tunnel_max_seconds,
                 max_bytes=self.proxy_server.policy.tunnel_max_bytes,
+                write_timeout_seconds=self.proxy_server.policy.tunnel_write_timeout_seconds,
             )
         finally:
             self.proxy_server.unregister_socket(upstream)
