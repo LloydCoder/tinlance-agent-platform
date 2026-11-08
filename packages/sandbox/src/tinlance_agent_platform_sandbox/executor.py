@@ -7,13 +7,13 @@ import os
 import resource
 import signal
 import subprocess
+import sys
 import tempfile
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, sleep
-import sys
 
 from .bubblewrap import SandboxLimits
 
