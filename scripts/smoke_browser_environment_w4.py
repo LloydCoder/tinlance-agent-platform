@@ -51,8 +51,18 @@ def create_user(name: str, start_uid: int) -> tuple[int, int]:
             continue
         if subprocess.run(["getent", "group", str(uid)], capture_output=True).returncode == 0:
             continue
-        run(["useradd", "--uid", str(uid), "--user-group", "--no-create-home",
-             "--shell", "/usr/sbin/nologin", name])
+        run(
+            [
+                "useradd",
+                "--uid",
+                str(uid),
+                "--user-group",
+                "--no-create-home",
+                "--shell",
+                "/usr/sbin/nologin",
+                name,
+            ]
+        )
         return uid, int(run(["id", "-g", name]))
     raise RuntimeError("no free UID/GID available for W4 isolation identities")
 
@@ -70,8 +80,7 @@ def probe_blocked(namespace: str, destination: str, port: int) -> bool:
     output = run(["ip", "netns", "exec", namespace, sys.executable, "-c", script], timeout=4)
     if output != "BLOCKED":
         raise RuntimeError(
-            "proxy namespace unexpectedly reached restricted destination "
-            f"{destination}:{port}"
+            f"proxy namespace unexpectedly reached restricted destination {destination}:{port}"
         )
     return True
 
@@ -168,14 +177,34 @@ def main() -> int:
         run(["ip", "link", "add", browser_if, "type", "veth", "peer", "name", proxy_browser_if])
         run(["ip", "link", "set", browser_if, "netns", browser_ns])
         run(["ip", "link", "set", proxy_browser_if, "netns", proxy_ns])
-        run([
-            "ip", "netns", "exec", browser_ns, "ip", "addr", "add",
-            f"{browser_ip}/30", "dev", browser_if,
-        ])
-        run([
-            "ip", "netns", "exec", proxy_ns, "ip", "addr", "add",
-            f"{proxy_browser_ip}/30", "dev", proxy_browser_if,
-        ])
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                browser_ns,
+                "ip",
+                "addr",
+                "add",
+                f"{browser_ip}/30",
+                "dev",
+                browser_if,
+            ]
+        )
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                proxy_ns,
+                "ip",
+                "addr",
+                "add",
+                f"{proxy_browser_ip}/30",
+                "dev",
+                proxy_browser_if,
+            ]
+        )
         run(["ip", "netns", "exec", browser_ns, "ip", "link", "set", browser_if, "up"])
         run(["ip", "netns", "exec", proxy_ns, "ip", "link", "set", proxy_browser_if, "up"])
 
@@ -185,15 +214,37 @@ def main() -> int:
         run(["ip", "link", "set", proxy_uplink_if, "netns", proxy_ns])
         run(["ip", "addr", "add", f"{host_uplink_ip}/30", "dev", host_uplink_if])
         run(["ip", "link", "set", host_uplink_if, "up"])
-        run([
-            "ip", "netns", "exec", proxy_ns, "ip", "addr", "add",
-            f"{proxy_uplink_ip}/30", "dev", proxy_uplink_if,
-        ])
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                proxy_ns,
+                "ip",
+                "addr",
+                "add",
+                f"{proxy_uplink_ip}/30",
+                "dev",
+                proxy_uplink_if,
+            ]
+        )
         run(["ip", "netns", "exec", proxy_ns, "ip", "link", "set", proxy_uplink_if, "up"])
-        run([
-            "ip", "netns", "exec", proxy_ns, "ip", "route", "add",
-            "default", "via", host_uplink_ip, "dev", proxy_uplink_if,
-        ])
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                proxy_ns,
+                "ip",
+                "route",
+                "add",
+                "default",
+                "via",
+                host_uplink_ip,
+                "dev",
+                proxy_uplink_if,
+            ]
+        )
 
         for netns, interfaces in (
             (browser_ns, (browser_if,)),
@@ -202,35 +253,74 @@ def main() -> int:
         ):
             run(["ip", "netns", "exec", netns, "ip", "link", "set", "lo", "up"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=1"])
-            run([
-                "ip", "netns", "exec", netns, "sysctl", "-w",
-                "net.ipv6.conf.default.disable_ipv6=1",
-            ])
+            run(
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    netns,
+                    "sysctl",
+                    "-w",
+                    "net.ipv6.conf.default.disable_ipv6=1",
+                ]
+            )
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.accept_ra=0"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.default.accept_ra=0"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.lo.disable_ipv6=1"])
             for interface in interfaces:
-                run([
-                    "ip", "netns", "exec", netns, "sysctl", "-w",
-                    f"net.ipv6.conf.{interface}.disable_ipv6=1",
-                ])
-                run([
-                    "ip", "netns", "exec", netns, "sysctl", "-w",
-                    f"net.ipv6.conf.{interface}.accept_ra=0",
-                ])
-            run([
-                "ip", "netns", "exec", netns, "ip", "-6", "route",
-                "flush", "table", "all", "default",
-            ])
+                run(
+                    [
+                        "ip",
+                        "netns",
+                        "exec",
+                        netns,
+                        "sysctl",
+                        "-w",
+                        f"net.ipv6.conf.{interface}.disable_ipv6=1",
+                    ]
+                )
+                run(
+                    [
+                        "ip",
+                        "netns",
+                        "exec",
+                        netns,
+                        "sysctl",
+                        "-w",
+                        f"net.ipv6.conf.{interface}.accept_ra=0",
+                    ]
+                )
+            run(
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    netns,
+                    "ip",
+                    "-6",
+                    "route",
+                    "flush",
+                    "table",
+                    "all",
+                    "default",
+                ]
+            )
         run(["ip", "netns", "exec", proxy_ns, "sysctl", "-w", "net.ipv4.ip_forward=0"])
         for netns in (browser_ns, proxy_ns, tenant_b_ns):
-            ipv6_disabled = run([
-                "ip", "netns", "exec", netns, "sysctl", "-n",
-                "net.ipv6.conf.all.disable_ipv6",
-            ])
-            ipv6_routes = run([
-                "ip", "netns", "exec", netns, "ip", "-6", "route", "show",
-            ])
+            ipv6_disabled = run(
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    netns,
+                    "sysctl",
+                    "-n",
+                    "net.ipv6.conf.all.disable_ipv6",
+                ]
+            )
+            ipv6_routes = run(
+                ["ip", "netns", "exec", netns, "ip", "-6", "route", "show"]
+            )
             if ipv6_disabled != "1" or ipv6_routes:
                 raise RuntimeError(f"IPv6 is not fully disabled in namespace {netns}")
 
@@ -247,17 +337,27 @@ def main() -> int:
         )
         subprocess.run(
             ["ip", "netns", "exec", proxy_ns, "nft", "-f", "-"],
-            input=proxy_rules, check=True, capture_output=True, text=True,
+            input=proxy_rules,
+            check=True,
+            capture_output=True,
+            text=True,
         )
-        host_rules = build_host_forwarding_rules(
-            proxy_host_interface=host_uplink_if,
-            proxy_subnet=str(uplink_network),
-            dns_server=DNS_SERVER,
-        ).replace("tnl_w4_forward", host_forward_table).replace("tnl_w4_nat", host_nat_table)
+        host_rules = (
+            build_host_forwarding_rules(
+                proxy_host_interface=host_uplink_if,
+                proxy_subnet=str(uplink_network),
+                dns_server=DNS_SERVER,
+            )
+            .replace("tnl_w4_forward", host_forward_table)
+            .replace("tnl_w4_nat", host_nat_table)
+        )
         run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
         subprocess.run(
-            ["nft", "-f", "-"], input=host_rules, check=True,
-            capture_output=True, text=True,
+            ["nft", "-f", "-"],
+            input=host_rules,
+            check=True,
+            capture_output=True,
+            text=True,
         )
         host_rules_created = True
 
@@ -272,17 +372,16 @@ def main() -> int:
         proxy_interfaces = run(["ip", "netns", "exec", proxy_ns, "ip", "-o", "link", "show"])
         if len(browser_interfaces.splitlines()) != 2 or len(proxy_interfaces.splitlines()) != 3:
             raise RuntimeError("browser or proxy namespace contains an unexpected interface")
-        tenant_b_interfaces = run([
-            "ip", "netns", "exec", tenant_b_ns, "ip", "-o", "link", "show"
-        ])
-        tenant_b_routes = run([
-            "ip", "netns", "exec", tenant_b_ns, "ip", "-4", "route", "show"
-        ])
+        tenant_b_interfaces = run(
+            ["ip", "netns", "exec", tenant_b_ns, "ip", "-o", "link", "show"]
+        )
+        tenant_b_routes = run(
+            ["ip", "netns", "exec", tenant_b_ns, "ip", "-4", "route", "show"]
+        )
         if len(tenant_b_interfaces.splitlines()) != 1 or tenant_b_routes:
             raise RuntimeError("tenant B must have only loopback and no network routes")
         host_namespace_ids = {
-            name: os.stat(f"/proc/self/ns/{name}").st_ino
-            for name in ("pid", "ipc", "mnt")
+            name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt")
         }
         host_all_namespace_ids = {
             name: os.stat(f"/proc/self/ns/{name}").st_ino
@@ -292,63 +391,105 @@ def main() -> int:
             "import json,os; print(json.dumps({name:os.stat('/proc/self/ns/'+name).st_ino "
             "for name in ('pid','ipc','mnt')}))"
         )
-        isolated_namespace_ids = json.loads(run([
-            "ip", "netns", "exec", browser_ns,
-            "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc",
-            "--propagation", "private", sys.executable, "-c", namespace_probe,
-        ]))
+        isolated_namespace_ids = json.loads(
+            run(
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    browser_ns,
+                    "unshare",
+                    "--mount",
+                    "--pid",
+                    "--ipc",
+                    "--fork",
+                    "--mount-proc",
+                    "--propagation",
+                    "private",
+                    sys.executable,
+                    "-c",
+                    namespace_probe,
+                ]
+            )
+        )
         if any(
-            isolated_namespace_ids[name] == host_namespace_ids[name]
-            for name in host_namespace_ids
+            isolated_namespace_ids[name] == host_namespace_ids[name] for name in host_namespace_ids
         ):
             raise RuntimeError(
                 "browser workload did not receive distinct PID, IPC and mount namespaces"
             )
-        evidence.update({
-            "browser_pid_namespace_isolated": True,
-            "browser_ipc_namespace_isolated": True,
-            "browser_mount_namespace_isolated": True,
-            "browser_namespace_ids": isolated_namespace_ids,
-            "host_namespace_ids": host_all_namespace_ids,
-        })
-        evidence.update({
-            "browser_namespace_has_no_default_route": True,
-            "browser_ipv6_disabled": True,
-            "proxy_ipv6_disabled": True,
-            "tenant_b_ipv6_disabled": True,
-            "proxy_namespace_has_approved_default_route": True,
-            "proxy_namespace_firewall_restrictive": True,
-            "browser_namespace_route_table": browser_routes,
-            "proxy_namespace_route_table": proxy_routes,
-            "browser_namespace_interface_count": 2,
-            "proxy_namespace_interface_count": 3,
-            "tenant_b_namespace_interface_count": 1,
-            "tenant_b_namespace_route_table": tenant_b_routes,
-            "proxy_namespace_dns_server": DNS_SERVER,
-            "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
-            "host_forwarding_policy": (
-                "proxy uplink only; established replies; TCP/443; DNS to approved resolver"
-            ),
-        })
+        evidence.update(
+            {
+                "browser_pid_namespace_isolated": True,
+                "browser_ipc_namespace_isolated": True,
+                "browser_mount_namespace_isolated": True,
+                "browser_namespace_ids": isolated_namespace_ids,
+                "host_namespace_ids": host_all_namespace_ids,
+            }
+        )
+        evidence.update(
+            {
+                "browser_namespace_has_no_default_route": True,
+                "browser_ipv6_disabled": True,
+                "proxy_ipv6_disabled": True,
+                "tenant_b_ipv6_disabled": True,
+                "proxy_namespace_has_approved_default_route": True,
+                "proxy_namespace_firewall_restrictive": True,
+                "browser_namespace_route_table": browser_routes,
+                "proxy_namespace_route_table": proxy_routes,
+                "browser_namespace_interface_count": 2,
+                "proxy_namespace_interface_count": 3,
+                "tenant_b_namespace_interface_count": 1,
+                "tenant_b_namespace_route_table": tenant_b_routes,
+                "proxy_namespace_dns_server": DNS_SERVER,
+                "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
+                "host_forwarding_policy": (
+                    "proxy uplink only; established replies; TCP/443; DNS to approved resolver"
+                ),
+            }
+        )
 
         proxy_log = work / "proxy.log"
         proxy_env = child_environment(Path("/tmp"), Path("/tmp"))
         with proxy_log.open("wb") as log_file:
             proxy_process = subprocess.Popen(
                 [
-                    "ip", "netns", "exec", proxy_ns,
-                    "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
-                    "--mount-proc", "--propagation", "private",
-                    "setpriv", "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
-                    "--clear-groups", "--no-new-privs", sys.executable,
+                    "ip",
+                    "netns",
+                    "exec",
+                    proxy_ns,
+                    "unshare",
+                    "--mount",
+                    "--pid",
+                    "--ipc",
+                    "--fork",
+                    "--kill-child",
+                    "--mount-proc",
+                    "--propagation",
+                    "private",
+                    "setpriv",
+                    "--reuid",
+                    str(proxy_uid),
+                    "--regid",
+                    str(proxy_gid),
+                    "--clear-groups",
+                    "--no-new-privs",
+                    sys.executable,
                     "scripts/browser_egress_proxy.py",
-                    "--bind-host", proxy_browser_ip,
-                    "--port", str(PROXY_PORT),
-                    "--client-network", f"{browser_ip}/32",
-                    "--allowed-domain", "example.com",
+                    "--bind-host",
+                    proxy_browser_ip,
+                    "--port",
+                    str(PROXY_PORT),
+                    "--client-network",
+                    f"{browser_ip}/32",
+                    "--allowed-domain",
+                    "example.com",
                 ],
-                stdout=log_file, stderr=subprocess.STDOUT,
-                cwd=Path(__file__).resolve().parents[1], env=proxy_env, start_new_session=True,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd=Path(__file__).resolve().parents[1],
+                env=proxy_env,
+                start_new_session=True,
             )
 
         deadline = time.monotonic() + 15
@@ -500,17 +641,38 @@ def main() -> int:
         evidence["browser_direct_egress_blocked"] = True
 
         guest_command = [
-            "ip", "netns", "exec", browser_ns,
-            "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
-            "--mount-proc", "--propagation", "private",
-            "setpriv", "--reuid", str(browser_uid), "--regid", str(browser_gid),
-            "--clear-groups", "--no-new-privs", sys.executable,
+            "ip",
+            "netns",
+            "exec",
+            browser_ns,
+            "unshare",
+            "--mount",
+            "--pid",
+            "--ipc",
+            "--fork",
+            "--kill-child",
+            "--mount-proc",
+            "--propagation",
+            "private",
+            "setpriv",
+            "--reuid",
+            str(browser_uid),
+            "--regid",
+            str(browser_gid),
+            "--clear-groups",
+            "--no-new-privs",
+            sys.executable,
             "scripts/browser_workspace_guest.py",
-            "--profile-root", str(profile_root),
-            "--proxy-url", f"http://{proxy_browser_ip}:{PROXY_PORT}",
-            "--tenant-id", "phase2-w4-tenant-a",
-            "--workspace-id", "workspace-a",
-            "--evidence", str(guest_evidence_path),
+            "--profile-root",
+            str(profile_root),
+            "--proxy-url",
+            f"http://{proxy_browser_ip}:{PROXY_PORT}",
+            "--tenant-id",
+            "phase2-w4-tenant-a",
+            "--workspace-id",
+            "workspace-a",
+            "--evidence",
+            str(guest_evidence_path),
         ]
         run(guest_command, timeout=180, env=child_environment(home, tmpdir, playwright=True))
         guest_evidence = json.loads(guest_evidence_path.read_text(encoding="utf-8"))
@@ -522,17 +684,38 @@ def main() -> int:
 
         tenant_b_probe = subprocess.run(
             [
-                "ip", "netns", "exec", tenant_b_ns,
-                "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
-                "--mount-proc", "--propagation", "private",
-                "setpriv", "--reuid", str(other_uid), "--regid", str(other_gid),
-                "--clear-groups", "--no-new-privs", sys.executable,
+                "ip",
+                "netns",
+                "exec",
+                tenant_b_ns,
+                "unshare",
+                "--mount",
+                "--pid",
+                "--ipc",
+                "--fork",
+                "--kill-child",
+                "--mount-proc",
+                "--propagation",
+                "private",
+                "setpriv",
+                "--reuid",
+                str(other_uid),
+                "--regid",
+                str(other_gid),
+                "--clear-groups",
+                "--no-new-privs",
+                sys.executable,
                 "scripts/browser_w4_tenant_probe.py",
-                "--ipc-key", str(ipc_key),
-                "--hidden-host-pid", str(tenant_a_probe.pid),
-                "--proxy-host", proxy_browser_ip,
-                "--proxy-port", str(PROXY_PORT),
-                "--profile-root", str(profile_root),
+                "--ipc-key",
+                str(ipc_key),
+                "--hidden-host-pid",
+                str(tenant_a_probe.pid),
+                "--proxy-host",
+                proxy_browser_ip,
+                "--proxy-port",
+                str(PROXY_PORT),
+                "--profile-root",
+                str(profile_root),
                 "--tenant-a-namespaces",
                 json.dumps(tenant_a_record["namespace_ids"], separators=(",", ":")),
                 "--host-namespaces",
@@ -545,8 +728,7 @@ def main() -> int:
         )
         if tenant_b_probe.returncode != 0:
             raise RuntimeError(
-                "concurrent cross-tenant isolation probe failed: "
-                f"{tenant_b_probe.stderr[-1500:]}"
+                f"concurrent cross-tenant isolation probe failed: {tenant_b_probe.stderr[-1500:]}"
             )
         tenant_b_record = json.loads(tenant_b_probe.stdout)
         if tenant_b_record.get("status") != "passed":
@@ -609,20 +791,23 @@ def main() -> int:
         if listener_thread is not None:
             listener_thread.join(timeout=1)
         for netns in reversed(namespaces):
-            listed = subprocess.run(["ip", "netns", "pids", netns],
-                                    check=False, capture_output=True, text=True)
+            listed = subprocess.run(
+                ["ip", "netns", "pids", netns], check=False, capture_output=True, text=True
+            )
             for raw_pid in listed.stdout.split():
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(int(raw_pid), signal.SIGTERM)
             if listed.stdout.strip():
                 time.sleep(0.5)
-                remaining = subprocess.run(["ip", "netns", "pids", netns],
-                                           check=False, capture_output=True, text=True)
+                remaining = subprocess.run(
+                    ["ip", "netns", "pids", netns], check=False, capture_output=True, text=True
+                )
                 for raw_pid in remaining.stdout.split():
                     with contextlib.suppress(ProcessLookupError):
                         os.kill(int(raw_pid), signal.SIGKILL)
-            deleted = subprocess.run(["ip", "netns", "del", netns],
-                                      check=False, capture_output=True)
+            deleted = subprocess.run(
+                ["ip", "netns", "del", netns], check=False, capture_output=True
+            )
             if deleted.returncode != 0:
                 cleanup_errors.append(f"network namespace {netns} could not be deleted")
         if host_link_created:
@@ -635,9 +820,7 @@ def main() -> int:
             if not host_link_deleted:
                 cleanup_errors.append("proxy host uplink could not be deleted")
         remaining_namespaces = {
-            line.split()[0]
-            for line in run(["ip", "netns", "list"]).splitlines()
-            if line.split()
+            line.split()[0] for line in run(["ip", "netns", "list"]).splitlines() if line.split()
         }
         if host_rules_created:
             if proxy_ns in remaining_namespaces or not host_link_deleted:
@@ -667,16 +850,18 @@ def main() -> int:
         except OSError:
             cleanup_errors.append("host IPv4 forwarding sysctl could not be restored")
         for family, table in (("inet", host_forward_table), ("ip", host_nat_table)):
-            if subprocess.run(["nft", "list", "table", family, table],
-                              check=False, capture_output=True).returncode == 0:
+            if (
+                subprocess.run(
+                    ["nft", "list", "table", family, table], check=False, capture_output=True
+                ).returncode
+                == 0
+            ):
                 cleanup_errors.append(f"host firewall table {table} remains")
         shutil.rmtree(work, ignore_errors=True)
         if work.exists():
             cleanup_errors.append("temporary browser workspace could not be removed")
         for username in users:
-            deleted_user = subprocess.run(
-                ["userdel", username], check=False, capture_output=True
-            )
+            deleted_user = subprocess.run(["userdel", username], check=False, capture_output=True)
             if (
                 deleted_user.returncode != 0
                 or subprocess.run(
@@ -687,14 +872,15 @@ def main() -> int:
                 == 0
             ):
                 cleanup_errors.append(f"temporary browser user {username} could not be deleted")
-            subprocess.run(
-                ["groupdel", username], check=False, capture_output=True
-            )
-            if subprocess.run(
-                ["getent", "group", username],
-                check=False,
-                capture_output=True,
-            ).returncode == 0:
+            subprocess.run(["groupdel", username], check=False, capture_output=True)
+            if (
+                subprocess.run(
+                    ["getent", "group", username],
+                    check=False,
+                    capture_output=True,
+                ).returncode
+                == 0
+            ):
                 cleanup_errors.append(f"temporary browser group {username} could not be deleted")
         evidence["cleanup_verified"] = not cleanup_errors
         if cleanup_errors:
