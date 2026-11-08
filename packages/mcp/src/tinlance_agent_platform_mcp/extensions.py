@@ -9,6 +9,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+from hashlib import sha256
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -29,6 +30,36 @@ _JOB_ID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     re.I,
 )
+_IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
+
+
+def extensions_action_purpose(
+    *,
+    tenant_id: str,
+    subject_id: str,
+    tool_name: str,
+    resource_id: str,
+    idempotency_key: str | None = None,
+) -> str:
+    """Bind a downstream service token to one tenant, actor, action and resource."""
+    if not all(isinstance(value, str) and value and value == value.strip() for value in (
+        tenant_id, subject_id, tool_name, resource_id
+    )):
+        raise ValueError("Extensions action-token identity must be complete and normalized")
+    if tool_name == "extensions_job_cancel":
+        if idempotency_key is not None:
+            raise ValueError("job-cancellation action purpose does not accept an idempotency key")
+    elif tool_name == "extensions_dead_letter_replay":
+        if not isinstance(idempotency_key, str) or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key):
+            raise ValueError("dead-letter replay action purpose requires a normalized idempotency key")
+    else:
+        raise ValueError("Extensions action-token tool is not registered")
+    canonical = json.dumps(
+        [tenant_id, subject_id, tool_name, resource_id, idempotency_key],
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return "extensions-action-v1:" + sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class ExtensionsServiceTokenIssuer(Protocol):
@@ -42,6 +73,7 @@ class ExtensionsServiceTokenIssuer(Protocol):
         request_id: str,
         traceparent: str | None,
         expires_in_seconds: int,
+        purpose: str | None = None,
         principal_type: str = "user",
     ) -> str: ...
 
@@ -233,6 +265,7 @@ class ExtensionsHTTPTransport:
         scope: ToolScope,
     ) -> dict[str, object]:
         idempotency_key: str | None = None
+        resource_id: str
         if tool_name == "extensions_job_cancel":
             tool = EXTENSIONS_JOB_CANCEL
             if set(arguments) != {"job_id"}:
@@ -242,6 +275,7 @@ class ExtensionsHTTPTransport:
                 raise ValueError("Extensions job ID must be a canonical UUID")
             if str(UUID(job_id)) != job_id.lower():
                 raise ValueError("Extensions job ID must be normalized")
+            resource_id = job_id
             path = f"/v1/jobs/{quote(job_id, safe='')}/cancel"
             required_scope = "extensions:jobs:cancel"
             idempotency_key = None
@@ -274,6 +308,7 @@ class ExtensionsHTTPTransport:
             fingerprint = arguments.get("intent_fingerprint")
             if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
                 raise ValueError("Extensions replay intent fingerprint is invalid")
+            resource_id = event_id
             path = f"/v1/outbox/dead-letters/{quote(event_id, safe='')}/replay"
             required_scope = "extensions:outbox:replay"
         else:
@@ -288,6 +323,13 @@ class ExtensionsHTTPTransport:
             raise PermissionError(
                 "Extensions call is missing its authenticated subject/request scope"
             )
+        purpose = extensions_action_purpose(
+            tenant_id=scope.tenant_id,
+            subject_id=scope.subject_id,
+            tool_name=tool_name,
+            resource_id=resource_id,
+            idempotency_key=idempotency_key,
+        )
         token = self._issuer.issue_token(
             tenant_id=scope.tenant_id,
             subject_id=scope.subject_id,
@@ -296,6 +338,7 @@ class ExtensionsHTTPTransport:
             request_id=scope.request_id,
             traceparent=scope.traceparent,
             expires_in_seconds=60,
+            purpose=purpose,
             principal_type=scope.principal_type,
         )
         if not token or token != token.strip() or any(character.isspace() for character in token):
