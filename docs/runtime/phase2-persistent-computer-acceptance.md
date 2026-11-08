@@ -138,7 +138,24 @@ The durable lease implementation is merged to Platform `main`. PR [#201](https:/
 - The Python `PostgresWorkspaceLeaseStore` adapter owns short tenant-scoped transactions and exposes acquire, renew, assert-active, revoke and release operations.
 - SQL integration tests cover concurrent acquisition denial, renewal, explicit revocation, stale-worker fencing, release/reacquisition, expiry/reacquisition, audit continuity, append-only history and tenant-policy presence.
 
-**Security boundary:** a lease assertion is a fencing decision, not proof that every external side effect is atomically fenced. The production supervisor must check the current fencing token at each consequential command boundary and terminate/reap the old worker on revocation or lease loss. This PR does not claim that the browser profile is yet durably encrypted or replicated.
+**Security boundary:** a lease assertion is a fencing decision, not proof that every external side effect is atomically fenced. The Platform command supervisor now provides a mandatory lease-assertion path and process-group termination; production composition must bind the assertion to the exact tenant/workspace lease and fencing token. This repository implementation does not itself establish a deployed production host, encrypted/replicated browser-profile storage or independent production assurance.
+
+### W5 trusted command supervisor — merged; host soak outstanding
+
+Platform PR [#205](https://github.com/LloydCoder/tinlance-agent-platform/pull/205) merged as `df2af66cd0989d1bf4beeb459c72b845d5da4813`. All eight exact-head PR workflows passed, and all six post-merge mainline workflows passed (CI, CodeQL, R10 Certification, Supply Chain Attestation, Secret Scan and Reference Agents).
+
+The merged command path adds:
+- Mandatory `lease_assertion` on every `SandboxExecutor.execute` call; there is no implicit no-lease execution path.
+- `WorkspaceLeaseSupervisor` as the trusted process-execution wrapper.
+- `execute_request` as the policy-validated sandbox command entrypoint, applying the request timeout ceiling and binding the lease assertion to the exact `SandboxRequest` so the Platform composition layer can verify tenant, workspace and fencing-token identity without violating package dependency boundaries.
+- Fail-closed behavior when the lease authority returns false or is unavailable.
+- Process-group termination and reaping on lease loss, timeout and supervisor errors, including descendants after the original command leader exits.
+- `waitid(WNOWAIT)` to retain the process-group leader identity until descendant cleanup, avoiding a reused process-group ID being signalled.
+- A final lease assertion after output capture, preventing a revoked lease from receiving a completed result.
+
+Regression tests cover pre-spawn denial, mid-command revocation, descendant cleanup after leader exit, lease-store outage, request binding and successful governed command execution.
+
+**Disposition:** repository-level W5 supervisor implementation is merged and green. W5 phase acceptance remains open until the separate continuous eight-hour controlled-host soak is executed and its artifact is independently inspected. This merge does not claim W5 completion or production certification.
 
 ### W5 soak gate — not yet accepted
 
