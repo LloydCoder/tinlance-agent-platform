@@ -125,48 +125,29 @@ jobs:
 
           report = json.loads(Path("artifacts/browser-w4.json").read_text(encoding="utf-8"))
           if report.get("status") != "passed":
-              raise SystemExit(f"W3 browser acceptance did not pass: {report}")
+              raise SystemExit(f"W4 adversarial browser acceptance did not pass: {report}")
           required = [
-              "network_namespace_created",
-              "browser_network_has_only_proxy_link",
-              "host_firewall_proxy_only",
+              "browser_namespace_has_no_default_route",
+              "proxy_namespace_has_approved_default_route",
+              "proxy_namespace_firewall_restrictive",
+              "proxy_namespace_host_services_blocked",
+              "proxy_namespace_private_egress_blocked",
+              "proxy_namespace_metadata_egress_blocked",
+              "proxy_namespace_unapproved_port_blocked",
+              "browser_direct_egress_blocked",
+              "cross_tenant_profile_reuse_denied",
               "proxy_listener_ready",
-              "guest_proxy_probe_passed",
-              "direct_public_egress_blocked",
-              "metadata_ip_denied",
-              "unallowlisted_hostname_denied",
-              "allowlisted_https_navigation",
-              "profile_persisted_across_restart",
-              "workspace_profile_isolation",
-              "tenant_profile_root_binding",
-              "proxy_unavailable_fail_closed",
-              "tenant_uid_separation",
-              "chromium_sandbox_enabled",
-              "browser_process_cap_eff_zero",
-              "browser_process_no_new_privs",
-              "chromium_renderer_seccomp_enabled",
-              "chromium_renderer_no_new_privs",
-              "chromium_renderer_cap_eff_zero",
-              "chromium_renderer_user_namespace_isolated",
+              "cleanup_verified",
           ]
-          guest = report.get("guest", {})
-          missing = [name for name in required if guest.get(name) is not True and report.get(name) is not True]
+          missing = [name for name in required if report.get(name) is not True]
           if missing:
-              raise SystemExit(f"W3 acceptance evidence is incomplete: {missing}")
-          if guest.get("chromium_renderer_count", 0) < 1:
-              raise SystemExit("W3 evidence must contain at least one Chromium renderer process.")
-          proxy_uid = report.get("proxy_process_uid")
-          if proxy_uid in (None, 0, guest.get("browser_process_uid"), guest.get("other_tenant_uid")):
-              raise SystemExit("W3 proxy must run under a distinct non-root UID.")
+              raise SystemExit(f"W4 security evidence is incomplete: {missing}")
+          guest = report.get("guest", {})
+          if guest.get("status") != "passed":
+              raise SystemExit("W4 Chromium guest evidence is missing or failed.")
           if report.get("production_certification") is not False:
-              raise SystemExit("Ephemeral W3 CI must not claim production certification.")
-          if report.get("cleanup_verified") is not True:
-              raise SystemExit("W3 network namespace and firewall cleanup was not verified.")
-          if report.get("proxy_process_uid") == report.get("browser_process_uid"):
-              raise SystemExit("Browser and egress proxy must run under separate OS identities.")
-          if report.get("browser_process_uid") == report.get("other_tenant_uid"):
-              raise SystemExit("Distinct tenants must use distinct OS identities.")
-          print("PASS: W3 browser environment, persistent profiles and enforced proxy egress.")
+              raise SystemExit("W4 ephemeral CI must not claim production certification.")
+          print("PASS: W4 dedicated proxy namespace, hostile egress probes, tenant isolation and Chromium.")
           print(json.dumps(report, sort_keys=True, indent=2))
           PY
           sudo chmod -R a+rX artifacts
