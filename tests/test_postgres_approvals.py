@@ -272,8 +272,6 @@ def test_approval_migration_has_tenant_rls_expiry_and_append_only_audit() -> Non
     ):
         assert required.lower() in migration.lower()
 
-
-
 def test_postgres_approval_verifier_maps_tenant_binding_failure_to_permission_error() -> None:
     connection = Connection(
         fail_on="platform.consume_approval",
@@ -290,8 +288,6 @@ def test_postgres_approval_verifier_maps_tenant_binding_failure_to_permission_er
         )
     assert connection.rolled_back is True
     assert connection.closed is True
-
-
 
 def test_reference_approval_authority_rejects_missing_intent_fingerprint() -> None:
     approvals = ApprovalService()
