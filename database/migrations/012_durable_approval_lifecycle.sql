@@ -52,7 +52,7 @@ alter table platform.approvals
     check (
         (status = 'pending' and decided_at is null and approved_by is null and consumed_at is null)
         or (status in ('approved', 'rejected')
-            and decided_at is not null and approved_by is not null and consumed_at is null)
+            and decided_at is not null and consumed_at is null)
         or (status = 'expired' and decided_at is not null and approved_by is null and consumed_at is null)
         or (status = 'cancelled' and decided_at is not null and consumed_at is null)
         or (status = 'consumed'
@@ -364,7 +364,9 @@ begin
       from platform.approvals
      where tenant_id = p_tenant_id and approval_id = p_approval_id
      for update;
-    if not found or current_approval.status <> 'approved' then
+    if not found
+       or current_approval.status <> 'approved'
+       or current_approval.approved_by is null then
         return false;
     end if;
     if current_approval.run_id <> p_run_id
