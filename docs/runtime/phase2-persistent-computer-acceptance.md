@@ -81,7 +81,7 @@ The W4 branch `feat/phase2-w4-egress-namespace` adds the first dedicated proxy-n
 
 The W4 harness also isolates browser and proxy processes with private PID, IPC and mount namespaces, checks route topology and no-default-route browser behavior, and probes host-local listeners, private/metadata destinations, non-HTTPS ports and direct browser egress. It reuses the real Chromium persistent-profile acceptance and cross-tenant profile-root denial probe. A hostile rootfs archive corpus extends coverage for duplicate paths, PAX path overrides, missing/cyclic/unsafe hardlinks, symlink escapes, FIFOs and device nodes.
 
-**W4 is not accepted yet.** The branch still requires exact-head Python test execution, real network namespace/Chromium CI evidence, SBOM/security scans, review of the raw evidence artifact, and cleanup verification. Broader concurrent cross-tenant filesystem/process/IPC/control-plane tests and runtime/seccomp escape probes remain required before W4 closure. The workflow must explicitly retain `production_certification=false`.
+**W4 is not accepted yet.** The branch still requires exact-head Python test execution, real network namespace/Chromium CI evidence, SBOM/security scans, review of the raw evidence artifact, and cleanup verification. The harness now runs tenant A and tenant B concurrently and checks PID, IPC, mount and network namespace separation, foreign-PID invisibility, SysV shared-memory invisibility, profile-root denial, proxy-network unreachability, mount denial, privilege-escalation denial and ptrace denial. These are implementation claims only until the exact-head W4 workflow passes and its artifact is inspected. The workflow must explicitly retain `production_certification=false`.
 
 ## 6. Remaining serial phases
 
