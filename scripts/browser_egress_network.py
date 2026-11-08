@@ -36,9 +36,7 @@ def _dns_server(value: str) -> str:
         or address.is_unspecified
         or address.is_reserved
     ):
-        raise ValueError(
-            "DNS forwarder must be an explicitly approved, reachable IPv4 resolver"
-        )
+        raise ValueError("DNS forwarder must be an explicitly approved, reachable IPv4 resolver")
     return str(address)
 
 
