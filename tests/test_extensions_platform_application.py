@@ -17,7 +17,7 @@ from tinlance_agent_platform_app import (
 )
 from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import ApprovalStatus, Principal
-from tinlance_agent_platform_mcp.extensions import ExtensionsHTTPResponse
+from tinlance_agent_platform_mcp.extensions import ExtensionsHTTPResponse, extensions_action_purpose
 
 ISSUER = "https://platform.identity.tinlance.test/"
 AUDIENCE = "tinlance-extensions-api"
@@ -149,6 +149,12 @@ def test_job_cancellation_is_policy_checked_and_uses_platform_minted_scoped_toke
     assert claims["scope"] == "extensions:jobs:cancel"
     assert claims["request_id"] == request_id
     assert claims["client_id"] == "tinlance-extensions-platform"
+    assert claims["purpose"] == extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_job_cancel",
+        resource_id=JOB_ID,
+    )
 
 
 def test_job_cancellation_without_platform_capability_fails_before_network_call() -> None:
@@ -350,6 +356,10 @@ def test_dead_letter_replay_requires_bound_human_approval_and_scoped_token() -> 
     assert claims["sub"] == "user-a"
     assert claims["scope"] == "extensions:outbox:replay"
     assert claims["request_id"] == request_id
+    assert claims["purpose"] == extensions_action_purpose(
+        tenant_id="tenant-a", subject_id="user-a", tool_name="extensions_dead_letter_replay",
+        resource_id=EVENT_ID, idempotency_key=REPLAY_IDEMPOTENCY_KEY
+    )
     assert str(run_id) == payload["run_id"]
     assert fingerprint == payload["intent_fingerprint"]
     assert approvals.get(approval_id, "tenant-a").status is ApprovalStatus.CONSUMED
@@ -453,4 +463,39 @@ def test_mcp_replay_request_identity_helper_matches_protocol_contract() -> None:
             jsonrpc_request_id=request_id,
         )
         == expected
+    )
+
+
+def test_extensions_action_purpose_is_bound_to_exact_resource_and_idempotency_key() -> None:
+    cancel_purpose = extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="oidc-user-42",
+        tool_name="extensions_job_cancel",
+        resource_id=JOB_ID,
+    )
+    assert cancel_purpose == (
+        "extensions-action-v1:6fb56c1543260cac3fb1c1285c1e71ccf79482d1dbe0a0c46f9a7a997e479d77"
+    )
+    assert cancel_purpose != extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="oidc-user-42",
+        tool_name="extensions_job_cancel",
+        resource_id="b4f6d9e2-1c3b-4a5d-8e7f-9012bc345679",
+    )
+    replay_purpose = extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="oidc-user-42",
+        tool_name="extensions_dead_letter_replay",
+        resource_id=EVENT_ID,
+        idempotency_key=REPLAY_IDEMPOTENCY_KEY,
+    )
+    assert replay_purpose == (
+        "extensions-action-v1:441761504df27dcdab9d9c0af40923a9bb402e7d0f5c32faea700b90a806d2b8"
+    )
+    assert replay_purpose != extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="oidc-user-42",
+        tool_name="extensions_dead_letter_replay",
+        resource_id=EVENT_ID,
+        idempotency_key="replay-idempotency-0002",
     )
