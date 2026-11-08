@@ -284,7 +284,9 @@ class ExtensionsHTTPTransport:
             or not scope.subject_id
             or not scope.request_id
         ):
-            raise PermissionError("Extensions call is missing its authenticated subject/request scope")
+            raise PermissionError(
+                "Extensions call is missing its authenticated subject/request scope"
+            )
         token = self._issuer.issue_token(
             tenant_id=scope.tenant_id,
             subject_id=scope.subject_id,
