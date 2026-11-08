@@ -24,6 +24,16 @@ def test_proxy_namespace_allows_only_https_and_explicit_dns() -> None:
     assert "192.88.99.0/24" in rules
 
 
+def test_generated_harness_veth_names_with_full_random_suffix_are_accepted() -> None:
+    rules = build_proxy_namespace_rules(
+        browser_interface="tbpbdeadbeef",
+        uplink_interface="tbupdeadbeef",
+        dns_server="1.1.1.1",
+    )
+    assert 'iifname "tbpbdeadbeef" tcp dport 3128 accept' in rules
+    assert 'oifname "tbupdeadbeef" ip daddr' in rules
+
+
 def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
     rules = build_host_forwarding_rules(
         proxy_host_interface="tbup0",
