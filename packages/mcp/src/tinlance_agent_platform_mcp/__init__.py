@@ -1,5 +1,14 @@
 from .gateway import MCPExecutionPermit, MCPTool, MCPToolGateway, ToolScope
 from .protocol import MCPHTTPResponse, MCPProtocolService, MCPToolDefinition
+from .extensions import (
+    EXTENSIONS_AUDIENCE,
+    EXTENSIONS_JOB_CANCEL,
+    EXTENSIONS_TOOL_REGISTRATIONS,
+    ExtensionsHTTPResponse,
+    ExtensionsHTTPTransport,
+    ExtensionsTransportError,
+    register_extensions_tools,
+)
 from .twi import (
     TWI_MCP_TOOL_DEFINITIONS,
     TWI_OPERATION_TO_TOOL,
@@ -31,6 +40,13 @@ __all__ = [
     "MCPToolDefinition",
     "MCPToolGateway",
     "ToolScope",
+    "EXTENSIONS_AUDIENCE",
+    "EXTENSIONS_JOB_CANCEL",
+    "EXTENSIONS_TOOL_REGISTRATIONS",
+    "ExtensionsHTTPResponse",
+    "ExtensionsHTTPTransport",
+    "ExtensionsTransportError",
+    "register_extensions_tools",
     "TWIHTTPResponse",
     "TWIHTTPTransport",
     "TWI_MCP_TOOL_DEFINITIONS",
