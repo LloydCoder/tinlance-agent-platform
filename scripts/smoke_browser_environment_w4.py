@@ -616,8 +616,7 @@ def main() -> int:
             env=child_environment(Path("/tmp"), Path("/tmp")),
         )
         evidence["host_public_https_probe"] = (
-            host_https_probe.returncode == 0
-            and host_https_probe.stdout.strip() == "HOST_HTTPS_OK"
+            host_https_probe.returncode == 0 and host_https_probe.stdout.strip() == "HOST_HTTPS_OK"
         )
         if not evidence["host_public_https_probe"]:
             evidence["host_public_https_probe_error"] = (
