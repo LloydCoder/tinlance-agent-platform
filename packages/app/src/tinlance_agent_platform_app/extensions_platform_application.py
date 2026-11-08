@@ -2,10 +2,16 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
-from tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse, AgentPlatformAPI
+from tinlance_agent_platform_api.service import (
+    APIHandler,
+    APIRequest,
+    APIResponse,
+    AgentPlatformAPI,
+)
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
     DataClass,
@@ -31,7 +37,10 @@ from tinlance_agent_platform_mcp.gateway import MCPToolGateway, ToolScope
 
 _OPERATION_TO_TOOL = {"extensions.jobs.cancel": "extensions_job_cancel"}
 _TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
-_JOB_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.I)
+_JOB_ID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.I,
+)
 
 
 class ExtensionsAPIHandler:
@@ -129,7 +138,9 @@ class ExtensionsAPIHandler:
             raise
         except ExtensionsTransportError as exc:
             if exc.status_code in {401, 403}:
-                return APIResponse("denied", {"error": "extensions_downstream_authentication_failed"})
+                return APIResponse(
+                    "denied", {"error": "extensions_downstream_authentication_failed"}
+                )
             if exc.status_code == 404:
                 return APIResponse("not_found", {"error": "extensions_job_not_found"})
             return APIResponse(
