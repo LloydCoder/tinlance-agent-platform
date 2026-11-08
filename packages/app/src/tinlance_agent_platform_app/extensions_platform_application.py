@@ -15,7 +15,6 @@ from tinlance_agent_platform_api.service import (
     APIRequest,
     APIResponse,
 )
-from tinlance_agent_platform_approvals import ApprovalService
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
     DataClass,
