@@ -7,10 +7,10 @@ from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from tinlance_agent_platform_api.service import (
+    AgentPlatformAPI,
     APIHandler,
     APIRequest,
     APIResponse,
-    AgentPlatformAPI,
 )
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
