@@ -207,10 +207,10 @@ BEGIN
     SELECT * INTO current_lease FROM platform.workspace_leases
      WHERE tenant_id = p_tenant_id AND workspace_id = p_workspace_id FOR UPDATE;
     IF NOT FOUND OR current_lease.status <> 'active'
-       OR current_lease.lease_id <> p_lease_id
-       OR current_lease.fencing_token <> p_fencing_token
-       OR current_lease.owner_subject_id <> p_owner_subject_id
-       OR current_lease.worker_id <> p_worker_id
+       OR current_lease.lease_id IS DISTINCT FROM p_lease_id
+       OR current_lease.fencing_token IS DISTINCT FROM p_fencing_token
+       OR current_lease.owner_subject_id IS DISTINCT FROM p_owner_subject_id
+       OR current_lease.worker_id IS DISTINCT FROM p_worker_id
        OR current_lease.lease_expires_at <= clock_timestamp() THEN
         RAISE EXCEPTION 'workspace lease is expired, revoked, or fenced' USING ERRCODE = '55000';
     END IF;
@@ -277,9 +277,9 @@ BEGIN
     IF NOT FOUND THEN
         RETURN false;
     END IF;
-    IF current_lease.lease_id <> p_lease_id OR current_lease.fencing_token <> p_fencing_token
-       OR current_lease.owner_subject_id <> p_owner_subject_id
-       OR current_lease.worker_id <> p_worker_id THEN
+    IF current_lease.lease_id IS DISTINCT FROM p_lease_id OR current_lease.fencing_token IS DISTINCT FROM p_fencing_token
+       OR current_lease.owner_subject_id IS DISTINCT FROM p_owner_subject_id
+       OR current_lease.worker_id IS DISTINCT FROM p_worker_id THEN
         RAISE EXCEPTION 'workspace lease fencing token mismatch' USING ERRCODE = '42501';
     END IF;
     IF current_lease.status = 'revoked' THEN
@@ -326,9 +326,9 @@ BEGIN
     IF NOT FOUND THEN
         RETURN false;
     END IF;
-    IF current_lease.lease_id <> p_lease_id OR current_lease.fencing_token <> p_fencing_token
-       OR current_lease.owner_subject_id <> p_owner_subject_id
-       OR current_lease.worker_id <> p_worker_id THEN
+    IF current_lease.lease_id IS DISTINCT FROM p_lease_id OR current_lease.fencing_token IS DISTINCT FROM p_fencing_token
+       OR current_lease.owner_subject_id IS DISTINCT FROM p_owner_subject_id
+       OR current_lease.worker_id IS DISTINCT FROM p_worker_id THEN
         RAISE EXCEPTION 'workspace lease fencing token mismatch' USING ERRCODE = '42501';
     END IF;
     IF current_lease.status = 'released' THEN
