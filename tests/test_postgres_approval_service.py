@@ -161,7 +161,7 @@ def test_postgres_approval_fails_closed_when_rls_hides_foreign_tenant():
 
     with pytest.raises(PermissionError):
         service.get(APPROVAL_ID, str(TENANT_ID))
-    assert connection.committed
+    assert connection.rolled_back
 
 
 def test_postgres_approval_expiry_is_persisted():
