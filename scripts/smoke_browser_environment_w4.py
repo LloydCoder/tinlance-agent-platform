@@ -270,11 +270,11 @@ def main() -> int:
         if len(tenant_b_interfaces.splitlines()) != 1 or tenant_b_routes:
             raise RuntimeError("tenant B must have only loopback and no network routes")
         host_namespace_ids = {
-            name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt")
+            name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt", "net")
         }
         namespace_probe = (
             "import json,os; print(json.dumps({name:os.stat('/proc/self/ns/'+name).st_ino "
-            "for name in ('pid','ipc','mnt')}))"
+            "for name in ('pid','ipc','mnt','net')}))"
         )
         isolated_namespace_ids = json.loads(run([
             "ip", "netns", "exec", browser_ns,
