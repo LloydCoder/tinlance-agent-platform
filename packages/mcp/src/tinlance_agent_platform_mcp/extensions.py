@@ -17,7 +17,7 @@ from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 from uuid import UUID
 
-from tinlance_agent_platform_contracts import DataClass, RiskTier
+from tinlance_agent_platform_contracts import RiskTier
 
 from .gateway import MCPTool, MCPToolGateway, ToolScope
 from .protocol import MCPToolDefinition
@@ -132,6 +132,50 @@ EXTENSIONS_DEAD_LETTER_REPLAY = MCPTool(
 EXTENSIONS_TOOL_REGISTRATIONS: tuple[MCPTool, ...] = (
     EXTENSIONS_JOB_CANCEL,
     EXTENSIONS_DEAD_LETTER_REPLAY,
+)
+
+EXTENSIONS_MCP_TOOL_DEFINITIONS: tuple[MCPToolDefinition, ...] = (
+    MCPToolDefinition(
+        name="extensions_job_cancel",
+        description="Request cancellation of a tenant-owned Tinlance Extensions job.",
+        operation="extensions.jobs.cancel",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["job_id"],
+            "properties": {"job_id": {"type": "string", "format": "uuid"}},
+        },
+        open_world=False,
+    ),
+    MCPToolDefinition(
+        name="extensions_dead_letter_replay",
+        description="Replay a dead-lettered Extensions event after bound human approval.",
+        operation="extensions.outbox.dead_letter.replay",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "event_id",
+                "idempotency_key",
+                "run_id",
+                "approval_id",
+                "intent_fingerprint",
+            ],
+            "properties": {
+                "event_id": {"type": "string", "format": "uuid"},
+                "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{16,128}$",
+                },
+                "run_id": {"type": "string", "format": "uuid"},
+                "approval_id": {"type": "string", "format": "uuid"},
+                "intent_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            },
+        },
+        consequential=True,
+        idempotency_argument="idempotency_key",
+        open_world=False,
+    ),
 )
 
 
