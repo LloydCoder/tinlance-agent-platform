@@ -67,8 +67,7 @@ def test_failure_diagnostics_redact_secrets_and_bound_output() -> None:
     raw = (
         "Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.secret.signature\\n"
         "AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\\n"
-        "api_key=super-secret-value\\n"
-        + ("diagnostic-line\\n" * 1000)
+        "api_key=super-secret-value\\n" + ("diagnostic-line\\n" * 1000)
     )
     sanitized = _sanitize_diagnostic(raw, limit=512)
     assert len(sanitized) <= 512
