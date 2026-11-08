@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import json
 import re
 from dataclasses import dataclass
+from hashlib import sha256
 from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
@@ -31,6 +33,7 @@ from tinlance_agent_platform_identity.service_tokens import (
 )
 from tinlance_agent_platform_mcp.extensions import (
     EXTENSIONS_AUDIENCE,
+    EXTENSIONS_DEAD_LETTER_REPLAY,
     ExtensionsHTTPClient,
     ExtensionsHTTPTransport,
     ExtensionsTransportError,
@@ -47,6 +50,48 @@ _JOB_ID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     re.I,
 )
+_IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
+
+
+def extensions_dead_letter_replay_run_id(
+    *, tenant_id: str, subject_id: str, request_id: str
+) -> UUID:
+    """Return the deterministic Platform run identifier used for replay approvals."""
+    values = (tenant_id, subject_id, request_id)
+    if not all(values) or any(value != value.strip() for value in values):
+        raise ValueError("Extensions replay run identity must be normalized")
+    return uuid5(
+        NAMESPACE_URL,
+        f"extensions:{tenant_id}:{subject_id}:{request_id}:extensions_dead_letter_replay",
+    )
+
+
+def compute_extensions_dead_letter_replay_intent_fingerprint(
+    *,
+    tenant_id: str,
+    subject_id: str,
+    run_id: str,
+    arguments: dict[str, object],
+) -> str:
+    """Bind replay approval to the exact tenant, actor, run, event and idempotency key."""
+    if set(arguments) != {"event_id", "idempotency_key"}:
+        raise ValueError("Extensions replay intent contains unsupported fields")
+    canonical = json.dumps(
+        {
+            "tenant_id": tenant_id,
+            "subject_id": subject_id,
+            "run_id": run_id,
+            "tool_name": "extensions_dead_letter_replay",
+            "capability": EXTENSIONS_DEAD_LETTER_REPLAY.capability,
+            "action": EXTENSIONS_DEAD_LETTER_REPLAY.action,
+            "resource": EXTENSIONS_DEAD_LETTER_REPLAY.resource_pattern,
+            "arguments": arguments,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return sha256(canonical.encode("utf-8")).hexdigest()
 _EVENT_ID = _JOB_ID
 _REPLAY_RESOURCE = "extensions://outbox/dead-letters/{event_id}"
 _REPLAY_ACTION = "replay"
@@ -109,113 +154,7 @@ class ExtensionsAPIHandler:
         if tool_name is None:
             return self._delegate.handle(request)
         principal = self._principal(request)
-        if request.operation == "extensions.jobs.cancel":
-            return self._cancel(request, principal)
-        return self._replay(request, principal)
 
-    def _cancel(self, request: APIRequest, principal: Principal) -> APIResponse:
-        if set(request.payload) != {"job_id"}:
-            raise ValueError("Extensions cancellation requires only job_id")
-        job_id = request.payload.get("job_id")
-        if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
-            raise ValueError("Extensions job ID must be a canonical UUID")
-        if str(UUID(job_id)) != job_id.lower():
-            raise ValueError("Extensions job ID must be normalized")
-        tool_name = "extensions_job_cancel"
-        capability = "extensions.jobs.cancel"
-        resource = "extensions://jobs/{job_id}"
-        scope, context = self._request_context(request, principal, capability, resource)
-        capability_request = CapabilityRequest(
-            action="cancel",
-            resource=resource,
-            capabilities=frozenset({capability}),
-            risk=RiskTier.LOW,
-            reversibility=Reversibility.REVERSIBLE,
-            data_class=DataClass.CONFIDENTIAL,
-            blast_radius="single",
-        )
-        run_id = uuid5(
-            NAMESPACE_URL,
-            f"extensions:{request.tenant_id}:{request.subject_id}:{request.request_id}:{tool_name}",
-        )
-        return self._execute(
-            lambda: self._gateway.call(
-                context, scope, tool_name, {"job_id": job_id}, capability_request, run_id
-            )
-        )
-
-    def _replay(self, request: APIRequest, principal: Principal) -> APIResponse:
-        if self._approval_verifier is None:
-            raise PermissionError("Platform human approval verifier is required")
-        required = {"event_id", "idempotency_key", "run_id", "approval_id", "intent_fingerprint"}
-        if set(request.payload) != required:
-            raise ValueError("Extensions dead-letter replay payload is incomplete or contains unknown fields")
-        event_id = request.payload.get("event_id")
-        if not isinstance(event_id, str) or not _EVENT_ID.fullmatch(event_id):
-            raise ValueError("Extensions event ID must be a canonical UUID")
-        if str(UUID(event_id)) != event_id.lower():
-            raise ValueError("Extensions event ID must be normalized")
-        idempotency_key = request.payload.get("idempotency_key")
-        if (
-            not isinstance(idempotency_key, str)
-            or request.idempotency_key != idempotency_key
-        ):
-            raise ValueError("Extensions replay requires a matching request idempotency key")
-        run_id = extensions_dead_letter_replay_run_id(
-            tenant_id=request.tenant_id,
-            subject_id=request.subject_id,
-            request_id=request.request_id,
-        )
-        if request.payload.get("run_id") != str(run_id):
-            raise PermissionError("Extensions replay run identity does not match request")
-        approval_raw = request.payload.get("approval_id")
-        try:
-            approval_id = UUID(approval_raw) if isinstance(approval_raw, str) else None
-        except ValueError as exc:
-            raise ValueError("Extensions approval ID must be a UUID") from exc
-        if approval_id is None or str(approval_id) != approval_raw.lower():
-            raise ValueError("Extensions approval ID must be a normalized UUID")
-        arguments: dict[str, object] = {
-            "event_id": event_id,
-            "idempotency_key": idempotency_key,
-        }
-        fingerprint = compute_extensions_dead_letter_replay_intent_fingerprint(
-            tenant_id=request.tenant_id,
-            subject_id=request.subject_id,
-            run_id=str(run_id),
-            arguments=arguments,
-        )
-        if request.payload.get("intent_fingerprint") != fingerprint:
-            raise PermissionError("Extensions replay approval intent has changed")
-        scope, context = self._request_context(
-            request, principal, _REPLAY_CAPABILITY, _REPLAY_RESOURCE
-        )
-        capability_request = CapabilityRequest(
-            action=_REPLAY_ACTION,
-            resource=_REPLAY_RESOURCE,
-            capabilities=frozenset({_REPLAY_CAPABILITY}),
-            risk=RiskTier.HIGH,
-            reversibility=Reversibility.REVERSIBLE,
-            data_class=DataClass.CONFIDENTIAL,
-            blast_radius="single",
-        )
-        return self._execute(
-            lambda: self._gateway.call(
-                context,
-                scope,
-                "extensions_dead_letter_replay",
-                arguments,
-                capability_request,
-                run_id,
-                approval_id=approval_id,
-                approval_verifier=self._approval_verifier,
-                intent_fingerprint=fingerprint,
-            )
-        )
-
-    def _request_context(
-        self, request: APIRequest, principal: Principal, capability: str, resource: str
-    ) -> tuple[ToolScope, RequestContext]:
         trace_id = request.trace_id
         if trace_id is not None and "-" in trace_id:
             parts = trace_id.split("-")
@@ -243,6 +182,92 @@ class ExtensionsAPIHandler:
             trace_id=trace_id,
             trace_context=trace_context,
         )
+
+        approval_arguments: dict[str, object] = {}
+        approval_id: UUID | None = None
+        intent_fingerprint: str | None = None
+        approval_verifier: ApprovalVerifier | None = None
+
+        if tool_name == "extensions_job_cancel":
+            if set(request.payload) != {"job_id"}:
+                raise ValueError("Extensions cancellation requires only job_id")
+            job_id = request.payload.get("job_id")
+            if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
+                raise ValueError("Extensions job ID must be a canonical UUID")
+            if str(UUID(job_id)) != job_id.lower():
+                raise ValueError("Extensions job ID must be normalized")
+            capability = "extensions.jobs.cancel"
+            resource = "extensions://jobs/{job_id}"
+            action = "cancel"
+            risk = RiskTier.LOW
+            reversibility = Reversibility.REVERSIBLE
+            data_class = DataClass.CONFIDENTIAL
+            arguments: dict[str, object] = {"job_id": job_id}
+            run_id = uuid5(
+                NAMESPACE_URL,
+                f"extensions:{request.tenant_id}:{request.subject_id}:{request.request_id}:{tool_name}",
+            )
+        else:
+            required_fields = {
+                "event_id",
+                "idempotency_key",
+                "run_id",
+                "approval_id",
+                "intent_fingerprint",
+            }
+            if set(request.payload) != required_fields:
+                raise ValueError("Extensions replay requires exact approval-bound fields")
+            event_id = request.payload.get("event_id")
+            if not isinstance(event_id, str) or not _JOB_ID.fullmatch(event_id):
+                raise ValueError("Extensions event ID must be a canonical UUID")
+            if str(UUID(event_id)) != event_id.lower():
+                raise ValueError("Extensions event ID must be normalized")
+            idempotency_key = request.payload.get("idempotency_key")
+            if (
+                not isinstance(idempotency_key, str)
+                or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key)
+                or request.idempotency_key != idempotency_key
+            ):
+                raise ValueError("Extensions replay idempotency key is invalid or unbound")
+            supplied_run_id = request.payload.get("run_id")
+            if not isinstance(supplied_run_id, str) or not _JOB_ID.fullmatch(supplied_run_id):
+                raise ValueError("Extensions replay run ID must be a canonical UUID")
+            run_id = extensions_dead_letter_replay_run_id(
+                tenant_id=request.tenant_id,
+                subject_id=request.subject_id,
+                request_id=request.request_id,
+            )
+            if str(run_id) != supplied_run_id.lower():
+                raise PermissionError("Extensions replay run ID does not match request context")
+            approval_value = request.payload.get("approval_id")
+            if not isinstance(approval_value, str) or not _JOB_ID.fullmatch(approval_value):
+                raise ValueError("Extensions replay approval ID must be a canonical UUID")
+            approval_id = UUID(approval_value)
+            if str(approval_id) != approval_value.lower():
+                raise ValueError("Extensions replay approval ID must be normalized")
+            approval_arguments = {
+                "event_id": event_id,
+                "idempotency_key": idempotency_key,
+            }
+            expected_fingerprint = compute_extensions_dead_letter_replay_intent_fingerprint(
+                tenant_id=request.tenant_id,
+                subject_id=request.subject_id,
+                run_id=str(run_id),
+                arguments=approval_arguments,
+            )
+            supplied_fingerprint = request.payload.get("intent_fingerprint")
+            if supplied_fingerprint != expected_fingerprint:
+                raise PermissionError("Extensions replay approval intent does not match request")
+            intent_fingerprint = expected_fingerprint
+            approval_verifier = self._approval_verifier
+            capability = EXTENSIONS_DEAD_LETTER_REPLAY.capability
+            resource = EXTENSIONS_DEAD_LETTER_REPLAY.resource_pattern
+            action = EXTENSIONS_DEAD_LETTER_REPLAY.action
+            risk = RiskTier.HIGH
+            reversibility = Reversibility.PARTIALLY_REVERSIBLE
+            data_class = DataClass.CONFIDENTIAL
+            arguments = dict(request.payload)
+
         scope = ToolScope(
             tenant_id=request.tenant_id,
             capability=capability,
@@ -252,23 +277,41 @@ class ExtensionsAPIHandler:
             traceparent=traceparent,
             principal_type=principal.principal_type,
         )
-        return scope, context
-
-    @staticmethod
-    def _execute(operation) -> APIResponse:
+        capability_request = CapabilityRequest(
+            action=action,
+            resource=resource,
+            capabilities=frozenset({capability}),
+            risk=risk,
+            reversibility=reversibility,
+            data_class=data_class,
+            blast_radius="single",
+        )
         try:
-            result = operation()
+            result = self._gateway.call(
+                context,
+                scope,
+                tool_name,
+                arguments,
+                capability_request,
+                run_id,
+                approval_id=approval_id,
+                approval_verifier=approval_verifier,
+                intent_fingerprint=intent_fingerprint,
+            )
         except PermissionError:
             raise
         except ValueError:
             raise
         except ExtensionsTransportError as exc:
             if exc.status_code in {401, 403}:
-                return APIResponse("denied", {"error": "extensions_downstream_authentication_failed"})
+                return APIResponse(
+                    "denied", {"error": "extensions_downstream_authentication_failed"}
+                )
             if exc.status_code == 404:
                 return APIResponse("not_found", {"error": "extensions_resource_not_found"})
             return APIResponse(
-                "failed", {"error": "extensions_unavailable", "retryable": exc.retryable}
+                "failed",
+                {"error": "extensions_unavailable", "retryable": exc.retryable},
             )
         return APIResponse("success", result)
 
@@ -325,6 +368,7 @@ def create_extensions_platform_application(
     extensions_base_url: str,
     verification_key_ids: tuple[str, ...] = (),
     http_client: ExtensionsHTTPClient | None = None,
+    approval_verifier: ApprovalVerifier | None = None,
     timeout_seconds: float = 5.0,
     approval_verifier: ApprovalVerifier | None = None,
 ) -> PlatformExtensionsApplication:
