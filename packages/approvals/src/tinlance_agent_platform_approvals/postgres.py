@@ -42,7 +42,9 @@ class PostgresApprovalService:
         connection = self._connection_factory()
         try:
             if getattr(connection, "autocommit", False):
-                raise RuntimeError("PostgresApprovalService requires explicit transaction ownership")
+                raise RuntimeError(
+                    "PostgresApprovalService requires explicit transaction ownership"
+                )
             connection.execute(
                 "SELECT set_config('platform.tenant_id', %s, true)",
                 (str(tenant_uuid),),
