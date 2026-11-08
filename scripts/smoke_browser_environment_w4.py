@@ -9,6 +9,7 @@ import select
 import shutil
 import signal
 import socket
+import socketserver
 import subprocess
 import sys
 import tempfile
@@ -44,8 +45,6 @@ def select_approved_dns_server() -> tuple[str, str]:
                 continue
             if (
                 isinstance(address, ipaddress.IPv4Address)
-                and not address.is_loopback
-                and not address.is_link_local
                 and not address.is_multicast
                 and not address.is_unspecified
                 and not address.is_reserved
@@ -62,6 +61,90 @@ def run(command: list[str], *, timeout: int = 30, env: dict[str, str] | None = N
         command, check=True, capture_output=True, text=True, timeout=timeout, env=env
     )
     return result.stdout.strip()
+
+
+class _DNSRelayServer:
+    def __init__(self, bind_ip: str, upstream_ip: str) -> None:
+        self.udp = _DNSUDPServer((bind_ip, 53), upstream_ip)
+        self.tcp = _DNSTCPServer((bind_ip, 53), upstream_ip)
+        self.threads = [
+            threading.Thread(target=self.udp.serve_forever, daemon=True),
+            threading.Thread(target=self.tcp.serve_forever, daemon=True),
+        ]
+        for thread in self.threads:
+            thread.start()
+
+    def close(self) -> None:
+        for server in (self.udp, self.tcp):
+            server.shutdown()
+            server.server_close()
+        for thread in self.threads:
+            thread.join(timeout=2)
+
+
+class _DNSUDPHandler(socketserver.BaseRequestHandler):
+    def handle(self) -> None:
+        payload, client_socket = self.request
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as upstream:
+                upstream.settimeout(3)
+                upstream.sendto(payload, (self.server.upstream_ip, 53))
+                response, _ = upstream.recvfrom(65535)
+            client_socket.sendto(response, self.client_address)
+        except OSError:
+            return
+
+
+class _DNSTCPHandler(socketserver.StreamRequestHandler):
+    def handle(self) -> None:
+        self.request.settimeout(5)
+        while True:
+            header = self.rfile.read(2)
+            if len(header) != 2:
+                return
+            size = int.from_bytes(header, "big")
+            if not 12 <= size <= 65535:
+                return
+            query = self.rfile.read(size)
+            if len(query) != size:
+                return
+            try:
+                with socket.create_connection((self.server.upstream_ip, 53), timeout=3) as upstream:
+                    upstream.sendall(header + query)
+                    response_header = _read_dns_bytes(upstream, 2)
+                    response_size = int.from_bytes(response_header, "big")
+                    response = _read_dns_bytes(upstream, response_size)
+                self.wfile.write(response_header + response)
+            except OSError:
+                return
+
+
+def _read_dns_bytes(connection: socket.socket, size: int) -> bytes:
+    result = bytearray()
+    while len(result) < size:
+        chunk = connection.recv(size - len(result))
+        if not chunk:
+            raise ConnectionError("DNS upstream closed a truncated response")
+        result.extend(chunk)
+    return bytes(result)
+
+
+class _DNSUDPServer(socketserver.ThreadingUDPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def __init__(self, address: tuple[str, int], upstream_ip: str) -> None:
+        self.upstream_ip = upstream_ip
+        super().__init__(address, _DNSUDPHandler)
+
+
+class _DNSTCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def __init__(self, address: tuple[str, int], upstream_ip: str) -> None:
+        self.upstream_ip = upstream_ip
+        super().__init__(address, _DNSTCPHandler)
 
 
 def child_environment(home: Path, tmpdir: Path, *, playwright: bool = False) -> dict[str, str]:
@@ -153,6 +236,7 @@ def main() -> int:
     tenant_a_probe: subprocess.Popen[str] | None = None
     listener: socket.socket | None = None
     listener_thread: threading.Thread | None = None
+    dns_relay: _DNSRelayServer | None = None
     resolv_dir = Path("/etc/netns") / proxy_ns
     old_forward = Path("/proc/sys/net/ipv4/ip_forward").read_text(encoding="ascii").strip()
     work = Path(tempfile.mkdtemp(prefix="tinlance-browser-w4-"))
@@ -353,6 +437,9 @@ def main() -> int:
             if ipv6_disabled != "1" or ipv6_routes:
                 raise RuntimeError(f"IPv6 is not fully disabled in namespace {netns}")
 
+        dns_relay = _DNSRelayServer(host_uplink_ip, DNS_SERVER)
+        evidence["host_dns_upstream"] = DNS_SERVER
+        evidence["host_dns_upstream_source"] = DNS_SERVER_SOURCE
         resolv_dir.mkdir(parents=True, exist_ok=False)
         resolver_config = write_proxy_resolver_config(
             resolv_dir,
@@ -372,7 +459,7 @@ def main() -> int:
         proxy_rules = build_proxy_namespace_rules(
             browser_interface=proxy_browser_if,
             uplink_interface=proxy_uplink_if,
-            dns_server=DNS_SERVER,
+            dns_server=host_uplink_ip,
         )
         subprocess.run(
             ["ip", "netns", "exec", proxy_ns, "nft", "-f", "-"],
@@ -385,7 +472,7 @@ def main() -> int:
             build_host_forwarding_rules(
                 proxy_host_interface=host_uplink_if,
                 proxy_subnet=str(uplink_network),
-                dns_server=DNS_SERVER,
+                host_dns_ip=host_uplink_ip,
             )
             .replace("tnl_w4_forward", host_forward_table)
             .replace("tnl_w4_nat", host_nat_table)
@@ -519,11 +606,10 @@ def main() -> int:
                 "proxy_namespace_interface_count": 3,
                 "tenant_b_namespace_interface_count": 1,
                 "tenant_b_namespace_route_table": tenant_b_routes,
-                "proxy_namespace_dns_server": DNS_SERVER,
-                "proxy_namespace_dns_server_source": DNS_SERVER_SOURCE,
-                "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
+                "proxy_namespace_dns_server": host_uplink_ip,
+                "proxy_namespace_egress_policy": "public TCP/443 and DNS to the dedicated host relay only",
                 "host_forwarding_policy": (
-                    "proxy uplink only; established replies; TCP/443; DNS to approved resolver"
+                    "proxy uplink only; established replies; TCP/443; host DNS relay on UDP/TCP 53"
                 ),
             }
         )
@@ -773,6 +859,8 @@ def main() -> int:
             proxy_ns, "169.254.169.254", 443
         )
         evidence["proxy_namespace_unapproved_port_blocked"] = probe_blocked(proxy_ns, "1.1.1.1", 80)
+        if dns_relay is not None:
+            dns_relay.close()
         if listener is not None:
             listener.close()
             listener = None
