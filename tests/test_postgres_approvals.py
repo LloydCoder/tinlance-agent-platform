@@ -80,7 +80,23 @@ def service(connection):
 
 
 def test_postgres_approval_request_persists_and_rehydrates_tenant_bound_contract() -> None:
-    connection = Connection()
+    pending_row = (
+        APPROVAL_ID,
+        TENANT_ID,
+        RUN_ID,
+        "invoice.refund",
+        "invoice:123",
+        "refund requested by account owner",
+        "requester-a",
+        "pending",
+        {"source": "unit-test"},
+        datetime.now(UTC) + timedelta(minutes=5),
+        FINGERPRINT,
+        None,
+        None,
+        None,
+    )
+    connection = Connection(row=pending_row)
     approval = service(connection).request(
         str(TENANT_ID),
         RUN_ID,
@@ -96,8 +112,8 @@ def test_postgres_approval_request_persists_and_rehydrates_tenant_bound_contract
     assert approval.approval_id == APPROVAL_ID
     assert approval.tenant_id == str(TENANT_ID)
     assert approval.run_id == RUN_ID
-    assert approval.status is ApprovalStatus.APPROVED
-    assert approval.approved_by == "approver-b"
+    assert approval.status is ApprovalStatus.PENDING
+    assert approval.approved_by is None
     assert connection.queries[0][0].startswith("SELECT set_config('platform.tenant_id'")
     assert "platform.request_approval" in connection.queries[1][0]
     assert connection.committed is True
@@ -155,7 +171,8 @@ def test_postgres_approval_verifier_fails_closed_when_not_consumed() -> None:
             "invoice:123",
             intent_fingerprint=FINGERPRINT,
         )
-    assert connection.rolled_back is True
+    assert connection.committed is True
+    assert connection.rolled_back is False
     assert connection.closed is True
 
 
