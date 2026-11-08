@@ -3,6 +3,7 @@ from collections.abc import Callable
 from tinlance_agent_platform_contracts import SandboxRequest
 
 from .bubblewrap import SandboxLimits, SandboxProvider
+from .executor import ProcessResult
 from .policy import SandboxPolicy
 from .workspace_supervisor import WorkspaceLeaseSupervisor
 
@@ -35,7 +36,7 @@ def execute_request(
     *,
     lease_assertion: Callable[[], bool],
     supervisor: WorkspaceLeaseSupervisor | None = None,
-):
+) -> ProcessResult:
     """Execute a policy-approved command under a continuously asserted workspace lease.
 
     The lease assertion is supplied by the Platform composition layer, which binds
