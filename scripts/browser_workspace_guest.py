@@ -203,6 +203,7 @@ def main() -> int:
                     "secure": True,
                     "httpOnly": True,
                     "sameSite": "Lax",
+                    "expires": 2_000_000_000,
                 }
             ]
         )
