@@ -1,3 +1,7 @@
+import os
+import signal
+import subprocess
+import sys
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -105,6 +109,35 @@ def test_sandbox_executor_terminates_background_descendants_when_leader_exits(
     assert result.exit_code == 0
     time.sleep(0.8)
     assert not marker.exists(), "a completed command must not leave background descendants running"
+
+
+def test_sandbox_executor_kills_command_when_supervisor_process_dies(tmp_path: Path) -> None:
+    started = tmp_path / "supervisor-crash-started"
+    finished = tmp_path / "supervisor-crash-finished"
+    command = (
+        "from pathlib import Path; import time; "
+        f"Path({str(started)!r}).touch(); time.sleep(3); "
+        f"Path({str(finished)!r}).touch()"
+    )
+    supervisor_code = f"""
+from tinlance_agent_platform_sandbox import SandboxExecutor, SandboxLimits
+SandboxExecutor().execute(
+    ["/usr/bin/python3", "-c", {command!r}],
+    cwd={str(tmp_path)!r},
+    limits=SandboxLimits(timeout_seconds=8, max_output_bytes=4096),
+    lease_assertion=lambda: True,
+)
+"""
+    supervisor = subprocess.Popen([sys.executable, "-c", supervisor_code], cwd=str(tmp_path))
+    deadline = time.monotonic() + 5
+    while not started.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert started.exists(), "supervised command did not start"
+    supervisor.kill()
+    supervisor.wait(timeout=5)
+
+    time.sleep(3.5)
+    assert not finished.exists(), "command survived an unexpected supervisor process exit"
 
 
 def test_sandbox_executor_kills_descendants_after_process_leader_exits_on_lease_loss(
