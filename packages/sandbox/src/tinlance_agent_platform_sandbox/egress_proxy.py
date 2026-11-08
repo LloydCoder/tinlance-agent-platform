@@ -424,7 +424,8 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
                 upstream.close()
                 raise EgressDenied("browser egress proxy is shutting down")
         except (EgressDenied, ValueError, OSError, ConnectionError) as exc:
-            # Emit a bounded reason without logging the requested hostname, URL, headers or credentials.
+            # Emit a bounded reason without logging the requested hostname, URL,
+            # headers or credentials.
             if isinstance(exc, EgressDenied):
                 reason = str(exc)[:160]
             else:
