@@ -11,7 +11,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
 
 from .bubblewrap import SandboxLimits
 
@@ -60,10 +60,20 @@ class SandboxExecutor:
             raise WorkspaceLeaseLost("workspace lease is expired, revoked, or fenced")
 
     @staticmethod
+    def _has_exited_without_reaping(process: subprocess.Popen[bytes]) -> bool:
+        # WNOWAIT keeps the group leader's PID reserved until descendants are
+        # terminated, preventing a reused process-group ID from being signalled.
+        info = os.waitid(
+            os.P_PID,
+            process.pid,
+            os.WEXITED | os.WNOHANG | os.WNOWAIT,
+        )
+        return info is not None and info.si_pid == process.pid
+
+    @staticmethod
     def _kill_and_reap(process: subprocess.Popen[bytes]) -> None:
-        # The group leader may have exited while descendants still run. Always
-        # signal the original process group; checking only poll() would orphan
-        # those descendants after a fast parent exit.
+        # Signal the original process group before reaping its leader so the
+        # process-group ID cannot be reused while cleanup is in progress.
         with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
         process.wait()
@@ -78,6 +88,8 @@ class SandboxExecutor:
     ) -> ProcessResult:
         if os.name != "posix":
             raise RuntimeError("production sandbox execution requires POSIX isolation")
+        if not all(hasattr(os, name) for name in ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT")):
+            raise RuntimeError("safe process-group supervision requires waitid with WNOWAIT")
         if not argv or not Path(cwd).is_absolute():
             raise ValueError("sandbox command and absolute cwd are required")
         if (
@@ -115,14 +127,12 @@ class SandboxExecutor:
                             timed_out = True
                             self._kill_and_reap(process)
                             break
-                        try:
-                            process.wait(timeout=min(self._LEASE_POLL_INTERVAL_SECONDS, remaining))
+                        if self._has_exited_without_reaping(process):
+                            # The leader is still a zombie, keeping its process-group
+                            # ID reserved while any detached descendants are killed.
+                            self._kill_and_reap(process)
                             break
-                        except subprocess.TimeoutExpired:
-                            continue
-                    # A command may exit while leaving background descendants in its
-                    # process group. Reap the whole group before returning any result.
-                    self._kill_and_reap(process)
+                        sleep(min(self._LEASE_POLL_INTERVAL_SECONDS, remaining))
                     # Do not return output to a caller whose lease expired at completion.
                     self._assert_lease(lease_assertion)
                 except WorkspaceLeaseLost:
