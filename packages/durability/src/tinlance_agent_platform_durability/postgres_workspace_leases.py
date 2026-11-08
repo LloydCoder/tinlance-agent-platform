@@ -141,12 +141,14 @@ class PostgresWorkspaceLeaseStore:
 
         def operation(connection: Any) -> datetime:
             row = connection.execute(
-                "SELECT platform.renew_workspace_lease(%s, %s, %s, %s, %s)",
+                "SELECT platform.renew_workspace_lease(%s, %s, %s, %s, %s, %s, %s)",
                 (
                     lease.tenant_id,
                     lease.workspace_id,
                     lease.lease_id,
                     lease.fencing_token,
+                    lease.owner_subject_id,
+                    lease.worker_id,
                     lease_seconds,
                 ),
             ).fetchone()
@@ -184,8 +186,15 @@ class PostgresWorkspaceLeaseStore:
 
         def operation(connection: Any) -> bool:
             row = connection.execute(
-                "SELECT platform.revoke_workspace_lease(%s, %s, %s, %s)",
-                (lease.tenant_id, lease.workspace_id, lease.lease_id, lease.fencing_token),
+                "SELECT platform.revoke_workspace_lease(%s, %s, %s, %s, %s, %s)",
+                (
+                    lease.tenant_id,
+                    lease.workspace_id,
+                    lease.lease_id,
+                    lease.fencing_token,
+                    lease.owner_subject_id,
+                    lease.worker_id,
+                ),
             ).fetchone()
             if row is None or not isinstance(row[0], bool):
                 raise RuntimeError("workspace lease revocation returned an unexpected result")
@@ -199,8 +208,15 @@ class PostgresWorkspaceLeaseStore:
 
         def operation(connection: Any) -> bool:
             row = connection.execute(
-                "SELECT platform.release_workspace_lease(%s, %s, %s, %s)",
-                (lease.tenant_id, lease.workspace_id, lease.lease_id, lease.fencing_token),
+                "SELECT platform.release_workspace_lease(%s, %s, %s, %s, %s, %s)",
+                (
+                    lease.tenant_id,
+                    lease.workspace_id,
+                    lease.lease_id,
+                    lease.fencing_token,
+                    lease.owner_subject_id,
+                    lease.worker_id,
+                ),
             ).fetchone()
             if row is None or not isinstance(row[0], bool):
                 raise RuntimeError("workspace lease release returned an unexpected result")
