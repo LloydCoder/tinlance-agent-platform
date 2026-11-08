@@ -588,6 +588,7 @@ def main() -> int:
                 connection.close()
             except OSError:
                 return
+
         listener_thread = threading.Thread(target=accept_once, daemon=True)
         listener_thread.start()
 
