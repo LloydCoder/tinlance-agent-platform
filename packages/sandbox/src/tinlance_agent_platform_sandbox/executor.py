@@ -49,9 +49,7 @@ class SandboxExecutor:
     _LEASE_POLL_INTERVAL_SECONDS = 0.25
 
     @staticmethod
-    def _assert_lease(lease_assertion: Callable[[], bool] | None) -> None:
-        if lease_assertion is None:
-            return
+    def _assert_lease(lease_assertion: Callable[[], bool]) -> None:
         try:
             active = lease_assertion()
         except Exception as exc:
@@ -76,7 +74,7 @@ class SandboxExecutor:
         *,
         cwd: str,
         limits: SandboxLimits,
-        lease_assertion: Callable[[], bool] | None = None,
+        lease_assertion: Callable[[], bool],
     ) -> ProcessResult:
         if os.name != "posix":
             raise RuntimeError("production sandbox execution requires POSIX isolation")
