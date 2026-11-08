@@ -19,8 +19,8 @@ from pathlib import Path
 
 from browser_egress_network import (
     build_host_forwarding_rules,
-    build_proxy_namespace_rules,
     build_host_iptables_forward_rules,
+    build_proxy_namespace_rules,
     validate_proxy_namespace_routes,
     write_proxy_resolver_config,
 )
@@ -457,7 +457,9 @@ def main() -> int:
             and (resolver_metadata.st_mode & 0o777) == 0o600
         )
         if evidence["proxy_resolver_config_private"] is not True:
-            raise RuntimeError("proxy resolver configuration is not private to its workload identity")
+            raise RuntimeError(
+                "proxy resolver configuration is not private to its workload identity"
+            )
 
         proxy_rules = build_proxy_namespace_rules(
             browser_interface=proxy_browser_if,
@@ -604,7 +606,9 @@ def main() -> int:
             [
                 sys.executable,
                 "-c",
-                "import socket; s=socket.create_connection(('example.com', 443), timeout=5); s.close(); print('HOST_HTTPS_OK')",
+                "import socket; "
+                "s = socket.create_connection(('example.com', 443), timeout=5); "
+                "s.close(); print('HOST_HTTPS_OK')",
             ],
             capture_output=True,
             text=True,
@@ -674,7 +678,9 @@ def main() -> int:
                 "tenant_b_namespace_interface_count": 1,
                 "tenant_b_namespace_route_table": tenant_b_routes,
                 "proxy_namespace_dns_server": host_uplink_ip,
-                "proxy_namespace_egress_policy": "public TCP/443 and DNS to the dedicated host relay only",
+                "proxy_namespace_egress_policy": (
+                    "public TCP/443 and DNS to the dedicated host relay only"
+                ),
                 "host_forwarding_policy": (
                     "proxy uplink only; established replies; TCP/443; host DNS relay on UDP/TCP 53"
                 ),
