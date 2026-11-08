@@ -186,6 +186,8 @@ CREATE OR REPLACE FUNCTION platform.renew_workspace_lease(
     p_workspace_id uuid,
     p_lease_id uuid,
     p_fencing_token bigint,
+    p_owner_subject_id text,
+    p_worker_id text,
     p_lease_seconds integer
 ) RETURNS timestamptz
 LANGUAGE plpgsql
@@ -207,6 +209,8 @@ BEGIN
     IF NOT FOUND OR current_lease.status <> 'active'
        OR current_lease.lease_id <> p_lease_id
        OR current_lease.fencing_token <> p_fencing_token
+       OR current_lease.owner_subject_id <> p_owner_subject_id
+       OR current_lease.worker_id <> p_worker_id
        OR current_lease.lease_expires_at <= clock_timestamp() THEN
         RAISE EXCEPTION 'workspace lease is expired, revoked, or fenced' USING ERRCODE = '55000';
     END IF;
@@ -254,12 +258,14 @@ CREATE OR REPLACE FUNCTION platform.revoke_workspace_lease(
     p_tenant_id uuid,
     p_workspace_id uuid,
     p_lease_id uuid,
-    p_fencing_token bigint
+    p_fencing_token bigint,
+    p_owner_subject_id text,
+    p_worker_id text
 ) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, platform
-AS $$
+AS $
 DECLARE
     current_lease platform.workspace_leases%rowtype;
 BEGIN
@@ -271,7 +277,9 @@ BEGIN
     IF NOT FOUND THEN
         RETURN false;
     END IF;
-    IF current_lease.lease_id <> p_lease_id OR current_lease.fencing_token <> p_fencing_token THEN
+    IF current_lease.lease_id <> p_lease_id OR current_lease.fencing_token <> p_fencing_token
+       OR current_lease.owner_subject_id <> p_owner_subject_id
+       OR current_lease.worker_id <> p_worker_id THEN
         RAISE EXCEPTION 'workspace lease fencing token mismatch' USING ERRCODE = '42501';
     END IF;
     IF current_lease.status = 'revoked' THEN
@@ -299,12 +307,14 @@ CREATE OR REPLACE FUNCTION platform.release_workspace_lease(
     p_tenant_id uuid,
     p_workspace_id uuid,
     p_lease_id uuid,
-    p_fencing_token bigint
+    p_fencing_token bigint,
+    p_owner_subject_id text,
+    p_worker_id text
 ) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, platform
-AS $$
+AS $
 DECLARE
     current_lease platform.workspace_leases%rowtype;
 BEGIN
@@ -316,7 +326,9 @@ BEGIN
     IF NOT FOUND THEN
         RETURN false;
     END IF;
-    IF current_lease.lease_id <> p_lease_id OR current_lease.fencing_token <> p_fencing_token THEN
+    IF current_lease.lease_id <> p_lease_id OR current_lease.fencing_token <> p_fencing_token
+       OR current_lease.owner_subject_id <> p_owner_subject_id
+       OR current_lease.worker_id <> p_worker_id THEN
         RAISE EXCEPTION 'workspace lease fencing token mismatch' USING ERRCODE = '42501';
     END IF;
     IF current_lease.status = 'released' THEN
@@ -341,7 +353,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION platform.acquire_workspace_lease(uuid, uuid, uuid, text, text, integer) FROM PUBLIC;
-REVOKE ALL ON FUNCTION platform.renew_workspace_lease(uuid, uuid, uuid, bigint, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION platform.renew_workspace_lease(uuid, uuid, uuid, bigint, text, text, integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION platform.assert_workspace_lease(uuid, uuid, uuid, bigint, text, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION platform.revoke_workspace_lease(uuid, uuid, uuid, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION platform.release_workspace_lease(uuid, uuid, uuid, bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION platform.revoke_workspace_lease(uuid, uuid, uuid, bigint, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION platform.release_workspace_lease(uuid, uuid, uuid, bigint, text, text) FROM PUBLIC;
