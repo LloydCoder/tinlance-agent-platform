@@ -132,6 +132,9 @@ jobs:
               raise SystemExit(f"W4 adversarial browser acceptance did not pass: {report}")
           required = [
               "browser_namespace_has_no_default_route",
+              "browser_ipv6_disabled",
+              "proxy_ipv6_disabled",
+              "tenant_b_ipv6_disabled",
               "proxy_namespace_has_approved_default_route",
               "proxy_namespace_firewall_restrictive",
               "browser_pid_namespace_isolated",
