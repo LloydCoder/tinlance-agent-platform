@@ -20,7 +20,8 @@ create table if not exists platform.action_approvals (
     created_at timestamptz not null default now(),
     decided_at timestamptz,
     unique (tenant_id, approval_id),
-    check ((status in ('approved', 'consumed')) = (approved_by is not null)),
+    check (status not in ('approved', 'consumed') or approved_by is not null),
+    check (status not in ('pending', 'rejected', 'cancelled') or approved_by is null),
     check ((status = 'consumed') = (consumed_at is not null)),
     check (
         (status in ('pending')) = (decided_at is null)
