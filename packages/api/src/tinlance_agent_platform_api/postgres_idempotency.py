@@ -266,6 +266,32 @@ class PostgresAPIIdempotencyStore:
 
         self._transaction(tenant_uuid, complete)
 
+    def prune_expired_completed(self, tenant_id: str, *, batch_limit: int = 1000) -> int:
+        """Delete only completed records past retention; never prune ambiguous outcomes."""
+        if not 1 <= batch_limit <= 10_000:
+            raise ValueError("idempotency prune batch limit must be between 1 and 10000")
+        tenant_uuid = self._tenant_uuid(tenant_id)
+
+        def prune(connection: Any) -> int:
+            rows = connection.execute(
+                """
+                DELETE FROM platform.api_idempotency_records
+                WHERE ctid IN (
+                    SELECT ctid
+                    FROM platform.api_idempotency_records
+                    WHERE tenant_id = %s AND status = 'completed' AND expires_at <= now()
+                    ORDER BY expires_at
+                    LIMIT %s
+                    FOR UPDATE SKIP LOCKED
+                )
+                RETURNING idempotency_key
+                """,
+                (tenant_uuid, batch_limit),
+            ).fetchall()
+            return len(rows)
+
+        return self._transaction(tenant_uuid, prune)
+
     def _mark_outcome_unknown(
         self,
         *,
