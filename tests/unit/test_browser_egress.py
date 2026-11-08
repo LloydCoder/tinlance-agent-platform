@@ -76,6 +76,7 @@ def test_unapproved_or_special_use_hosts_are_rejected(hostname: str) -> None:
         "192.0.2.1",
         "::ffff:127.0.0.1",
         "64:ff9b::" + "a9fe:a9fe",
+        "::" + "c0a8:0101",
     ],
 )
 def test_non_public_dns_answers_are_rejected(address: str) -> None:
@@ -103,14 +104,16 @@ def test_invalid_idna_hostname_is_rejected() -> None:
         normalize_hostname("bad..example.com")
 
 
-def test_connector_rejects_ipv4_embedded_nat64_destination(
+@pytest.mark.parametrize("address", ["64:ff9b::" + "a9fe:a9fe", "::" + "c0a8:0101"])
+def test_connector_rejects_ipv4_embedded_ipv6_destinations(
+    address: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def unexpected_connection(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("connector attempted a NAT64 destination")
 
     monkeypatch.setattr(socket, "create_connection", unexpected_connection)
-    target = ResolvedTarget("example.com", 443, ("64:ff9b::" + "a9fe:a9fe",))
+    target = ResolvedTarget("example.com", 443, (address,))
     with pytest.raises(EgressDenied):
         connect_pinned_target(target, timeout_seconds=3.0)
 
