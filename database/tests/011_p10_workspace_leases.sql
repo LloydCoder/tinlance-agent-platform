@@ -40,6 +40,36 @@ BEGIN
         RAISE EXCEPTION 'concurrent active workspace lease was acquired twice';
     END IF;
 
+    BEGIN
+        PERFORM platform.renew_workspace_lease(
+            tenant, workspace, NULL::uuid, NULL::bigint, NULL::text, NULL::text, 600
+        );
+        RAISE EXCEPTION 'null lease identity bypassed renewal fencing';
+    EXCEPTION WHEN SQLSTATE '55000' THEN
+        NULL;
+    END;
+    BEGIN
+        PERFORM platform.revoke_workspace_lease(
+            tenant, workspace, NULL::uuid, NULL::bigint, NULL::text, NULL::text
+        );
+        RAISE EXCEPTION 'null lease identity bypassed revocation fencing';
+    EXCEPTION WHEN SQLSTATE '42501' THEN
+        NULL;
+    END;
+    IF platform.assert_workspace_lease(
+        tenant, workspace, NULL::uuid, NULL::bigint, NULL::text, NULL::text
+    ) THEN
+        RAISE EXCEPTION 'null lease identity passed workspace assertion';
+    END IF;
+    BEGIN
+        PERFORM platform.release_workspace_lease(
+            tenant, workspace, NULL::uuid, NULL::bigint, NULL::text, NULL::text
+        );
+        RAISE EXCEPTION 'null lease identity bypassed release fencing';
+    EXCEPTION WHEN SQLSTATE '42501' THEN
+        NULL;
+    END;
+
     renewed_until := platform.renew_workspace_lease(tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a', 900);
     IF renewed_until <= clock_timestamp() THEN
         RAISE EXCEPTION 'workspace lease renewal did not advance expiry';
