@@ -219,6 +219,27 @@ def main() -> int:
         proxy_interfaces = run(["ip", "netns", "exec", proxy_ns, "ip", "-o", "link", "show"])
         if len(browser_interfaces.splitlines()) != 2 or len(proxy_interfaces.splitlines()) != 3:
             raise RuntimeError("browser or proxy namespace contains an unexpected interface")
+        host_namespace_ids = {
+            name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt")
+        }
+        namespace_probe = (
+            "import json,os; print(json.dumps({name:os.stat('/proc/self/ns/'+name).st_ino "
+            "for name in ('pid','ipc','mnt')}))"
+        )
+        isolated_namespace_ids = json.loads(run([
+            "ip", "netns", "exec", browser_ns,
+            "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc",
+            "--propagation", "private", sys.executable, "-c", namespace_probe,
+        ]))
+        if any(isolated_namespace_ids[name] == host_namespace_ids[name] for name in host_namespace_ids):
+            raise RuntimeError("browser workload did not receive distinct PID, IPC and mount namespaces")
+        evidence.update({
+            "browser_pid_namespace_isolated": True,
+            "browser_ipc_namespace_isolated": True,
+            "browser_mount_namespace_isolated": True,
+            "browser_namespace_ids": isolated_namespace_ids,
+            "host_namespace_ids": host_namespace_ids,
+        })
         evidence.update({
             "browser_namespace_has_no_default_route": True,
             "proxy_namespace_has_approved_default_route": True,
@@ -238,6 +259,7 @@ def main() -> int:
             proxy_process = subprocess.Popen(
                 [
                     "ip", "netns", "exec", proxy_ns,
+                    "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc", "--propagation", "private",
                     "setpriv", "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
                     "--clear-groups", "--no-new-privs", sys.executable,
                     "scripts/browser_egress_proxy.py",
@@ -316,8 +338,9 @@ def main() -> int:
         evidence["browser_direct_egress_blocked"] = True
 
         guest_command = [
-            "ip", "netns", "exec", browser_ns, "setpriv",
-            "--reuid", str(browser_uid), "--regid", str(browser_gid),
+            "ip", "netns", "exec", browser_ns,
+            "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc", "--propagation", "private",
+            "setpriv", "--reuid", str(browser_uid), "--regid", str(browser_gid),
             "--clear-groups", "--no-new-privs", sys.executable,
             "scripts/browser_workspace_guest.py",
             "--profile-root", str(profile_root),
