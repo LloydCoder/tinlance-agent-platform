@@ -222,7 +222,7 @@ def _browser_cycle(
     profile_root: Path,
     tenant_id: str,
     workspace_id: str,
-    expected_marker: str | None,
+    expected_markers: tuple[str | None, ...],
     marker: str,
     fixture_url: str,
 ) -> None:
@@ -244,7 +244,7 @@ def _browser_cycle(
                 if response is None or response.status != 200:
                     raise RuntimeError("local browser persistence fixture did not load")
                 actual_marker = page.evaluate("() => localStorage.getItem('w5-soak-marker')")
-                if actual_marker != expected_marker:
+                if actual_marker not in expected_markers:
                     raise RuntimeError(
                         "persistent browser profile marker was lost or changed across restart"
                     )
@@ -395,7 +395,7 @@ def run_soak(args: argparse.Namespace) -> dict[str, Any]:
                 profile_root,
                 str(tenant_id),
                 str(workspace_id),
-                state.get("browser_marker"),
+                (state.get("browser_marker"), marker),
                 marker,
                 fixture_url,
             )
