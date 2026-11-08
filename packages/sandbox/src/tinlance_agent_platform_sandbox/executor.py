@@ -144,7 +144,7 @@ class SandboxExecutor:
                     # Recheck after output collection so a revoked lease cannot receive
                     # a result merely because the command completed before revocation.
                     self._assert_lease(lease_assertion)
-                except WorkspaceLeaseLost:
+                except BaseException:
                     if not group_cleaned:
                         self._kill_and_reap(process)
                     raise
