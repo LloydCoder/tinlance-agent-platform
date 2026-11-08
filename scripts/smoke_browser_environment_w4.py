@@ -443,7 +443,7 @@ def main() -> int:
         resolv_dir.mkdir(parents=True, exist_ok=False)
         resolver_config = write_proxy_resolver_config(
             resolv_dir,
-            dns_server=DNS_SERVER,
+            dns_server=host_uplink_ip,
             proxy_uid=proxy_uid,
             proxy_gid=proxy_gid,
         )
