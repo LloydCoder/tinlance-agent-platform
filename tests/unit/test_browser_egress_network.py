@@ -65,6 +65,25 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
             "tbbr0",
             "tbup0",
         )
+    with pytest.raises(ValueError, match="approved uplink"):
+        validate_proxy_namespace_routes(
+            browser + "\n" + uplink + "\ndefault via 10.255.4.1 dev",
+            "10.254.4.0/30",
+            "10.255.4.0/30",
+            "10.255.4.1",
+            "tbbr0",
+            "tbup0",
+        )
+    with pytest.raises(ValueError, match="unexpected route"):
+        validate_proxy_namespace_routes(
+            browser.replace("dev tbbr0", "dev") + "\n" + uplink
+            + "\ndefault via 10.255.4.1 dev tbup0",
+            "10.254.4.0/30",
+            "10.255.4.0/30",
+            "10.255.4.1",
+            "tbbr0",
+            "tbup0",
+        )
 
 
 @pytest.mark.parametrize("name", ["", "lo", "eth0", "a;drop"])
