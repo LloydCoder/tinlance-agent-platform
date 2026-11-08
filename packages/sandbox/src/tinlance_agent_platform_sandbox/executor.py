@@ -7,8 +7,8 @@ import resource
 import signal
 import subprocess
 import tempfile
-from contextlib import suppress
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
