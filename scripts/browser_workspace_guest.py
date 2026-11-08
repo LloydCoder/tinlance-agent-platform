@@ -95,9 +95,7 @@ def chromium_process_security() -> dict[str, object]:
         renderer_user_namespace = os.readlink(f"/proc/{renderer_pid}/ns/user")
         renderer_seccomp = renderer_status.get("Seccomp") == "2"
         renderer_no_new_privs = renderer_status.get("NoNewPrivs") == "1"
-        renderer_cap_eff_zero = (
-            int(renderer_status.get("CapEff", "ffffffffffffffff"), 16) == 0
-        )
+        renderer_cap_eff_zero = int(renderer_status.get("CapEff", "ffffffffffffffff"), 16) == 0
         renderer_user_namespace_isolated = renderer_user_namespace != pid_one_user_namespace
         if not all(
             (
@@ -124,6 +122,7 @@ def chromium_process_security() -> dict[str, object]:
         "chromium_renderer_user_namespace_isolated": True,
         "chromium_renderer_pids": renderer_checks,
     }
+
 
 def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
     with socket.create_connection((proxy_ip, proxy_port), timeout=3) as connection:
