@@ -130,7 +130,11 @@ class PostgresWorkspaceLeaseStore:
         return cast(WorkspaceLease | None, self._transaction(tenant, operation))
 
     def renew(self, lease: WorkspaceLease, *, lease_seconds: int = 900) -> datetime:
-        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 60 <= lease_seconds <= 3600:
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or not 60 <= lease_seconds <= 3600
+        ):
             raise ValueError("lease_seconds must be between 60 and 3600")
         if not isinstance(lease, WorkspaceLease):
             raise TypeError("lease must be a WorkspaceLease")
