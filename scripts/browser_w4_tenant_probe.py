@@ -28,10 +28,7 @@ def main() -> int:
     args = parser.parse_args()
 
     names = ("pid", "ipc", "mnt", "net")
-    current = {
-        name: os.stat(f"/proc/self/ns/{name}").st_ino
-        for name in names
-    }
+    current = {name: os.stat(f"/proc/self/ns/{name}").st_ino for name in names}
     tenant_a = json.loads(args.tenant_a_namespaces)
     host = json.loads(args.host_namespaces)
     if any(current[name] == tenant_a[name] for name in names):
