@@ -81,6 +81,25 @@ def test_sandbox_executor_rejects_an_inactive_workspace_lease_before_spawn(tmp_p
     assert not marker.exists()
 
 
+def test_sandbox_executor_terminates_background_descendants_when_leader_exits(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "background-descendant-survived"
+    child_code = f"import time; time.sleep(0.6); open({str(marker)!r}, 'w').write('late')"
+    parent_code = f"import subprocess,sys; subprocess.Popen([sys.executable, '-c', {child_code!r}])"
+
+    result = SandboxExecutor().execute(
+        ["/usr/bin/python3", "-c", parent_code],
+        cwd=str(tmp_path),
+        limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
+        lease_assertion=lambda: True,
+    )
+
+    assert result.exit_code == 0
+    time.sleep(0.8)
+    assert not marker.exists(), "a completed command must not leave background descendants running"
+
+
 def test_sandbox_executor_kills_descendants_after_process_leader_exits_on_lease_loss(
     tmp_path: Path,
 ) -> None:
