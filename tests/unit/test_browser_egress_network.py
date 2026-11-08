@@ -25,24 +25,28 @@ def test_proxy_namespace_allows_only_https_and_explicit_dns() -> None:
 def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
     rules = build_host_forwarding_rules(
         proxy_host_interface="tbup0",
-        browser_host_interface="tbhb0",
         proxy_subnet="10.255.4.0/30",
     )
     assert 'iifname "tbup0" tcp dport 443 accept' in rules
-    assert 'iifname "tbup0" udp dport 53 accept' in rules
-    assert 'iifname "tbhb0" drop' in rules
+    assert 'iifname "tbup0" ip daddr 1.1.1.1 udp dport 53 accept' in rules
+    assert 'iifname "tbup0" drop' in rules
     assert 'ip saddr 10.255.4.0/30 masquerade' in rules
-    assert 'iifname "tbhb0" masquerade' not in rules
 
 
 def test_proxy_namespace_route_validation_rejects_default_or_extra_routes() -> None:
-    valid = "10.254.4.0/30 dev br0 proto kernel scope link src 10.254.4.2"
-    assert validate_proxy_namespace_routes(valid + "\\ndefault via 10.254.4.1 dev tbup0", "10.254.4.0/30", "10.254.4.1") is True
-    with pytest.raises(ValueError, match="default route"):
-        validate_proxy_namespace_routes(valid + "\ndefault via 10.254.4.1 dev br0", "10.254.4.1")
+    valid = "10.254.4.0/30 dev tbbr0 proto kernel scope link src 10.254.4.2"
+    expected = valid + "\ndefault via 10.254.4.1 dev tbup0"
+    assert validate_proxy_namespace_routes(expected, "10.254.4.0/30", "10.254.4.1") is True
+    with pytest.raises(ValueError, match="approved gateway"):
+        validate_proxy_namespace_routes(
+            valid + "\ndefault via 10.254.4.254 dev tbup0",
+            "10.254.4.0/30",
+            "10.254.4.1",
+        )
     with pytest.raises(ValueError, match="unexpected route"):
         validate_proxy_namespace_routes(
-            valid + "\n192.168.1.0/24 dev br0 scope link",
+            valid + "\n192.168.1.0/24 dev tbbr0 scope link\ndefault via 10.254.4.1 dev tbup0",
+            "10.254.4.0/30",
             "10.254.4.1",
         )
 
