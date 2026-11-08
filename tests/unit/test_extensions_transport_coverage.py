@@ -11,6 +11,7 @@ from tinlance_agent_platform_mcp.extensions import (
     ExtensionsHTTPTransport,
     ExtensionsTransportError,
     _UrllibExtensionsHTTPClient,
+    extensions_action_purpose,
 )
 from tinlance_agent_platform_mcp.gateway import ToolScope
 
@@ -242,3 +243,43 @@ def test_extensions_urllib_client_disables_redirects_and_bounds_response_body() 
         server.shutdown()
         server.server_close()
         worker.join(timeout=1)
+
+
+
+def test_extensions_transport_mints_resource_bound_purposes_for_both_actions() -> None:
+    issuer = TokenIssuer()
+    http = HTTPClient(ExtensionsHTTPResponse(200, {"content-type": "application/json"}, b'{"status":"ok"}'))
+    transport = ExtensionsHTTPTransport(
+        base_url=_loopback_origin(),
+        token_issuer=issuer,
+        http_client=http,
+    )
+    job_id = "a4f6d9e2-1c3b-4a5d-8e7f-9012bc345678"
+    event_id = "c4f6d9e2-1c3b-4a5d-8e7f-9012bc345679"
+    transport.call("extensions_job_cancel", {"job_id": job_id}, _scope())
+    assert issuer.calls[-1]["purpose"] == extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_job_cancel",
+        resource_id=job_id,
+    )
+
+    replay_arguments = {
+        "event_id": event_id,
+        "idempotency_key": "replay-idempotency-0001",
+        "run_id": "e4f6d9e2-1c3b-4a5d-8e7f-9012bc345678",
+        "approval_id": "f4f6d9e2-1c3b-4a5d-8e7f-9012bc345678",
+        "intent_fingerprint": "a" * 64,
+    }
+    replay_scope = _scope(
+        capability="extensions.outbox.dead_letter.replay",
+        resource="extensions://outbox/dead-letters/{event_id}",
+    )
+    transport.call("extensions_dead_letter_replay", replay_arguments, replay_scope)
+    assert issuer.calls[-1]["purpose"] == extensions_action_purpose(
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_dead_letter_replay",
+        resource_id=event_id,
+        idempotency_key="replay-idempotency-0001",
+    )
