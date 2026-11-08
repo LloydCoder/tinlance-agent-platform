@@ -48,8 +48,9 @@ def main() -> int:
     try:
         with socket.create_connection((args.proxy_host, args.proxy_port), timeout=1):
             raise SystemExit("tenant B can reach tenant A's proxy network")
-    except OSError:
-        pass
+    except OSError as exc:
+        if exc.errno != errno.ENETUNREACH:
+            raise SystemExit("tenant B network denial was not caused by its isolated route table")
 
     mount_result = libc.mount(
         ctypes.c_char_p(b"none"),
@@ -61,17 +62,28 @@ def main() -> int:
     if mount_result == 0:
         libc.umount2(ctypes.c_char_p(b"/tmp"), ctypes.c_int(0))
         raise SystemExit("tenant B unexpectedly mounted a filesystem")
+    if ctypes.get_errno() != errno.EPERM:
+        raise SystemExit("mount escape probe did not fail with EPERM")
 
     try:
         os.setuid(0)
-    except PermissionError:
-        pass
+    except PermissionError as exc:
+        if exc.errno != errno.EPERM:
+            raise SystemExit("UID escalation probe did not fail with EPERM") from exc
     else:
         raise SystemExit("tenant B unexpectedly escalated to UID 0")
 
     ptrace_result = libc.ptrace(16, args.hidden_host_pid, 0, 0)
-    if ptrace_result == 0:
-        raise SystemExit("tenant B unexpectedly attached to a foreign host process")
+    ptrace_errno = ctypes.get_errno()
+    if ptrace_result == 0 or ptrace_errno not in (errno.ESRCH, errno.EPERM):
+        raise SystemExit("foreign PID ptrace probe did not fail closed")
+
+    try:
+        list(Path(args.profile_root).iterdir())
+    except PermissionError:
+        pass
+    else:
+        raise SystemExit("tenant B can enumerate tenant A's profile root")
 
     try:
         BrowserProfileLease.acquire(
