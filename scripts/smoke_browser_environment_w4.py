@@ -931,8 +931,6 @@ def main() -> int:
             proxy_ns, "169.254.169.254", 443
         )
         evidence["proxy_namespace_unapproved_port_blocked"] = probe_blocked(proxy_ns, "1.1.1.1", 80)
-        if dns_relay is not None:
-            dns_relay.close()
         if listener is not None:
             listener.close()
             listener = None
