@@ -12,6 +12,8 @@ on:
       - "scripts/browser_workspace_guest.py"
       - "scripts/browser_tenant_isolation_probe.py"
       - "scripts/smoke_browser_environment_w4.py"
+      - "scripts/browser_w4_tenant_probe.py"
+      - "scripts/browser_w4_tenant_a.py"
       - "tests/unit/test_browser_egress.py"
       - "tests/unit/test_browser_workspace.py"
       - "tests/unit/test_browser_smoke_environment.py"
