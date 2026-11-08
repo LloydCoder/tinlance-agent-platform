@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 from scripts.browser_egress_network import (
     build_host_forwarding_rules,
@@ -142,12 +144,10 @@ def test_proxy_resolver_config_is_readable_only_by_proxy_identity(tmp_path) -> N
     config = write_proxy_resolver_config(
         tmp_path,
         dns_server="1.1.1.1",
-        proxy_uid=52000,
-        proxy_gid=52000,
     )
     metadata = config.stat()
-    assert metadata.st_uid == 52000
-    assert metadata.st_gid == 52000
+    assert metadata.st_uid == os.geteuid()
+    assert metadata.st_gid == os.getegid()
     assert metadata.st_mode & 0o777 == 0o600
     assert config.read_text(encoding="ascii") == (
         "nameserver 1.1.1.1\\noptions timeout:2 attempts:1\\n"
