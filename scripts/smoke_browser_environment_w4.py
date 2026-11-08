@@ -850,7 +850,12 @@ def main() -> int:
         evidence["failure_message"] = str(exc)[:512]
         if isinstance(exc, subprocess.CalledProcessError):
             evidence["failure_stdout"] = (exc.stdout or "")[-2000:]
-            evidence["failure_stderr"] = (exc.stderr or "")[-2000:]
+            evidence["failure_stderr"] = (exc.stderr or "")[-4000:]
+        proxy_log_path = locals().get("proxy_log")
+        if isinstance(proxy_log_path, Path) and proxy_log_path.exists():
+            evidence["proxy_log_tail"] = proxy_log_path.read_text(
+                encoding="utf-8", errors="replace"
+            )[-4000:]
         raise
     finally:
         cleanup_errors: list[str] = []
@@ -885,27 +890,55 @@ def main() -> int:
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(int(raw_pid), signal.SIGTERM)
             if listed.stdout.strip():
-                time.sleep(0.5)
+                for raw_pid in listed.stdout.split():
+                    with contextlib.suppress(ProcessLookupError):
+                        os.kill(int(raw_pid), signal.SIGTERM)
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    remaining = subprocess.run(
+                        ["ip", "netns", "pids", netns], check=False, capture_output=True, text=True
+                    )
+                    if not remaining.stdout.strip():
+                        break
+                    for raw_pid in remaining.stdout.split():
+                        with contextlib.suppress(ProcessLookupError):
+                            os.kill(int(raw_pid), signal.SIGKILL)
+                    time.sleep(0.1)
                 remaining = subprocess.run(
                     ["ip", "netns", "pids", netns], check=False, capture_output=True, text=True
                 )
-                for raw_pid in remaining.stdout.split():
-                    with contextlib.suppress(ProcessLookupError):
-                        os.kill(int(raw_pid), signal.SIGKILL)
+                if remaining.stdout.strip():
+                    cleanup_errors.append(
+                        f"network namespace {netns} still has processes: {remaining.stdout.strip()[:500]}"
+                    )
             deleted = subprocess.run(
-                ["ip", "netns", "del", netns], check=False, capture_output=True
+                ["ip", "netns", "del", netns], check=False, capture_output=True, text=True
             )
             if deleted.returncode != 0:
-                cleanup_errors.append(f"network namespace {netns} could not be deleted")
+                cleanup_errors.append(
+                    f"network namespace {netns} could not be deleted: {deleted.stderr[-500:]}"
+                )
         if host_link_created:
-            deleted = subprocess.run(
-                ["ip", "link", "del", host_uplink_if],
+            existing_link = subprocess.run(
+                ["ip", "link", "show", "dev", host_uplink_if],
                 check=False,
                 capture_output=True,
             )
-            host_link_deleted = deleted.returncode == 0
-            if not host_link_deleted:
-                cleanup_errors.append("proxy host uplink could not be deleted")
+            if existing_link.returncode != 0:
+                # Deleting the proxy namespace may already have destroyed its veth peer.
+                host_link_deleted = True
+            else:
+                deleted = subprocess.run(
+                    ["ip", "link", "del", host_uplink_if],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                host_link_deleted = deleted.returncode == 0
+                if not host_link_deleted:
+                    cleanup_errors.append(
+                        f"proxy host uplink could not be deleted: {deleted.stderr[-500:]}"
+                    )
         remaining_namespaces = {
             line.split()[0] for line in run(["ip", "netns", "list"]).splitlines() if line.split()
         }
