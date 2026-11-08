@@ -139,7 +139,7 @@ class ApprovalService:
                 or current.resource != resource
                 or (
                     intent_fingerprint is not None
-                    and current.intent_fingerprint not in {None, intent_fingerprint}
+                    and current.intent_fingerprint != intent_fingerprint
                 )
             ):
                 raise PermissionError("approval does not bind to this action")
