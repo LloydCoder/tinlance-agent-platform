@@ -256,6 +256,7 @@ def test_production_transport_rejects_plain_http() -> None:
         raise AssertionError("plain HTTP must be rejected by default")
 
 
+# fmt: off
 EVENT_ID = "c4f6d9e2-1c3b-4a5d-8e7f-9012bc345679"
 REPLAY_IDEMPOTENCY_KEY = "replay-idempotency-0001"
 
@@ -401,3 +402,4 @@ def test_dead_letter_replay_rejects_approval_for_different_event_intent() -> Non
     else:
         raise AssertionError("approval must be bound to the exact event and intent")
     assert http.calls == []
+# fmt: on
