@@ -7,6 +7,7 @@ import resource
 import signal
 import subprocess
 import tempfile
+from contextlib import suppress
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,10 +65,8 @@ class SandboxExecutor:
     def _kill_and_reap(process: subprocess.Popen[bytes]) -> None:
         if process.poll() is not None:
             return
-        try:
+        with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
         process.wait()
 
     def execute(
