@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -6,7 +7,7 @@ import pytest
 from tinlance_agent_platform_approvals import PostgresApprovalService
 from tinlance_agent_platform_contracts import ApprovalRequest, ApprovalStatus
 
-ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[1]
 TENANT_ID = UUID("00000000-0000-0000-0000-000000000091")
 RUN_ID = UUID("40000000-0000-0000-0000-000000000091")
 APPROVAL_ID = UUID("50000000-0000-0000-0000-000000000091")
