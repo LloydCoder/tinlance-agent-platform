@@ -117,7 +117,6 @@ jobs:
             PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" \
             PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" \
             "$pythonLocation/bin/python" scripts/smoke_browser_environment_w4.py \
-              --artifacts "$GITHUB_WORKSPACE/artifacts"
           test -s artifacts/browser-w4.json
           python - <<'PY'
           import json
