@@ -20,6 +20,7 @@ class IdempotencyInProgressError(IdempotencyConflictError):
     """The same guarded operation is currently executing on another worker."""
 
     code = "idempotency_in_progress"
+    retryable = True
 
 
 class IdempotencyOutcomeUnknownError(IdempotencyConflictError):
