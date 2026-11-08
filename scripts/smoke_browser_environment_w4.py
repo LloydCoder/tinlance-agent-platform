@@ -98,6 +98,7 @@ def main() -> int:
     proxy_browser_ip = str(browser_network.network_address + 1)
     host_uplink_ip = str(uplink_network.network_address + 1)
     proxy_uplink_ip = str(uplink_network.network_address + 2)
+    host_probe_port = 49152 + secrets.randbelow(16384)
 
     browser_name = f"tnlbr-a-{suffix}"
     proxy_name = f"tnlbr-p-{suffix}"
@@ -389,7 +390,7 @@ def main() -> int:
         # private/link-local destinations or arbitrary non-HTTPS ports.
         listener = socket.socket()
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listener.bind((host_uplink_ip, 18080))
+        listener.bind((host_uplink_ip, host_probe_port))
         listener.listen(1)
         listener.settimeout(0.2)
         def accept_once() -> None:
@@ -408,7 +409,7 @@ def main() -> int:
             "inet", "tnl_proxy", "output",
             "oifname", proxy_uplink_if,
             "ip", "daddr", host_uplink_ip,
-            "tcp", "dport", "18080", "accept",
+            "tcp", "dport", str(host_probe_port), "accept",
         ])
         output_rules = run([
             "ip", "netns", "exec", proxy_ns, "nft", "-a",
@@ -417,12 +418,12 @@ def main() -> int:
         probe_handle = next(
             int(line.rsplit("# handle ", 1)[1])
             for line in output_rules.splitlines()
-            if host_uplink_ip in line and "18080" in line and "# handle " in line
+            if host_uplink_ip in line and str(host_probe_port) in line and "# handle " in line
         )
         try:
             host_probe_code = (
                 "import socket; s=socket.socket(); s.settimeout(1); "
-                f"r=s.connect_ex(({host_uplink_ip!r}, 18080)); "
+                f"r=s.connect_ex(({host_uplink_ip!r}, {host_probe_port})); "
                 "print('REACHED' if r == 0 else 'BLOCKED')"
             )
             host_probe = subprocess.run(
