@@ -1,8 +1,11 @@
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
+from tinlance_agent_platform_durability import WorkspaceLease
 from tinlance_agent_platform_runtime import ExecutionTimeout, call_with_timeout
 from tinlance_agent_platform_sandbox import SandboxExecutor, SandboxLimits, WorkspaceLeaseSupervisor
 
@@ -118,7 +121,15 @@ class ActiveWorkspaceLeaseStore:
 def test_workspace_lease_supervisor_binds_the_lease_store_to_each_command(tmp_path: Path) -> None:
     store = ActiveWorkspaceLeaseStore()
     supervisor = WorkspaceLeaseSupervisor(store)
-    lease = object()
+    lease = WorkspaceLease(
+        UUID('00000000-0000-0000-0000-000000000092'),
+        UUID('20000000-0000-0000-0000-000000000092'),
+        UUID('30000000-0000-0000-0000-000000000092'),
+        'owner-a',
+        'worker-a',
+        1,
+        datetime.now(UTC) + timedelta(minutes=10),
+    )
     result = supervisor.execute(
         lease,
         ["/usr/bin/python3", "-c", "print('fenced')"],
@@ -150,7 +161,15 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
 
     with pytest.raises(WorkspaceLeaseLost):
         supervisor.execute(
-            object(),
+            WorkspaceLease(
+                UUID('00000000-0000-0000-0000-000000000093'),
+                UUID('20000000-0000-0000-0000-000000000093'),
+                UUID('30000000-0000-0000-0000-000000000093'),
+                'owner-a',
+                'worker-a',
+                1,
+                datetime.now(UTC) + timedelta(minutes=10),
+            ),
             command,
             cwd=str(tmp_path),
             limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
