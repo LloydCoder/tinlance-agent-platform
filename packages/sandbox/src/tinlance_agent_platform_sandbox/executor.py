@@ -17,6 +17,18 @@ from time import monotonic, sleep
 
 from .bubblewrap import SandboxLimits
 
+_LIBC = ctypes.CDLL(None, use_errno=True)
+_PRCTL = _LIBC.prctl
+_PRCTL.argtypes = [
+    ctypes.c_int,
+    ctypes.c_ulong,
+    ctypes.c_ulong,
+    ctypes.c_ulong,
+    ctypes.c_ulong,
+]
+_PRCTL.restype = ctypes.c_int
+_PR_SET_PDEATHSIG = 1
+
 
 class WorkspaceLeaseLost(RuntimeError):
     """Raised when a persistent workspace loses its current fencing authority."""
@@ -34,17 +46,7 @@ def _limit_process(limits: SandboxLimits, expected_parent_pid: int) -> None:
     """Apply hard resource ceilings and parent-death containment before exec."""
     if sys.platform != "linux":
         raise RuntimeError("sandbox process supervision requires Linux PR_SET_PDEATHSIG")
-    libc = ctypes.CDLL(None, use_errno=True)
-    prctl = libc.prctl
-    prctl.argtypes = [
-        ctypes.c_int,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-    ]
-    prctl.restype = ctypes.c_int
-    if prctl(1, signal.SIGKILL, 0, 0, 0) != 0:  # PR_SET_PDEATHSIG
+    if _PRCTL(_PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) != 0:
         error = ctypes.get_errno()
         raise OSError(error, os.strerror(error))
     # Close the fork/preexec race: if the parent died before prctl was installed,
