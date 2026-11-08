@@ -21,13 +21,13 @@ select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000091', 
 
 do $$
 declare
-    approval_id uuid;
-    expiry_id uuid;
-    race_id uuid;
+    v_approval_id uuid;
+    v_expiry_id uuid;
+    v_race_id uuid;
     fingerprint text := repeat('a', 64);
     consumed boolean;
 begin
-    approval_id := platform.request_approval(
+    v_approval_id := platform.request_approval(
         '00000000-0000-0000-0000-000000000091',
         '50000000-0000-0000-0000-000000000091',
         '40000000-0000-0000-0000-000000000091',
@@ -41,17 +41,17 @@ begin
         null
     );
 
-    if approval_id <> '50000000-0000-0000-0000-000000000091' then
+    if v_approval_id <> '50000000-0000-0000-0000-000000000091' then
         raise exception 'approval request returned an unexpected ID';
     end if;
-    if (select a.status from platform.approvals a where a.approval_id = approval_id) <> 'pending' then
+    if (select a.status from platform.approvals a where a.approval_id = v_approval_id) <> 'pending' then
         raise exception 'new approval is not pending';
     end if;
 
     begin
         perform platform.decide_approval(
             '00000000-0000-0000-0000-000000000091',
-            approval_id,
+            v_approval_id,
             true,
             'requester-a',
             fingerprint
@@ -64,7 +64,7 @@ begin
     begin
         perform platform.decide_approval(
             '00000000-0000-0000-0000-000000000091',
-            approval_id,
+            v_approval_id,
             true,
             'approver-b',
             repeat('b', 64)
@@ -76,7 +76,7 @@ begin
 
     if platform.decide_approval(
         '00000000-0000-0000-0000-000000000091',
-        approval_id,
+        v_approval_id,
         true,
         'approver-b',
         fingerprint
@@ -87,7 +87,7 @@ begin
     begin
         perform platform.consume_approval(
             '00000000-0000-0000-0000-000000000091',
-            approval_id,
+            v_approval_id,
             '40000000-0000-0000-0000-000000000091',
             'invoice.refund',
             'invoice:other',
@@ -100,7 +100,7 @@ begin
 
     consumed := platform.consume_approval(
         '00000000-0000-0000-0000-000000000091',
-        approval_id,
+        v_approval_id,
         '40000000-0000-0000-0000-000000000091',
         'invoice.refund',
         'invoice:123',
@@ -112,7 +112,7 @@ begin
 
     consumed := platform.consume_approval(
         '00000000-0000-0000-0000-000000000091',
-        approval_id,
+        v_approval_id,
         '40000000-0000-0000-0000-000000000091',
         'invoice.refund',
         'invoice:123',
@@ -122,14 +122,14 @@ begin
         raise exception 'consumed approval was reusable';
     end if;
 
-    if (select a.status from platform.approvals a where a.approval_id = approval_id) <> 'consumed' then
+    if (select a.status from platform.approvals a where a.approval_id = v_approval_id) <> 'consumed' then
         raise exception 'approval status was not persisted as consumed';
     end if;
-    if (select count(*) from platform.approval_events e where e.approval_id = approval_id) <> 3 then
+    if (select count(*) from platform.approval_events e where e.approval_id = v_approval_id) <> 3 then
         raise exception 'approval lifecycle audit did not record request, decision and consumption';
     end if;
 
-    expiry_id := platform.request_approval(
+    v_expiry_id := platform.request_approval(
         '00000000-0000-0000-0000-000000000091',
         '50000000-0000-0000-0000-000000000092',
         '40000000-0000-0000-0000-000000000092',
@@ -148,12 +148,12 @@ begin
     ) is not true then
         raise exception 'expired approval was not transitioned';
     end if;
-    if (select a.status from platform.approvals a where a.approval_id = expiry_id) <> 'expired' then
+    if (select a.status from platform.approvals a where a.approval_id = v_expiry_id) <> 'expired' then
         raise exception 'expired approval status was not persisted';
     end if;
     if platform.consume_approval(
         '00000000-0000-0000-0000-000000000091',
-        expiry_id,
+        v_expiry_id,
         '40000000-0000-0000-0000-000000000092',
         'invoice.refund',
         'invoice:expired',
@@ -162,7 +162,7 @@ begin
         raise exception 'expired approval was consumed';
     end if;
 
-    race_id := platform.request_approval(
+    v_race_id := platform.request_approval(
         '00000000-0000-0000-0000-000000000091',
         '50000000-0000-0000-0000-000000000093',
         '40000000-0000-0000-0000-000000000093',
@@ -177,7 +177,7 @@ begin
     );
     perform platform.decide_approval(
         '00000000-0000-0000-0000-000000000091',
-        race_id,
+        v_race_id,
         true,
         'approver-b',
         fingerprint
