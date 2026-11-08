@@ -78,6 +78,7 @@ Resolver = Callable[[str], tuple[str, ...]]
 
 
 NAT64_WELL_KNOWN_PREFIX = ipaddress.ip_network("64:ff9b::/96")
+IPV4_COMPATIBLE_PREFIX = ipaddress.ip_network("::/96")
 
 
 def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -89,6 +90,7 @@ def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -
         and (
             address.ipv4_mapped is not None
             or address in NAT64_WELL_KNOWN_PREFIX
+            or address in IPV4_COMPATIBLE_PREFIX
         )
     ):
         return False
