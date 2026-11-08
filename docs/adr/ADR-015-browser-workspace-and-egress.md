@@ -92,6 +92,11 @@ W4 replaces the W3 host-network proxy placement with two independent links and a
 The W4 acceptance workflow is an ephemeral CI adversarial test, not a production certification. The workflow must retain the raw JSON evidence and SBOM, prove cleanup, and explicitly report `production_certification=false`. Remaining hostile archive corpus coverage and broader concurrent filesystem/process/IPC/control-plane isolation must also pass before W4 is accepted. Production still requires a trusted supervisor, durable encrypted profile storage, process cgroups, operational audit, provider-attested host security controls and independent review.
 
 ## References
+- Linux network namespaces and veth pairs: https://man7.org/linux/man-pages/man7/network_namespaces.7.html
+- util-linux `unshare` PID, IPC and mount namespace behavior: https://man7.org/linux/man-pages/man1/unshare.1.html
+- Chromium Linux sandbox layers (namespaces and seccomp-BPF): https://chromium.googlesource.com/chromium/src/+/master/docs/linux/sandboxing.md
+- Netfilter nftables rules and verdict semantics: https://netfilter.org/projects/nftables/manpage.html
+- Docker's nftables guidance for interface-scoped forwarding restrictions: https://docs.docker.com/engine/network/firewall-nftables/
 
 - Chromium proxy behavior and implicit bypass rules: https://chromium.googlesource.com/chromium/src/+/HEAD/net/docs/proxy.md
 - OWASP SSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
