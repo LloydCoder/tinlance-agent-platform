@@ -6,6 +6,7 @@ import ipaddress
 import json
 import os
 import socket
+import time
 from pathlib import Path
 
 from tinlance_agent_platform_sandbox.browser import (
@@ -15,79 +16,90 @@ from tinlance_agent_platform_sandbox.browser import (
 
 
 def chromium_process_security() -> dict[str, object]:
-    pending = [os.getpid()]
-    seen: set[int] = set()
+    """Verify Chromium's browser and renderer processes retain kernel isolation."""
+    deadline = time.monotonic() + 5
     chromium: list[tuple[int, list[str], dict[str, str]]] = []
-    while pending:
-        parent = pending.pop()
-        if parent in seen:
-            continue
-        seen.add(parent)
-        children_file = Path(f"/proc/{parent}/task/{parent}/children")
-        with contextlib.suppress(FileNotFoundError, PermissionError, ValueError):
-            pending.extend(int(value) for value in children_file.read_text().split())
-        command_file = Path(f"/proc/{parent}/cmdline")
-        status_file = Path(f"/proc/{parent}/status")
-        try:
-            command = [
-                value.decode("utf-8", errors="replace")
-                for value in command_file.read_bytes().split(b"\x00")
-                if value
-            ]
-            status = {}
-            for line in status_file.read_text(encoding="ascii").splitlines():
-                if ":" in line:
-                    key, value = line.split(":", 1)
-                    status[key] = value.strip()
-        except (FileNotFoundError, PermissionError):
-            continue
-        executable = command[0].lower() if command else ""
-        if "chrome" in executable or "chromium" in executable:
-            chromium.append((parent, command, status))
+    pid_one_user_namespace = os.readlink("/proc/1/ns/user")
 
-    main_processes = [
-        (pid, command, status)
-        for pid, command, status in chromium
-        if any(argument.startswith("--user-data-dir=") for argument in command)
-    ]
-    if not main_processes:
-        raise SystemExit("could not identify the Chromium browser process")
-    pid, command, status = main_processes[0]
-    no_new_privs = status.get("NoNewPrivs") == "1"
-    cap_eff = status.get("CapEff", "ffffffffffffffff")
+    while time.monotonic() < deadline:
+        chromium = []
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdecimal():
+                continue
+            pid = int(entry.name)
+            command_file = entry / "cmdline"
+            status_file = entry / "status"
+            try:
+                command = [
+                    value.decode("utf-8", errors="replace")
+                    for value in command_file.read_bytes().split(b"\\x00")
+                    if value
+                ]
+                status: dict[str, str] = {}
+                for line in status_file.read_text(encoding="ascii").splitlines():
+                    if ":" in line:
+                        key, value = line.split(":", 1)
+                        status[key] = value.strip()
+            except (FileNotFoundError, PermissionError, ProcessLookupError):
+                continue
+            executable = command[0].lower() if command else ""
+            if ("chrome" in executable or "chromium" in executable) and command:
+                chromium.append((pid, command, status))
+
+        browser_processes = [
+            (pid, command, status)
+            for pid, command, status in chromium
+            if any(argument.startswith("--user-data-dir=") for argument in command)
+            and status.get("Uid", "").split()[0:1] == [str(os.geteuid())]
+        ]
+        if browser_processes:
+            browser_pid, browser_command, browser_status = browser_processes[0]
+            renderer_processes = [
+                (pid, command, status)
+                for pid, command, status in chromium
+                if "--type=renderer" in command
+                and status.get("Uid", "").split()[0:1] == [str(os.geteuid())]
+            ]
+            if renderer_processes:
+                break
+        time.sleep(0.1)
+    else:
+        process_diagnostics = [
+            {
+                "pid": pid,
+                "uid": status.get("Uid", ""),
+                "command": command[:8],
+            }
+            for pid, command, status in chromium
+        ]
+        raise SystemExit(
+            "Chromium did not create an isolated renderer process; "
+            f"observed Chromium processes: {process_diagnostics[:12]}"
+        )
+
+    no_new_privs = browser_status.get("NoNewPrivs") == "1"
+    cap_eff = browser_status.get("CapEff", "ffffffffffffffff")
     cap_eff_zero = int(cap_eff, 16) == 0
     forbidden_sandbox_flags = {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-namespace-sandbox",
     }
-    sandbox_enabled = not any(argument in forbidden_sandbox_flags for argument in command)
+    sandbox_enabled = not any(argument in forbidden_sandbox_flags for argument in browser_command)
     if not no_new_privs or not cap_eff_zero or not sandbox_enabled:
         raise SystemExit(
             "Chromium process did not retain the required sandbox/no-new-privileges boundary"
         )
 
-    renderer_processes = [
-        (renderer_pid, renderer_status)
-        for renderer_pid, renderer_command, renderer_status in chromium
-        if "--type=renderer" in renderer_command
-    ]
-    if not renderer_processes:
-        raise SystemExit("Chromium did not create an isolated renderer process")
-    host_user_namespace = os.readlink("/proc/1/ns/user")
     renderer_checks = []
-    for renderer_pid, renderer_status in renderer_processes:
+    for renderer_pid, _, renderer_status in renderer_processes:
         renderer_user_namespace = os.readlink(f"/proc/{renderer_pid}/ns/user")
         renderer_seccomp = renderer_status.get("Seccomp") == "2"
         renderer_no_new_privs = renderer_status.get("NoNewPrivs") == "1"
         renderer_cap_eff_zero = (
-            int(
-                renderer_status.get("CapEff", "ffffffffffffffff"),
-                16,
-            )
-            == 0
+            int(renderer_status.get("CapEff", "ffffffffffffffff"), 16) == 0
         )
-        renderer_user_namespace_isolated = renderer_user_namespace != host_user_namespace
+        renderer_user_namespace_isolated = renderer_user_namespace != pid_one_user_namespace
         if not all(
             (
                 renderer_seccomp,
@@ -102,7 +114,7 @@ def chromium_process_security() -> dict[str, object]:
         renderer_checks.append(renderer_pid)
 
     return {
-        "chromium_pid": pid,
+        "chromium_pid": browser_pid,
         "chromium_sandbox_enabled": sandbox_enabled,
         "browser_process_no_new_privs": no_new_privs,
         "browser_process_cap_eff_zero": cap_eff_zero,
@@ -113,7 +125,6 @@ def chromium_process_security() -> dict[str, object]:
         "chromium_renderer_user_namespace_isolated": True,
         "chromium_renderer_pids": renderer_checks,
     }
-
 
 def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
     with socket.create_connection((proxy_ip, proxy_port), timeout=3) as connection:
