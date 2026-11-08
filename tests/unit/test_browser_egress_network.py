@@ -34,7 +34,7 @@ def test_host_forwarding_rules_only_nat_proxy_uplink() -> None:
     assert 'iifname "tbup0" ip daddr 1.1.1.1 udp dport 53 accept' in rules
     assert 'iifname "tbup0" drop' in rules
     assert "type filter hook forward priority -50; policy accept;" in rules
-    assert 'ip saddr 10.255.4.0/30 masquerade' in rules
+    assert 'ip saddr 10.255.4.0/30 oifname != "tbup0" masquerade' in rules
 
 
 def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
