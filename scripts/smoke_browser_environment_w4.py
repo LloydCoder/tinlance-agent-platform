@@ -259,6 +259,14 @@ def main() -> int:
         proxy_interfaces = run(["ip", "netns", "exec", proxy_ns, "ip", "-o", "link", "show"])
         if len(browser_interfaces.splitlines()) != 2 or len(proxy_interfaces.splitlines()) != 3:
             raise RuntimeError("browser or proxy namespace contains an unexpected interface")
+        tenant_b_interfaces = run([
+            "ip", "netns", "exec", tenant_b_ns, "ip", "-o", "link", "show"
+        ])
+        tenant_b_routes = run([
+            "ip", "netns", "exec", tenant_b_ns, "ip", "-4", "route", "show"
+        ])
+        if len(tenant_b_interfaces.splitlines()) != 1 or tenant_b_routes:
+            raise RuntimeError("tenant B must have only loopback and no network routes")
         host_namespace_ids = {
             name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt")
         }
@@ -293,6 +301,8 @@ def main() -> int:
             "proxy_namespace_route_table": proxy_routes,
             "browser_namespace_interface_count": 2,
             "proxy_namespace_interface_count": 3,
+            "tenant_b_namespace_interface_count": 1,
+            "tenant_b_namespace_route_table": tenant_b_routes,
             "proxy_namespace_dns_server": DNS_SERVER,
             "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
             "host_forwarding_policy": (
