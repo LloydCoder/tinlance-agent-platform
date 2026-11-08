@@ -142,9 +142,9 @@ BEGIN
     END IF;
 
     IF current_lease.status = 'active' THEN
-        UPDATE platform.workspace_leases
+        UPDATE platform.workspace_leases AS wl
            SET status = 'expired', updated_at = clock_timestamp()
-         WHERE tenant_id = p_tenant_id AND workspace_id = p_workspace_id;
+         WHERE wl.tenant_id = p_tenant_id AND wl.workspace_id = p_workspace_id;
         INSERT INTO platform.workspace_lease_events (
             event_id, tenant_id, workspace_id, lease_id, fencing_token,
             event_type, owner_subject_id, worker_id
@@ -156,7 +156,7 @@ BEGIN
     END IF;
 
     new_token := current_lease.fencing_token + 1;
-    UPDATE platform.workspace_leases
+    UPDATE platform.workspace_leases AS wl
        SET lease_id = p_lease_id,
            owner_subject_id = p_owner_subject_id,
            worker_id = p_worker_id,
@@ -166,7 +166,7 @@ BEGIN
            updated_at = clock_timestamp(),
            revoked_at = NULL,
            released_at = NULL
-     WHERE tenant_id = p_tenant_id AND workspace_id = p_workspace_id;
+     WHERE wl.tenant_id = p_tenant_id AND wl.workspace_id = p_workspace_id;
 
     INSERT INTO platform.workspace_lease_events (
         event_id, tenant_id, workspace_id, lease_id, fencing_token,
