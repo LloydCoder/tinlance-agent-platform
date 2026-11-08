@@ -265,7 +265,7 @@ CREATE OR REPLACE FUNCTION platform.revoke_workspace_lease(
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, platform
-AS $
+AS $$
 DECLARE
     current_lease platform.workspace_leases%rowtype;
 BEGIN
@@ -314,7 +314,7 @@ CREATE OR REPLACE FUNCTION platform.release_workspace_lease(
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, platform
-AS $
+AS $$
 DECLARE
     current_lease platform.workspace_leases%rowtype;
 BEGIN
