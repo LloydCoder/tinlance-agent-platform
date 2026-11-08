@@ -122,11 +122,11 @@ def test_workspace_lease_supervisor_binds_the_lease_store_to_each_command(tmp_pa
     store = ActiveWorkspaceLeaseStore()
     supervisor = WorkspaceLeaseSupervisor(store)
     lease = WorkspaceLease(
-        UUID('00000000-0000-0000-0000-000000000092'),
-        UUID('20000000-0000-0000-0000-000000000092'),
-        UUID('30000000-0000-0000-0000-000000000092'),
-        'owner-a',
-        'worker-a',
+        UUID("00000000-0000-0000-0000-000000000092"),
+        UUID("20000000-0000-0000-0000-000000000092"),
+        UUID("30000000-0000-0000-0000-000000000092"),
+        "owner-a",
+        "worker-a",
         1,
         datetime.now(UTC) + timedelta(minutes=10),
     )
@@ -162,11 +162,11 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
     with pytest.raises(WorkspaceLeaseLost):
         supervisor.execute(
             WorkspaceLease(
-                UUID('00000000-0000-0000-0000-000000000093'),
-                UUID('20000000-0000-0000-0000-000000000093'),
-                UUID('30000000-0000-0000-0000-000000000093'),
-                'owner-a',
-                'worker-a',
+                UUID("00000000-0000-0000-0000-000000000093"),
+                UUID("20000000-0000-0000-0000-000000000093"),
+                UUID("30000000-0000-0000-0000-000000000093"),
+                "owner-a",
+                "worker-a",
                 1,
                 datetime.now(UTC) + timedelta(minutes=10),
             ),
