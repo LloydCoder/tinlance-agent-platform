@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from tinlance_agent_platform_runtime import ExecutionTimeout, call_with_timeout
-from tinlance_agent_platform_sandbox import SandboxExecutor, SandboxLimits
+from tinlance_agent_platform_sandbox import SandboxExecutor, SandboxLimits, WorkspaceLeaseSupervisor
 
 
 def test_model_deadline_is_hard() -> None:
@@ -103,3 +103,57 @@ def test_sandbox_executor_kills_process_group_when_workspace_lease_is_lost(tmp_p
     assert started.exists()
     assert not finished.exists()
     assert checks >= 3
+
+
+class ActiveWorkspaceLeaseStore:
+    def __init__(self, active: bool = True) -> None:
+        self.active = active
+        self.assertions = 0
+
+    def assert_active(self, lease: object) -> bool:
+        self.assertions += 1
+        return self.active
+
+
+def test_workspace_lease_supervisor_binds_the_lease_store_to_each_command(tmp_path: Path) -> None:
+    store = ActiveWorkspaceLeaseStore()
+    supervisor = WorkspaceLeaseSupervisor(store)
+    lease = object()
+    result = supervisor.execute(
+        lease,
+        ["/usr/bin/python3", "-c", "print('fenced')"],
+        cwd=str(tmp_path),
+        limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "fenced"
+    assert store.assertions >= 2
+
+
+def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    class UnavailableLeaseStore:
+        def assert_active(self, lease: object) -> bool:
+            raise RuntimeError("database unavailable")
+
+    marker = tmp_path / "must-not-exist"
+    supervisor = WorkspaceLeaseSupervisor(UnavailableLeaseStore())
+    command = [
+        "/usr/bin/python3",
+        "-c",
+        f"from pathlib import Path; Path({str(marker)!r}).touch()",
+    ]
+
+    from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
+
+    with pytest.raises(WorkspaceLeaseLost):
+        supervisor.execute(
+            object(),
+            command,
+            cwd=str(tmp_path),
+            limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
+        )
+
+    assert not marker.exists()
