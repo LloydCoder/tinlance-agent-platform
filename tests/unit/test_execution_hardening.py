@@ -54,6 +54,7 @@ def test_sandbox_executor_enforces_combined_stdout_stderr_output_limit(tmp_path:
     assert result.stdout == "o" * 96
     assert result.stderr == "e" * 32
 
+
 def test_sandbox_executor_rejects_an_inactive_workspace_lease_before_spawn(tmp_path: Path) -> None:
     from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
 
