@@ -34,7 +34,7 @@ create index if not exists idx_action_approvals_tenant_run
     on platform.action_approvals (tenant_id, run_id, created_at);
 create index if not exists idx_action_approvals_expiry
     on platform.action_approvals (tenant_id, expires_at)
-    where status = 'pending';
+    where status in ('pending', 'approved');
 
 alter table platform.action_approvals enable row level security;
 alter table platform.action_approvals force row level security;
