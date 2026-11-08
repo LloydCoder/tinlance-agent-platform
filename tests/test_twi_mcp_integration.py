@@ -277,7 +277,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             uuid4(),
             approval_id=uuid4(),
             approval_verifier=approvals,
-            intent_fingerprint="intent-sha256",
+            intent_fingerprint="a" * 64,
         )
         self.assertEqual(result["status"], "candidate")
         self.assertEqual(len(approvals.calls), 1)
@@ -588,7 +588,7 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             uuid4(),
             approval_id=uuid4(),
             approval_verifier=approvals,
-            intent_fingerprint="delete-intent-fingerprint",
+            intent_fingerprint="b" * 64,
         )
         self.assertEqual(len(approvals.calls), 1)
         self.assertEqual(self.http.calls[0]["method"], "DELETE")
