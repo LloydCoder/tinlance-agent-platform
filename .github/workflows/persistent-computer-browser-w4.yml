@@ -149,6 +149,7 @@ jobs:
               "cross_tenant_profile_reuse_denied",
               "concurrent_cross_tenant_isolation",
               "namespace_escape_probes_passed",
+              "proxy_namespace_public_https_probe",
               "proxy_listener_ready",
               "cleanup_verified",
           ]
