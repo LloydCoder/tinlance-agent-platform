@@ -185,7 +185,7 @@ class PostgresApprovalService:
             raise PermissionError("approval does not exist in the authenticated tenant scope")
         current = self._from_row(row)
         if (
-            current.status is ApprovalStatus.PENDING
+            current.status in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED}
             and current.expires_at is not None
             and current.expires_at <= datetime.now(UTC)
         ):
@@ -205,7 +205,7 @@ class PostgresApprovalService:
                     tenant_id=tenant_uuid,
                     approval_id=approval_id,
                     event_type="expired",
-                    actor_subject_id=None,
+                    actor_subject_id=current.approved_by,
                     intent_fingerprint=current.intent_fingerprint,
                 )
         return current
