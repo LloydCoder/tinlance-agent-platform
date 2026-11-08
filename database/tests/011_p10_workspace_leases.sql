@@ -28,7 +28,7 @@ BEGIN
         RAISE EXCEPTION 'first workspace lease did not start at fencing token 1';
     END IF;
     IF NOT platform.assert_workspace_lease(
-        tenant, workspace, lease_one, 1, 'owner-a', 'worker-a'
+        tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a'
     ) THEN
         RAISE EXCEPTION 'new workspace lease did not assert active';
     END IF;
@@ -40,16 +40,16 @@ BEGIN
         RAISE EXCEPTION 'concurrent active workspace lease was acquired twice';
     END IF;
 
-    renewed_until := platform.renew_workspace_lease(tenant, workspace, lease_one, 1, 'owner-a', 'worker-a', 900);
+    renewed_until := platform.renew_workspace_lease(tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a', 900);
     IF renewed_until <= clock_timestamp() THEN
         RAISE EXCEPTION 'workspace lease renewal did not advance expiry';
     END IF;
 
-    IF platform.revoke_workspace_lease(tenant, workspace, lease_one, 1, 'owner-a', 'worker-a') IS NOT TRUE THEN
+    IF platform.revoke_workspace_lease(tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a') IS NOT TRUE THEN
         RAISE EXCEPTION 'active workspace lease was not revoked';
     END IF;
     IF platform.assert_workspace_lease(
-        tenant, workspace, lease_one, 1, 'owner-a', 'worker-a'
+        tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a'
     ) THEN
         RAISE EXCEPTION 'revoked worker retained active lease authority';
     END IF;
@@ -58,7 +58,7 @@ BEGIN
     END IF;
 
     BEGIN
-        PERFORM platform.renew_workspace_lease(tenant, workspace, lease_one, 1, 'owner-a', 'worker-a', 600);
+        PERFORM platform.renew_workspace_lease(tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a', 600);
         RAISE EXCEPTION 'revoked lease was renewed';
     EXCEPTION WHEN SQLSTATE '55000' THEN
         NULL;
@@ -71,17 +71,17 @@ BEGIN
         RAISE EXCEPTION 'reacquisition did not increment the fencing token';
     END IF;
     IF platform.assert_workspace_lease(
-        tenant, workspace, lease_one, 1, 'owner-a', 'worker-a'
+        tenant, workspace, lease_one, 1::bigint, 'owner-a', 'worker-a'
     ) THEN
         RAISE EXCEPTION 'stale worker passed fencing after a new acquisition';
     END IF;
     IF NOT platform.assert_workspace_lease(
-        tenant, workspace, lease_two, 2, 'owner-b', 'worker-b'
+        tenant, workspace, lease_two, 2::bigint, 'owner-b', 'worker-b'
     ) THEN
         RAISE EXCEPTION 'new worker failed fencing assertion';
     END IF;
 
-    IF platform.release_workspace_lease(tenant, workspace, lease_two, 2, 'owner-b', 'worker-b') IS NOT TRUE THEN
+    IF platform.release_workspace_lease(tenant, workspace, lease_two, 2::bigint, 'owner-b', 'worker-b') IS NOT TRUE THEN
         RAISE EXCEPTION 'active workspace lease was not released';
     END IF;
     SELECT * INTO third_row FROM platform.acquire_workspace_lease(
@@ -101,7 +101,7 @@ BEGIN
         RAISE EXCEPTION 'expired lease recovery did not advance fencing token';
     END IF;
     IF platform.assert_workspace_lease(
-        tenant, workspace, lease_three, 3, 'owner-c', 'worker-c'
+        tenant, workspace, lease_three, 3::bigint, 'owner-c', 'worker-c'
     ) THEN
         RAISE EXCEPTION 'expired stale worker passed fencing assertion';
     END IF;
