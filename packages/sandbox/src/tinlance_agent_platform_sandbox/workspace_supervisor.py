@@ -41,6 +41,7 @@ class WorkspaceLeaseSupervisor:
     ) -> ProcessResult:
         def assertion() -> bool:
             return self._lease_store.assert_active(lease)
+
         return self._executor.execute(
             argv,
             cwd=cwd,
