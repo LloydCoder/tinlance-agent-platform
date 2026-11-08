@@ -1,5 +1,3 @@
-from .gateway import MCPExecutionPermit, MCPTool, MCPToolGateway, ToolScope
-from .protocol import MCPHTTPResponse, MCPProtocolService, MCPToolDefinition
 from .extensions import (
     EXTENSIONS_AUDIENCE,
     EXTENSIONS_JOB_CANCEL,
@@ -9,6 +7,8 @@ from .extensions import (
     ExtensionsTransportError,
     register_extensions_tools,
 )
+from .gateway import MCPExecutionPermit, MCPTool, MCPToolGateway, ToolScope
+from .protocol import MCPHTTPResponse, MCPProtocolService, MCPToolDefinition
 from .twi import (
     TWI_MCP_TOOL_DEFINITIONS,
     TWI_OPERATION_TO_TOOL,
