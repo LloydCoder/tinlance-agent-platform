@@ -85,10 +85,7 @@ def test_sandbox_executor_kills_descendants_after_process_leader_exits_on_lease_
 
     marker = tmp_path / "descendant-survived"
     child_code = f"import time; time.sleep(0.6); open({str(marker)!r}, 'w').write('late')"
-    parent_code = (
-        "import subprocess,sys; "
-        f"subprocess.Popen([sys.executable, '-c', {child_code!r}])"
-    )
+    parent_code = f"import subprocess,sys; subprocess.Popen([sys.executable, '-c', {child_code!r}])"
     checks = 0
 
     def lease_is_active() -> bool:
