@@ -18,7 +18,6 @@ def chromium_process_security() -> dict[str, object]:
     """Verify Chromium's browser and renderer processes retain kernel isolation."""
     deadline = time.monotonic() + 5
     chromium: list[tuple[int, list[str], dict[str, str]]] = []
-    pid_one_user_namespace = os.readlink("/proc/1/ns/user")
 
     while time.monotonic() < deadline:
         chromium = []
@@ -76,6 +75,11 @@ def chromium_process_security() -> dict[str, object]:
             f"observed Chromium processes: {process_diagnostics[:12]}"
         )
 
+    browser_user_namespace = os.readlink(f"/proc/{browser_pid}/ns/user")
+    guest_user_namespace = os.readlink("/proc/self/ns/user")
+    if browser_user_namespace != guest_user_namespace:
+        raise SystemExit("Chromium browser process escaped the tenant user namespace")
+
     no_new_privs = browser_status.get("NoNewPrivs") == "1"
     cap_eff = browser_status.get("CapEff", "ffffffffffffffff")
     cap_eff_zero = int(cap_eff, 16) == 0
@@ -96,7 +100,7 @@ def chromium_process_security() -> dict[str, object]:
         renderer_seccomp = renderer_status.get("Seccomp") == "2"
         renderer_no_new_privs = renderer_status.get("NoNewPrivs") == "1"
         renderer_cap_eff_zero = int(renderer_status.get("CapEff", "ffffffffffffffff"), 16) == 0
-        renderer_user_namespace_isolated = renderer_user_namespace != pid_one_user_namespace
+        renderer_user_namespace_isolated = renderer_user_namespace != browser_user_namespace
         if not all(
             (
                 renderer_seccomp,
@@ -113,6 +117,7 @@ def chromium_process_security() -> dict[str, object]:
     return {
         "chromium_pid": browser_pid,
         "chromium_sandbox_enabled": sandbox_enabled,
+        "chromium_browser_user_namespace_matches_guest": True,
         "browser_process_no_new_privs": no_new_privs,
         "browser_process_cap_eff_zero": cap_eff_zero,
         "chromium_renderer_count": len(renderer_processes),
