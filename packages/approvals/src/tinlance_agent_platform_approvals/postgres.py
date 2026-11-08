@@ -16,7 +16,7 @@ _FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
 _COLUMNS = """
     approval_id, tenant_id, run_id, action, resource, reason, requested_by,
     status, metadata, expires_at, intent_fingerprint, approved_by, consumed_at
-"""
+""".strip()
 
 
 class PostgresApprovalService:
