@@ -196,8 +196,7 @@ def test_postgres_approval_records_authenticated_approver_and_intent():
     assert result.approved_by == "approver-b"
     assert connection.committed
     assert any(
-        "INSERT INTO platform.action_approval_events" in query
-        for query, _ in connection.queries
+        "INSERT INTO platform.action_approval_events" in query for query, _ in connection.queries
     )
 
 
