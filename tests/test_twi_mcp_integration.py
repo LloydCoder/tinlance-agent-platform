@@ -576,15 +576,26 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(PermissionError, "approved human review"):
             gateway.call(
-                context, scope, "twi_monitor_delete", arguments, request, uuid4(),
+                context,
+                scope,
+                "twi_monitor_delete",
+                arguments,
+                request,
+                uuid4(),
                 intent_fingerprint="c" * 64,
             )
         self.assertEqual(self.http.calls, [])
 
         with self.assertRaisesRegex(PermissionError, "intent fingerprint"):
             gateway.call(
-                context, scope, "twi_monitor_delete", arguments, request, uuid4(),
-                approval_id=uuid4(), approval_verifier=ApprovedIntent(),
+                context,
+                scope,
+                "twi_monitor_delete",
+                arguments,
+                request,
+                uuid4(),
+                approval_id=uuid4(),
+                approval_verifier=ApprovedIntent(),
             )
         self.assertEqual(self.http.calls, [])
 
