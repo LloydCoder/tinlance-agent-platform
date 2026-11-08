@@ -49,7 +49,7 @@ class ApprovalService:
         if current is None:
             raise KeyError("approval does not exist")
         if (
-            current.status is ApprovalStatus.PENDING
+            current.status in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED}
             and current.expires_at is not None
             and current.expires_at <= datetime.now(UTC)
         ):
