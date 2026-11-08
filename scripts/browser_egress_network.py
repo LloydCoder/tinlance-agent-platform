@@ -155,7 +155,7 @@ def validate_proxy_namespace_routes(
             browser_interface if network == browser else uplink_interface
         )
         if fields[device_index + 1] != expected_interface:
-            raise ValueError("proxy namespace connected route uses an unexpected interface")
+            raise ValueError("proxy namespace contains an unexpected route interface")
         connected.add(network)
     if connected != {browser, uplink} or not default:
         raise ValueError("proxy namespace routes do not match the approved topology")
