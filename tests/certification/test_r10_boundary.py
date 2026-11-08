@@ -201,7 +201,7 @@ def test_tool_version_confusion_is_denied() -> None:
 
 def test_approval_substitution_replay_and_self_approval_are_denied() -> None:
     approvals = ApprovalService()
-    intent = "intent-sha"
+    intent = "a" * 64
     approval = approvals.request(
         TENANT_A,
         RUN_ID,
