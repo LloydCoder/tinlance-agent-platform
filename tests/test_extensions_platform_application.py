@@ -302,7 +302,11 @@ def _approved_replay_request(approval_service: ApprovalService, request_id: str)
 
 def test_dead_letter_replay_requires_bound_human_approval_and_scoped_token() -> None:
     http = FakeHTTPClient(
-        ExtensionsHTTPResponse(200, {"content-type": "application/json"}, b'{"status":"requeued"}')
+        ExtensionsHTTPResponse(
+            200,
+            {"content-type": "application/json"},
+            b'{"status":"requeued"}',
+        )
     )
     approvals = ApprovalService()
     request_id = "platform-extensions-replay-0001"
@@ -325,7 +329,9 @@ def test_dead_letter_replay_requires_bound_human_approval_and_scoped_token() -> 
     assert len(http.calls) == 1
     call = http.calls[0]
     assert call["method"] == "POST"
-    assert call["url"] == f"https://extensions.internal/v1/outbox/dead-letters/{EVENT_ID}/replay"
+    assert call["url"] == (
+        f"https://extensions.internal/v1/outbox/dead-letters/{EVENT_ID}/replay"
+    )
     assert call["body"] is None
     assert call["headers"]["X-Request-ID"] == request_id
     assert call["headers"]["Idempotency-Key"] == REPLAY_IDEMPOTENCY_KEY
@@ -366,7 +372,9 @@ def test_dead_letter_replay_fails_closed_without_approval_verifier() -> None:
     except PermissionError:
         pass
     else:
-        raise AssertionError("dead-letter replay must fail closed without an approval verifier")
+        raise AssertionError(
+            "dead-letter replay must fail closed without an approval verifier"
+        )
     assert http.calls == []
 
 
