@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import re
+import stat
+from pathlib import Path
 
 _NON_PUBLIC_V4_SET = (
     "{ 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, "
@@ -164,17 +167,13 @@ def validate_proxy_namespace_routes(
 
 
 def write_proxy_resolver_config(
-    directory: str | "os.PathLike[str]",
+    directory: str | os.PathLike[str],
     *,
     dns_server: str,
     proxy_uid: int | None = None,
     proxy_gid: int | None = None,
-) -> "os.PathLike[str]":
+) -> Path:
     """Create a resolver file readable only by the proxy workload identity."""
-    import os
-    from pathlib import Path
-    import stat
-
     if (proxy_uid is None) != (proxy_gid is None):
         raise ValueError("proxy resolver ownership requires both UID and GID")
     target = Path(directory) / "resolv.conf"
