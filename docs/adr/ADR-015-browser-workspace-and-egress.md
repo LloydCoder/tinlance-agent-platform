@@ -29,7 +29,7 @@ Domain allowlisting alone is insufficient for SSRF. DNS answers must be validate
 - The namespace has loopback plus one veth to a host-side proxy endpoint, exactly one connected route to that proxy, no IPv4 or IPv6 default route, and no direct DNS route.
 - Host nftables permits the workspace veth to reach only the proxy's TCP port and drops all other traffic arriving from that veth.
 - The proxy binds to a specific private/loopback address, not a wildcard or public interface, and validates the client source network.
-- The browser uses an explicit HTTP proxy endpoint expressed as a private IP literal. The Chromium implicit loopback/link-local bypass list is removed with `<-loopback>`; browser-side DNS resolution is disabled; QUIC is disabled.
+- The browser uses an explicit HTTP proxy endpoint expressed as a private IP literal. The Chromium implicit loopback/link-local bypass list is removed with `<-loopback>`. Destination hostnames are sent in HTTPS CONNECT requests to the proxy for resolution and IP pinning; the browser namespace has no default route or direct DNS route. QUIC and background networking are disabled.
 - If the proxy is unreachable, browser navigation fails. There is no `direct://` proxy fallback and the namespace has no route for direct egress.
 
 ### Egress policy and SSRF defense
@@ -41,7 +41,7 @@ Domain allowlisting alone is insufficient for SSRF. DNS answers must be validate
 - Connect to a validated IP literal from the same DNS answer set; never resolve the hostname again for the socket connection.
 - Every CONNECT is evaluated independently. Redirects therefore receive the same allowlist, DNS and IP-range checks as the initial request.
 - TLS remains end-to-end between Chromium and the destination. The proxy does not intercept TLS or disable certificate verification.
-- Bound concurrent connections, connect time, tunnel idle time, tunnel lifetime and aggregate tunnel bytes. Do not log URLs, headers, credentials or query strings.
+- Bound concurrent connections, DNS/connect time, tunnel idle time, tunnel lifetime and bytes transferred per tunnel. Do not log URLs, headers, credentials or query strings.
 
 ## Threats addressed
 
