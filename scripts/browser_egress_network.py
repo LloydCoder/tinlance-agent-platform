@@ -28,8 +28,17 @@ def _dns_server(value: str) -> str:
         address = ipaddress.ip_address(value)
     except ValueError as exc:
         raise ValueError("DNS forwarding requires an explicit IP literal") from exc
-    if not isinstance(address, ipaddress.IPv4Address) or not address.is_global:
-        raise ValueError("DNS forwarder must be an explicitly approved global IPv4 address")
+    if (
+        not isinstance(address, ipaddress.IPv4Address)
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_unspecified
+        or address.is_reserved
+    ):
+        raise ValueError(
+            "DNS forwarder must be an explicitly approved, reachable IPv4 resolver"
+        )
     return str(address)
 
 
