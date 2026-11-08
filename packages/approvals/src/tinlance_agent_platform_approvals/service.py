@@ -88,7 +88,7 @@ class ApprovalService:
                 raise PermissionError("approval is owned by another tenant")
             if current.status is not ApprovalStatus.PENDING:
                 raise ValueError("approval is no longer pending")
-            if intent_fingerprint is not None and current.intent_fingerprint != intent_fingerprint:
+            if current.intent_fingerprint != intent_fingerprint
                 raise PermissionError("approval intent does not match")
             if approved and approver_subject_id == current.requested_by:
                 raise PermissionError("requester cannot approve the same consequential request")
@@ -137,10 +137,7 @@ class ApprovalService:
                 current.run_id != run_id
                 or current.action != action
                 or current.resource != resource
-                or (
-                    intent_fingerprint is not None
-                    and current.intent_fingerprint != intent_fingerprint
-                )
+                or current.intent_fingerprint != intent_fingerprint
             ):
                 raise PermissionError("approval does not bind to this action")
             return current.status
