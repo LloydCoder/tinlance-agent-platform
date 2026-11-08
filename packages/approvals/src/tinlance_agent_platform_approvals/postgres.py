@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from tinlance_agent_platform_contracts import ApprovalRequest, ApprovalStatus
@@ -169,7 +169,7 @@ class PostgresApprovalService:
             )
             return item
 
-        return self._transaction(tenant_id, operation)
+        return cast(ApprovalRequest, self._transaction(tenant_id, operation))
 
     def _current(self, connection: Any, approval_id: UUID, tenant_uuid: UUID) -> ApprovalRequest:
         row = connection.execute(
@@ -255,7 +255,7 @@ class PostgresApprovalService:
             )
             return item
 
-        return self._transaction(tenant_id, operation)
+        return cast(ApprovalRequest, self._transaction(tenant_id, operation))
 
     def validate_approved_for(
         self,
@@ -280,7 +280,7 @@ class PostgresApprovalService:
                 )
             return current.status
 
-        return self._transaction(tenant_id, operation)
+        return cast(ApprovalStatus, self._transaction(tenant_id, operation))
 
     def require_approved_for(
         self,
@@ -328,9 +328,12 @@ class PostgresApprovalService:
         self._transaction(tenant_id, operation)
 
     def get(self, approval_id: UUID, tenant_id: str) -> ApprovalRequest:
-        return self._transaction(
-            tenant_id,
-            lambda connection, tenant_uuid: self._current(connection, approval_id, tenant_uuid),
+        return cast(
+            ApprovalRequest,
+            self._transaction(
+                tenant_id,
+                lambda connection, tenant_uuid: self._current(connection, approval_id, tenant_uuid),
+            ),
         )
 
     @staticmethod
