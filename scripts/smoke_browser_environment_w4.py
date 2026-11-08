@@ -659,8 +659,13 @@ def main() -> int:
             shutil.rmtree(resolv_dir, ignore_errors=True)
             if resolv_dir.exists():
                 cleanup_errors.append("proxy namespace resolver config remains")
-        with contextlib.suppress(OSError):
-            Path("/proc/sys/net/ipv4/ip_forward").write_text(old_forward, encoding="ascii")
+        try:
+            forwarding_setting = Path("/proc/sys/net/ipv4/ip_forward")
+            forwarding_setting.write_text(old_forward, encoding="ascii")
+            if forwarding_setting.read_text(encoding="ascii").strip() != old_forward:
+                cleanup_errors.append("host IPv4 forwarding sysctl was not restored")
+        except OSError:
+            cleanup_errors.append("host IPv4 forwarding sysctl could not be restored")
         for family, table in (("inet", host_forward_table), ("ip", host_nat_table)):
             if subprocess.run(["nft", "list", "table", family, table],
                               check=False, capture_output=True).returncode == 0:
