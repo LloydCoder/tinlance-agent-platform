@@ -248,7 +248,9 @@ def test_extensions_urllib_client_disables_redirects_and_bounds_response_body() 
 
 def test_extensions_transport_mints_resource_bound_purposes_for_both_actions() -> None:
     issuer = TokenIssuer()
-    http = HTTPClient(ExtensionsHTTPResponse(200, {"content-type": "application/json"}, b'{"status":"ok"}'))
+    http = HTTPClient(
+        ExtensionsHTTPResponse(200, {"content-type": "application/json"}, b'{"status":"ok"}')
+    )
     transport = ExtensionsHTTPTransport(
         base_url=_loopback_origin(),
         token_issuer=issuer,
