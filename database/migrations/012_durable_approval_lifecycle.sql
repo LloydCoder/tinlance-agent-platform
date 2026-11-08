@@ -202,8 +202,7 @@ begin
     end if;
 
     perform 1 from platform.tenants
-     where tenant_id = p_tenant_id and status = 'active'
-     for share;
+     where tenant_id = p_tenant_id and status = 'active';
     if not found then
         raise exception 'tenant is not active' using errcode = '42501';
     end if;
