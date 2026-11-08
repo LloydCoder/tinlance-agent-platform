@@ -11,6 +11,7 @@ end
 $$;
 grant platform_approval_client to approval_test_app;
 
+begin;
 insert into platform.tenants(tenant_id, name) values
 ('00000000-0000-0000-0000-000000000091', 'approval-tenant-a'),
 ('00000000-0000-0000-0000-000000000092', 'approval-tenant-b');
@@ -43,7 +44,7 @@ begin
     if approval_id <> '50000000-0000-0000-0000-000000000091' then
         raise exception 'approval request returned an unexpected ID';
     end if;
-    if (select status from platform.approvals where approval_id = approval_id) <> 'pending' then
+    if (select a.status from platform.approvals a where a.approval_id = approval_id) <> 'pending' then
         raise exception 'new approval is not pending';
     end if;
 
@@ -147,7 +148,7 @@ begin
     ) is not true then
         raise exception 'expired approval was not transitioned';
     end if;
-    if (select status from platform.approvals where approval_id = expiry_id) <> 'expired' then
+    if (select a.status from platform.approvals a where a.approval_id = expiry_id) <> 'expired' then
         raise exception 'expired approval status was not persisted';
     end if;
     if platform.consume_approval(
@@ -250,6 +251,7 @@ end
 $$;
 
 reset role;
+commit;
 
 -- Two independent sessions race to consume the same approved approval.
 select dblink_connect(
