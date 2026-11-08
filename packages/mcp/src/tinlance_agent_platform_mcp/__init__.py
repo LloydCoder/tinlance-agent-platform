@@ -1,6 +1,8 @@
 from .extensions import (
     EXTENSIONS_AUDIENCE,
+    EXTENSIONS_DEAD_LETTER_REPLAY,
     EXTENSIONS_JOB_CANCEL,
+    EXTENSIONS_MCP_TOOL_DEFINITIONS,
     EXTENSIONS_TOOL_REGISTRATIONS,
     ExtensionsHTTPResponse,
     ExtensionsHTTPTransport,
@@ -41,7 +43,9 @@ __all__ = [
     "MCPToolGateway",
     "ToolScope",
     "EXTENSIONS_AUDIENCE",
+    "EXTENSIONS_DEAD_LETTER_REPLAY",
     "EXTENSIONS_JOB_CANCEL",
+    "EXTENSIONS_MCP_TOOL_DEFINITIONS",
     "EXTENSIONS_TOOL_REGISTRATIONS",
     "ExtensionsHTTPResponse",
     "ExtensionsHTTPTransport",
