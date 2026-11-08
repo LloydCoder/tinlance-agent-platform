@@ -185,7 +185,13 @@ def write_proxy_resolver_config(
             os.fchown(descriptor, proxy_uid, proxy_gid)
         with os.fdopen(descriptor, "w", encoding="ascii") as stream:
             descriptor = -1
-            stream.write("nameserver " + _dns_server(dns_server) + chr(10) + "options timeout:2 attempts:1" + chr(10))
+            stream.write(
+                "nameserver "
+                + _dns_server(dns_server)
+                + chr(10)
+                + "options timeout:2 attempts:1"
+                + chr(10)
+            )
         metadata = target.stat(follow_symlinks=False)
         expected_uid = os.geteuid() if proxy_uid is None else proxy_uid
         expected_gid = os.getegid() if proxy_gid is None else proxy_gid
