@@ -71,6 +71,11 @@ class BubblewrapProvider:
             "--ro-bind",
             "/lib64",
             "/lib64",
+            # Chromium and platform libraries need read-only host sysfs for
+            # CPU topology and device capability discovery inside the sandbox.
+            "--ro-bind",
+            "/sys",
+            "/sys",
             "--proc",
             "/proc",
             "--dev",
