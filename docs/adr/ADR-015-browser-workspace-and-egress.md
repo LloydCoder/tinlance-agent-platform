@@ -81,5 +81,6 @@ The W3 workflow must prove, on its exact PR head:
 
 - Chromium proxy behavior and implicit bypass rules: https://chromium.googlesource.com/chromium/src/+/HEAD/net/docs/proxy.md
 - OWASP SSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+- RFC 6052 — IPv6 Addressing of IPv4/IPv6 Translators (defines the `64:ff9b::/96` well-known NAT64 prefix and IPv4-embedded address format): https://datatracker.ietf.org/doc/html/rfc6052
 - Docker network isolation concepts (internal networks have no default gateway): https://docs.docker.com/compose/how-tos/networking/
 - Playwright Docker guidance (official test image is not recommended for untrusted websites): https://playwright.dev/docs/docker
