@@ -176,3 +176,40 @@ def test_postgres_approval_expiry_is_persisted():
     assert result.status is ApprovalStatus.EXPIRED
     assert connection.committed
     assert any("status = 'expired'" in query for query, _ in connection.queries)
+
+
+def test_postgres_approval_records_authenticated_approver_and_intent():
+    pending = approval_row()
+    approved = approval_row("approved", approved_by="approver-b")
+    connection = Connection(selected=pending, updated=approved)
+    service = PostgresApprovalService(connection_factory=lambda: connection)
+
+    result = service.decide(
+        APPROVAL_ID,
+        True,
+        str(TENANT_ID),
+        approver_subject_id="approver-b",
+        intent_fingerprint=FINGERPRINT,
+    )
+
+    assert result.status is ApprovalStatus.APPROVED
+    assert result.approved_by == "approver-b"
+    assert connection.committed
+    assert any("INSERT INTO platform.action_approval_events" in query for query, _ in connection.queries)
+
+
+def test_postgres_approval_rejects_changed_intent_before_consumption():
+    approved = approval_row("approved", approved_by="approver-b")
+    connection = Connection(selected=approved)
+    service = PostgresApprovalService(connection_factory=lambda: connection)
+
+    with pytest.raises(PermissionError, match="does not match"):
+        service.require_approved_for(
+            APPROVAL_ID,
+            str(TENANT_ID),
+            RUN_ID,
+            "replay",
+            "extensions://outbox/dead-letters/{event_id}",
+            intent_fingerprint="c" * 64,
+        )
+    assert not any("UPDATE platform.action_approvals" in query for query, _ in connection.queries)
