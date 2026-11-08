@@ -117,7 +117,7 @@ BEGIN
     ) VALUES (
         p_tenant_id, p_workspace_id, p_lease_id, p_owner_subject_id, p_worker_id,
         1, 'active', new_expiry
-    ) ON CONFLICT (tenant_id, workspace_id) DO NOTHING;
+    ) ON CONFLICT ON CONSTRAINT workspace_leases_pkey DO NOTHING;
     GET DIAGNOSTICS inserted_count = ROW_COUNT;
 
     IF inserted_count = 1 THEN
