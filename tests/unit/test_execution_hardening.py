@@ -5,9 +5,16 @@ from uuid import UUID
 
 import pytest
 
+from tinlance_agent_platform_contracts import SandboxRequest
 from tinlance_agent_platform_durability import WorkspaceLease
 from tinlance_agent_platform_runtime import ExecutionTimeout, call_with_timeout
-from tinlance_agent_platform_sandbox import SandboxExecutor, SandboxLimits, WorkspaceLeaseSupervisor
+from tinlance_agent_platform_sandbox import (
+    SandboxExecutor,
+    SandboxLimits,
+    SandboxPolicy,
+    WorkspaceLeaseSupervisor,
+    execute_request,
+)
 
 
 def test_model_deadline_is_hard() -> None:
@@ -227,3 +234,44 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
         )
 
     assert not marker.exists()
+
+
+def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path: Path) -> None:
+    request = SandboxRequest(
+        UUID("00000000-0000-0000-0000-000000000094"),
+        "tenant-a",
+        UUID("40000000-0000-0000-0000-000000000094"),
+        "workspace-a",
+        ("/usr/bin/python3", "-c", "print('governed-workspace')"),
+        3,
+        allowed_paths=(str(tmp_path),),
+    )
+    policy = SandboxPolicy(
+        allowed_commands=frozenset({"/usr/bin/python3"}),
+        allowed_workspace_roots=(str(tmp_path),),
+    )
+
+    class PassthroughProvider:
+        def command(
+            self, argv: list[str], limits: SandboxLimits, workspace_paths: tuple[str, ...] = ()
+        ) -> list[str]:
+            return argv
+
+    assertions = 0
+
+    def active_lease() -> bool:
+        nonlocal assertions
+        assertions += 1
+        return True
+
+    result = execute_request(
+        request,
+        policy,
+        PassthroughProvider(),
+        SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
+        lease_assertion=active_lease,
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "governed-workspace"
+    assert assertions >= 2
