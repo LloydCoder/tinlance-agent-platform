@@ -136,6 +136,7 @@ jobs:
               "browser_ipc_namespace_isolated",
               "browser_mount_namespace_isolated",
               "proxy_namespace_host_services_blocked",
+              "host_local_blocked_by_host_firewall",
               "proxy_namespace_private_egress_blocked",
               "proxy_namespace_metadata_egress_blocked",
               "proxy_namespace_unapproved_port_blocked",
