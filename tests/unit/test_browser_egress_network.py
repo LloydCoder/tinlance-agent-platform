@@ -201,3 +201,15 @@ def test_host_forwarding_allow_rules_are_interface_and_identity_scoped() -> None
         "-j",
         "ACCEPT",
     )
+
+
+def test_browser_https_probe_requires_tls_12_or_newer() -> None:
+    import ssl
+
+    from scripts.browser_workspace_guest import verified_tls_context
+
+    context = verified_tls_context()
+    assert context.minimum_version == ssl.TLSVersion.TLSv1_2
+    assert context.maximum_version == ssl.TLSVersion.TLSv1_3
+    assert context.check_hostname is True
+    assert context.verify_mode == ssl.CERT_REQUIRED
