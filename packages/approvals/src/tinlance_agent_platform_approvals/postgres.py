@@ -242,10 +242,7 @@ class PostgresApprovalService:
             approval.run_id != run_id
             or approval.action != action
             or approval.resource != resource
-            or (
-                fingerprint is not None
-                and approval.intent_fingerprint != fingerprint
-            )
+            or approval.intent_fingerprint != fingerprint
         ):
             raise PermissionError("approval does not bind to this action")
         return approval.status
