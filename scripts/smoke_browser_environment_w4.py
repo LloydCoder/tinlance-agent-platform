@@ -223,6 +223,16 @@ def main() -> int:
                 "flush", "table", "all", "default",
             ])
         run(["ip", "netns", "exec", proxy_ns, "sysctl", "-w", "net.ipv4.ip_forward=0"])
+        for netns in (browser_ns, proxy_ns, tenant_b_ns):
+            ipv6_disabled = run([
+                "ip", "netns", "exec", netns, "sysctl", "-n",
+                "net.ipv6.conf.all.disable_ipv6",
+            ])
+            ipv6_routes = run([
+                "ip", "netns", "exec", netns, "ip", "-6", "route", "show",
+            ])
+            if ipv6_disabled != "1" or ipv6_routes:
+                raise RuntimeError(f"IPv6 is not fully disabled in namespace {netns}")
 
         resolv_dir.mkdir(parents=True, exist_ok=False)
         (resolv_dir / "resolv.conf").write_text(
@@ -303,6 +313,9 @@ def main() -> int:
         })
         evidence.update({
             "browser_namespace_has_no_default_route": True,
+            "browser_ipv6_disabled": True,
+            "proxy_ipv6_disabled": True,
+            "tenant_b_ipv6_disabled": True,
             "proxy_namespace_has_approved_default_route": True,
             "proxy_namespace_firewall_restrictive": True,
             "browser_namespace_route_table": browser_routes,
