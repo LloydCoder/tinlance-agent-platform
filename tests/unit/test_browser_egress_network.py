@@ -42,10 +42,17 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
     browser = "10.254.4.0/30 dev tbbr0 proto kernel scope link src 10.254.4.2"
     uplink = "10.255.4.0/30 dev tbup0 proto kernel scope link src 10.255.4.2"
     valid = browser + "\n" + uplink + "\ndefault via 10.255.4.1 dev tbup0"
-    assert validate_proxy_namespace_routes(
-        valid, "10.254.4.0/30", "10.255.4.0/30", "10.255.4.1",
-        "tbbr0", "tbup0",
-    ) is True
+    assert (
+        validate_proxy_namespace_routes(
+            valid,
+            "10.254.4.0/30",
+            "10.255.4.0/30",
+            "10.255.4.1",
+            "tbbr0",
+            "tbup0",
+        )
+        is True
+    )
     with pytest.raises(ValueError, match="approved gateway"):
         validate_proxy_namespace_routes(
             browser + "\n" + uplink + "\ndefault via 10.255.4.254 dev tbup0",
@@ -57,7 +64,8 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
         )
     with pytest.raises(ValueError, match="unexpected route"):
         validate_proxy_namespace_routes(
-            browser + "\n192.168.1.0/24 dev tbbr0 scope link"
+            browser
+            + "\n192.168.1.0/24 dev tbbr0 scope link"
             + "\ndefault via 10.255.4.1 dev tbup0",
             "10.254.4.0/30",
             "10.255.4.0/30",
@@ -76,7 +84,9 @@ def test_proxy_namespace_route_validation_rejects_unapproved_routes() -> None:
         )
     with pytest.raises(ValueError, match="unexpected route"):
         validate_proxy_namespace_routes(
-            browser.replace("dev tbbr0", "dev") + "\n" + uplink
+            browser.replace("dev tbbr0", "dev")
+            + "\n"
+            + uplink
             + "\ndefault via 10.255.4.1 dev tbup0",
             "10.254.4.0/30",
             "10.255.4.0/30",
