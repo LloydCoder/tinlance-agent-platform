@@ -68,7 +68,10 @@ def probe_blocked(namespace: str, destination: str, port: int) -> bool:
     )
     output = run(["ip", "netns", "exec", namespace, sys.executable, "-c", script], timeout=4)
     if output != "BLOCKED":
-        raise RuntimeError(f"proxy namespace unexpectedly reached restricted destination {destination}:{port}")
+        raise RuntimeError(
+            "proxy namespace unexpectedly reached restricted destination "
+            f"{destination}:{port}"
+        )
     return True
 
 
@@ -154,8 +157,14 @@ def main() -> int:
         run(["ip", "link", "add", browser_if, "type", "veth", "peer", "name", proxy_browser_if])
         run(["ip", "link", "set", browser_if, "netns", browser_ns])
         run(["ip", "link", "set", proxy_browser_if, "netns", proxy_ns])
-        run(["ip", "netns", "exec", browser_ns, "ip", "addr", "add", f"{browser_ip}/30", "dev", browser_if])
-        run(["ip", "netns", "exec", proxy_ns, "ip", "addr", "add", f"{proxy_browser_ip}/30", "dev", proxy_browser_if])
+        run([
+            "ip", "netns", "exec", browser_ns, "ip", "addr", "add",
+            f"{browser_ip}/30", "dev", browser_if,
+        ])
+        run([
+            "ip", "netns", "exec", proxy_ns, "ip", "addr", "add",
+            f"{proxy_browser_ip}/30", "dev", proxy_browser_if,
+        ])
         run(["ip", "netns", "exec", browser_ns, "ip", "link", "set", browser_if, "up"])
         run(["ip", "netns", "exec", proxy_ns, "ip", "link", "set", proxy_browser_if, "up"])
 
@@ -165,9 +174,15 @@ def main() -> int:
         run(["ip", "link", "set", proxy_uplink_if, "netns", proxy_ns])
         run(["ip", "addr", "add", f"{host_uplink_ip}/30", "dev", host_uplink_if])
         run(["ip", "link", "set", host_uplink_if, "up"])
-        run(["ip", "netns", "exec", proxy_ns, "ip", "addr", "add", f"{proxy_uplink_ip}/30", "dev", proxy_uplink_if])
+        run([
+            "ip", "netns", "exec", proxy_ns, "ip", "addr", "add",
+            f"{proxy_uplink_ip}/30", "dev", proxy_uplink_if,
+        ])
         run(["ip", "netns", "exec", proxy_ns, "ip", "link", "set", proxy_uplink_if, "up"])
-        run(["ip", "netns", "exec", proxy_ns, "ip", "route", "add", "default", "via", host_uplink_ip, "dev", proxy_uplink_if])
+        run([
+            "ip", "netns", "exec", proxy_ns, "ip", "route", "add",
+            "default", "via", host_uplink_ip, "dev", proxy_uplink_if,
+        ])
 
         for netns, interfaces in (
             (browser_ns, (browser_if,)),
@@ -175,14 +190,26 @@ def main() -> int:
         ):
             run(["ip", "netns", "exec", netns, "ip", "link", "set", "lo", "up"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=1"])
-            run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=1"])
+            run([
+                "ip", "netns", "exec", netns, "sysctl", "-w",
+                "net.ipv6.conf.default.disable_ipv6=1",
+            ])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.accept_ra=0"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.default.accept_ra=0"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.lo.disable_ipv6=1"])
             for interface in interfaces:
-                run(["ip", "netns", "exec", netns, "sysctl", "-w", f"net.ipv6.conf.{interface}.disable_ipv6=1"])
-                run(["ip", "netns", "exec", netns, "sysctl", "-w", f"net.ipv6.conf.{interface}.accept_ra=0"])
-            run(["ip", "netns", "exec", netns, "ip", "-6", "route", "flush", "table", "all", "default"])
+                run([
+                    "ip", "netns", "exec", netns, "sysctl", "-w",
+                    f"net.ipv6.conf.{interface}.disable_ipv6=1",
+                ])
+                run([
+                    "ip", "netns", "exec", netns, "sysctl", "-w",
+                    f"net.ipv6.conf.{interface}.accept_ra=0",
+                ])
+            run([
+                "ip", "netns", "exec", netns, "ip", "-6", "route",
+                "flush", "table", "all", "default",
+            ])
         run(["ip", "netns", "exec", proxy_ns, "sysctl", "-w", "net.ipv4.ip_forward=0"])
 
         resolv_dir.mkdir(parents=True, exist_ok=False)
@@ -205,7 +232,10 @@ def main() -> int:
             proxy_subnet=str(uplink_network),
         ).replace("tnl_w4_forward", host_forward_table).replace("tnl_w4_nat", host_nat_table)
         run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
-        subprocess.run(["nft", "-f", "-"], input=host_rules, check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["nft", "-f", "-"], input=host_rules, check=True,
+            capture_output=True, text=True,
+        )
         host_rules_created = True
 
         browser_routes = run(["ip", "netns", "exec", browser_ns, "ip", "-4", "route", "show"])
@@ -231,8 +261,13 @@ def main() -> int:
             "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc",
             "--propagation", "private", sys.executable, "-c", namespace_probe,
         ]))
-        if any(isolated_namespace_ids[name] == host_namespace_ids[name] for name in host_namespace_ids):
-            raise RuntimeError("browser workload did not receive distinct PID, IPC and mount namespaces")
+        if any(
+            isolated_namespace_ids[name] == host_namespace_ids[name]
+            for name in host_namespace_ids
+        ):
+            raise RuntimeError(
+                "browser workload did not receive distinct PID, IPC and mount namespaces"
+            )
         evidence.update({
             "browser_pid_namespace_isolated": True,
             "browser_ipc_namespace_isolated": True,
@@ -250,7 +285,9 @@ def main() -> int:
             "proxy_namespace_interface_count": 3,
             "proxy_namespace_dns_server": DNS_SERVER,
             "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
-            "host_forwarding_policy": "proxy uplink only; established replies; TCP/443; DNS to approved resolver",
+            "host_forwarding_policy": (
+                "proxy uplink only; established replies; TCP/443; DNS to approved resolver"
+            ),
         })
 
         proxy_log = work / "proxy.log"
@@ -259,7 +296,8 @@ def main() -> int:
             proxy_process = subprocess.Popen(
                 [
                     "ip", "netns", "exec", proxy_ns,
-                    "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc", "--propagation", "private",
+                    "unshare", "--mount", "--pid", "--ipc", "--fork",
+                    "--mount-proc", "--propagation", "private",
                     "setpriv", "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
                     "--clear-groups", "--no-new-privs", sys.executable,
                     "scripts/browser_egress_proxy.py",
@@ -277,8 +315,11 @@ def main() -> int:
             if proxy_process.poll() is not None:
                 raise RuntimeError("W4 egress proxy exited before readiness")
             ready = subprocess.run(
-                ["ip", "netns", "exec", browser_ns, sys.executable, "-c",
-                 f"import socket; s=socket.create_connection(({proxy_browser_ip!r},{PROXY_PORT}),timeout=1); s.close()"],
+                [
+                    "ip", "netns", "exec", browser_ns, sys.executable, "-c",
+                    f"import socket; s=socket.create_connection(({proxy_browser_ip!r}, "
+                    f"{PROXY_PORT}), timeout=1); s.close()",
+                ],
                 capture_output=True, timeout=2,
             )
             if ready.returncode == 0:
@@ -305,18 +346,29 @@ def main() -> int:
         listener_thread = threading.Thread(target=accept_once, daemon=True)
         listener_thread.start()
 
+        host_probe_code = (
+            "import socket; s=socket.socket(); s.settimeout(1); "
+            f"r=s.connect_ex(({host_uplink_ip!r}, 18080)); "
+            "print('REACHED' if r == 0 else 'BLOCKED')"
+        )
         host_probe = subprocess.run(
-            ["ip", "netns", "exec", proxy_ns, "setpriv", "--reuid", str(proxy_uid),
-             "--regid", str(proxy_gid), "--clear-groups", "--no-new-privs",
-             sys.executable, "-c",
-             f"import socket; s=socket.socket(); s.settimeout(1); r=s.connect_ex(({host_uplink_ip!r},18080)); print('REACHED' if r == 0 else 'BLOCKED')"],
+            [
+                "ip", "netns", "exec", proxy_ns, "setpriv",
+                "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
+                "--clear-groups", "--no-new-privs", sys.executable,
+                "-c", host_probe_code,
+            ],
             capture_output=True, text=True, timeout=4,
         )
         if host_probe.returncode != 0 or host_probe.stdout.strip() != "BLOCKED":
             raise RuntimeError("compromised proxy can reach a host-local service")
         evidence["proxy_namespace_host_services_blocked"] = True
-        evidence["proxy_namespace_private_egress_blocked"] = probe_blocked(proxy_ns, "10.0.0.1", 443)
-        evidence["proxy_namespace_metadata_egress_blocked"] = probe_blocked(proxy_ns, "169.254.169.254", 443)
+        evidence["proxy_namespace_private_egress_blocked"] = probe_blocked(
+            proxy_ns, "10.0.0.1", 443
+        )
+        evidence["proxy_namespace_metadata_egress_blocked"] = probe_blocked(
+            proxy_ns, "169.254.169.254", 443
+        )
         evidence["proxy_namespace_unapproved_port_blocked"] = probe_blocked(proxy_ns, "1.1.1.1", 80)
         if listener is not None:
             listener.close()
@@ -327,10 +379,14 @@ def main() -> int:
         # The browser has no default route and cannot use the proxy uplink
         # directly, even if its proxy configuration is removed or bypassed.
         direct_probe = subprocess.run(
-            ["ip", "netns", "exec", browser_ns, "setpriv", "--reuid", str(browser_uid),
-             "--regid", str(browser_gid), "--clear-groups", "--no-new-privs",
-             sys.executable, "-c",
-             "import socket; s=socket.socket(); s.settimeout(1); r=s.connect_ex(('1.1.1.1',443)); print('REACHED' if r == 0 else 'BLOCKED')"],
+            [
+                "ip", "netns", "exec", browser_ns, "setpriv",
+                "--reuid", str(browser_uid), "--regid", str(browser_gid),
+                "--clear-groups", "--no-new-privs", sys.executable, "-c",
+                "import socket; s=socket.socket(); s.settimeout(1); "
+                "r=s.connect_ex(('1.1.1.1', 443)); "
+                "print('REACHED' if r == 0 else 'BLOCKED')",
+            ],
             capture_output=True, text=True, timeout=4,
         )
         if direct_probe.returncode != 0 or direct_probe.stdout.strip() != "BLOCKED":
@@ -339,7 +395,8 @@ def main() -> int:
 
         guest_command = [
             "ip", "netns", "exec", browser_ns,
-            "unshare", "--mount", "--pid", "--ipc", "--fork", "--mount-proc", "--propagation", "private",
+            "unshare", "--mount", "--pid", "--ipc", "--fork",
+            "--mount-proc", "--propagation", "private",
             "setpriv", "--reuid", str(browser_uid), "--regid", str(browser_gid),
             "--clear-groups", "--no-new-privs", sys.executable,
             "scripts/browser_workspace_guest.py",
