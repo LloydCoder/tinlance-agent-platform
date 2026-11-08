@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.browser_egress_network import (
     build_host_forwarding_rules,
     build_proxy_namespace_rules,
