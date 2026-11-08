@@ -58,12 +58,13 @@ def create_user(name: str, start_uid: int) -> tuple[int, int]:
 
 def probe_blocked(namespace: str, destination: str, port: int) -> bool:
     script = (
-        "import socket,sys; "
-        f"target=({destination!r},{port}); "
-        "try_connect=False; "
-        "try: socket.create_connection(target,timeout=1); try_connect=True "
-        "except OSError: pass; "
-        "print('REACHED' if try_connect else 'BLOCKED')"
+        "import socket\\n"
+        f"target = ({destination!r}, {port})\\n"
+        "try:\\n"
+        "    socket.create_connection(target, timeout=1)\\n"
+        "    print('REACHED')\\n"
+        "except OSError:\\n"
+        "    print('BLOCKED')\\n"
     )
     output = run(["ip", "netns", "exec", namespace, sys.executable, "-c", script], timeout=4)
     if output != "BLOCKED":
@@ -172,6 +173,7 @@ def main() -> int:
             (browser_ns, (browser_if,)),
             (proxy_ns, (proxy_browser_if, proxy_uplink_if)),
         ):
+            run(["ip", "netns", "exec", netns, "ip", "link", "set", "lo", "up"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=1"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=1"])
             run(["ip", "netns", "exec", netns, "sysctl", "-w", "net.ipv6.conf.all.accept_ra=0"])
@@ -291,7 +293,8 @@ def main() -> int:
         if host_probe.returncode != 0 or host_probe.stdout.strip() != "BLOCKED":
             raise RuntimeError("compromised proxy can reach a host-local service")
         evidence["proxy_namespace_host_services_blocked"] = True
-        evidence["proxy_namespace_private_egress_blocked"] = probe_blocked(proxy_ns, "169.254.169.254", 443)
+        evidence["proxy_namespace_private_egress_blocked"] = probe_blocked(proxy_ns, "10.0.0.1", 443)
+        evidence["proxy_namespace_metadata_egress_blocked"] = probe_blocked(proxy_ns, "169.254.169.254", 443)
         evidence["proxy_namespace_unapproved_port_blocked"] = probe_blocked(proxy_ns, "1.1.1.1", 80)
         if listener is not None:
             listener.close()
