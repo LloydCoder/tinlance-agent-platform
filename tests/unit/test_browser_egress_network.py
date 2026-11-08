@@ -152,10 +152,7 @@ def test_proxy_resolver_config_is_readable_only_by_proxy_identity(tmp_path) -> N
     assert metadata.st_gid == os.getegid()
     assert metadata.st_mode & 0o777 == 0o600
     assert config.read_text(encoding="ascii") == (
-        "nameserver 1.1.1.1"
-        + chr(10)
-        + "options timeout:2 attempts:1"
-        + chr(10)
+        "nameserver 1.1.1.1" + chr(10) + "options timeout:2 attempts:1" + chr(10)
     )
 
 
