@@ -20,6 +20,7 @@ from pathlib import Path
 from browser_egress_network import (
     build_host_forwarding_rules,
     build_proxy_namespace_rules,
+    build_host_iptables_forward_rules,
     validate_proxy_namespace_routes,
     write_proxy_resolver_config,
 )
@@ -237,6 +238,8 @@ def main() -> int:
     listener: socket.socket | None = None
     listener_thread: threading.Thread | None = None
     dns_relay: _DNSRelayServer | None = None
+    host_iptables_chain: str | None = None
+    host_iptables_rules: list[tuple[str, ...]] = []
     resolv_dir = Path("/etc/netns") / proxy_ns
     old_forward = Path("/proc/sys/net/ipv4/ip_forward").read_text(encoding="ascii").strip()
     work = Path(tempfile.mkdtemp(prefix="tinlance-browser-w4-"))
@@ -486,6 +489,32 @@ def main() -> int:
             text=True,
         )
         host_rules_created = True
+
+        host_route = run(["ip", "-4", "route", "get", "1.1.1.1"])
+        host_route_fields = host_route.split()
+        if "dev" not in host_route_fields:
+            raise RuntimeError("host route lookup did not identify an egress interface")
+        host_egress_interface = host_route_fields[host_route_fields.index("dev") + 1]
+        docker_user = subprocess.run(
+            ["iptables", "-S", "DOCKER-USER"], check=False, capture_output=True, text=True
+        )
+        host_iptables_chain = "DOCKER-USER" if docker_user.returncode == 0 else "FORWARD"
+        scoped_rules = build_host_iptables_forward_rules(
+            proxy_host_interface=host_uplink_if,
+            egress_interface=host_egress_interface,
+            proxy_ip=proxy_uplink_ip,
+        )
+        for rule in scoped_rules:
+            subprocess.run(
+                ["iptables", "-I", host_iptables_chain, "1", *rule],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            host_iptables_rules.append(rule)
+        evidence["host_egress_interface"] = host_egress_interface
+        evidence["host_forwarding_chain"] = host_iptables_chain
+        evidence["host_scoped_forward_rules_installed"] = True
 
         browser_routes = run(["ip", "netns", "exec", browser_ns, "ip", "-4", "route", "show"])
         if any(line.split()[:1] == ["default"] for line in browser_routes.splitlines()):
@@ -1164,6 +1193,18 @@ def main() -> int:
                     )
                     if deleted.returncode != 0:
                         cleanup_errors.append(f"host firewall table {table} could not be deleted")
+        if host_iptables_chain is not None:
+            for rule in reversed(host_iptables_rules):
+                deleted = subprocess.run(
+                    ["iptables", "-D", host_iptables_chain, *rule],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if deleted.returncode != 0:
+                    cleanup_errors.append(
+                        f"host forwarding rule could not be removed from {host_iptables_chain}"
+                    )
         if resolv_dir.exists():
             shutil.rmtree(resolv_dir, ignore_errors=True)
             if resolv_dir.exists():
