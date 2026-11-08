@@ -322,7 +322,7 @@ BEGIN
     IF current_lease.status = 'released' THEN
         RETURN false;
     END IF;
-    IF current_lease.status <> 'active' THEN
+    IF current_lease.status <> 'active' OR current_lease.lease_expires_at <= clock_timestamp() THEN
         RAISE EXCEPTION 'workspace lease is not active' USING ERRCODE = '55000';
     END IF;
     UPDATE platform.workspace_leases
