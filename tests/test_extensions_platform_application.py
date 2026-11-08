@@ -150,7 +150,10 @@ def test_job_cancellation_is_policy_checked_and_uses_platform_minted_scoped_toke
     assert claims["request_id"] == request_id
     assert claims["client_id"] == "tinlance-extensions-platform"
     assert claims["purpose"] == extensions_action_purpose(
-        tenant_id="tenant-a", subject_id="user-a", tool_name="extensions_job_cancel", resource_id=JOB_ID
+        tenant_id="tenant-a",
+        subject_id="user-a",
+        tool_name="extensions_job_cancel",
+        resource_id=JOB_ID,
     )
 
 
