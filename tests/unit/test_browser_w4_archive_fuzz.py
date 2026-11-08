@@ -5,7 +5,6 @@ import tarfile
 from pathlib import Path
 
 import pytest
-
 from scripts.normalize_rootfs_tar import normalize_rootfs_tar
 
 
@@ -40,9 +39,15 @@ def _archive(path: Path, members: list[tuple[str, str, str]]) -> None:
 @pytest.mark.parametrize(
     ("entries", "message"),
     [
-        ([("file", "usr/bin/a", "one"), ("file", "usr/bin/a", "two")], "duplicate rootfs archive path"),
+        (
+            [("file", "usr/bin/a", "one"), ("file", "usr/bin/a", "two")],
+            "duplicate rootfs archive path",
+        ),
         ([("hardlink", "usr/bin/a", "usr/bin/missing")], "missing hardlink target"),
-        ([("hardlink", "usr/bin/a", "usr/bin/b"), ("hardlink", "usr/bin/b", "usr/bin/a")], "cyclic hardlink"),
+        (
+            [("hardlink", "usr/bin/a", "usr/bin/b"), ("hardlink", "usr/bin/b", "usr/bin/a")],
+            "cyclic hardlink",
+        ),
         ([("symlink", "usr/bin/link", "/../../etc/shadow")], "unsafe symlink"),
         ([("fifo", "var/run/agent.sock", "")], "unsupported special file"),
         ([("char", "dev/mem", "")], "unsupported special file"),
@@ -80,7 +85,10 @@ def test_hardlink_to_symlink_is_rejected(tmp_path: Path) -> None:
     source = tmp_path / "hardlink-symlink.tar"
     _archive(
         source,
-        [("symlink", "usr/bin/target", "relative"), ("hardlink", "usr/bin/alias", "usr/bin/target")],
+        [
+            ("symlink", "usr/bin/target", "relative"),
+            ("hardlink", "usr/bin/alias", "usr/bin/target"),
+        ],
     )
     with pytest.raises(ValueError, match="hardlink target is not a regular file"):
         normalize_rootfs_tar(source, tmp_path / "normalized.tar")
