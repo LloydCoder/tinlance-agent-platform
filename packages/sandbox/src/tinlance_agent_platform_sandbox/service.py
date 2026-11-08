@@ -25,7 +25,9 @@ def build_command(
     limits: SandboxLimits,
 ) -> list[str]:
     validate_request(request, policy)
-    return provider.command(list(request.command), limits, request.allowed_paths, network=request.network)
+    return provider.command(
+        list(request.command), limits, request.allowed_paths, network=request.network
+    )
 
 
 def execute_request(
