@@ -75,25 +75,27 @@ def build_host_forwarding_rules(
     *,
     proxy_host_interface: str,
     proxy_subnet: str,
-    dns_server: str,
+    host_dns_ip: str,
 ) -> str:
-    """Restrict host forwarding/NAT to the proxy namespace's approved egress."""
+    """Restrict host DNS ingress and proxy forwarding to the dedicated uplink."""
     uplink = _interface(proxy_host_interface)
-    dns = _dns_server(dns_server)
+    dns = ipaddress.ip_address(host_dns_ip)
     subnet = ipaddress.ip_network(proxy_subnet, strict=True)
     if subnet.version != 4 or not subnet.is_private:
         raise ValueError("proxy uplink must use a private IPv4 subnet")
+    if dns.version != 4 or dns not in subnet:
+        raise ValueError("host DNS relay must bind to the proxy uplink subnet")
     return f"""table inet tnl_w4_forward {{
   chain input {{
     type filter hook input priority -50; policy accept;
+    iifname "{uplink}" ip daddr {dns} udp dport 53 accept
+    iifname "{uplink}" ip daddr {dns} tcp dport 53 accept
     iifname "{uplink}" drop
   }}
   chain forward {{
     type filter hook forward priority -50; policy accept;
     ct state established,related accept
     iifname "{uplink}" ip daddr != {_NON_PUBLIC_V4_SET} tcp dport 443 accept
-    iifname "{uplink}" ip daddr {dns} udp dport 53 accept
-    iifname "{uplink}" ip daddr {dns} tcp dport 53 accept
     iifname "{uplink}" drop
   }}
 }}
