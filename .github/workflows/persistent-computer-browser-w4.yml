@@ -150,6 +150,23 @@ jobs:
           guest = report.get("guest", {})
           if guest.get("status") != "passed":
               raise SystemExit("W4 Chromium guest evidence is missing or failed.")
+          chromium_requirements = [
+              "chromium_sandbox_enabled",
+              "browser_process_cap_eff_zero",
+              "browser_process_no_new_privs",
+              "chromium_renderer_seccomp_enabled",
+              "chromium_renderer_no_new_privs",
+              "chromium_renderer_cap_eff_zero",
+              "chromium_renderer_user_namespace_isolated",
+          ]
+          missing_chromium = [name for name in chromium_requirements if guest.get(name) is not True]
+          if missing_chromium or guest.get("chromium_renderer_count", 0) < 1:
+              raise SystemExit(f"W4 Chromium confinement evidence is incomplete: {missing_chromium}")
+          proxy_uid = report.get("proxy_process_uid")
+          browser_uid = report.get("browser_process_uid")
+          other_uid = report.get("other_tenant_uid")
+          if not proxy_uid or not browser_uid or not other_uid or len({proxy_uid, browser_uid, other_uid}) != 3:
+              raise SystemExit("W4 browser, proxy and other-tenant OS identities must be distinct.")
           if report.get("production_certification") is not False:
               raise SystemExit("W4 ephemeral CI must not claim production certification.")
           print("PASS: W4 dedicated proxy namespace, hostile egress probes, tenant isolation and Chromium.")
