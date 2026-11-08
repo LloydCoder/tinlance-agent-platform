@@ -8,7 +8,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from copy import deepcopy
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from .service import APIRequest, APIResponse, IdempotencyConflictError
@@ -228,7 +228,7 @@ class PostgresAPIIdempotencyStore:
                 return "outcome_unknown", None
             raise RuntimeError("idempotency record has an unsupported state")
 
-        return self._transaction(tenant_uuid, reserve)
+        return cast(tuple[str, APIResponse | None], self._transaction(tenant_uuid, reserve))
 
     def _complete(
         self,
@@ -290,7 +290,7 @@ class PostgresAPIIdempotencyStore:
             ).fetchall()
             return len(rows)
 
-        return self._transaction(tenant_uuid, prune)
+        return cast(int, self._transaction(tenant_uuid, prune))
 
     def _mark_outcome_unknown(
         self,
