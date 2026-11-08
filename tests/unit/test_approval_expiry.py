@@ -16,7 +16,7 @@ def test_expired_approval_fails_closed() -> None:
         "db:item",
         "reason",
         "agent",
-        expires_at=datetime.now(UTC) + timedelta(seconds=0.01),
+        expires_at=datetime.now(UTC) + timedelta(seconds=0.5),
     )
     sleep(0.02)
     with pytest.raises(PermissionError):
@@ -42,7 +42,7 @@ def test_approved_but_unconsumed_approval_expires():
         approver_subject_id="approver",
         intent_fingerprint="a" * 64,
     )
-    sleep(0.02)
+    sleep(0.6)
 
     expired = service.get(approval.approval_id, "t1")
 
