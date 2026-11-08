@@ -8,7 +8,8 @@ import re
 _NON_PUBLIC_V4_SET = (
     "{ 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, "
     "127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, "
-    "192.0.0.0/24, 192.0.2.0/24, 192.168.0.0/16, "
+    "192.0.0.0/24, 192.0.2.0/24, 192.88.99.0/24, "
+    "192.168.0.0/16, "
     "198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, "
     "224.0.0.0/4, 240.0.0.0/4 }"
 )
@@ -98,6 +99,8 @@ def validate_proxy_namespace_routes(
     browser_network: str,
     uplink_network: str,
     expected_default_gateway: str,
+    expected_browser_interface: str,
+    expected_uplink_interface: str,
 ) -> bool:
     """Require two approved connected routes and one approved egress default."""
     browser = ipaddress.ip_network(browser_network, strict=True)
@@ -113,6 +116,10 @@ def validate_proxy_namespace_routes(
         or gateway not in uplink
     ):
         raise ValueError("proxy route policy requires distinct private IPv4 links")
+    browser_interface = _interface(expected_browser_interface)
+    uplink_interface = _interface(expected_uplink_interface)
+    if browser_interface == uplink_interface:
+        raise ValueError("proxy route interfaces must be distinct")
     lines = [line.split() for line in routes.splitlines() if line.strip()]
     if len(lines) != 3:
         raise ValueError("proxy namespace contains an unexpected route")
@@ -122,8 +129,11 @@ def validate_proxy_namespace_routes(
         if fields[0] == "default":
             if len(fields) < 4 or fields[1] != "via" or fields[2] != str(gateway):
                 raise ValueError("proxy namespace default route does not use approved gateway")
-            if "dev" not in fields or not fields[fields.index("dev") + 1].startswith("tb"):
-                raise ValueError("proxy namespace default route has no harness uplink")
+            if (
+                "dev" not in fields
+                or fields[fields.index("dev") + 1] != uplink_interface
+            ):
+                raise ValueError("proxy namespace default route does not use the approved uplink")
             default = True
             continue
         try:
@@ -132,6 +142,11 @@ def validate_proxy_namespace_routes(
             raise ValueError("proxy namespace contains an unexpected route") from exc
         if network not in {browser, uplink} or "dev" not in fields:
             raise ValueError("proxy namespace contains an unexpected route")
+        expected_interface = (
+            browser_interface if network == browser else uplink_interface
+        )
+        if fields[fields.index("dev") + 1] != expected_interface:
+            raise ValueError("proxy namespace connected route uses an unexpected interface")
         connected.add(network)
     if connected != {browser, uplink} or not default:
         raise ValueError("proxy namespace routes do not match the approved topology")
