@@ -40,13 +40,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     command = list(args.command)
     if command and command[0] == "--":
         command.pop(0)
-    if not command or any(value <= 0 for value in (
+    limits = (
         args.parent_pid,
         args.cpu_seconds,
         args.memory_bytes,
         args.file_size_bytes,
         args.max_processes,
-    )):
+    )
+    if not command or any(value <= 0 for value in limits):
         _parser().error("positive limits, parent PID and a command are required")
     if not sys.platform.startswith("linux"):
         raise RuntimeError("sandbox exec guard requires Linux")
