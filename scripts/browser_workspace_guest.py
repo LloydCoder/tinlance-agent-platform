@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ipaddress
 import json
 import os
@@ -184,10 +185,8 @@ def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
         tls.close()
         return response_line.startswith(b"HTTP/1.1 200 ")
     finally:
-        try:
+        with contextlib.suppress(OSError):
             connection.close()
-        except OSError:
-            pass
 
 
 def main() -> int:
