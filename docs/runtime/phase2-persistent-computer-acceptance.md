@@ -167,6 +167,16 @@ Regression coverage forcibly terminates a separate supervisor process and verifi
 
 **Acceptance boundary:** this is a merged crash-containment implementation slice, not W5 phase acceptance. The genuine continuous eight-hour controlled-host soak described below remains mandatory. No production certification is implied.
 
+### W5 thread-safe exec-guard follow-up — merged
+
+Platform PR [#210](https://github.com/LloydCoder/tinlance-agent-platform/pull/210) merged as `255b4ea75e9d6a8d231fbb60f2c7d3165aea5b6f`.
+
+The sandbox command path no longer uses Python `preexec_fn` in the supervising application process. Resource limits and Linux parent-death containment are applied by a dedicated exec-guard process before it replaces itself with the requested command. This avoids the documented fork/lock deadlock hazard associated with `preexec_fn` in multithreaded processes. The guard launches under Python isolated mode (`-I`) so workspace content and `PYTHONPATH` cannot shadow the trusted module.
+
+Regression coverage verifies that no `preexec_fn` is supplied, normal command execution remains functional, workspace code cannot shadow the guard, and supervisor-process death still prevents the delayed child side effect. Exact-head Python 3.12–3.14 quality, full pytest/coverage, Ruff, mypy, dependency audit, SBOM, SQL, TSIC conformance, CodeQL, Secret Scan, R10 and host-feasibility checks passed. Post-merge validation is tracked against the exact merge SHA.
+
+**Acceptance boundary:** this removes a process-launch reliability/security hazard. It does not replace the continuous eight-hour controlled-host soak or production qualification.
+
 ### W5 soak gate — not yet accepted
 
 A genuine continuous eight-hour run remains mandatory and has not been evidenced by PR #201 or #202. The GitHub-hosted runner ceiling is six hours per job, so the soak must execute on a dedicated controlled persistent host or registered self-hosted runner. It must include real browser/profile persistence across process and supervisor restarts, lease renewal/expiry/revocation, stale-worker fencing, quota admission/overrun behavior, append-only audit continuity, crash/recovery and cleanup. The trusted supervisor must enforce the current fencing token at every consequential command boundary and terminate/reap workers on lease loss. Segmented hosted jobs or a synthetic clock do not count as an eight-hour soak.
