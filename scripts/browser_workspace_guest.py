@@ -48,6 +48,7 @@ def chromium_process_security() -> dict[str, object]:
             (pid, command, status)
             for pid, command, status in chromium
             if any(argument.startswith("--user-data-dir=") for argument in command)
+            and not any(argument.startswith("--type=") for argument in command)
             and status.get("Uid", "").split()[0:1] == [str(os.geteuid())]
         ]
         if browser_processes:
