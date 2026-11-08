@@ -145,6 +145,14 @@ def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
     return b" 403 " in response.split(b"\r\n", 1)[0]
 
 
+def verified_tls_context() -> ssl.SSLContext:
+    """Create a certificate-verifying TLS client context limited to TLS 1.2/1.3."""
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.maximum_version = ssl.TLSVersion.TLSv1_3
+    return context
+
+
 def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
     """Prove an approved CONNECT tunnel carries a verified end-to-end TLS request."""
     connection = socket.create_connection((proxy_ip, proxy_port), timeout=5)
@@ -169,7 +177,7 @@ def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
         status_line = bytes(headers).split(crlf, 1)[0]
         if not status_line.startswith(b"HTTP/1.1 200 "):
             raise ConnectionError(f"approved CONNECT was rejected: {status_line!r}")
-        tls = ssl.create_default_context().wrap_socket(connection, server_hostname=hostname)
+        tls = verified_tls_context().wrap_socket(connection, server_hostname=hostname)
         tls.sendall(
             b"GET / HTTP/1.1"
             + crlf
