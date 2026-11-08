@@ -122,11 +122,16 @@ def _open_or_recover_lease(
     workspace_id: UUID,
     owner: str,
     worker: str,
+    *,
+    force_reacquire: bool = False,
 ) -> WorkspaceLease:
     if state.get("lease"):
         prior = _lease_from_state(state)
-        if store.assert_active(prior):
+        if store.assert_active(prior) and not force_reacquire:
             return prior
+        if store.assert_active(prior) and force_reacquire:
+            if not store.revoke(prior):
+                raise RuntimeError("host-restart fencing could not revoke the prior lease")
         state["stale_lease_rejected"] = True
     lease = store.acquire(
         tenant_id,
@@ -329,7 +334,13 @@ def run_soak(args: argparse.Namespace) -> dict[str, Any]:
     owner = "tinlance-w5-soak"
     worker = f"w5-worker-{current_boot[:12]}"
     lease = _open_or_recover_lease(
-        store, state, tenant_id, workspace_id, owner, worker
+        store,
+        state,
+        tenant_id,
+        workspace_id,
+        owner,
+        worker,
+        force_reacquire=bool(previous_boot and previous_boot != current_boot),
     )
     _save_lease(state, lease)
 
@@ -375,7 +386,11 @@ def run_soak(args: argparse.Namespace) -> dict[str, Any]:
             _save_lease(state, lease)
 
             iteration = int(state["browser_cycles"]) + 1
-            marker = str(iteration)
+            pending_marker = state.get("pending_browser_marker")
+            marker = str(pending_marker if pending_marker is not None else iteration)
+            if pending_marker is None:
+                state["pending_browser_marker"] = marker
+                _atomic_json(state_path, state)
             _browser_cycle(
                 profile_root,
                 str(tenant_id),
@@ -386,6 +401,7 @@ def run_soak(args: argparse.Namespace) -> dict[str, Any]:
             )
             _quota_cycle(dsn, tenant_id, agent_id, run_id, workspace_id, iteration)
             state["browser_marker"] = marker
+            state.pop("pending_browser_marker", None)
             state["browser_cycles"] = iteration
             state["quota_iterations"] = int(state["quota_iterations"]) + 1
             state["quota_denials"] = int(state["quota_denials"]) + 1
@@ -483,8 +499,21 @@ def run_soak(args: argparse.Namespace) -> dict[str, Any]:
         if not state["expiry_completed"] or not state["revocation_completed"]:
             raise RuntimeError("lease expiry/revocation acceptance probes did not complete")
 
+        if not store.assert_active(lease):
+            raise RuntimeError("workspace lease was not active at final cleanup")
+        if not store.release(lease):
+            raise RuntimeError("workspace lease release did not commit")
         if store.assert_active(lease):
-            store.release(lease)
+            raise RuntimeError("released workspace lease still passed active assertion")
+
+        fixture.shutdown()
+        fixture.server_close()
+        fixture_thread.join(timeout=5)
+        import shutil
+
+        shutil.rmtree(profile_root, ignore_errors=False)
+        if profile_root.exists():
+            raise RuntimeError("persistent browser profile cleanup left residual files")
 
         with psycopg.connect(dsn) as connection:
             connection.execute(
@@ -520,7 +549,7 @@ def run_soak(args: argparse.Namespace) -> dict[str, Any]:
                 "append_only_audit_continuity": True,
                 "process_restart_verified": state["process_start_count"] >= 2,
                 "host_restart_verified": state["host_restart_count"] >= 1,
-                "cleanup_verified": True,
+                "cleanup_verified": not profile_root.exists(),
                 "production_certification": False,
             }
         )
