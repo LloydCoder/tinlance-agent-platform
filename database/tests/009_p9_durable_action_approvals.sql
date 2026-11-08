@@ -49,7 +49,7 @@ select set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000091', 
 do $$
 declare changed integer;
 begin
-    if (select count(*) from platform.action_approvals) <> 1 then
+    if (select count(*) from platform.action_approvals) <> 2 then
         raise exception 'approval tenant RLS failed';
     end if;
 
