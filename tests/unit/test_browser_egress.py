@@ -322,3 +322,44 @@ def test_connector_uses_one_deadline_across_all_validated_addresses(
         ]
     finally:
         fake_socket.close()
+
+
+def test_tunnel_write_backpressure_respects_a_finite_deadline() -> None:
+    import threading
+    import time
+
+    from tinlance_agent_platform_sandbox.egress_proxy import _relay_tunnel
+
+    client, sender = socket.socketpair()
+    upstream, non_reader = socket.socketpair()
+    upstream.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+    sender.settimeout(1)
+    send_errors: list[OSError] = []
+
+    def send_payload() -> None:
+        try:
+            sender.sendall(b"x" * (8 * 1024 * 1024))
+        except OSError as exc:
+            send_errors.append(exc)
+
+    worker = threading.Thread(target=send_payload, daemon=True)
+    worker.start()
+    started = time.monotonic()
+    try:
+        _relay_tunnel(
+            client,
+            upstream,
+            idle_timeout_seconds=2.0,
+            max_seconds=3.0,
+            max_bytes=16 * 1024 * 1024,
+            write_timeout_seconds=0.05,
+        )
+        elapsed = time.monotonic() - started
+        assert elapsed < 0.75
+    finally:
+        client.close()
+        upstream.close()
+        sender.close()
+        non_reader.close()
+        worker.join(timeout=1)
+    assert not worker.is_alive()
