@@ -60,9 +60,7 @@ class PostgresApprovalService:
 
     @staticmethod
     def _fingerprint(value: str | None) -> str | None:
-        if value is not None and (
-            not isinstance(value, str) or not _FINGERPRINT.fullmatch(value)
-        ):
+        if value is not None and (not isinstance(value, str) or not _FINGERPRINT.fullmatch(value)):
             raise ValueError("intent fingerprint must be 64 lowercase hexadecimal characters")
         return value
 
