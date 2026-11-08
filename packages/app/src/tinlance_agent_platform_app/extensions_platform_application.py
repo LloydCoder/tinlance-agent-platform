@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from tinlance_agent_platform_api.service import APIHandler, APIRequest, APIResponse, AgentPlatformAPI
 from tinlance_agent_platform_contracts import (
@@ -60,7 +60,7 @@ class ExtensionsAPIHandler:
         job_id = request.payload.get("job_id")
         if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
             raise ValueError("Extensions job ID must be a canonical UUID")
-        if str(__import__("uuid").UUID(job_id)) != job_id.lower():
+        if str(UUID(job_id)) != job_id.lower():
             raise ValueError("Extensions job ID must be normalized")
 
         trace_id = request.trace_id
