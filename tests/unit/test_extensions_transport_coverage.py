@@ -245,7 +245,6 @@ def test_extensions_urllib_client_disables_redirects_and_bounds_response_body() 
         worker.join(timeout=1)
 
 
-
 def test_extensions_transport_mints_resource_bound_purposes_for_both_actions() -> None:
     issuer = TokenIssuer()
     http = HTTPClient(
