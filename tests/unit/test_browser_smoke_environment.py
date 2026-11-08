@@ -59,3 +59,20 @@ def test_proxy_child_environment_does_not_include_browser_cache(
     assert environment["HOME"] == str(tmp_path / "proxy-home")
     assert environment["TMPDIR"] == str(tmp_path / "proxy-tmp")
     assert "PLAYWRIGHT_BROWSERS_PATH" not in environment
+
+
+def test_failure_diagnostics_redact_secrets_and_bound_output() -> None:
+    from scripts.smoke_browser_environment import _sanitize_diagnostic
+
+    raw = (
+        "Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.secret.signature\\n"
+        "AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\\n"
+        "api_key=super-secret-value\\n"
+        + ("diagnostic-line\\n" * 1000)
+    )
+    sanitized = _sanitize_diagnostic(raw, limit=512)
+    assert len(sanitized) <= 512
+    assert "eyJhbGciOiJSUzI1NiJ9.secret.signature" not in sanitized
+    assert "AKIAIOSFODNN7EXAMPLE" not in sanitized
+    assert "super-secret-value" not in sanitized
+    assert "[REDACTED]" in sanitized
