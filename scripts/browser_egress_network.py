@@ -145,15 +145,9 @@ def validate_proxy_namespace_routes(
         except ValueError as exc:
             raise ValueError("proxy namespace contains an unexpected route") from exc
         device_index = fields.index("dev") if "dev" in fields else -1
-        if (
-            network not in {browser, uplink}
-            or device_index < 0
-            or device_index + 1 >= len(fields)
-        ):
+        if network not in {browser, uplink} or device_index < 0 or device_index + 1 >= len(fields):
             raise ValueError("proxy namespace contains an unexpected route")
-        expected_interface = (
-            browser_interface if network == browser else uplink_interface
-        )
+        expected_interface = browser_interface if network == browser else uplink_interface
         if fields[device_index + 1] != expected_interface:
             raise ValueError("proxy namespace contains an unexpected route interface")
         connected.add(network)
