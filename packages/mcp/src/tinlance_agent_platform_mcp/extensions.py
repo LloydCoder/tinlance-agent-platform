@@ -232,6 +232,7 @@ class ExtensionsHTTPTransport:
         arguments: Mapping[str, object],
         scope: ToolScope,
     ) -> dict[str, object]:
+        idempotency_key: str | None = None
         if tool_name == "extensions_job_cancel":
             tool = EXTENSIONS_JOB_CANCEL
             if set(arguments) != {"job_id"}:
@@ -260,11 +261,12 @@ class ExtensionsHTTPTransport:
                 raise ValueError("Extensions event ID must be a canonical UUID")
             if str(UUID(event_id)) != event_id.lower():
                 raise ValueError("Extensions event ID must be normalized")
-            idempotency_key = arguments.get("idempotency_key")
-            if not isinstance(idempotency_key, str) or not re.fullmatch(
-                r"[A-Za-z0-9._:-]{16,128}", idempotency_key
+            idempotency_key_value = arguments.get("idempotency_key")
+            if not isinstance(idempotency_key_value, str) or not re.fullmatch(
+                r"[A-Za-z0-9._:-]{16,128}", idempotency_key_value
             ):
                 raise ValueError("Extensions replay requires a normalized idempotency key")
+            idempotency_key = idempotency_key_value
             for field in ("run_id", "approval_id"):
                 value = arguments.get(field)
                 if not isinstance(value, str) or not _JOB_ID.fullmatch(value):
