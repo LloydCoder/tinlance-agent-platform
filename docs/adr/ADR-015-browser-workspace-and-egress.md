@@ -77,6 +77,20 @@ The W3 workflow must prove, on its exact PR head:
 - Browser process cgroups, hostile multi-tenant adversarial isolation, eight-hour persistence, snapshot/restore and independent security review remain later acceptance work (W4–W6 and final assurance).
 - The proxy's domain allowlist must be issued by Platform policy. A browser task cannot expand its own allowlist or mutate network policy.
 
+## W4 adversarial egress boundary
+
+W4 replaces the W3 host-network proxy placement with two independent links and a dedicated proxy network namespace:
+
+- The browser namespace connects directly to the proxy namespace over a private veth pair. Neither endpoint is present in the host network namespace.
+- The proxy namespace has a second veth pair to the host, an explicit default route through that uplink, IPv6 disabled, and IP forwarding disabled.
+- The proxy namespace nftables input chain is default-deny and accepts only browser-side TCP/3128 plus established replies. Its output chain is default-deny and permits only public unicast TCP/443 plus UDP/TCP DNS to the explicitly configured resolver.
+- Private, loopback, link-local, shared-address, reserved, multicast and metadata ranges are denied at the proxy namespace egress boundary, independently of the proxy application's DNS/IP validation.
+- Host nftables drops packets from the proxy uplink addressed to host-local services. Host forwarding is default-deny and accepts only proxy-uplink public TCP/443, approved DNS, and established replies; NAT applies only to the proxy uplink subnet.
+- Browser and proxy processes run under distinct non-root identities. The W4 harness gives both workloads private PID, IPC and mount namespaces; the browser mount namespace uses private propagation.
+- The harness verifies the browser has no default route, the proxy has only the two expected connected routes and the approved host gateway, host-local listener access fails, private/metadata and non-HTTPS egress fail, direct browser public egress fails, and cross-tenant profile-root reuse is denied.
+
+The W4 acceptance workflow is an ephemeral CI adversarial test, not a production certification. The workflow must retain the raw JSON evidence and SBOM, prove cleanup, and explicitly report `production_certification=false`. Remaining hostile archive corpus coverage and broader concurrent filesystem/process/IPC/control-plane isolation must also pass before W4 is accepted. Production still requires a trusted supervisor, durable encrypted profile storage, process cgroups, operational audit, provider-attested host security controls and independent review.
+
 ## References
 
 - Chromium proxy behavior and implicit bypass rules: https://chromium.googlesource.com/chromium/src/+/HEAD/net/docs/proxy.md
