@@ -1,6 +1,6 @@
 # Persistent Computer Phase 2 Acceptance Record
 
-**Status as of 2026-11-08:** Phase 2 is not complete. W2 and W3 implementation acceptance are complete at the repository ephemeral-CI feasibility level. W4 is the next serial phase. Production certification remains explicitly out of scope for these ephemeral CI artifacts.
+**Status as of 2026-11-08:** Phase 2 is not complete. W2, W3 and W4 implementation acceptance are complete at the repository ephemeral-CI feasibility level. W5 is the next serial phase. Production certification remains explicitly out of scope for these ephemeral CI artifacts.
 
 This document is the implementation-side acceptance record. The canonical TSIC tracking issue is [tinlance-system-integration#102](https://github.com/LloydCoder/tinlance-system-integration/issues/102).
 
@@ -65,12 +65,51 @@ The direct Firecracker report and the jailed Firecracker report are distinct evi
 
 **W2 disposition:** W2 reproducible rootfs, independent-build reproducibility, direct multi-runtime developer-workspace execution and Firecracker jailer-path acceptance are complete for the repository's ephemeral feasibility scope. W2 is closed for this acceptance programme. Production CPU/microcode side-channel sign-off remains a separate production gate and is not implied by W2 closure.
 
-## 4. W3 browser-environment acceptance — completed for ephemeral CI feasibility\n\nPR #197 (`f29bdc95d5d86a957e1ab465445e361a1ad2e5de`) passed exact-head CI, CodeQL, Secret Scan, R10, Reference Agents, Host Feasibility, Guest Boot Smoke, Firecracker Jailer Smoke, gVisor W1, Kata W1, W2 multi-runtime developer-workspace acceptance and W3 browser acceptance. The W2 workflow completed all four jobs successfully: KVM 30/30, gVisor 30/30, Kata 30/30 and Firecracker through jailer 3/3. The W3 workflow run `42459138846` completed successfully.\n\nThe W3 artifact `browser-w3-42459138846` (artifact SHA-256 `81ba33b45fbf7b3b7e21a1991ce7308e18301fed8375d9375029e1155e7101d5`) was downloaded and independently inspected. Its report records: real Chromium 156.0.8078.4; browser UID 51000 and proxy UID 52000; separate tenant UID 53000; exactly one proxy link plus loopback; no IPv4 or IPv6 default route; host firewall proxy-only; direct public egress blocked; metadata IP and unallowlisted hostname denied; allowlisted HTTPS navigation succeeded; persistent profile across restart; workspace and tenant profile isolation; proxy-outage fail-closed behavior; Chromium sandbox enabled; renderer seccomp, `no_new_privs`, zero effective capabilities and user-namespace isolation; cleanup verified. The report and SBOM are included in the artifact. `production_certification=false` is explicit.\n\n**W3 limitations retained:** the CI harness is an ephemeral feasibility test, not production multi-tenant certification. In this slice, the unprivileged egress proxy runs in the host network namespace. A compromised proxy could attempt host-local connections. W4 must move it into a dedicated egress-only network namespace, constrain outbound TCP/443 and explicitly approved DNS forwarding, and test hostile proxy/browser behavior. Production also requires a trusted supervisor, durable encrypted profile storage, process cgroups, operational audit and independent security review.\n\n**W3 disposition:** accepted for ephemeral CI feasibility only; no production certification is implied.\n\n## 5. Remaining serial phases
+## 4. W3 browser-environment acceptance — completed for ephemeral CI feasibility
+
+PR #197 was merged to Platform `main` as `2c3903c4fee096aa285014d9dc8aa6b1e5f809ea`. All 12 required exact-head pull-request workflow runs passed before merge. Post-merge mainline CI, CodeQL (successful retry after a transient GitHub release-download HTTP 504), Secret Scan, Supply Chain Attestation, Reference Agents and R10 all completed successfully on the merge commit.
+
+The W3 artifact `browser-w3-42459138846` (artifact SHA-256 `81ba33b45fbf7b3b7e21a1991ce7308e18301fed8375d9375029e1155e7101d5`) was downloaded and independently inspected. Its report records real Chromium 156.0.8078.4; browser UID 51000 and proxy UID 52000; separate tenant UID 53000; exactly one proxy link plus loopback; no IPv4 or IPv6 default route; host firewall proxy-only; direct public egress blocked; metadata IP and unallowlisted hostname denied; allowlisted HTTPS navigation succeeded; persistent profile across restart; workspace and tenant profile isolation; proxy-outage fail-closed behavior; Chromium sandbox enabled; renderer seccomp, `no_new_privs`, zero effective capabilities and user-namespace isolation; cleanup verified. The report and SBOM are included in the artifact. `production_certification=false` is explicit.
+
+**W3 limitations retained:** the W3 harness ran the unprivileged egress proxy in the host network namespace. A compromised proxy could attempt host-local connections. W4 therefore moves the proxy into a dedicated egress-only network namespace and constrains outbound TCP/443 plus explicitly approved DNS forwarding. Production also requires a trusted supervisor, durable encrypted profile storage, process cgroups, operational audit and independent security review.
+
+**W3 disposition:** accepted for ephemeral CI feasibility only; no production certification is implied.
+
+## 5. W4 adversarial isolation — accepted for ephemeral CI feasibility
+
+PR #200 adds the dedicated egress-only proxy namespace and concurrent tenant adversarial acceptance harness. The implementation separates browser and proxy network namespaces over a private veth pair, gives the proxy a separate host-facing uplink, and keeps the browser namespace without a default route. Proxy namespace nftables defaults to drop and permits only browser-side TCP/3128, established replies, public unicast TCP/443 and DNS to a dedicated host DNS relay. Private, shared-address, loopback, link-local, metadata, reserved and multicast ranges are blocked independently of application-layer DNS validation.
+
+The host DNS relay binds only to the proxy-facing host veth address. Host INPUT permits only UDP/TCP 53 from the proxy uplink to that relay and blocks other host-local service access. The relay forwards to the host-configured resolver. The proxy resolver file is owned by the proxy UID/GID and mode 0600. Host forwarding/NAT is scoped to the proxy uplink; the harness inserts temporary source-IP/interface/TCP-443 and established-return rules in DOCKER-USER (or FORWARD when DOCKER-USER is absent), without changing the host's global FORWARD policy, and removes those exact rules during cleanup.
+
+The W4 harness runs browser, proxy and tenant B workloads under distinct non-root identities and private PID, IPC and mount namespaces. It verifies browser direct-egress denial; proxy public HTTPS connectivity; host-local/private/metadata/non-HTTPS egress denial; browser/proxy namespace topology; profile persistence across restart; workspace and tenant profile isolation; concurrent tenant A/B isolation; foreign PID/IPC invisibility; mount, privilege-escalation and ptrace denial; and cleanup. Chromium 156.0.8078.4 ran with its sandbox enabled; renderer seccomp, no_new_privs, zero effective capabilities and isolated renderer user namespaces were verified.
+
+### Independently inspected W4 evidence
+
+Workflow run [42471763414](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42471763414) completed successfully. Artifact browser-w4-42471763414 (SHA-256 5ceaf3bf575dd26387c26d0fcab3e7a70d3b462455847df47e0d9e0362696295) was downloaded and inspected. The report SHA-256 is c172d0d69c6727f8f859b25574d776c26bdcb1c468c2ae44d7cb7ccef1cf410d; the SBOM SHA-256 is eb8f71f38a0c072a96df5615d79237a31e7a02e79738b58dbc2b44c17581f6c6.
+
+The report records:
+- Browser UID 51000, proxy UID 52000 and tenant B UID 53000.
+- Browser namespace with no default route; proxy namespace with only its browser-side and host-uplink links; IPv6 disabled.
+- Browser direct public egress blocked; proxy public HTTPS and allowlisted CONNECT tunnel succeeded.
+- Host-local services, private/metadata destinations and non-HTTPS ports blocked at independent network boundaries.
+- Resolver file owned by proxy UID/GID with mode 0600; host DNS relay limited to the proxy-facing host address.
+- Persistent browser profile across restart; workspace profile isolation; tenant profile-root reuse denied.
+- Concurrent cross-tenant isolation; foreign host PID and IPC segment invisibility; ptrace, mount and privilege-escalation attempts denied.
+- Chromium sandbox, renderer seccomp, no_new_privs, zero effective capabilities and renderer user-namespace isolation.
+- Namespace/firewall/process cleanup verified.
+
+The artifact explicitly records production_certification=false.
+
+**W4 residual risk:** the network layer permits public unicast TCP/443 to any destination. The proxy's application allowlist enforces domain policy, but a compromised proxy could attempt TLS exfiltration to another public TCP/443 endpoint. DNS is restricted to the dedicated host relay and host resolver, but DNS query names are not independently allowlisted. Production must add destination-level egress enforcement independent of the proxy process and explicit DNS query policy.
+
+**W4 disposition:** accepted for ephemeral CI adversarial feasibility only. This does not certify production readiness or complete Phase 2.
+
+## 6. Remaining serial phases
 
 | Phase | Required acceptance |
 |---|---|
-| W3 browser environment | Browser launch and lifecycle; isolated persistent browser profile; SSRF and cloud-metadata protection; DNS rebinding; proxy-enforced egress policy; no host-network fallback |
-| W4 adversarial isolation | Hostile archive/artifact fuzzing; path/link/device attacks; namespace and seccomp escape probes; cross-tenant filesystem, process, network, IPC and control-plane isolation under concurrency |
+| W3 browser environment | Complete for ephemeral CI feasibility; production supervisor, encrypted durable profiles and independent review remain open |
+| W4 adversarial isolation | Complete for ephemeral CI feasibility; public TCP/443 destination-level enforcement and DNS query policy remain production blockers |
 | W5 eight-hour persistence | Genuine continuous 8-hour soak; restarts; lease expiry and revocation; quota enforcement; audit continuity; crash/recovery behavior |
 | W6 snapshot/restore | Snapshot integrity and provenance; restore to clean host; storage reattachment; fencing; stale-worker revocation; credential refresh; replay prevention |
 | Production economics | Repeated capacity and noisy-neighbor benchmarks; p50/p95/p99; CPU/memory/storage/network utilization; per-tenant unit economics; spend caps; teardown and cost reconciliation |
@@ -78,7 +117,7 @@ The direct Firecracker report and the jailed Firecracker report are distinct evi
 
 No phase may be skipped. A green unit suite, smoke test or individual runtime workflow does not certify the whole phase. Each phase requires implementation evidence, fully green required workflows, a forensic audit and reconciled documentation.
 
-## 5. Upstream security references
+## 7. Upstream security references
 
 - [Firecracker jailer documentation](https://github.com/firecracker-microvm/firecracker/blob/main/docs/jailer.md) — trusted jailer inputs, chroot/mount/PID/network namespaces, UID/GID dropping, cgroups and `--netns`.
 - [Firecracker seccomp documentation](https://github.com/firecracker-microvm/firecracker/blob/main/docs/seccomp.md) — default restrictive filters are loaded per thread.

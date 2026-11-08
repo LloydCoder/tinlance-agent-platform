@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ipaddress
 import json
 import os
 import socket
+import ssl
 import time
 from pathlib import Path
 
@@ -143,6 +145,56 @@ def proxy_denies(proxy_ip: str, proxy_port: int, authority: str) -> bool:
     return b" 403 " in response.split(b"\r\n", 1)[0]
 
 
+def verified_tls_context() -> ssl.SSLContext:
+    """Create a certificate-verifying TLS client context limited to TLS 1.2/1.3."""
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.maximum_version = ssl.TLSVersion.TLSv1_3
+    return context
+
+
+def proxy_allows_https(proxy_ip: str, proxy_port: int, hostname: str) -> bool:
+    """Prove an approved CONNECT tunnel carries a verified end-to-end TLS request."""
+    connection = socket.create_connection((proxy_ip, proxy_port), timeout=5)
+    connection.settimeout(5)
+    crlf = bytes((13, 10))
+    try:
+        authority = f"{hostname}:443"
+        connection.sendall(
+            f"CONNECT {authority} HTTP/1.1".encode("ascii")
+            + crlf
+            + f"Host: {authority}".encode("ascii")
+            + crlf
+            + b"Proxy-Connection: keep-alive"
+            + crlf * 2
+        )
+        headers = bytearray()
+        while crlf * 2 not in headers and len(headers) < 8192:
+            chunk = connection.recv(1024)
+            if not chunk:
+                raise ConnectionError("proxy closed before CONNECT response")
+            headers.extend(chunk)
+        status_line = bytes(headers).split(crlf, 1)[0]
+        if not status_line.startswith(b"HTTP/1.1 200 "):
+            raise ConnectionError(f"approved CONNECT was rejected: {status_line!r}")
+        tls = verified_tls_context().wrap_socket(connection, server_hostname=hostname)
+        tls.sendall(
+            b"GET / HTTP/1.1"
+            + crlf
+            + f"Host: {hostname}".encode("ascii")
+            + crlf
+            + b"Connection: close"
+            + crlf * 2
+        )
+        with tls.makefile("rb") as response_stream:
+            response_line = response_stream.readline(1024)
+        tls.close()
+        return response_line.startswith(b"HTTP/1.1 200 ")
+    finally:
+        with contextlib.suppress(OSError):
+            connection.close()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run W3 browser workspace acceptance inside its netns."
@@ -179,6 +231,9 @@ def main() -> int:
         raise SystemExit("browser egress proxy did not reject an unallowlisted hostname")
     evidence["metadata_ip_denied"] = True
     evidence["unallowlisted_hostname_denied"] = True
+    if not proxy_allows_https(proxy_ip, proxy_port, "example.com"):
+        raise SystemExit("browser egress proxy did not complete the approved HTTPS tunnel")
+    evidence["proxy_allowed_https_tunnel"] = True
 
     manager = BrowserWorkspaceManager(
         args.profile_root,

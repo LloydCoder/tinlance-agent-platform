@@ -423,7 +423,14 @@ class _BrowserProxyHandler(BaseHTTPRequestHandler):
             if not self.proxy_server.register_socket(upstream):
                 upstream.close()
                 raise EgressDenied("browser egress proxy is shutting down")
-        except (EgressDenied, ValueError, OSError, ConnectionError):
+        except (EgressDenied, ValueError, OSError, ConnectionError) as exc:
+            # Emit a bounded reason without logging the requested hostname, URL,
+            # headers or credentials.
+            if isinstance(exc, EgressDenied):
+                reason = str(exc)[:160]
+            else:
+                reason = f"{type(exc).__name__} errno={getattr(exc, 'errno', None)}"
+            print(f"browser egress CONNECT denied: {reason}", flush=True)
             with contextlib.suppress(OSError):
                 self.send_error(403, "Destination denied by browser egress policy")
             return

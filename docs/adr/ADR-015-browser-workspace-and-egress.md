@@ -1,6 +1,6 @@
 # ADR-015 — Persistent browser workspace and enforced egress
 
-**Status:** Accepted for W3 ephemeral CI feasibility; production deployment and hostile multi-tenant certification remain open
+**Status:** Accepted for W3 and W4 ephemeral CI feasibility; production deployment, destination-level egress enforcement and hostile multi-tenant certification remain open
 
 **Date:** 2026-11-07
 
@@ -71,13 +71,38 @@ The W3 workflow must prove, on its exact PR head:
 
 ## Limitations and follow-on phases
 
-- W3 CI demonstrates an ephemeral browser feasibility boundary with separate browser, proxy and second-tenant OS identities. It is not a production multi-tenant hostile-browser certification.
-- The W3 harness currently runs the unprivileged egress proxy in the host network namespace. Browser workloads cannot route to host services, but a compromised proxy process could attempt host-local connections. W4 must move the proxy into a dedicated egress-only network namespace and enforce public TCP/443 plus explicitly approved DNS forwarding before production sign-off.
-- Production requires a trusted supervisor that provisions distinct tenant UIDs, per-tenant profile mounts, isolated network namespaces, nftables policy, durable encrypted profile storage, lifecycle recovery and operational audit.
-- Browser process cgroups, hostile multi-tenant adversarial isolation, eight-hour persistence, snapshot/restore and independent security review remain later acceptance work (W4–W6 and final assurance).
+- W3 established the browser/proxy feasibility boundary; W4 now adds a dedicated proxy network namespace, host-local service isolation, interface-scoped forwarding and concurrent tenant adversarial probes. Both phases are accepted only at ephemeral-CI feasibility level, not as production hostile-browser certification.
+- W4 still permits public unicast TCP/443 at the network layer; the proxy application allowlist is not an independent control against a compromised proxy process. Production needs a trusted egress enforcement point that binds approved names/policies to destination IPs, plus DNS query policy that prevents resolver abuse.
+- Production requires a trusted supervisor that provisions distinct tenant UIDs, per-tenant profile mounts, isolated network namespaces, nftables and host-forwarding policy, durable encrypted profile storage, lifecycle recovery, process cgroups and operational audit.
+- Eight-hour persistence, snapshot/restore, production economics and independent security review remain W5/W6 and final assurance work.
 - The proxy's domain allowlist must be issued by Platform policy. A browser task cannot expand its own allowlist or mutate network policy.
 
+## W4 adversarial egress boundary
+
+W4 replaces the W3 host-network proxy placement with a dedicated proxy network namespace and a second tenant network boundary:
+
+- The browser namespace connects directly to the proxy namespace over a private veth pair. Neither endpoint is present in the host network namespace. The browser namespace has no default route, IPv6 is disabled, and direct public egress is blocked.
+- The proxy namespace has a second veth pair to the host, an explicit default route through that uplink, IPv6 disabled, and IP forwarding disabled. Its nftables input chain is default-deny and accepts only browser-side TCP/3128 plus established replies. Its output chain is default-deny and permits only public unicast TCP/443 plus UDP/TCP DNS to the dedicated host DNS relay.
+- The host DNS relay binds only to the proxy-facing host veth address. Host INPUT allows only UDP/TCP 53 from the proxy uplink to that address and drops other proxy-to-host service traffic. The relay forwards to the host-configured resolver (127.0.0.53 in the inspected CI run). The proxy namespace resolver file is owned by the proxy UID/GID and mode 0600.
+- Private, loopback, link-local, shared-address, reserved, multicast and metadata ranges are denied at the proxy namespace egress boundary, independently of the proxy application's DNS/IP validation.
+- Host nftables scopes the forwarding/NAT path to the proxy uplink subnet. Where Docker's iptables backend enforces a host FORWARD policy of DROP, the harness inserts exact source-IP/interface/TCP-443 and established-return rules into DOCKER-USER (or the FORWARD chain when DOCKER-USER is absent), without changing the host's global forwarding policy. The exact rules are removed during cleanup. NAT applies only to the proxy uplink subnet.
+- Browser, proxy and second-tenant workloads run under distinct non-root identities. The harness gives each workload private PID, IPC and mount namespaces; the browser mount namespace uses private propagation. Tenant B has no proxy route or uplink.
+- The harness verifies browser direct egress denial; proxy public HTTPS connectivity; host-local service denial; private/metadata and non-HTTPS egress denial; profile and cross-tenant isolation; foreign PID/IPC invisibility; mount, privilege-escalation and ptrace denial; and full namespace/firewall cleanup.
+
+**Residual egress risk:** the network layer permits public unicast IPv4 TCP/443 to any destination, not only the proxy's configured hostname allowlist. The proxy application enforces the domain policy, but a compromised proxy process could attempt TLS exfiltration to an arbitrary public TCP/443 endpoint. The host DNS relay is restricted to the proxy-facing veth and the configured host resolver, but DNS query names are not independently allowlisted; DNS tunnelling/abuse remains a production policy concern. Private/link-local/metadata destinations and non-HTTPS ports remain blocked. Production must add a trusted egress enforcement point that binds approved names/policies to destination IPs independently of the proxy process and apply explicit DNS query policy.
+
+**W4 acceptance evidence (2026-11-08):** workflow run [42471763414](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42471763414) completed successfully. The independently downloaded artifact browser-w4-42471763414 has SHA-256 5ceaf3bf575dd26387c26d0fcab3e7a70d3b462455847df47e0d9e0362696295; report SHA-256 c172d0d69c6727f8f859b25574d776c26bdcb1c468c2ae44d7cb7ccef1cf410d; SBOM SHA-256 eb8f71f38a0c072a96df5615d79237a31e7a02e79738b58dbc2b44c17581f6c6. The report records browser UID 51000, proxy UID 52000 and tenant B UID 53000; dedicated browser/proxy namespaces; direct browser egress blocked; proxy HTTPS connectivity; host-local/private/metadata/non-HTTPS egress denial; DNS relay and mode-0600 resolver ownership; Chromium 156.0.8078.4 with sandbox enabled, renderer seccomp, no_new_privs, zero effective capabilities and isolated renderer user namespaces; persistent profile across restart; workspace and tenant profile isolation; concurrent tenant A/B isolation; foreign PID/IPC invisibility; mount, privilege-escalation and ptrace denial; cleanup verified. Both report and SBOM were inspected. The report explicitly records production_certification=false.
+
+**W4 disposition:** accepted for ephemeral CI adversarial feasibility only. This is not production certification. Production still requires a trusted supervisor, destination-level egress enforcement independent of the proxy, DNS query policy, durable encrypted profile storage, process cgroups, operational audit, provider-attested host security controls and independent review.
+
 ## References
+- Linux network namespaces and veth pairs: https://man7.org/linux/man-pages/man7/network_namespaces.7.html
+- util-linux `unshare` PID, IPC and mount namespace behavior: https://man7.org/linux/man-pages/man1/unshare.1.html
+- Chromium Linux sandbox layers (namespaces and seccomp-BPF): https://chromium.googlesource.com/chromium/src/+/master/docs/linux/sandboxing.md
+- Netfilter nftables rules and verdict semantics: https://netfilter.org/projects/nftables/manpage.html
+- Docker's nftables guidance for interface-scoped forwarding restrictions: https://docs.docker.com/engine/network/firewall-nftables/
+- Docker's iptables firewall guidance for the user-managed DOCKER-USER chain and host FORWARD policy: https://docs.docker.com/engine/network/firewall-iptables/
+- Docker packet filtering/firewall behavior and the default DROP forwarding policy: https://docs.docker.com/engine/network/packet-filtering-firewalls/
 
 - Chromium proxy behavior and implicit bypass rules: https://chromium.googlesource.com/chromium/src/+/HEAD/net/docs/proxy.md
 - OWASP SSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html

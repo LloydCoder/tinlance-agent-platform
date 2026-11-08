@@ -1,0 +1,218 @@
+name: Persistent Computer W4 Adversarial Browser Isolation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/persistent-computer-browser-w4.yml"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/browser.py"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/egress_proxy.py"
+      - "packages/sandbox/src/tinlance_agent_platform_sandbox/__init__.py"
+      - "scripts/browser_egress_proxy.py"
+      - "scripts/browser_workspace_guest.py"
+      - "scripts/browser_tenant_isolation_probe.py"
+      - "scripts/smoke_browser_environment_w4.py"
+      - "scripts/browser_w4_tenant_probe.py"
+      - "scripts/browser_w4_tenant_a.py"
+      - "tests/unit/test_browser_egress.py"
+      - "tests/unit/test_browser_workspace.py"
+      - "tests/unit/test_browser_smoke_environment.py"
+      - "tests/unit/test_browser_egress_network.py"
+      - "tests/unit/test_browser_w4_archive_fuzz.py"
+      - "scripts/normalize_rootfs_tar.py"
+      - "tests/unit/test_normalize_rootfs_tar.py"
+      - "scripts/browser_egress_network.py"
+      - "scripts/smoke_browser_environment_w4.py"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistent-computer-browser-w4-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-w4:
+    name: W4 adversarial isolated Chromium workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Install project, test and browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test,browser,security]"
+          python -m playwright install chromium
+          sudo env LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$pythonLocation/bin/python" -m playwright install-deps chromium
+          chmod o+x "$HOME" "$HOME/.cache" "$HOME/.cache/ms-playwright"
+          chmod -R a+rX "$HOME/.cache/ms-playwright"
+
+      - name: Run W4 browser, egress policy and adversarial network tests
+        run: |
+          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py tests/unit/test_browser_smoke_environment.py tests/unit/test_browser_egress_network.py tests/unit/test_browser_w4_archive_fuzz.py tests/unit/test_normalize_rootfs_tar.py
+
+      - name: Audit browser optional dependencies and generate SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python -m pip freeze | grep -vE '^(tinlance-agent-platform==|-e )' > /tmp/browser-w4-requirements.txt
+          pip-audit --strict -r /tmp/browser-w4-requirements.txt
+          cyclonedx-py environment --output-format JSON --output-file artifacts/browser-w4-sbom.json
+
+      - name: Run dedicated egress namespace, hostile-proxy probes and real Chromium acceptance
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y iproute2 nftables util-linux
+          mkdir -p artifacts
+
+          apparmor_profile="/etc/apparmor.d/tinlance-playwright-chromium"
+          cleanup_apparmor() {
+            if [[ -f "$apparmor_profile" ]]; then
+              sudo apparmor_parser -R "$apparmor_profile" >/dev/null 2>&1 || true
+              sudo rm -f "$apparmor_profile"
+            fi
+          }
+          trap cleanup_apparmor EXIT
+
+          userns_restriction=""
+          if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            userns_restriction="$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)"
+          fi
+          if [[ "$userns_restriction" == "1" ]]; then
+            chromium_executable="$("$pythonLocation/bin/python" -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+            chromium_revision_dir="$(basename "$(dirname "$(dirname "$chromium_executable")")")"
+            case "$chromium_revision_dir" in
+              chromium-[0-9]*) ;;
+              *) echo "Unexpected Playwright Chromium executable path: $chromium_executable"; exit 1 ;;
+            esac
+            chromium_revision="${chromium_revision_dir#chromium-}"
+            chromium_bin="$HOME/.cache/ms-playwright/chromium_headless_shell-$chromium_revision/chrome-headless-shell-linux64/chrome-headless-shell"
+            if [[ ! -x "$chromium_bin" ]]; then
+              echo "Playwright headless shell executable is missing: $chromium_bin"
+              exit 1
+            fi
+            sudo tee "$apparmor_profile" >/dev/null <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile tinlance-playwright-chromium $chromium_bin flags=(unconfined) {
+            userns,
+          }
+          EOF
+            sudo apparmor_parser -r "$apparmor_profile"
+            test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = "1"
+            echo "Loaded exact-binary Chromium AppArmor userns allowance; global restriction remains enabled."
+          fi
+
+          sudo env \
+            PATH="$PATH" \
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" \
+            PYTHONPATH="$GITHUB_WORKSPACE/packages/sandbox/src:$GITHUB_WORKSPACE/packages/contracts/src" \
+            PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" \
+            "$pythonLocation/bin/python" scripts/smoke_browser_environment_w4.py \
+          test -s artifacts/browser-w4.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/browser-w4.json").read_text(encoding="utf-8"))
+          if report.get("status") != "passed":
+              raise SystemExit(f"W4 adversarial browser acceptance did not pass: {report}")
+          required = [
+              "browser_namespace_has_no_default_route",
+              "browser_ipv6_disabled",
+              "proxy_ipv6_disabled",
+              "tenant_b_ipv6_disabled",
+              "proxy_namespace_has_approved_default_route",
+              "proxy_namespace_firewall_restrictive",
+              "proxy_resolver_config_private",
+              "browser_pid_namespace_isolated",
+              "browser_ipc_namespace_isolated",
+              "browser_mount_namespace_isolated",
+              "proxy_namespace_host_services_blocked",
+              "host_local_blocked_by_host_firewall",
+              "proxy_namespace_private_egress_blocked",
+              "proxy_namespace_metadata_egress_blocked",
+              "proxy_namespace_unapproved_port_blocked",
+              "browser_direct_egress_blocked",
+              "cross_tenant_profile_reuse_denied",
+              "concurrent_cross_tenant_isolation",
+              "namespace_escape_probes_passed",
+              "proxy_namespace_public_https_probe",
+              "proxy_listener_ready",
+              "cleanup_verified",
+          ]
+          missing = [name for name in required if report.get(name) is not True]
+          if missing:
+              raise SystemExit(f"W4 security evidence is incomplete: {missing}")
+          guest = report.get("guest", {})
+          if guest.get("status") != "passed":
+              raise SystemExit("W4 Chromium guest evidence is missing or failed.")
+          chromium_requirements = [
+              "proxy_allowed_https_tunnel",
+              "chromium_sandbox_enabled",
+              "browser_process_cap_eff_zero",
+              "browser_process_no_new_privs",
+              "chromium_renderer_seccomp_enabled",
+              "chromium_renderer_no_new_privs",
+              "chromium_renderer_cap_eff_zero",
+              "chromium_renderer_user_namespace_isolated",
+          ]
+          missing_chromium = [name for name in chromium_requirements if guest.get(name) is not True]
+          if missing_chromium or guest.get("chromium_renderer_count", 0) < 1:
+              raise SystemExit(f"W4 Chromium confinement evidence is incomplete: {missing_chromium}")
+          proxy_uid = report.get("proxy_process_uid")
+          browser_uid = report.get("browser_process_uid")
+          other_uid = report.get("other_tenant_uid")
+          if not proxy_uid or not browser_uid or not other_uid or len({proxy_uid, browser_uid, other_uid}) != 3:
+              raise SystemExit("W4 browser, proxy and other-tenant OS identities must be distinct.")
+          tenant_b = report.get("tenant_b_probe", {})
+          if report.get("tenant_b_namespace_interface_count") != 1:
+              raise SystemExit("W4 tenant B namespace must expose only loopback.")
+          if report.get("tenant_b_namespace_route_table") not in ("", None):
+              raise SystemExit("W4 tenant B namespace must have no IPv4 routes.")
+          tenant_requirements = [
+              "pid_namespace_isolated",
+              "ipc_namespace_isolated",
+              "mount_namespace_isolated",
+              "network_namespace_isolated",
+              "foreign_host_pid_invisible",
+              "foreign_ipc_segment_invisible",
+              "tenant_a_proxy_unreachable",
+              "mount_syscall_denied",
+              "privilege_escalation_denied",
+              "foreign_pid_ptrace_denied",
+              "cross_tenant_profile_reuse_denied",
+          ]
+          missing_tenant = [
+              name for name in tenant_requirements if tenant_b.get(name) is not True
+          ]
+          if missing_tenant:
+              raise SystemExit(f"W4 concurrent tenant isolation evidence is incomplete: {missing_tenant}")
+          if report.get("production_certification") is not False:
+              raise SystemExit("W4 ephemeral CI must not claim production certification.")
+          print("PASS: W4 dedicated proxy namespace, hostile egress probes, tenant isolation and Chromium.")
+          print(json.dumps(report, sort_keys=True, indent=2))
+          PY
+          sudo chmod -R a+rX artifacts
+
+      - name: Upload W4 adversarial browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-w4-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 90
