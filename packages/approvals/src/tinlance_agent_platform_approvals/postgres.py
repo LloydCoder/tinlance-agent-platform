@@ -193,7 +193,7 @@ class PostgresApprovalService:
                 f"""
                 UPDATE platform.action_approvals
                 SET status = 'expired', decided_at = now()
-                WHERE approval_id = %s AND tenant_id = %s AND status = 'pending'
+                WHERE approval_id = %s AND tenant_id = %s AND status IN ('pending', 'approved')
                 RETURNING {_COLUMNS}
                 """,
                 (approval_id, tenant_uuid),
