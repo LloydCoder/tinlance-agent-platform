@@ -366,7 +366,12 @@ def main() -> int:
             raise RuntimeError("browser namespace unexpectedly has a default route")
         proxy_routes = run(["ip", "netns", "exec", proxy_ns, "ip", "-4", "route", "show"])
         validate_proxy_namespace_routes(
-            proxy_routes, str(browser_network), str(uplink_network), host_uplink_ip
+            proxy_routes,
+            str(browser_network),
+            str(uplink_network),
+            host_uplink_ip,
+            proxy_browser_if,
+            proxy_uplink_if,
         )
         browser_interfaces = run(["ip", "netns", "exec", browser_ns, "ip", "-o", "link", "show"])
         proxy_interfaces = run(["ip", "netns", "exec", proxy_ns, "ip", "-o", "link", "show"])
