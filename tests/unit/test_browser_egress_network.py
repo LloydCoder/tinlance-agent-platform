@@ -166,3 +166,41 @@ def test_host_dns_relay_must_be_on_the_proxy_uplink() -> None:
             proxy_subnet="10.255.4.0/30",
             host_dns_ip="10.0.0.53",
         )
+
+
+def test_host_forwarding_allow_rules_are_interface_and_identity_scoped() -> None:
+    from scripts.browser_egress_network import build_host_iptables_forward_rules
+
+    outbound, inbound = build_host_iptables_forward_rules(
+        proxy_host_interface="tbup1234",
+        egress_interface="eth0",
+        proxy_ip="10.255.4.2",
+    )
+    assert outbound == (
+        "-i",
+        "tbup1234",
+        "-o",
+        "eth0",
+        "-s",
+        "10.255.4.2/32",
+        "-p",
+        "tcp",
+        "--dport",
+        "443",
+        "-j",
+        "ACCEPT",
+    )
+    assert inbound == (
+        "-i",
+        "eth0",
+        "-o",
+        "tbup1234",
+        "-d",
+        "10.255.4.2/32",
+        "-m",
+        "conntrack",
+        "--ctstate",
+        "ESTABLISHED,RELATED",
+        "-j",
+        "ACCEPT",
+    )
