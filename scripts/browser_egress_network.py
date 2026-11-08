@@ -88,33 +88,43 @@ table ip tnl_w4_nat {{
 def validate_proxy_namespace_routes(
     routes: str,
     browser_network: str,
+    uplink_network: str,
     expected_default_gateway: str,
 ) -> bool:
-    """Require exactly the browser connected route and approved uplink default."""
+    """Require two approved connected routes and one approved egress default."""
     browser = ipaddress.ip_network(browser_network, strict=True)
+    uplink = ipaddress.ip_network(uplink_network, strict=True)
     gateway = ipaddress.ip_address(expected_default_gateway)
-    if browser.version != 4 or not browser.is_private or gateway.version != 4:
-        raise ValueError("proxy route policy requires private IPv4 addresses")
+    if (
+        browser.version != 4
+        or uplink.version != 4
+        or not browser.is_private
+        or not uplink.is_private
+        or browser.overlaps(uplink)
+        or gateway.version != 4
+        or gateway not in uplink
+    ):
+        raise ValueError("proxy route policy requires distinct private IPv4 links")
     lines = [line.split() for line in routes.splitlines() if line.strip()]
-    if len(lines) != 2:
+    if len(lines) != 3:
         raise ValueError("proxy namespace contains an unexpected route")
-    connected = False
+    connected: set[ipaddress.IPv4Network] = set()
     default = False
     for fields in lines:
         if fields[0] == "default":
             if len(fields) < 4 or fields[1] != "via" or fields[2] != str(gateway):
                 raise ValueError("proxy namespace default route does not use approved gateway")
-            if "dev" not in fields or fields[fields.index("dev") + 1] == "":
-                raise ValueError("proxy namespace default route has no uplink")
+            if "dev" not in fields or not fields[fields.index("dev") + 1].startswith("tb"):
+                raise ValueError("proxy namespace default route has no harness uplink")
             default = True
             continue
         try:
             network = ipaddress.ip_network(fields[0], strict=False)
         except ValueError as exc:
             raise ValueError("proxy namespace contains an unexpected route") from exc
-        if network != browser or "dev" not in fields:
+        if network not in {browser, uplink} or "dev" not in fields:
             raise ValueError("proxy namespace contains an unexpected route")
-        connected = True
-    if not connected or not default:
+        connected.add(network)
+    if connected != {browser, uplink} or not default:
         raise ValueError("proxy namespace routes do not match the approved topology")
     return True
