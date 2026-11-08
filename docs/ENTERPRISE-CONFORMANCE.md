@@ -67,3 +67,14 @@ Conformance is enforced by CI on every pull request.
 ## Finalization
 
 After M29, the finite engineering roadmap ends. New threats, standards, incidents and platform changes enter continuous enterprise assurance rather than new arbitrary numbered phases.
+
+
+## Extensions dead-letter replay conformance — PR #195
+
+The Platform integration now has an executable HIGH-risk replay contract with exact intent binding, explicit human approval, one-time approval consumption, idempotent retry behavior, and least-privilege downstream service-token scope. Negative tests cover absent approval verifier, event-intent substitution, and retry behavior without a second downstream side effect. The successful path verifies tenant, subject, audience, request ID and the sole `extensions:outbox:replay` scope in the minted JWT.
+
+PR #195 merged as `a2cd923b7d187de2f0b983a169ea0f03ff96aa94`. Exact-head workflows passed on `f4ba45893cf0261deff58629ba964a24e28e953d`: CI (Python 3.12/3.13/3.14, PostgreSQL integration and TSIC), CodeQL [42457552627](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457552627), Secret Scan [42457552644](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457552644), Reference Agents [42457552676](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457552676), and R10 Certification [42457552736](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457552736). Exact-head CI is [42457552670](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457552670).
+
+Post-merge checks passed on `a2cd923b7d187de2f0b983a169ea0f03ff96aa94`: CI [42457671532](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457671532), CodeQL [42457671552](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457671552), Secret Scan [42457671510](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457671510), Reference Agents [42457671509](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457671509), R10 Certification [42457671536](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457671536), and Supply Chain Attestation [42457671530](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42457671530).
+
+This is a merged integration contract, not evidence of a production-configured approval provider or a production Extensions endpoint deployment. Production must inject the durable, tenant-aware approval verifier, configure service-token signing/rotation, and complete live identity-provider, provider-delivery, operational, privacy and independent security reviews. External delivery remains at-least-once; do not describe it as exactly-once.

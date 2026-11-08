@@ -87,3 +87,14 @@ The reference HTTP server is for contract/integration testing. Production deploy
 ## Integration verification
 
 The Agent OS boundary is covered by the API gateway and identity-binding tests. Authentication and tenant context are resolved server-side; request-body identity is never treated as authority.
+
+
+## Tinlance Extensions dead-letter replay — PR #195
+
+The Platform now exposes the tenant-scoped Extensions dead-letter replay action through the governed MCP/tool path. The tool is registered as `extensions_dead_letter_replay`, operation `extensions.outbox.dead_letter.replay`, capability `extensions.outbox.dead_letter.replay`, resource pattern `extensions://outbox/dead-letters/{event_id}`, and HIGH risk. It is explicitly approval-gated and requires an idempotency argument.
+
+The request binds the tenant, subject, deterministic Platform run ID, exact event ID and idempotency key into an SHA-256 intent fingerprint. `extensions_mcp_request_id` mirrors the stateless MCP request-ID derivation so an approval can be prepared for the same run before execution. The MCP protocol moves the idempotency key into request metadata; the Extensions API handler reconstructs that value from the request context and rejects any mismatch.
+
+Execution requires an injected `ApprovalVerifier`; absence defaults to deny. The verifier consumes the approval against the exact run, action, resource and intent fingerprint. The transport then mints a 60-second, audience-bound Platform service token for `tinlance-extensions-api` with only `extensions:outbox:replay`. It never forwards the inbound bearer token or approval metadata. The downstream call is a bodyless POST to the tenant-protected replay route and carries the request ID, trace context and idempotency key.
+
+The Platform API idempotency boundary returns the original result for same-key retries and rejects conflicting reuse. The Extensions database remains authoritative for tenant-scoped dead-letter state transition and append-only replay audit. This integration does not claim exactly-once external provider side effects; provider idempotency and receiver-side guarantees remain separate controls.
