@@ -216,3 +216,17 @@ def test_postgres_approval_rejects_changed_intent_before_consumption():
             intent_fingerprint="c" * 64,
         )
     assert not any("UPDATE platform.action_approvals" in query for query, _ in connection.queries)
+
+
+def test_postgres_approved_but_unconsumed_approval_expires():
+    expired_at = datetime.now(UTC) - timedelta(seconds=1)
+    approved = approval_row("approved", expires_at=expired_at, approved_by="approver-b")
+    expired = approval_row("expired", expires_at=expired_at, approved_by="approver-b")
+    connection = Connection(selected=approved, updated=expired)
+    service = PostgresApprovalService(connection_factory=lambda: connection)
+
+    result = service.get(APPROVAL_ID, str(TENANT_ID))
+
+    assert result.status is ApprovalStatus.EXPIRED
+    assert result.approved_by == "approver-b"
+    assert connection.committed
