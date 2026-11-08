@@ -122,10 +122,10 @@ begin
         raise exception 'consumed approval was reusable';
     end if;
 
-    if (select status from platform.approvals where approval_id = approval_id) <> 'consumed' then
+    if (select a.status from platform.approvals a where a.approval_id = approval_id) <> 'consumed' then
         raise exception 'approval status was not persisted as consumed';
     end if;
-    if (select count(*) from platform.approval_events where approval_id = approval_id) <> 3 then
+    if (select count(*) from platform.approval_events e where e.approval_id = approval_id) <> 3 then
         raise exception 'approval lifecycle audit did not record request, decision and consumption';
     end if;
 
