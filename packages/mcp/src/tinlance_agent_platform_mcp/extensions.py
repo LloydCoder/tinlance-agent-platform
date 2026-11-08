@@ -9,9 +9,9 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
-from hashlib import sha256
 from collections.abc import Mapping
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, Protocol
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
@@ -42,18 +42,28 @@ def extensions_action_purpose(
     idempotency_key: str | None = None,
 ) -> str:
     """Bind a downstream service token to one tenant, actor, action and resource."""
-    if not all(isinstance(value, str) and value and value == value.strip() for value in (
-        tenant_id, subject_id, tool_name, resource_id
-    )):
+    if not all(
+        isinstance(value, str) and value and value == value.strip()
+        for value in (tenant_id, subject_id, tool_name, resource_id)
+    ):
         raise ValueError("Extensions action-token identity must be complete and normalized")
     if tool_name == "extensions_job_cancel":
         if idempotency_key is not None:
-            raise ValueError("job-cancellation action purpose does not accept an idempotency key")
+            raise ValueError(
+                "job-cancellation action purpose does not accept an idempotency key"
+            )
     elif tool_name == "extensions_dead_letter_replay":
-        if not isinstance(idempotency_key, str) or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key):
-            raise ValueError("dead-letter replay action purpose requires a normalized idempotency key")
+        if (
+            not isinstance(idempotency_key, str)
+            or not _IDEMPOTENCY_KEY.fullmatch(idempotency_key)
+        ):
+            raise ValueError(
+                "dead-letter replay action purpose requires a normalized idempotency key"
+            )
     else:
-        raise ValueError("Extensions action-token tool is not registered")
+        raise ValueError(
+            "Extensions action-token tool is not registered"
+        )
     canonical = json.dumps(
         [tenant_id, subject_id, tool_name, resource_id, idempotency_key],
         separators=(",", ":"),
