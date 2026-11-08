@@ -318,9 +318,7 @@ def main() -> int:
                     "net.ipv6.conf.all.disable_ipv6",
                 ]
             )
-            ipv6_routes = run(
-                ["ip", "netns", "exec", netns, "ip", "-6", "route", "show"]
-            )
+            ipv6_routes = run(["ip", "netns", "exec", netns, "ip", "-6", "route", "show"])
             if ipv6_disabled != "1" or ipv6_routes:
                 raise RuntimeError(f"IPv6 is not fully disabled in namespace {netns}")
 
@@ -377,20 +375,15 @@ def main() -> int:
         proxy_interfaces = run(["ip", "netns", "exec", proxy_ns, "ip", "-o", "link", "show"])
         if len(browser_interfaces.splitlines()) != 2 or len(proxy_interfaces.splitlines()) != 3:
             raise RuntimeError("browser or proxy namespace contains an unexpected interface")
-        tenant_b_interfaces = run(
-            ["ip", "netns", "exec", tenant_b_ns, "ip", "-o", "link", "show"]
-        )
-        tenant_b_routes = run(
-            ["ip", "netns", "exec", tenant_b_ns, "ip", "-4", "route", "show"]
-        )
+        tenant_b_interfaces = run(["ip", "netns", "exec", tenant_b_ns, "ip", "-o", "link", "show"])
+        tenant_b_routes = run(["ip", "netns", "exec", tenant_b_ns, "ip", "-4", "route", "show"])
         if len(tenant_b_interfaces.splitlines()) != 1 or tenant_b_routes:
             raise RuntimeError("tenant B must have only loopback and no network routes")
         host_namespace_ids = {
             name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt")
         }
         host_all_namespace_ids = {
-            name: os.stat(f"/proc/self/ns/{name}").st_ino
-            for name in ("pid", "ipc", "mnt", "net")
+            name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt", "net")
         }
         namespace_probe = (
             "import json,os; print(json.dumps({name:os.stat('/proc/self/ns/'+name).st_ino "
@@ -503,11 +496,17 @@ def main() -> int:
                 raise RuntimeError("W4 egress proxy exited before readiness")
             ready = subprocess.run(
                 [
-                    "ip", "netns", "exec", browser_ns, sys.executable, "-c",
+                    "ip",
+                    "netns",
+                    "exec",
+                    browser_ns,
+                    sys.executable,
+                    "-c",
                     f"import socket; s=socket.create_connection(({proxy_browser_ip!r}, "
                     f"{PROXY_PORT}), timeout=1); s.close()",
                 ],
-                capture_output=True, timeout=2,
+                capture_output=True,
+                timeout=2,
             )
             if ready.returncode == 0:
                 break
@@ -522,14 +521,32 @@ def main() -> int:
         ipc_key = secrets.randbelow(0x7FFFFFFE) + 1
         tenant_a_code = subprocess.Popen(
             [
-                "ip", "netns", "exec", browser_ns,
-                "unshare", "--mount", "--pid", "--ipc", "--fork", "--kill-child",
-                "--mount-proc", "--propagation", "private",
-                "setpriv", "--reuid", str(browser_uid), "--regid", str(browser_gid),
-                "--clear-groups", "--no-new-privs", sys.executable,
+                "ip",
+                "netns",
+                "exec",
+                browser_ns,
+                "unshare",
+                "--mount",
+                "--pid",
+                "--ipc",
+                "--fork",
+                "--kill-child",
+                "--mount-proc",
+                "--propagation",
+                "private",
+                "setpriv",
+                "--reuid",
+                str(browser_uid),
+                "--regid",
+                str(browser_gid),
+                "--clear-groups",
+                "--no-new-privs",
+                sys.executable,
                 "scripts/browser_w4_tenant_a.py",
-                "--ipc-key", str(ipc_key),
-                "--hold-seconds", "120",
+                "--ipc-key",
+                str(ipc_key),
+                "--hold-seconds",
+                "120",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -575,17 +592,44 @@ def main() -> int:
 
         # Temporarily permit the test destination through the proxy namespace
         # firewall so the independent host INPUT drop is what blocks this probe.
-        run([
-            "ip", "netns", "exec", proxy_ns, "nft", "insert", "rule",
-            "inet", "tnl_proxy", "output",
-            "oifname", proxy_uplink_if,
-            "ip", "daddr", host_uplink_ip,
-            "tcp", "dport", str(host_probe_port), "accept",
-        ])
-        output_rules = run([
-            "ip", "netns", "exec", proxy_ns, "nft", "-a",
-            "list", "chain", "inet", "tnl_proxy", "output",
-        ])
+        run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                proxy_ns,
+                "nft",
+                "insert",
+                "rule",
+                "inet",
+                "tnl_proxy",
+                "output",
+                "oifname",
+                proxy_uplink_if,
+                "ip",
+                "daddr",
+                host_uplink_ip,
+                "tcp",
+                "dport",
+                str(host_probe_port),
+                "accept",
+            ]
+        )
+        output_rules = run(
+            [
+                "ip",
+                "netns",
+                "exec",
+                proxy_ns,
+                "nft",
+                "-a",
+                "list",
+                "chain",
+                "inet",
+                "tnl_proxy",
+                "output",
+            ]
+        )
         probe_handle = next(
             int(line.rsplit("# handle ", 1)[1])
             for line in output_rules.splitlines()
@@ -599,22 +643,46 @@ def main() -> int:
             )
             host_probe = subprocess.run(
                 [
-                    "ip", "netns", "exec", proxy_ns, "setpriv",
-                    "--reuid", str(proxy_uid), "--regid", str(proxy_gid),
-                    "--clear-groups", "--no-new-privs", sys.executable,
-                    "-c", host_probe_code,
+                    "ip",
+                    "netns",
+                    "exec",
+                    proxy_ns,
+                    "setpriv",
+                    "--reuid",
+                    str(proxy_uid),
+                    "--regid",
+                    str(proxy_gid),
+                    "--clear-groups",
+                    "--no-new-privs",
+                    sys.executable,
+                    "-c",
+                    host_probe_code,
                 ],
-                capture_output=True, text=True, timeout=4,
+                capture_output=True,
+                text=True,
+                timeout=4,
             )
             if host_probe.returncode != 0 or host_probe.stdout.strip() != "BLOCKED":
                 raise RuntimeError("host INPUT firewall did not block a proxy-to-host connection")
             evidence["proxy_namespace_host_services_blocked"] = True
             evidence["host_local_blocked_by_host_firewall"] = True
         finally:
-            run([
-                "ip", "netns", "exec", proxy_ns, "nft", "delete", "rule",
-                "inet", "tnl_proxy", "output", "handle", str(probe_handle),
-            ])
+            run(
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    proxy_ns,
+                    "nft",
+                    "delete",
+                    "rule",
+                    "inet",
+                    "tnl_proxy",
+                    "output",
+                    "handle",
+                    str(probe_handle),
+                ]
+            )
         evidence["proxy_namespace_private_egress_blocked"] = probe_blocked(
             proxy_ns, "10.0.0.1", 443
         )
@@ -632,14 +700,26 @@ def main() -> int:
         # directly, even if its proxy configuration is removed or bypassed.
         direct_probe = subprocess.run(
             [
-                "ip", "netns", "exec", browser_ns, "setpriv",
-                "--reuid", str(browser_uid), "--regid", str(browser_gid),
-                "--clear-groups", "--no-new-privs", sys.executable, "-c",
+                "ip",
+                "netns",
+                "exec",
+                browser_ns,
+                "setpriv",
+                "--reuid",
+                str(browser_uid),
+                "--regid",
+                str(browser_gid),
+                "--clear-groups",
+                "--no-new-privs",
+                sys.executable,
+                "-c",
                 "import socket; s=socket.socket(); s.settimeout(1); "
                 "r=s.connect_ex(('1.1.1.1', 443)); "
                 "print('REACHED' if r == 0 else 'BLOCKED')",
             ],
-            capture_output=True, text=True, timeout=4,
+            capture_output=True,
+            text=True,
+            timeout=4,
         )
         if direct_probe.returncode != 0 or direct_probe.stdout.strip() != "BLOCKED":
             raise RuntimeError("browser namespace unexpectedly has direct public egress")
@@ -840,9 +920,7 @@ def main() -> int:
                         capture_output=True,
                     )
                     if deleted.returncode != 0:
-                        cleanup_errors.append(
-                            f"host firewall table {table} could not be deleted"
-                        )
+                        cleanup_errors.append(f"host firewall table {table} could not be deleted")
         if resolv_dir.exists():
             shutil.rmtree(resolv_dir, ignore_errors=True)
             if resolv_dir.exists():
