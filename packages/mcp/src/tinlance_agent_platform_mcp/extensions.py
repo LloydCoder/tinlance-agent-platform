@@ -3,6 +3,7 @@
 The adapter mints short-lived, audience-bound Platform service tokens. It never
 forwards inbound credentials and exposes only explicitly registered operations.
 """
+
 from __future__ import annotations
 
 import ipaddress
