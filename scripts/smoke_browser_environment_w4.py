@@ -651,6 +651,32 @@ def main() -> int:
             if subprocess.run(["nft", "list", "table", family, table],
                               check=False, capture_output=True).returncode == 0:
                 cleanup_errors.append(f"host firewall table {table} remains")
+        shutil.rmtree(work, ignore_errors=True)
+        if work.exists():
+            cleanup_errors.append("temporary browser workspace could not be removed")
+        for username in users:
+            deleted_user = subprocess.run(
+                ["userdel", username], check=False, capture_output=True
+            )
+            if (
+                deleted_user.returncode != 0
+                or subprocess.run(
+                    ["getent", "passwd", username],
+                    check=False,
+                    capture_output=True,
+                ).returncode
+                == 0
+            ):
+                cleanup_errors.append(f"temporary browser user {username} could not be deleted")
+            subprocess.run(
+                ["groupdel", username], check=False, capture_output=True
+            )
+            if subprocess.run(
+                ["getent", "group", username],
+                check=False,
+                capture_output=True,
+            ).returncode == 0:
+                cleanup_errors.append(f"temporary browser group {username} could not be deleted")
         evidence["cleanup_verified"] = not cleanup_errors
         if cleanup_errors:
             evidence["status"] = "failed"
@@ -659,10 +685,6 @@ def main() -> int:
         (artifacts / "browser-w4.json").write_text(
             json.dumps(evidence, sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
-        shutil.rmtree(work, ignore_errors=True)
-        for username in users:
-            subprocess.run(["userdel", username], check=False, capture_output=True)
-            subprocess.run(["groupdel", username], check=False, capture_output=True)
         if cleanup_errors:
             raise RuntimeError(f"W4 cleanup failed: {cleanup_errors}")
 
