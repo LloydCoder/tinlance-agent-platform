@@ -16,6 +16,9 @@ on:
       - "tests/unit/test_browser_workspace.py"
       - "tests/unit/test_browser_smoke_environment.py"
       - "tests/unit/test_browser_egress_network.py"
+      - "tests/unit/test_browser_w4_archive_fuzz.py"
+      - "scripts/normalize_rootfs_tar.py"
+      - "tests/unit/test_normalize_rootfs_tar.py"
       - "scripts/browser_egress_network.py"
       - "scripts/smoke_browser_environment_w4.py"
       - "pyproject.toml"
@@ -55,7 +58,7 @@ jobs:
 
       - name: Run W4 browser, egress policy and adversarial network tests
         run: |
-          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py tests/unit/test_browser_smoke_environment.py tests/unit/test_browser_egress_network.py
+          pytest -q tests/unit/test_browser_egress.py tests/unit/test_browser_workspace.py tests/unit/test_browser_smoke_environment.py tests/unit/test_browser_egress_network.py tests/unit/test_browser_w4_archive_fuzz.py tests/unit/test_normalize_rootfs_tar.py
 
       - name: Audit browser optional dependencies and generate SBOM
         run: |
