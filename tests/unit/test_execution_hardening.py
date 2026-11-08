@@ -377,7 +377,7 @@ def test_sandbox_executor_avoids_preexec_fn_in_multithreaded_parent(
     assert launch.get("preexec_fn") is None
     command = launch.get("command")
     assert isinstance(command, list)
-    assert command[1:3] == ["-m", "tinlance_agent_platform_sandbox.exec_guard"]
+    assert command[1:4] == ["-I", "-m", "tinlance_agent_platform_sandbox.exec_guard"]
 
 
 def test_sandbox_exec_guard_cannot_be_shadowed_by_workspace_code(tmp_path: Path) -> None:
