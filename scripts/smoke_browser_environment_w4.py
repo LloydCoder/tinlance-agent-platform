@@ -242,6 +242,7 @@ def main() -> int:
         host_rules = build_host_forwarding_rules(
             proxy_host_interface=host_uplink_if,
             proxy_subnet=str(uplink_network),
+            dns_server=DNS_SERVER,
         ).replace("tnl_w4_forward", host_forward_table).replace("tnl_w4_nat", host_nat_table)
         run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
         subprocess.run(
