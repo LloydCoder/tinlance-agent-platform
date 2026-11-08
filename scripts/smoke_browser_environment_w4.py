@@ -581,6 +581,7 @@ def main() -> int:
         listener.bind((host_uplink_ip, host_probe_port))
         listener.listen(1)
         listener.settimeout(0.2)
+
         def accept_once() -> None:
             try:
                 connection, _ = listener.accept()
