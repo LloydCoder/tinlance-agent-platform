@@ -56,11 +56,11 @@ def _scope(
     "url",
     [
         "ftp://" + "127.0.0.1",
-        "https://user@extensions.example",
-        "https://user:pass@extensions.example",
-        "https://" + "extensions.example/path",
-        "https://" + "extensions.example?query=1",
-        "https://" + "extensions.example#fragment",
+        "https://user@127.0.0.1",
+        "https://user:pass@127.0.0.1",
+        "https://" + "127.0.0.1/path",
+        "https://" + "127.0.0.1?query=1",
+        "https://" + "127.0.0.1#fragment",
     ],
 )
 def test_extensions_transport_rejects_non_origin_base_urls(url: str) -> None:
