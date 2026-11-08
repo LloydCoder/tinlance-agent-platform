@@ -23,6 +23,7 @@ _ALLOWED_KMS_KEY_SPECS = frozenset({"RSA_2048", "RSA_3072", "RSA_4096"})
 _KMS_SIGNING_ALGORITHM = "RSASSA_PKCS1_V1_5_SHA_256"
 _TRACEPARENT_RE = re.compile(r"^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$")
+_TENANT_ID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 _SCOPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$")
 
 
@@ -196,8 +197,9 @@ class PlatformServiceTokenIssuer:
         purpose: str | None = None,
         principal_type: str = "user",
     ) -> str:
+        if not isinstance(tenant_id, str) or not _TENANT_ID_RE.fullmatch(tenant_id):
+            raise ValueError("Platform service-token tenant identifier is invalid")
         for value, name in (
-            (tenant_id, "tenant identifier"),
             (subject_id, "subject identifier"),
             (request_id, "request identifier"),
         ):

@@ -143,6 +143,8 @@ def test_publishes_kms_public_key_as_jwks(
     "kwargs",
     [
         {"tenant_id": " tenant-a", "subject_id": "user-a"},
+        {"tenant_id": "Tenant-A", "subject_id": "user-a"},
+        {"tenant_id": "tenant.a", "subject_id": "user-a"},
         {"tenant_id": "tenant-a", "subject_id": " user-a"},
         {"tenant_id": "tenant-a", "subject_id": "user-a", "audience": "https://attacker.example"},
         {"tenant_id": "tenant-a", "subject_id": "user-a", "expires_in_seconds": 301},
