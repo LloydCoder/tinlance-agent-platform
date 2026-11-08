@@ -1,6 +1,6 @@
 # Persistent Computer Phase 2 Acceptance Record
 
-**Status as of 2026-11-08:** Phase 2 is not complete. W2 and W3 implementation acceptance are complete at the repository ephemeral-CI feasibility level. W4 is the next serial phase. Production certification remains explicitly out of scope for these ephemeral CI artifacts.
+**Status as of 2026-11-08:** Phase 2 is not complete. W2, W3 and W4 implementation acceptance are complete at the repository ephemeral-CI feasibility level. W5 is the next serial phase. Production certification remains explicitly out of scope for these ephemeral CI artifacts.
 
 This document is the implementation-side acceptance record. The canonical TSIC tracking issue is [tinlance-system-integration#102](https://github.com/LloydCoder/tinlance-system-integration/issues/102).
 
@@ -75,20 +75,41 @@ The W3 artifact `browser-w3-42459138846` (artifact SHA-256 `81ba33b45fbf7b3b7e21
 
 **W3 disposition:** accepted for ephemeral CI feasibility only; no production certification is implied.
 
-## 5. W4 adversarial isolation — implementation in progress; not yet accepted
+## 5. W4 adversarial isolation — accepted for ephemeral CI feasibility
 
-The W4 branch `feat/phase2-w4-egress-namespace` adds the first dedicated proxy-network boundary and adversarial acceptance harness. The browser and proxy namespaces communicate over a direct private veth pair that is not exposed in the host network namespace. The proxy receives a separate host-facing uplink. Namespace nftables defaults to drop and permits only browser-side TCP/3128, established replies, public TCP/443 and DNS to the explicitly configured resolver. Private, shared-address, loopback, link-local, metadata, reserved and multicast ranges are blocked independently of application-layer DNS validation. Host nftables blocks proxy-uplink access to host-local services and limits forwarding/NAT to approved proxy egress.
+PR #200 adds the dedicated egress-only proxy namespace and concurrent tenant adversarial acceptance harness. The implementation separates browser and proxy network namespaces over a private veth pair, gives the proxy a separate host-facing uplink, and keeps the browser namespace without a default route. Proxy namespace nftables defaults to drop and permits only browser-side TCP/3128, established replies, public unicast TCP/443 and DNS to a dedicated host DNS relay. Private, shared-address, loopback, link-local, metadata, reserved and multicast ranges are blocked independently of application-layer DNS validation.
 
-The W4 harness also isolates browser and proxy processes with private PID, IPC and mount namespaces, checks route topology and no-default-route browser behavior, and probes host-local listeners, private/metadata destinations, non-HTTPS ports and direct browser egress. It reuses the real Chromium persistent-profile acceptance and cross-tenant profile-root denial probe. A hostile rootfs archive corpus extends coverage for duplicate paths, PAX path overrides, missing/cyclic/unsafe hardlinks, symlink escapes, FIFOs and device nodes.
+The host DNS relay binds only to the proxy-facing host veth address. Host INPUT permits only UDP/TCP 53 from the proxy uplink to that relay and blocks other host-local service access. The relay forwards to the host-configured resolver. The proxy resolver file is owned by the proxy UID/GID and mode 0600. Host forwarding/NAT is scoped to the proxy uplink; the harness inserts temporary source-IP/interface/TCP-443 and established-return rules in DOCKER-USER (or FORWARD when DOCKER-USER is absent), without changing the host's global FORWARD policy, and removes those exact rules during cleanup.
 
-**W4 is not accepted yet.** The branch still requires exact-head Python test execution, real network namespace/Chromium CI evidence, SBOM/security scans, review of the raw evidence artifact, and cleanup verification. The harness now runs tenant A and tenant B concurrently and checks PID, IPC, mount and network namespace separation, foreign-PID invisibility, SysV shared-memory invisibility, profile-root denial, proxy-network unreachability, mount denial, privilege-escalation denial and ptrace denial. These are implementation claims only until the exact-head W4 workflow passes and its artifact is inspected. The workflow must explicitly retain `production_certification=false`.
+The W4 harness runs browser, proxy and tenant B workloads under distinct non-root identities and private PID, IPC and mount namespaces. It verifies browser direct-egress denial; proxy public HTTPS connectivity; host-local/private/metadata/non-HTTPS egress denial; browser/proxy namespace topology; profile persistence across restart; workspace and tenant profile isolation; concurrent tenant A/B isolation; foreign PID/IPC invisibility; mount, privilege-escalation and ptrace denial; and cleanup. Chromium 156.0.8078.4 ran with its sandbox enabled; renderer seccomp, no_new_privs, zero effective capabilities and isolated renderer user namespaces were verified.
+
+### Independently inspected W4 evidence
+
+Workflow run [42471763414](https://github.com/LloydCoder/tinlance-agent-platform/actions/runs/42471763414) completed successfully. Artifact browser-w4-42471763414 (SHA-256 5ceaf3bf575dd26387c26d0fcab3e7a70d3b462455847df47e0d9e0362696295) was downloaded and inspected. The report SHA-256 is c172d0d69c6727f8f859b25574d776c26bdcb1c468c2ae44d7cb7ccef1cf410d; the SBOM SHA-256 is eb8f71f38a0c072a96df5615d79237a31e7a02e79738b58dbc2b44c17581f6c6.
+
+The report records:
+- Browser UID 51000, proxy UID 52000 and tenant B UID 53000.
+- Browser namespace with no default route; proxy namespace with only its browser-side and host-uplink links; IPv6 disabled.
+- Browser direct public egress blocked; proxy public HTTPS and allowlisted CONNECT tunnel succeeded.
+- Host-local services, private/metadata destinations and non-HTTPS ports blocked at independent network boundaries.
+- Resolver file owned by proxy UID/GID with mode 0600; host DNS relay limited to the proxy-facing host address.
+- Persistent browser profile across restart; workspace profile isolation; tenant profile-root reuse denied.
+- Concurrent cross-tenant isolation; foreign host PID and IPC segment invisibility; ptrace, mount and privilege-escalation attempts denied.
+- Chromium sandbox, renderer seccomp, no_new_privs, zero effective capabilities and renderer user-namespace isolation.
+- Namespace/firewall/process cleanup verified.
+
+The artifact explicitly records production_certification=false.
+
+**W4 residual risk:** the network layer permits public unicast TCP/443 to any destination. The proxy's application allowlist enforces domain policy, but a compromised proxy could attempt TLS exfiltration to another public TCP/443 endpoint. DNS is restricted to the dedicated host relay and host resolver, but DNS query names are not independently allowlisted. Production must add destination-level egress enforcement independent of the proxy process and explicit DNS query policy.
+
+**W4 disposition:** accepted for ephemeral CI adversarial feasibility only. This does not certify production readiness or complete Phase 2.
 
 ## 6. Remaining serial phases
 
 | Phase | Required acceptance |
 |---|---|
-| W3 browser environment | Browser launch and lifecycle; isolated persistent browser profile; SSRF and cloud-metadata protection; DNS rebinding; proxy-enforced egress policy; no host-network fallback |
-| W4 adversarial isolation | Dedicated egress-only proxy namespace; host-local/private/metadata and non-HTTPS egress denial; PID/IPC/mount separation; hostile archive/artifact fuzzing; path/link/device attacks; namespace and seccomp escape probes; concurrent cross-tenant filesystem, process, network, IPC and control-plane isolation |
+| W3 browser environment | Complete for ephemeral CI feasibility; production supervisor, encrypted durable profiles and independent review remain open |
+| W4 adversarial isolation | Complete for ephemeral CI feasibility; public TCP/443 destination-level enforcement and DNS query policy remain production blockers |
 | W5 eight-hour persistence | Genuine continuous 8-hour soak; restarts; lease expiry and revocation; quota enforcement; audit continuity; crash/recovery behavior |
 | W6 snapshot/restore | Snapshot integrity and provenance; restore to clean host; storage reattachment; fencing; stale-worker revocation; credential refresh; replay prevention |
 | Production economics | Repeated capacity and noisy-neighbor benchmarks; p50/p95/p99; CPU/memory/storage/network utilization; per-tenant unit economics; spend caps; teardown and cost reconciliation |
