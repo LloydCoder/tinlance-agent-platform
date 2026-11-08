@@ -1,6 +1,6 @@
 # ADR-015 — Persistent browser workspace and enforced egress
 
-**Status:** Proposed for W3 implementation validation
+**Status:** Accepted for W3 ephemeral CI feasibility; production deployment and hostile multi-tenant certification remain open
 
 **Date:** 2026-11-07
 
