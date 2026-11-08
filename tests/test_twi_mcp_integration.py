@@ -575,7 +575,15 @@ class TWIPlatformIntegrationTests(unittest.TestCase):
             reversibility=Reversibility.PARTIALLY_REVERSIBLE,
         )
         with self.assertRaisesRegex(PermissionError, "approved human review"):
-            gateway.call(context, scope, "twi_monitor_delete", arguments, request, uuid4())
+            gateway.call(
+                context,
+                scope,
+                "twi_monitor_delete",
+                arguments,
+                request,
+                uuid4(),
+                intent_fingerprint="c" * 64,
+            )
         self.assertEqual(self.http.calls, [])
 
         with self.assertRaisesRegex(PermissionError, "intent fingerprint"):
