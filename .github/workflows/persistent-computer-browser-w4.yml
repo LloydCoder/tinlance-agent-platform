@@ -137,6 +137,7 @@ jobs:
               "tenant_b_ipv6_disabled",
               "proxy_namespace_has_approved_default_route",
               "proxy_namespace_firewall_restrictive",
+              "proxy_resolver_config_private",
               "browser_pid_namespace_isolated",
               "browser_ipc_namespace_isolated",
               "browser_mount_namespace_isolated",
