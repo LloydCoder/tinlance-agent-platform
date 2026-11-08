@@ -112,7 +112,11 @@ class PostgresWorkspaceLeaseStore:
             raise TypeError("workspace_id must be a UUID")
         owner = self._identity(owner_subject_id, "owner_subject_id", 512)
         worker = self._identity(worker_id, "worker_id", 256)
-        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 60 <= lease_seconds <= 3600:
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or not 60 <= lease_seconds <= 3600
+        ):
             raise ValueError("lease_seconds must be between 60 and 3600")
         lease_id = uuid4()
 
@@ -134,7 +138,13 @@ class PostgresWorkspaceLeaseStore:
         def operation(connection: Any) -> datetime:
             row = connection.execute(
                 "SELECT platform.renew_workspace_lease(%s, %s, %s, %s, %s)",
-                (lease.tenant_id, lease.workspace_id, lease.lease_id, lease.fencing_token, lease_seconds),
+                (
+                    lease.tenant_id,
+                    lease.workspace_id,
+                    lease.lease_id,
+                    lease.fencing_token,
+                    lease_seconds,
+                ),
             ).fetchone()
             if row is None or not isinstance(row[0], datetime):
                 raise RuntimeError("workspace lease renewal returned an unexpected result")
