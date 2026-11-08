@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-import json
 import re
 from dataclasses import dataclass
-from hashlib import sha256
 from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
@@ -92,44 +90,6 @@ def compute_extensions_dead_letter_replay_intent_fingerprint(
         ensure_ascii=False,
     )
     return sha256(canonical.encode("utf-8")).hexdigest()
-_EVENT_ID = _JOB_ID
-_REPLAY_RESOURCE = "extensions://outbox/dead-letters/{event_id}"
-_REPLAY_ACTION = "replay"
-_REPLAY_CAPABILITY = "extensions.outbox.dead_letter.replay"
-
-
-def extensions_dead_letter_replay_run_id(
-    *, tenant_id: str, subject_id: str, request_id: str
-) -> UUID:
-    """Derive a stable run identity for one tenant/subject/request tuple."""
-    if not all((tenant_id, subject_id, request_id)):
-        raise ValueError("replay run identity requires tenant, subject and request")
-    return uuid5(
-        NAMESPACE_URL,
-        f"extensions:{tenant_id}:{subject_id}:{request_id}:extensions_dead_letter_replay",
-    )
-
-
-def compute_extensions_dead_letter_replay_intent_fingerprint(
-    *, tenant_id: str, subject_id: str, run_id: str, arguments: dict[str, object]
-) -> str:
-    """Bind human approval to the exact event, idempotency key and execution identity."""
-    payload = json.dumps(
-        {
-            "tenant_id": tenant_id,
-            "subject_id": subject_id,
-            "run_id": run_id,
-            "tool": "extensions_dead_letter_replay",
-            "capability": _REPLAY_CAPABILITY,
-            "action": _REPLAY_ACTION,
-            "resource": _REPLAY_RESOURCE,
-            "arguments": arguments,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return sha256(payload.encode("utf-8")).hexdigest()
-
 
 class ExtensionsAPIHandler:
     """Route registered Extensions operations through the Platform tool gateway."""
@@ -370,7 +330,6 @@ def create_extensions_platform_application(
     http_client: ExtensionsHTTPClient | None = None,
     approval_verifier: ApprovalVerifier | None = None,
     timeout_seconds: float = 5.0,
-    approval_verifier: ApprovalVerifier | None = None,
 ) -> PlatformExtensionsApplication:
     """Compose the Platform-authorized Extensions action boundary."""
     signer = KMSRS256Signer(
