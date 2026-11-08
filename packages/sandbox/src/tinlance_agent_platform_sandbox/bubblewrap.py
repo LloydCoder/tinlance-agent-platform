@@ -71,6 +71,11 @@ class BubblewrapProvider:
             "--ro-bind",
             "/lib64",
             "/lib64",
+            # Host configuration provides resolver, NSS, locale, and runtime
+            # configuration without granting the guest write access.
+            "--ro-bind",
+            "/etc",
+            "/etc",
             # Chromium and platform libraries need read-only host sysfs for
             # CPU topology and device capability discovery inside the sandbox.
             "--ro-bind",
