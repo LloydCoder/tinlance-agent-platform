@@ -310,8 +310,7 @@ begin
     if current_approval.status <> 'pending' then
         raise exception 'approval is no longer pending' using errcode = '55000';
     end if;
-    if p_intent_fingerprint is not null
-       and current_approval.intent_fingerprint is distinct from p_intent_fingerprint then
+    if current_approval.intent_fingerprint is distinct from p_intent_fingerprint then
         raise exception 'approval intent does not match' using errcode = '42501';
     end if;
     if p_approved and p_approver_subject_id = current_approval.requested_by then
@@ -373,10 +372,7 @@ begin
     if current_approval.run_id <> p_run_id
        or current_approval.action <> p_action
        or current_approval.resource <> p_resource
-       or (
-            p_intent_fingerprint is not null
-            and current_approval.intent_fingerprint is distinct from p_intent_fingerprint
-       ) then
+       or current_approval.intent_fingerprint is distinct from p_intent_fingerprint then
         raise exception 'approval does not bind to this action' using errcode = '42501';
     end if;
 
