@@ -142,6 +142,8 @@ def main() -> int:
         home = work / "home"
         tmpdir = work / "tmp"
         guest_evidence_path = work / "guest-evidence.json"
+        os.chown(work, browser_uid, browser_gid)
+        os.chmod(work, 0o700)
         for path in (profile_root, home, tmpdir):
             path.mkdir(mode=0o700)
             os.chown(path, browser_uid, browser_gid)
