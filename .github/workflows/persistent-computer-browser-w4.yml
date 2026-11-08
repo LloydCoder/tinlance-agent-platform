@@ -173,6 +173,10 @@ jobs:
           if not proxy_uid or not browser_uid or not other_uid or len({proxy_uid, browser_uid, other_uid}) != 3:
               raise SystemExit("W4 browser, proxy and other-tenant OS identities must be distinct.")
           tenant_b = report.get("tenant_b_probe", {})
+          if report.get("tenant_b_namespace_interface_count") != 1:
+              raise SystemExit("W4 tenant B namespace must expose only loopback.")
+          if report.get("tenant_b_namespace_route_table") not in ("", None):
+              raise SystemExit("W4 tenant B namespace must have no IPv4 routes.")
           tenant_requirements = [
               "pid_namespace_isolated",
               "ipc_namespace_isolated",
