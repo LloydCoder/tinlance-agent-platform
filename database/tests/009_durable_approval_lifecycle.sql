@@ -144,7 +144,7 @@ begin
     );
     perform pg_sleep(0.2);
     if platform.expire_approval_if_due(
-        '00000000-0000-0000-0000-000000000091', expiry_id
+        '00000000-0000-0000-0000-000000000091', v_expiry_id
     ) is not true then
         raise exception 'expired approval was not transitioned';
     end if;
