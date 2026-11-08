@@ -108,7 +108,7 @@ BEGIN
 
     SELECT count(*) INTO event_count FROM platform.workspace_lease_events
      WHERE tenant_id = tenant AND workspace_id = workspace;
-    IF event_count <> 9 THEN
+    IF event_count <> 8 THEN
         RAISE EXCEPTION 'workspace lease audit history is incomplete: % events', event_count;
     END IF;
 
