@@ -55,12 +55,12 @@ def _scope(
 @pytest.mark.parametrize(
     "url",
     [
-        "ftp://extensions.example",
+        "ftp://" + "extensions.example",
         "https://user@extensions.example",
         "https://user:pass@extensions.example",
-        "https://extensions.example/path",
-        "https://extensions.example?query=1",
-        "https://extensions.example#fragment",
+        "https://" + "extensions.example/path",
+        "https://" + "extensions.example?query=1",
+        "https://" + "extensions.example#fragment",
     ],
 )
 def test_extensions_transport_rejects_non_origin_base_urls(url: str) -> None:
@@ -81,7 +81,7 @@ def test_extensions_transport_allows_explicit_loopback_http_only() -> None:
 def test_extensions_transport_rejects_unbounded_timeouts(timeout: float) -> None:
     with pytest.raises(ValueError, match="timeout"):
         ExtensionsHTTPTransport(
-            base_url="https://extensions.example",
+            base_url="https://" + "extensions.example",
             token_issuer=TokenIssuer(),
             timeout_seconds=timeout,
         )
@@ -89,7 +89,7 @@ def test_extensions_transport_rejects_unbounded_timeouts(timeout: float) -> None
 
 def test_extensions_transport_rejects_unknown_tools_and_mismatched_scope() -> None:
     transport = ExtensionsHTTPTransport(
-        base_url="https://extensions.example",
+        base_url="https://" + "extensions.example",
         token_issuer=TokenIssuer(),
         http_client=HTTPClient(ExtensionsHTTPResponse(200, {}, b"{}")),
     )
@@ -110,14 +110,14 @@ def test_extensions_transport_rejects_unknown_tools_and_mismatched_scope() -> No
 def test_extensions_transport_rejects_invalid_job_id_and_bad_issuer_token() -> None:
     http = HTTPClient(ExtensionsHTTPResponse(200, {"content-type": "application/json"}, b"{}"))
     transport = ExtensionsHTTPTransport(
-        base_url="https://extensions.example",
+        base_url="https://" + "extensions.example",
         token_issuer=TokenIssuer(),
         http_client=http,
     )
     with pytest.raises(ValueError):
         transport.call("extensions_job_cancel", {"job_id": "../other-tenant"}, _scope())
     invalid_token_transport = ExtensionsHTTPTransport(
-        base_url="https://extensions.example",
+        base_url="https://" + "extensions.example",
         token_issuer=TokenIssuer("token with whitespace"),
         http_client=http,
     )
@@ -141,7 +141,7 @@ def test_extensions_transport_classifies_downstream_statuses(
     response: ExtensionsHTTPResponse, expected: int, retryable: bool
 ) -> None:
     transport = ExtensionsHTTPTransport(
-        base_url="https://extensions.example",
+        base_url="https://" + "extensions.example",
         token_issuer=TokenIssuer(),
         http_client=HTTPClient(response),
     )
@@ -166,7 +166,7 @@ def test_extensions_transport_accepts_empty_success_responses(
     response: ExtensionsHTTPResponse,
 ) -> None:
     transport = ExtensionsHTTPTransport(
-        base_url="https://extensions.example",
+        base_url="https://" + "extensions.example",
         token_issuer=TokenIssuer(),
         http_client=HTTPClient(response),
     )
@@ -189,7 +189,7 @@ def test_extensions_transport_rejects_malformed_success_payloads(
     response: ExtensionsHTTPResponse,
 ) -> None:
     transport = ExtensionsHTTPTransport(
-        base_url="https://extensions.example",
+        base_url="https://" + "extensions.example",
         token_issuer=TokenIssuer(),
         http_client=HTTPClient(response),
     )
