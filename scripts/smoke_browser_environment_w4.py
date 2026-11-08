@@ -509,7 +509,7 @@ def main() -> int:
                 "tenant_b_namespace_interface_count": 1,
                 "tenant_b_namespace_route_table": tenant_b_routes,
                 "proxy_namespace_dns_server": DNS_SERVER,
-        "proxy_namespace_dns_server_source": DNS_SERVER_SOURCE,
+                "proxy_namespace_dns_server_source": DNS_SERVER_SOURCE,
                 "proxy_namespace_egress_policy": "public TCP/443 and approved DNS only",
                 "host_forwarding_policy": (
                     "proxy uplink only; established replies; TCP/443; DNS to approved resolver"
