@@ -77,6 +77,31 @@ class EgressPolicy:
 Resolver = Callable[[str], tuple[str, ...]]
 
 
+NAT64_WELL_KNOWN_PREFIX = ipaddress.ip_network("64:ff9b::/96")
+
+
+def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Reject non-global IPs and IPv4-embedded NAT64 destinations."""
+    if not address.is_global:
+        return False
+    if (
+        isinstance(address, ipaddress.IPv6Address)
+        and (
+            address.ipv4_mapped is not None
+            or address in NAT64_WELL_KNOWN_PREFIX
+        )
+    ):
+        return False
+    return not (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
 def normalize_hostname(hostname: str) -> str:
     """Canonicalize a DNS hostname without performing name resolution."""
     if not hostname or len(hostname) > 253 or "\x00" in hostname:
@@ -184,16 +209,7 @@ def resolve_public_target(
             address = ipaddress.ip_address(raw_address)
         except ValueError as exc:
             raise EgressDenied("DNS returned a malformed address") from exc
-        if (
-            not address.is_global
-            or address.is_private
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_multicast
-            or address.is_reserved
-            or address.is_unspecified
-            or getattr(address, "ipv4_mapped", None) is not None
-        ):
+        if not _is_public_address(address):
             raise EgressDenied("DNS returned a non-public or special-use address")
         validated.append(str(address))
 
@@ -213,16 +229,7 @@ def connect_pinned_target(target: ResolvedTarget, *, timeout_seconds: float) -> 
             address = ipaddress.ip_address(raw_address)
         except ValueError as exc:
             raise EgressDenied("connector refuses to resolve a hostname") from exc
-        if (
-            not address.is_global
-            or address.is_private
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_multicast
-            or address.is_reserved
-            or address.is_unspecified
-            or getattr(address, "ipv4_mapped", None) is not None
-        ):
+        if not _is_public_address(address):
             raise EgressDenied("connector refuses a non-public address")
         remaining = deadline - time.monotonic()
         if remaining <= 0:
