@@ -45,23 +45,23 @@ def _sanitize_diagnostic(value: object, *, limit: int = 4_000) -> str:
     text = str(value)
     patterns = (
         (
-            re.compile(r"(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s,;]+"),
-            r"\\1[REDACTED]",
+            re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+"),
+            r"\1[REDACTED]",
         ),
         (
             re.compile(
-                r"(?i)\\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|"
-                r"password|secret|token|private[_-]?key)\\s*[:=]\\s*)[^\\s,;]+"
+                r"(?i)\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+                r"password|secret|token|private[_-]?key)\s*[:=]\s*)[^\s,;]+"
             ),
-            r"\\1[REDACTED]",
+            r"\1[REDACTED]",
         ),
         (
-            re.compile(r"\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b"),
+            re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b"),
             "[REDACTED]",
         ),
-        (re.compile(r"\\bAKIA[0-9A-Z]{16}\\b"), "[REDACTED]"),
-        (re.compile(r"\\bgh[pousr]_[A-Za-z0-9_]{20,}\\b"), "[REDACTED]"),
-        (re.compile(r"\\bsk-[A-Za-z0-9_-]{20,}\\b"), "[REDACTED]"),
+        (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED]"),
+        (re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"), "[REDACTED]"),
+        (re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"), "[REDACTED]"),
     )
     for pattern, replacement in patterns:
         text = pattern.sub(replacement, text)
