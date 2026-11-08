@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from tinlance_agent_platform_budgets import (
     PostgresQuotaLedger,
@@ -127,11 +127,11 @@ def _open_or_recover_lease(
 ) -> WorkspaceLease:
     if state.get("lease"):
         prior = _lease_from_state(state)
-        if store.assert_active(prior) and not force_reacquire:
+        prior_active = store.assert_active(prior)
+        if prior_active and not force_reacquire:
             return prior
-        if store.assert_active(prior) and force_reacquire:
-            if not store.revoke(prior):
-                raise RuntimeError("host-restart fencing could not revoke the prior lease")
+        if prior_active and force_reacquire and not store.revoke(prior):
+            raise RuntimeError("host-restart fencing could not revoke the prior lease")
         state["stale_lease_rejected"] = True
     lease = store.acquire(
         tenant_id,
