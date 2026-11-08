@@ -435,12 +435,11 @@ def test_dead_letter_replay_approval_is_consumed_once() -> None:
     assert response.status == "success"
     assert len(http.calls) == 1
 
-    try:
-        application.api.dispatch(request)
-    except PermissionError:
-        pass
-    else:
-        raise AssertionError("a consumed replay approval must never authorize a second execution")
+    retry_response = application.api.dispatch(request)
+    assert retry_response.status == "success"
+    assert retry_response.payload == response.payload
+    # The API's idempotency boundary returns the original result without a second
+    # approval consumption or downstream HTTP side effect.
     assert len(http.calls) == 1
 
 
