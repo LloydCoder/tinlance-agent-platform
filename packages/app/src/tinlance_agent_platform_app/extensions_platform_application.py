@@ -177,10 +177,11 @@ class ExtensionsAPIHandler:
             )
         else:
             required_fields = {"event_id", "run_id", "approval_id", "intent_fingerprint"}
-            if set(request.payload) not in {
-                required_fields,
-                required_fields | {"idempotency_key"},
-            }:
+            payload_fields = set(request.payload)
+            if (
+                payload_fields != required_fields
+                and payload_fields != required_fields | {"idempotency_key"}
+            ):
                 raise ValueError("Extensions replay requires exact approval-bound fields")
             event_id = request.payload.get("event_id")
             if not isinstance(event_id, str) or not _JOB_ID.fullmatch(event_id):
