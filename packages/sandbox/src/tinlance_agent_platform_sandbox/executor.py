@@ -88,7 +88,8 @@ class SandboxExecutor:
     ) -> ProcessResult:
         if os.name != "posix":
             raise RuntimeError("production sandbox execution requires POSIX isolation")
-        if not all(hasattr(os, name) for name in ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT")):
+        required_waitid_features = ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT")
+        if not all(hasattr(os, name) for name in required_waitid_features):
             raise RuntimeError("safe process-group supervision requires waitid with WNOWAIT")
         if not argv or not Path(cwd).is_absolute():
             raise ValueError("sandbox command and absolute cwd are required")
