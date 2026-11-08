@@ -24,6 +24,7 @@ def test_sandbox_executor_enforces_timeout(tmp_path: Path) -> None:
         ["/bin/sh", "-c", "sleep 2"],
         cwd=str(tmp_path),
         limits=SandboxLimits(timeout_seconds=1, max_output_bytes=4096),
+        lease_assertion=lambda: True,
     )
     assert result.timed_out is True
     assert result.exit_code != 0
@@ -34,6 +35,7 @@ def test_sandbox_executor_captures_output(tmp_path: Path) -> None:
         ["/bin/sh", "-c", "printf 'ok'"],
         cwd=str(tmp_path),
         limits=SandboxLimits(timeout_seconds=2, max_output_bytes=4096),
+        lease_assertion=lambda: True,
     )
     assert result.timed_out is False
     assert result.exit_code == 0
@@ -50,6 +52,7 @@ def test_sandbox_executor_enforces_combined_stdout_stderr_output_limit(tmp_path:
         ],
         cwd=str(tmp_path),
         limits=SandboxLimits(timeout_seconds=2, max_output_bytes=limit),
+        lease_assertion=lambda: True,
     )
 
     assert result.exit_code == 0
@@ -147,7 +150,7 @@ class ActiveWorkspaceLeaseStore:
 
 def test_workspace_lease_supervisor_binds_the_lease_store_to_each_command(tmp_path: Path) -> None:
     store = ActiveWorkspaceLeaseStore()
-    supervisor = WorkspaceLeaseSupervisor(store)
+    supervisor = WorkspaceLeaseSupervisor()
     lease = WorkspaceLease(
         UUID("00000000-0000-0000-0000-000000000092"),
         UUID("20000000-0000-0000-0000-000000000092"),
@@ -158,7 +161,7 @@ def test_workspace_lease_supervisor_binds_the_lease_store_to_each_command(tmp_pa
         datetime.now(UTC) + timedelta(minutes=10),
     )
     result = supervisor.execute(
-        lease,
+        lambda: store.assert_active(lease),
         ["/usr/bin/python3", "-c", "print('fenced')"],
         cwd=str(tmp_path),
         limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
@@ -177,7 +180,17 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
             raise RuntimeError("database unavailable")
 
     marker = tmp_path / "must-not-exist"
-    supervisor = WorkspaceLeaseSupervisor(UnavailableLeaseStore())
+    store = UnavailableLeaseStore()
+    lease = WorkspaceLease(
+        UUID("00000000-0000-0000-0000-000000000093"),
+        UUID("20000000-0000-0000-0000-000000000093"),
+        UUID("30000000-0000-0000-0000-000000000093"),
+        "owner-a",
+        "worker-a",
+        1,
+        datetime.now(UTC) + timedelta(minutes=10),
+    )
+    supervisor = WorkspaceLeaseSupervisor()
     command = [
         "/usr/bin/python3",
         "-c",
@@ -188,15 +201,7 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
 
     with pytest.raises(WorkspaceLeaseLost):
         supervisor.execute(
-            WorkspaceLease(
-                UUID("00000000-0000-0000-0000-000000000093"),
-                UUID("20000000-0000-0000-0000-000000000093"),
-                UUID("30000000-0000-0000-0000-000000000093"),
-                "owner-a",
-                "worker-a",
-                1,
-                datetime.now(UTC) + timedelta(minutes=10),
-            ),
+            lambda: store.assert_active(lease),
             command,
             cwd=str(tmp_path),
             limits=SandboxLimits(timeout_seconds=3, max_output_bytes=4096),
