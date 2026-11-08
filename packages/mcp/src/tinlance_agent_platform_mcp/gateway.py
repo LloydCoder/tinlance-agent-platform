@@ -349,6 +349,13 @@ class MCPToolGateway:
         if permit.decision.requires_approval:
             if approval_id is None or approval_verifier is None:
                 raise PermissionError("approved human review is required")
+            intent_fingerprint = permit.intent_fingerprint
+            if (
+                not isinstance(intent_fingerprint, str)
+                or len(intent_fingerprint) != 64
+                or any(character not in "0123456789abcdef" for character in intent_fingerprint)
+            ):
+                raise PermissionError("human approval must bind to an exact intent fingerprint")
             approval_verifier.require_approved_for(
                 approval_id,
                 permit.tenant_id,

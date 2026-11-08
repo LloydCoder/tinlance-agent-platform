@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
@@ -66,12 +67,60 @@ class PrincipalResolver(Protocol):
     def resolve(self, bearer_token: str) -> AuthenticatedPrincipal: ...
 
 
+class IdempotencyStore(Protocol):
+    """Store that serializes one guarded operation per tenant/principal/key."""
+
+    def execute_once(
+        self,
+        request: APIRequest,
+        fingerprint: str,
+        operation: Callable[[], APIResponse],
+    ) -> APIResponse: ...
+
+
+class InMemoryIdempotencyStore:
+    """Process-local reference store for tests and development only."""
+
+    def __init__(self, *, max_entries: int = _MAX_IDEMPOTENCY_ENTRIES) -> None:
+        if max_entries < 1:
+            raise ValueError("idempotency cache capacity must be positive")
+        self._max_entries = max_entries
+        self._records: dict[tuple[str, str, str], tuple[str, APIResponse]] = {}
+        self._order: list[tuple[str, str, str]] = []
+        self._lock = RLock()
+
+    def execute_once(
+        self,
+        request: APIRequest,
+        fingerprint: str,
+        operation: Callable[[], APIResponse],
+    ) -> APIResponse:
+        caller_key = request.idempotency_key or request.request_id
+        key = (request.tenant_id, request.subject_id, caller_key)
+        with self._lock:
+            existing = self._records.get(key)
+            if existing is not None:
+                if existing[0] != fingerprint:
+                    raise IdempotencyConflictError("request ID was reused for a different request")
+                return deepcopy(existing[1])
+            response = operation()
+            self._records[key] = (fingerprint, deepcopy(response))
+            self._order.append(key)
+            while len(self._order) > self._max_entries:
+                evicted = self._order.pop(0)
+                self._records.pop(evicted, None)
+            return response
+
+
 class AgentPlatformAPI:
-    def __init__(self, handler: APIHandler) -> None:
+    def __init__(
+        self,
+        handler: APIHandler,
+        *,
+        idempotency_store: IdempotencyStore | None = None,
+    ) -> None:
         self._handler = handler
-        self._idempotency: dict[tuple[str, str, str], tuple[str, APIResponse]] = {}
-        self._idempotency_order: list[tuple[str, str, str]] = []
-        self._idempotency_lock = RLock()
+        self._idempotency_store = idempotency_store or InMemoryIdempotencyStore()
 
     @staticmethod
     def _fingerprint(request: APIRequest) -> str:
@@ -104,25 +153,11 @@ class AgentPlatformAPI:
             return self._handler.handle(request)
 
         fingerprint = self._fingerprint(request)
-        with self._idempotency_lock:
-            caller_key = request.idempotency_key or request.request_id
-            # Tuple scoping avoids cross-tenant collisions and delimiter ambiguity.
-            key = (request.tenant_id, request.subject_id, caller_key)
-            existing = self._idempotency.get(key)
-            if existing is not None:
-                if existing[0] != fingerprint:
-                    raise IdempotencyConflictError("request ID was reused for a different request")
-                return deepcopy(existing[1])
-
-            # The reference boundary serializes guarded side effects so two
-            # concurrent deliveries with the same request ID cannot both execute.
-            response = self._handler.handle(request)
-            self._idempotency[key] = (fingerprint, deepcopy(response))
-            self._idempotency_order.append(key)
-            while len(self._idempotency_order) > _MAX_IDEMPOTENCY_ENTRIES:
-                evicted = self._idempotency_order.pop(0)
-                self._idempotency.pop(evicted, None)
-            return response
+        return self._idempotency_store.execute_once(
+            request,
+            fingerprint,
+            lambda: self._handler.handle(request),
+        )
 
     def dispatch_authenticated(
         self,

@@ -14,6 +14,7 @@ from tinlance_agent_platform_api.service import (
     APIHandler,
     APIRequest,
     APIResponse,
+    IdempotencyStore,
 )
 from tinlance_agent_platform_contracts import (
     CapabilityRequest,
@@ -342,6 +343,7 @@ def create_extensions_platform_application(
     verification_key_ids: tuple[str, ...] = (),
     http_client: ExtensionsHTTPClient | None = None,
     approval_verifier: ApprovalVerifier | None = None,
+    idempotency_store: IdempotencyStore | None = None,
     timeout_seconds: float = 5.0,
 ) -> PlatformExtensionsApplication:
     """Compose the Platform-authorized Extensions action boundary."""
@@ -371,7 +373,7 @@ def create_extensions_platform_application(
         approval_verifier=approval_verifier,
     )
     return PlatformExtensionsApplication(
-        api=AgentPlatformAPI(handler),
+        api=AgentPlatformAPI(handler, idempotency_store=idempotency_store),
         signer=signer,
         token_issuer=token_issuer,
         gateway=gateway,
