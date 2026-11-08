@@ -270,11 +270,16 @@ def main() -> int:
         if len(tenant_b_interfaces.splitlines()) != 1 or tenant_b_routes:
             raise RuntimeError("tenant B must have only loopback and no network routes")
         host_namespace_ids = {
-            name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt", "net")
+            name: os.stat(f"/proc/self/ns/{name}").st_ino
+            for name in ("pid", "ipc", "mnt")
+        }
+        host_all_namespace_ids = {
+            name: os.stat(f"/proc/self/ns/{name}").st_ino
+            for name in ("pid", "ipc", "mnt", "net")
         }
         namespace_probe = (
             "import json,os; print(json.dumps({name:os.stat('/proc/self/ns/'+name).st_ino "
-            "for name in ('pid','ipc','mnt','net')}))"
+            "for name in ('pid','ipc','mnt')}))"
         )
         isolated_namespace_ids = json.loads(run([
             "ip", "netns", "exec", browser_ns,
@@ -293,7 +298,7 @@ def main() -> int:
             "browser_ipc_namespace_isolated": True,
             "browser_mount_namespace_isolated": True,
             "browser_namespace_ids": isolated_namespace_ids,
-            "host_namespace_ids": host_namespace_ids,
+            "host_namespace_ids": host_all_namespace_ids,
         })
         evidence.update({
             "browser_namespace_has_no_default_route": True,
@@ -387,8 +392,8 @@ def main() -> int:
         if tenant_a_record.get("status") != "ready":
             raise RuntimeError("tenant A namespace marker did not initialize")
         if any(
-            tenant_a_record["namespace_ids"][name] == host_namespace_ids[name]
-            for name in host_namespace_ids
+            tenant_a_record["namespace_ids"][name] == host_all_namespace_ids[name]
+            for name in host_all_namespace_ids
         ):
             raise RuntimeError("tenant A shares a PID, IPC, mount or network namespace with host")
 
@@ -517,7 +522,7 @@ def main() -> int:
                 "--tenant-a-namespaces",
                 json.dumps(tenant_a_record["namespace_ids"], separators=(",", ":")),
                 "--host-namespaces",
-                json.dumps(host_namespace_ids, separators=(",", ":")),
+                json.dumps(host_all_namespace_ids, separators=(",", ":")),
             ],
             capture_output=True,
             text=True,
