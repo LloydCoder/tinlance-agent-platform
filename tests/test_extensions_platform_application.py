@@ -417,9 +417,7 @@ def test_dead_letter_replay_approval_is_consumed_once() -> None:
     )
     approvals = ApprovalService()
     request_id = "platform-extensions-replay-one-time"
-    _run_id, _fingerprint, _approval_id, payload = _approved_replay_request(
-        approvals, request_id
-    )
+    _run_id, _fingerprint, _approval_id, payload = _approved_replay_request(approvals, request_id)
     application = _application(http, approval_verifier=approvals)
     request = APIRequest(
         tenant_id="tenant-a",
@@ -443,14 +441,11 @@ def test_dead_letter_replay_approval_is_consumed_once() -> None:
     assert len(http.calls) == 1
 
 
-
 def test_mcp_replay_request_identity_helper_matches_protocol_contract() -> None:
     import hashlib
 
     request_id = "rpc-replay-0001"
-    expected = "mcp-" + hashlib.sha256(
-        f"tenant-a:user-a:{request_id}".encode()
-    ).hexdigest()[:32]
+    expected = "mcp-" + hashlib.sha256(f"tenant-a:user-a:{request_id}".encode()).hexdigest()[:32]
     assert (
         extensions_mcp_request_id(
             tenant_id="tenant-a",
