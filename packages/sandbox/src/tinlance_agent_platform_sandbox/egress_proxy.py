@@ -85,15 +85,12 @@ def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -
     """Reject non-global IPs and IPv4-embedded NAT64 destinations."""
     if not address.is_global:
         return False
-    if (
-        isinstance(address, ipaddress.IPv6Address)
-        and (
-            address.ipv4_mapped is not None
-            or address in NAT64_WELL_KNOWN_PREFIX
-            or address in IPV4_COMPATIBLE_PREFIX
-        )
-    ):
-        return False
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None or address in IPV4_COMPATIBLE_PREFIX:
+            return False
+        if address in NAT64_WELL_KNOWN_PREFIX:
+            embedded_ipv4 = ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
+            return _is_public_address(embedded_ipv4)
     return not (
         address.is_private
         or address.is_loopback
