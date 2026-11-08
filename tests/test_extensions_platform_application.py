@@ -330,7 +330,13 @@ def test_dead_letter_replay_requires_bound_human_approval_and_scoped_token() -> 
     assert call["headers"]["X-Request-ID"] == request_id
     assert call["headers"]["Idempotency-Key"] == REPLAY_IDEMPOTENCY_KEY
     token = call["headers"]["Authorization"].removeprefix("Bearer ")
-    claims = jwt.decode(token, application.signer.public_key, algorithms=["RS256"], issuer=ISSUER, audience=AUDIENCE)
+    claims = jwt.decode(
+        token,
+        application.signer.public_key,
+        algorithms=["RS256"],
+        issuer=ISSUER,
+        audience=AUDIENCE,
+    )
     assert claims["tenant_id"] == "tenant-a"
     assert claims["sub"] == "user-a"
     assert claims["scope"] == "extensions:outbox:replay"
