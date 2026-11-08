@@ -14,6 +14,10 @@ APPROVAL_ID = UUID("50000000-0000-0000-0000-000000000091")
 FINGERPRINT = "a" * 64
 
 
+class SQLPermissionError(RuntimeError):
+    sqlstate = "42501"
+
+
 class Cursor:
     def __init__(self, row):
         self.row = row
@@ -23,7 +27,7 @@ class Cursor:
 
 
 class Connection:
-    def __init__(self, *, row=None, consume=True, fail_on=None):
+    def __init__(self, *, row=None, consume=True, fail_on=None, fail_exception=None):
         self.row = row or (
             APPROVAL_ID,
             TENANT_ID,
@@ -42,6 +46,7 @@ class Connection:
         )
         self.consume = consume
         self.fail_on = fail_on
+        self.fail_exception = fail_exception
         self.queries = []
         self.committed = False
         self.rolled_back = False
@@ -50,6 +55,8 @@ class Connection:
     def execute(self, query, params=()):
         self.queries.append((query, params))
         if self.fail_on and self.fail_on in query:
+            if self.fail_exception is not None:
+                raise self.fail_exception
             raise RuntimeError("simulated database failure")
         if "set_config('platform.tenant_id'" in query:
             return Cursor((params[0],))
@@ -256,7 +263,30 @@ def test_approval_migration_has_tenant_rls_expiry_and_append_only_audit() -> Non
         "ENABLE ROW LEVEL SECURITY",
         "FORCE ROW LEVEL SECURITY",
         "REVOKE UPDATE, DELETE, TRUNCATE",
+        "platform_approval_executor",
+        "NOBYPASSRLS",
+        "SECURITY DEFINER",
+        "set search_path",
         "intent_fingerprint",
         "consumed_at",
     ):
         assert required.lower() in migration.lower()
+
+
+
+def test_postgres_approval_verifier_maps_tenant_binding_failure_to_permission_error() -> None:
+    connection = Connection(
+        fail_on="platform.consume_approval",
+        fail_exception=SQLPermissionError("approval intent mismatch"),
+    )
+    with pytest.raises(PermissionError, match="does not bind"):
+        service(connection).require_approved_for(
+            APPROVAL_ID,
+            str(TENANT_ID),
+            RUN_ID,
+            "invoice.refund",
+            "invoice:123",
+            intent_fingerprint=FINGERPRINT,
+        )
+    assert connection.rolled_back is True
+    assert connection.closed is True
