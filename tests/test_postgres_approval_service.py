@@ -99,7 +99,10 @@ def test_postgres_approval_request_persists_tenant_bound_intent_and_event():
     assert connection.closed
     assert any("set_config('platform.tenant_id'" in query for query, _ in connection.queries)
     assert any("INSERT INTO platform.action_approvals" in query for query, _ in connection.queries)
-    assert any("INSERT INTO platform.action_approval_events" in query for query, _ in connection.queries)
+    assert any(
+        "INSERT INTO platform.action_approval_events" in query
+        for query, _ in connection.queries
+    )
 
 
 def test_postgres_approval_consumption_is_bound_and_one_time():
