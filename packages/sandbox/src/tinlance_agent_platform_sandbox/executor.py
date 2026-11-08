@@ -119,6 +119,7 @@ class SandboxExecutor:
                 )
                 timed_out = False
                 deadline = monotonic() + limits.timeout_seconds
+                group_cleaned = False
                 try:
                     while True:
                         self._assert_lease(lease_assertion)
@@ -126,24 +127,30 @@ class SandboxExecutor:
                         if remaining <= 0:
                             timed_out = True
                             self._kill_and_reap(process)
+                            group_cleaned = True
                             break
                         if self._has_exited_without_reaping(process):
                             # The leader is still a zombie, keeping its process-group
                             # ID reserved while any detached descendants are killed.
                             self._kill_and_reap(process)
+                            group_cleaned = True
                             break
                         sleep(min(self._LEASE_POLL_INTERVAL_SECONDS, remaining))
-                    # Do not return output to a caller whose lease expired at completion.
+
+                    # Capture output only after every process in the command group is dead.
+                    stdout_data = stdout_path.read_bytes()[: limits.max_output_bytes]
+                    stderr_budget = max(0, limits.max_output_bytes - len(stdout_data))
+                    stderr_data = stderr_path.read_bytes()[:stderr_budget]
+                    # Recheck after output collection so a revoked lease cannot receive
+                    # a result merely because the command completed before revocation.
                     self._assert_lease(lease_assertion)
                 except WorkspaceLeaseLost:
-                    self._kill_and_reap(process)
+                    if not group_cleaned:
+                        self._kill_and_reap(process)
                     raise
 
             # max_output_bytes is an aggregate result budget across both streams.
             # Preserve stdout first, then use only the remaining budget for stderr.
-            stdout_data = stdout_path.read_bytes()[: limits.max_output_bytes]
-            stderr_budget = max(0, limits.max_output_bytes - len(stdout_data))
-            stderr_data = stderr_path.read_bytes()[:stderr_budget]
             return ProcessResult(
                 process.returncode,
                 stdout_data.decode("utf-8", errors="replace"),
