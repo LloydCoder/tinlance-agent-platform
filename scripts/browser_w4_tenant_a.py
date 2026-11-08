@@ -21,8 +21,7 @@ def main() -> int:
         raise OSError(ctypes.get_errno(), "unable to create tenant A IPC marker")
 
     namespace_ids = {
-        name: os.stat(f"/proc/self/ns/{name}").st_ino
-        for name in ("pid", "ipc", "mnt", "net")
+        name: os.stat(f"/proc/self/ns/{name}").st_ino for name in ("pid", "ipc", "mnt", "net")
     }
     print(
         json.dumps(
