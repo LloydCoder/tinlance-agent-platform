@@ -259,9 +259,10 @@ def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path
 
     assertions = 0
 
-    def active_lease() -> bool:
+    def active_lease(candidate: SandboxRequest) -> bool:
         nonlocal assertions
         assertions += 1
+        assert candidate is request
         return True
 
     result = execute_request(
