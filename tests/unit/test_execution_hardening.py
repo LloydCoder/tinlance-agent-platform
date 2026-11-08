@@ -418,3 +418,21 @@ def test_bubblewrap_provider_mounts_sysfs_read_only(monkeypatch: pytest.MonkeyPa
         if token == "--ro-bind"
     }
     assert ("/sys", "/sys") in read_only_mounts
+
+
+def test_bubblewrap_provider_mounts_etc_read_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BubblewrapProvider()
+    monkeypatch.setattr(provider, "available", lambda: True)
+
+    command = provider.command(
+        ["/usr/bin/python3", "-c", "print('ok')"],
+        SandboxLimits(),
+        ("/workspace",),
+    )
+
+    read_only_mounts = {
+        tuple(command[index + 1 : index + 3])
+        for index, token in enumerate(command[:-2])
+        if token == "--ro-bind"
+    }
+    assert ("/etc", "/etc") in read_only_mounts
