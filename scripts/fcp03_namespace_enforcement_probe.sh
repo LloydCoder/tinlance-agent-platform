@@ -11,7 +11,7 @@
 
 set -Eeuo pipefail
 
-for command in ip nft sysctl python3 sha256sum awk grep docker; do
+for command in ip nft sysctl python3 sha256sum awk grep sed docker; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'missing required command: %s\n' "$command" >&2
     exit 2
@@ -30,7 +30,7 @@ peer_if="f3n${suffix}"
 server_file="$(mktemp /tmp/fcp03-probe-server.XXXXXX.py)"
 server_pid=""
 
-baseline_host_rules="$(nft list ruleset | sha256sum | awk '{print $1}')"
+baseline_host_rules="$(nft list ruleset | sed -E 's/counter packets [0-9]+ bytes [0-9]+/counter packets <n> bytes <n>/g' | sha256sum | awk '{print $1}')"
 baseline_docker="$(docker ps --no-trunc --format '{{.ID}} {{.Names}} {{.Status}}' | sort)"
 
 cleanup() {
@@ -160,7 +160,7 @@ fi
 cleanup
 trap - EXIT
 
-after_host_rules="$(nft list ruleset | sha256sum | awk '{print $1}')"
+after_host_rules="$(nft list ruleset | sed -E 's/counter packets [0-9]+ bytes [0-9]+/counter packets <n> bytes <n>/g' | sha256sum | awk '{print $1}')"
 after_docker="$(docker ps --no-trunc --format '{{.ID}} {{.Names}} {{.Status}}' | sort)"
 if [[ "$baseline_host_rules" != "$after_host_rules" ]]; then
   echo "host nftables ruleset changed unexpectedly" >&2
