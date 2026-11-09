@@ -62,7 +62,7 @@ BEGIN
     END IF;
 
     SELECT count(*) INTO event_count FROM platform.workspace_restore_events
-     WHERE tenant_id = tenant AND workspace_id = workspace;
+     WHERE tenant_id = tenant AND workspace_id IN (workspace, workspace_two);
     IF event_count <> 4 THEN
         RAISE EXCEPTION 'restore event ledger has % rows, expected 4', event_count;
     END IF;
