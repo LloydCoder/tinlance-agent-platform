@@ -78,7 +78,7 @@ def test_complete_and_fail_use_tenant_scoped_functions():
     assert connection.calls[1][0] == (
         "SELECT platform.complete_workspace_restore(%s, %s, %s, %s)"
     )
-    assert connection.calls[2][0] == (
+    assert connection.calls[3][0] == (
         "SELECT platform.fail_workspace_restore(%s, %s, %s, %s)"
     )
     assert connection.committed
