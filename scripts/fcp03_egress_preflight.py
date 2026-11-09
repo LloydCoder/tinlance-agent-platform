@@ -185,7 +185,11 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
             destination, target = route.get("destination"), route.get("target")
             if route.get("state") != "active":
                 findings.add("nat-route-state-not-active")
-            if destination == "0.0.0.0/0" and isinstance(target, str) and target.startswith("igw-"):
+            if (
+                destination == "0.0.0.0/0"
+                and isinstance(target, str)
+                and target.startswith("igw-")
+            ):
                 normalized_target = "internet-gateway"
             else:
                 normalized_target = target
