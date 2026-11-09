@@ -327,8 +327,8 @@ class S3SnapshotStore:
     ) -> None:
         if not isinstance(bucket, str) or not bucket or "/" in bucket:
             raise ValueError("snapshot S3 bucket name is invalid")
-        if not isinstance(sse_kms_key_id, str) or not sse_kms_key_id:
-            raise ValueError("snapshot S3 storage requires an SSE-KMS key identifier")
+        if not isinstance(sse_kms_key_id, str) or not sse_kms_key_id.startswith("arn:aws:kms:"):
+            raise ValueError("snapshot S3 storage requires an AWS KMS key ARN")
         if (
             not isinstance(prefix, str)
             or not prefix
@@ -382,6 +382,11 @@ class S3SnapshotStore:
             if error.get("Code") in {"NoSuchKey", "NotFound"} or metadata.get("HTTPStatusCode") == 404:
                 raise SnapshotError("snapshot object does not exist in S3") from exc
             raise
+        if (
+            response.get("ServerSideEncryption") != "aws:kms"
+            or response.get("SSEKMSKeyId") != self._kms_key_id
+        ):
+            raise SnapshotIntegrityError("S3 snapshot object is not encrypted with the configured KMS key")
         body = response.get("Body")
         length = response.get("ContentLength")
         if (
