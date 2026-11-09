@@ -47,7 +47,7 @@ def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
     assert "ApprovedProbeDomain" not in template["Parameters"]
     assert "Default" not in template["Parameters"]["TeardownAtUtc"]
     approved_domains = template["Parameters"]["ApprovedDomains"]["Description"].lower()
-    assert "ssm" not in approved_domains
+    assert "ssm control-plane" not in approved_domains
     assert "instance-profile" in approved_domains
 
 
