@@ -3,6 +3,17 @@ from .outbox import OutboxRecord, TransactionalOutbox
 from .postgres_workspace_leases import PostgresWorkspaceLeaseStore, WorkspaceLease
 from .recovery import FailureMode, RecoveryDrill, RecoveryGate, RecoveryObjective
 from .service import IdempotencyStore, RetryPolicy, RunRepository
+from .snapshots import (
+    AESGCMCipher,
+    FilesystemSnapshotStore,
+    HMACSnapshotSigner,
+    RestoreResult,
+    SnapshotConflictError,
+    SnapshotError,
+    SnapshotIntegrityError,
+    SnapshotReference,
+    WorkspaceSnapshotService,
+)
 
 __all__ = [
     "IdempotencyStore",
@@ -18,4 +29,13 @@ __all__ = [
     "RecoveryDrill",
     "RecoveryGate",
     "RecoveryObjective",
+    "AESGCMCipher",
+    "FilesystemSnapshotStore",
+    "HMACSnapshotSigner",
+    "RestoreResult",
+    "SnapshotConflictError",
+    "SnapshotError",
+    "SnapshotIntegrityError",
+    "SnapshotReference",
+    "WorkspaceSnapshotService",
 ]
