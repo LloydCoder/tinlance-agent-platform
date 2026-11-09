@@ -62,9 +62,7 @@ def ec2_client() -> FakeClient:
                     ]
                 }
             ],
-            "describe_vpcs": [
-                {"Vpcs": [{"VpcId": "vpc-worker", "CidrBlock": "10.20.0.0/16"}]}
-            ],
+            "describe_vpcs": [{"Vpcs": [{"VpcId": "vpc-worker", "CidrBlock": "10.20.0.0/16"}]}],
             "describe_network_acls": [
                 {
                     "NetworkAcls": [
