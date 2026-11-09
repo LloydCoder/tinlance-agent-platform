@@ -217,3 +217,47 @@ def test_attestation_trust_rejects_naive_and_inverted_validity_windows() -> None
         AttestationTrust("att-1", now, valid_from=now + timedelta(seconds=1))
     with pytest.raises(ValueError, match="revocation timestamp"):
         AttestationTrust("att-1", now + timedelta(minutes=1), revoked=True)
+
+
+
+def test_sender_key_thumbprint_rejects_noncanonical_base64url_tail_bits() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="canonical"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            ("api://platform",),
+            "agent",
+            "jti",
+            now,
+            now + timedelta(minutes=1),
+            sender_key_thumbprint="A" * 42 + "B",
+        )
+
+
+def test_key_lifecycle_rejects_overlapping_active_version_even_if_one_is_future() -> None:
+    now = datetime.now(UTC)
+    current = KeyVersion("kms/platform", "1", "EdDSA", KeyState.ACTIVE, now)
+    scheduled = KeyVersion(
+        "kms/platform", "2", "EdDSA", KeyState.ACTIVE, now + timedelta(minutes=5)
+    )
+    with pytest.raises(RuntimeError, match="exactly one active"):
+        KeyLifecycle((current, scheduled)).active(now=now)
+
+
+def test_token_security_constant_time_claim_comparison_accepts_unicode_nonce() -> None:
+    now = datetime.now(UTC)
+    token = TokenSecurityContext(
+        "https://issuer.invalid",
+        ("api://platform",),
+        "agent",
+        "jti",
+        now - timedelta(seconds=1),
+        now + timedelta(minutes=1),
+        nonce="nonce-ü",
+    )
+    token.validate(
+        expected_issuer="https://issuer.invalid",
+        expected_audience="api://platform",
+        expected_nonce="nonce-ü",
+        now=now,
+    )
