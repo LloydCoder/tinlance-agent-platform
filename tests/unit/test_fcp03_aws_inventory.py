@@ -932,3 +932,21 @@ def test_collector_rejects_invalid_dns_firewall_rule_priority(priority: object) 
     )
 
     assert "dns-firewall-rule-priority-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_rejects_wildcard_dns_allowlist_even_when_targets_match() -> None:
+    resolver = resolver_client()
+    resolver.responses["list_firewall_domains"][0]["Domains"] = ["*"]
+    firewall = firewall_client()
+    firewall.responses["describe_rule_group"][0]["RuleGroup"]["RulesSource"]["RulesSourceList"][
+        "Targets"
+    ] = ["*"]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver,
+    )
+
+    assert "dns-allowlist-wildcard-present" in evaluate_fcp03_topology(snapshot)
