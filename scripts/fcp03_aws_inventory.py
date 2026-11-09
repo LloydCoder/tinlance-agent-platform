@@ -338,9 +338,9 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
             egress_rules.append(rule)
         elif entry.get("Egress") is False:
             ingress_rules.append(rule)
-    sort_key = lambda rule: (
-        rule["rule_number"] if isinstance(rule["rule_number"], int) else 2**31
-    )
+    def sort_key(rule: dict[str, object]) -> int:
+        rule_number = rule["rule_number"]
+        return rule_number if isinstance(rule_number, int) else 2**31
     ingress_rules.sort(key=sort_key)
     egress_rules.sort(key=sort_key)
     return {
