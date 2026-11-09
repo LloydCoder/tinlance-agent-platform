@@ -5,11 +5,15 @@ FROM ${BASE_IMAGE}
 ARG APT_SNAPSHOT
 
 # The minimal Ubuntu base has no CA bundle. Bootstrap trust from the ephemeral
-# build runner through a BuildKit secret (never an image layer), switch Ubuntu
-# mirrors to HTTPS, and install the pinned CA package. All workspace packages
-# then resolve from one immutable Ubuntu snapshot with normal TLS verification.
+# build runner through a BuildKit secret (never an image layer). Route every
+# architecture through Canonical's snapshot-enabled primary archive endpoint:
+# the ports mirror does not honor the dated snapshot URL. All packages remain
+# architecture-filtered by APT and resolve from one immutable snapshot.
 RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true,mode=0444 \
-    sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
+    sed -i \
+        -e 's|http://|https://|g' \
+        -e 's|https://ports.ubuntu.com/ubuntu-ports|https://archive.ubuntu.com/ubuntu|g' \
+        /etc/apt/sources.list.d/ubuntu.sources \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
