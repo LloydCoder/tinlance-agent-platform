@@ -748,7 +748,7 @@
                 },
                 "ArnEquals": {
                   "aws:SourceArn": {
-                    "Fn::Sub": "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/${AWS::StackName}-auto-teardown"
+                    "Fn::Sub": "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/tinlance-fcp03-auto-teardown"
                   }
                 }
               }
@@ -785,9 +785,7 @@
     "AutomaticTeardown": {
       "Type": "AWS::Scheduler::Schedule",
       "Properties": {
-        "Name": {
-          "Fn::Sub": "${AWS::StackName}-auto-teardown"
-        },
+        "Name": "tinlance-fcp03-auto-teardown",
         "Description": "Deletes the entire disposable FCP-03 lab at the required UTC deadline.",
         "ScheduleExpression": {
           "Fn::Sub": "at(${TeardownAtUtc})"
