@@ -117,7 +117,7 @@ def test_lab_has_an_automatic_stack_teardown_target_scoped_to_this_stack() -> No
     assert schedule["ActionAfterCompletion"] == "DELETE"
     assert schedule["FlexibleTimeWindow"]["Mode"] == "OFF"
     assert target["Arn"] == "arn:aws:scheduler:::aws-sdk:cloudformation:deleteStack"
-    assert json.loads(target["Input"]) == {"StackName": "${AWS::StackName}"}
+    assert target["Input"]["Fn::Sub"] == "{\"StackName\":\"${AWS::StackName}\"}"
     statement = role_policy["Statement"][0]
     assert statement["Action"] == ["cloudformation:DeleteStack"]
     assert statement["Resource"] == {
