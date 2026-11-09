@@ -81,7 +81,9 @@ def make_snapshot(tmp_path: Path):
     )
 
 
-def test_snapshot_round_trip_restores_clean_workspace_with_new_fence_and_refreshed_credentials(tmp_path):
+def test_snapshot_round_trip_restores_clean_workspace_with_new_fence_and_refreshed_credentials(
+    tmp_path,
+):
     snapshots = service(tmp_path)
     reference = snapshots.create(
         tenant_id=TENANT, workspace_id=WORKSPACE, fencing_token=4,
@@ -202,14 +204,18 @@ def test_restore_requires_active_lease_before_and_after_materialization(tmp_path
         snapshots.restore(
             reference=reference, tenant_id=TENANT, workspace_id=WORKSPACE,
             restore_id=uuid4(), fencing_token=5, destination=destination,
-            lease_authority=LeaseAuthority([False]), ledger=ledger, credential_refresher=Credentials(),
+            lease_authority=LeaseAuthority([False]),
+            ledger=ledger,
+            credential_refresher=Credentials(),
         )
     assert not ledger.claimed
     with pytest.raises(SnapshotError, match="revoked before publication"):
         snapshots.restore(
             reference=reference, tenant_id=TENANT, workspace_id=WORKSPACE,
             restore_id=uuid4(), fencing_token=5, destination=destination,
-            lease_authority=LeaseAuthority([True, False]), ledger=ledger, credential_refresher=Credentials(),
+            lease_authority=LeaseAuthority([True, False]),
+            ledger=ledger,
+            credential_refresher=Credentials(),
         )
     assert not destination.exists()
     assert not list(destination.parent.glob(".*.restore-*"))
@@ -288,7 +294,6 @@ def test_restore_rejects_tampered_ciphertext_and_modified_reference_digest(tmp_p
         tenant_id=TENANT, workspace_id=WORKSPACE, fencing_token=4,
         files={"workspace/a": b"a"},
     )
-    store = snapshots._store
     object_path = tmp_path / "objects" / (reference.snapshot_id.hex + ".snapshot")
     ciphertext = object_path.read_bytes()
     object_path.write_bytes(ciphertext[:-1] + bytes([ciphertext[-1] ^ 1]))
