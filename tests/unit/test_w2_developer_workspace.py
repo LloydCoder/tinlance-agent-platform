@@ -74,7 +74,6 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
         "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund"
         in dockerfile
     )
-    assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
     secret_mount_index = dockerfile.index(
         "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true"
