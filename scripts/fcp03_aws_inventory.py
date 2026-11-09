@@ -226,6 +226,54 @@ def _dns_firewall_snapshot(
     }
 
 
+
+def _stateful_rule_group_snapshots(
+    network_firewall: Any, policy: Mapping[str, Any]
+) -> list[dict[str, object]]:
+    """Read every stateful rule group referenced by the worker's firewall policy."""
+    references = policy.get("StatefulRuleGroupReferences", [])
+    if not isinstance(references, list):
+        return []
+
+    snapshots: list[dict[str, object]] = []
+    for reference in references:
+        arn = reference.get("ResourceArn") if isinstance(reference, Mapping) else None
+        if not isinstance(arn, str) or not arn:
+            snapshots.append(
+                {
+                    "status": "UNKNOWN",
+                    "type": "UNKNOWN",
+                    "rule_order": None,
+                    "generated_rules_type": None,
+                    "targets": [],
+                    "target_types": [],
+                }
+            )
+            continue
+
+        response = network_firewall.describe_rule_group(RuleGroupArn=arn)
+        rule_group = response.get("RuleGroup", {})
+        response_metadata = response.get("RuleGroupResponse", {})
+        rules_source = rule_group.get("RulesSource", {})
+        domain_list = rules_source.get("RulesSourceList", {})
+        targets = domain_list.get("Targets", [])
+        target_types = domain_list.get("TargetTypes", [])
+        snapshots.append(
+            {
+                "status": response_metadata.get("RuleGroupStatus", "UNKNOWN"),
+                "type": response_metadata.get("Type", "UNKNOWN"),
+                "rule_order": rule_group.get("StatefulRuleOptions", {}).get("RuleOrder"),
+                "generated_rules_type": domain_list.get("GeneratedRulesType"),
+                "targets": sorted(
+                    value for value in targets if isinstance(value, str)
+                ) if isinstance(targets, list) else [],
+                "target_types": sorted(
+                    value for value in target_types if isinstance(value, str)
+                ) if isinstance(target_types, list) else [],
+            }
+        )
+    return snapshots
+
 def collect_fcp03_snapshot(
     *,
     instance_id: str,
@@ -390,10 +438,21 @@ def collect_fcp03_snapshot(
             else {}
         )
         policy = policy_response.get("FirewallPolicy", {})
+        policy_metadata = policy_response.get("FirewallPolicyResponse", {})
         validation = _resolved_ip_validation(policy)
+        policy_errors = policy_metadata.get("Errors")
         firewall_snapshot = {
             "endpoints_by_az": endpoints,
-            "policy": {"route53_resolved_ip_validation": validation},
+            "policy": {
+                "route53_resolved_ip_validation": validation,
+                "status": policy_metadata.get("FirewallPolicyStatus", "UNKNOWN"),
+                "errors": policy_errors if isinstance(policy_errors, list) else None,
+                "stateful_rule_order": policy.get("StatefulEngineOptions", {}).get("RuleOrder"),
+                "stateful_default_actions": policy.get("StatefulDefaultActions", []),
+                "stateful_rule_groups": _stateful_rule_group_snapshots(
+                    network_firewall, policy
+                ),
+            },
         }
         group_id = validation.get("dns_firewall_rule_group_id") if validation else None
         dns_snapshot = _dns_firewall_snapshot(
