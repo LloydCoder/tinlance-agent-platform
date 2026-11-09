@@ -126,3 +126,58 @@ def test_production_readiness_rejects_naive_evidence_timestamps() -> None:
             verified_at=datetime(2026, 11, 9),
             evidence_sha256="a" * 64,
         )
+
+
+
+def test_verified_dependency_rejects_credential_bearing_evidence_uri() -> None:
+    with pytest.raises(ValueError, match="credentials"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://operator:secret@evidence.example/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
+
+
+def test_production_readiness_rejects_future_dated_evidence() -> None:
+    future = datetime(2026, 11, 10, tzinfo=UTC)
+    dependencies = tuple(
+        ProductionDependency(
+            dependency.kind,
+            dependency.name,
+            dependency.verified,
+            dependency.evidence_ref,
+            verified_by=dependency.verified_by,
+            verified_at=future,
+            evidence_sha256=dependency.evidence_sha256,
+        )
+        for dependency in _verified_dependencies()
+    )
+    with pytest.raises(RuntimeError, match="future-dated"):
+        ProductionReadiness("1.1.0", dependencies).verify(
+            now=datetime(2026, 11, 9, tzinfo=UTC)
+        )
+
+
+def test_production_readiness_rejects_naive_verification_clock() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ProductionReadiness("1.1.0", _verified_dependencies()).verify(
+            now=datetime(2026, 11, 9)
+        )
+
+
+def test_dependency_expiry_must_follow_verification_time() -> None:
+    with pytest.raises(ValueError, match="later than verification"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://evidence.example/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            expires_at=datetime(2026, 11, 8, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
