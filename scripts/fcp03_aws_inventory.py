@@ -496,24 +496,34 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
         "NetworkAcls",
         Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}],
     )
+    invalid_snapshot = {
+        "associated": False,
+        "network_acl_id": None,
+        "subnet_ids": [],
+        "egress_rules": None,
+        "ingress_rules": None,
+    }
     matches = []
     for acl in network_acls:
+        # The API filter scopes this response to the requested subnet. Any
+        # malformed record or association therefore makes the scoped inventory
+        # incomplete; never ignore it just because another record looks valid.
         if not isinstance(acl, Mapping):
-            continue
-        associations = acl.get("Associations", [])
-        if isinstance(associations, list) and any(
-            isinstance(association, Mapping) and association.get("SubnetId") == subnet_id
-            for association in associations
-        ):
+            return invalid_snapshot
+        associations = acl.get("Associations")
+        if not isinstance(associations, list):
+            return invalid_snapshot
+        for association in associations:
+            if (
+                not isinstance(association, Mapping)
+                or not isinstance(association.get("SubnetId"), str)
+                or not association.get("SubnetId")
+            ):
+                return invalid_snapshot
+        if any(association["SubnetId"] == subnet_id for association in associations):
             matches.append(acl)
     if len(matches) != 1:
-        return {
-            "associated": False,
-            "network_acl_id": None,
-            "subnet_ids": [],
-            "egress_rules": [],
-            "ingress_rules": [],
-        }
+        return invalid_snapshot
 
     acl = matches[0]
     raw_associations = acl.get("Associations", [])
@@ -534,8 +544,8 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
 
     ingress_rules: list[dict[str, object]] | None = []
     egress_rules: list[dict[str, object]] | None = []
-    entries = acl.get("Entries", [])
-    invalid_entry_inventory = not isinstance(entries, list)
+    entries = acl.get("Entries")
+    invalid_entry_inventory = "Entries" not in acl or not isinstance(entries, list)
     if not isinstance(entries, list):
         entries = []
     for entry in entries:
