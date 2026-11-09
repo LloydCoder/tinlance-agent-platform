@@ -16,6 +16,7 @@ from typing import Any
 def _all_pages(client: Any, operation: str, result_key: str, **params: Any) -> list[Any]:
     items: list[Any] = []
     request = dict(params)
+    seen_tokens: set[str] = set()
     while True:
         response = getattr(client, operation)(**request)
         page = response.get(result_key, [])
@@ -23,8 +24,13 @@ def _all_pages(client: Any, operation: str, result_key: str, **params: Any) -> l
             raise ValueError(f"AWS {operation} returned an invalid {result_key} collection")
         items.extend(page)
         token = response.get("NextToken")
-        if not token:
+        if token is None or token == "":
             return items
+        if not isinstance(token, str):
+            raise ValueError(f"AWS {operation} returned an invalid pagination token")
+        if token in seen_tokens:
+            raise ValueError(f"AWS {operation} returned a repeated pagination token")
+        seen_tokens.add(token)
         request["NextToken"] = token
 
 
