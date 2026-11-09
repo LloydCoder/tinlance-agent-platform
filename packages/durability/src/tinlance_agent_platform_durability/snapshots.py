@@ -359,18 +359,20 @@ class WorkspaceSnapshotService:
         entries = decoded.get("files")
         if not isinstance(entries, list) or not entries or len(entries) > self.MAX_FILES:
             raise SnapshotIntegrityError("snapshot file manifest is invalid")
+        if not ledger.begin(
+            tenant_id, workspace_id, restore_id, reference.snapshot_id, fencing_token
+        ):
+            raise SnapshotConflictError("restore operation was already claimed")
         target = Path(destination)
         if target.exists() or target.is_symlink():
+            with suppress(Exception):
+                ledger.fail(restore_id, "destination_not_clean")
             raise SnapshotConflictError("restore destination must not exist on the clean host")
         parent = target.parent.resolve(strict=True)
         target = parent / target.name
         staging = parent / f".{target.name}.restore-{restore_id.hex}"
         if staging.exists() or staging.is_symlink():
             raise SnapshotConflictError("restore staging path already exists")
-        if not ledger.begin(
-            tenant_id, workspace_id, restore_id, reference.snapshot_id, fencing_token
-        ):
-            raise SnapshotConflictError("restore operation was already claimed")
         published = False
         staging_created = False
         try:
@@ -415,7 +417,7 @@ class WorkspaceSnapshotService:
                 for k, v in credentials.items()
             ):
                 raise SnapshotError(
-                    "credential refresher must return opaque secret references, never secret values"
+                    "credential references must be opaque secret references, never secret values"
                 )
             if not lease_authority.assert_active(tenant_id, workspace_id, fencing_token):
                 raise SnapshotError("restore lease was revoked before publication")
