@@ -220,7 +220,7 @@ def test_missing_network_firewall_is_reported_as_incomplete_not_pass() -> None:
 
     findings = evaluate_fcp03_topology(snapshot)
 
-    assert "worker-firewall-route-missing" not in findings
+    assert "worker-firewall-route-missing" in findings
     assert "resolved-ip-validation-missing" in findings
     assert "dns-allowlist-incomplete" in findings
 
