@@ -9,7 +9,7 @@
     "ApprovedDomains": {
       "Type": "CommaDelimitedList",
       "Description": "Exact approved FQDNs for the worker's bounded DNS and HTTPS smoke probes; the worker has no SSM or instance-profile dependency.",
-      "AllowedPattern": "^(?![0-9]+(?:\\\\.[0-9]+){3}$)(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$",
+      "AllowedPattern": "^(?![0-9]+(?:\\.[0-9]+){3}$)(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$",
       "ConstraintDescription": "Each item must be an exact DNS FQDN. Wildcards, IP literals, empty labels and malformed host labels are not allowed."
     },
     "TeardownAtUtc": {
