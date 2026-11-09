@@ -203,6 +203,40 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     ):
         findings.add("worker-nacl-egress-policy-invalid")
 
+    expected_nacl_ingress_rules = [
+        {
+            "rule_number": 100,
+            "protocol": "6",
+            "action": "allow",
+            "cidr": "0.0.0.0/0",
+            "from_port": 1024,
+            "to_port": 65535,
+        },
+        {
+            "rule_number": 110,
+            "protocol": "17",
+            "action": "allow",
+            "cidr": "0.0.0.0/0",
+            "from_port": 1024,
+            "to_port": 65535,
+        },
+        {
+            "rule_number": 32766,
+            "protocol": "-1",
+            "action": "deny",
+            "cidr": "0.0.0.0/0",
+            "from_port": None,
+            "to_port": None,
+        },
+    ]
+    raw_nacl_ingress_rules = network_acl.get("ingress_rules")
+    if (
+        not isinstance(raw_nacl_ingress_rules, Sequence)
+        or isinstance(raw_nacl_ingress_rules, (str, bytes))
+        or list(raw_nacl_ingress_rules) != expected_nacl_ingress_rules
+    ):
+        findings.add("worker-nacl-ingress-policy-invalid")
+
     if _has_unrestricted_egress(worker.get("security_group_egress")):
         findings.add("unrestricted-security-group-egress")
 
