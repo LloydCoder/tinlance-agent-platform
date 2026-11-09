@@ -441,13 +441,13 @@ def test_snapshot_catalog_records_and_requires_exact_tenant_scoped_reference(tmp
         store=store,
         cipher=AESGCMCipher(b"e" * 32),
         signer=HMACSnapshotSigner(b"s" * 32),
+        catalog=Catalog(),
     )
-    assert untrusted.restore is not None
 
     with pytest.raises(SnapshotIntegrityError, match="catalog"):
-        snapshots.restore(
+        untrusted.restore(
             reference=reference,
-            tenant_id=uuid4(),
+            tenant_id=TENANT,
             workspace_id=WORKSPACE,
             restore_id=uuid4(),
             fencing_token=5,
