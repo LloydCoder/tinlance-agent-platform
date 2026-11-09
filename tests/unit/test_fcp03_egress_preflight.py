@@ -12,6 +12,9 @@ def valid_topology() -> dict[str, object]:
             "subnet_cidr": "10.20.1.0/24",
             "public_ip": None,
             "map_public_ip_on_launch": False,
+            "metadata_endpoint_enabled": False,
+            "metadata_tokens_required": True,
+            "metadata_hop_limit": 1,
             "availability_zone": "eu-west-1a",
             "default_route_target": "vpce-fw-a",
             "security_group_egress": [
@@ -185,3 +188,23 @@ def test_rejects_incomplete_dns_firewall_resources() -> None:
     assert "dns-rule-group-association-not-ready" in findings
     assert "dns-firewall-rule-not-ready" in findings
     assert "dns-firewall-domain-list-not-ready" in findings
+
+
+def test_rejects_an_enabled_or_unknown_instance_metadata_endpoint() -> None:
+    topology = valid_topology()
+    topology["worker"]["metadata_endpoint_enabled"] = True
+
+    assert "worker-metadata-endpoint-enabled" in evaluate_fcp03_topology(topology)
+
+    topology["worker"]["metadata_endpoint_enabled"] = None
+    assert "worker-metadata-endpoint-enabled" in evaluate_fcp03_topology(topology)
+
+
+def test_requires_imdsv2_and_a_single_hop_metadata_limit() -> None:
+    topology = valid_topology()
+    topology["worker"]["metadata_tokens_required"] = False
+    topology["worker"]["metadata_hop_limit"] = 2
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "worker-metadata-protection-invalid" in findings

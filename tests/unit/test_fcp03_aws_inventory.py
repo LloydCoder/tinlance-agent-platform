@@ -38,6 +38,11 @@ def ec2_client() -> FakeClient:
                                     "Placement": {"AvailabilityZone": "eu-west-1a"},
                                     "PrivateIpAddress": "10.20.1.10",
                                     "PublicIpAddress": None,
+                                    "MetadataOptions": {
+                                        "HttpEndpoint": "disabled",
+                                        "HttpTokens": "required",
+                                        "HttpPutResponseHopLimit": 1,
+                                    },
                                     "SecurityGroups": [{"GroupId": "sg-worker"}],
                                 }
                             ]
@@ -207,6 +212,9 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
     assert snapshot["firewall"]["endpoints_by_az"] == {"eu-west-1a": "vpce-fw-a"}
     assert snapshot["dns_firewall"]["allowlist_domains"] == ["approved.example"]
     assert snapshot["dns_firewall"]["terminal_block"] is True
+    assert snapshot["worker"]["metadata_endpoint_enabled"] is False
+    assert snapshot["worker"]["metadata_tokens_required"] is True
+    assert snapshot["worker"]["metadata_hop_limit"] == 1
 
 
 def test_missing_network_firewall_is_reported_as_incomplete_not_pass() -> None:

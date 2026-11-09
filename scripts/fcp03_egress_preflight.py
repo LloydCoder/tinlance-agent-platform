@@ -58,6 +58,10 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("worker-public-address")
     if worker.get("map_public_ip_on_launch") is not False:
         findings.add("worker-public-subnet")
+    if worker.get("metadata_endpoint_enabled") is not False:
+        findings.add("worker-metadata-endpoint-enabled")
+    if worker.get("metadata_tokens_required") is not True or worker.get("metadata_hop_limit") != 1:
+        findings.add("worker-metadata-protection-invalid")
     if (
         worker.get("ipv6_enabled")
         or worker.get("ipv6_addresses")
