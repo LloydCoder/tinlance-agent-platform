@@ -60,15 +60,11 @@ class TokenSecurityContext:
     ) -> None:
         current = now or datetime.now(UTC)
         _require_aware(current, "validation time")
-        if not expected_issuer.strip() or not hmac.compare_digest(
-            self.issuer, expected_issuer
-        ):
+        if not expected_issuer.strip() or not hmac.compare_digest(self.issuer, expected_issuer):
             raise PermissionError("token issuer is not trusted")
         if not expected_audience.strip() or expected_audience not in self.audience:
             raise PermissionError("token audience is not trusted")
-        if current < self.issued_at or (
-            self.not_before is not None and current < self.not_before
-        ):
+        if current < self.issued_at or (self.not_before is not None and current < self.not_before):
             raise PermissionError("token is not yet valid")
         if current >= self.expires_at:
             raise PermissionError("token is outside its validity window")
@@ -79,9 +75,7 @@ class TokenSecurityContext:
         if self.sender_key_thumbprint is not None:
             if expected_sender_key_thumbprint is None:
                 raise PermissionError("sender-bound token requires request key binding")
-            if not hmac.compare_digest(
-                self.sender_key_thumbprint, expected_sender_key_thumbprint
-            ):
+            if not hmac.compare_digest(self.sender_key_thumbprint, expected_sender_key_thumbprint):
                 raise PermissionError("token sender key does not match the request")
         elif expected_sender_key_thumbprint is not None:
             raise PermissionError("token is missing the required sender key constraint")
