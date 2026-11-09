@@ -45,6 +45,16 @@ DECLARE
     event_count integer;
     visible_count integer;
 BEGIN
+    IF platform.record_workspace_snapshot(
+        tenant, snapshot_one, workspace, 5, clock_timestamp(), digest,
+        replace(snapshot_one::text, '-', '') || '.snapshot'
+    ) IS NOT TRUE OR platform.record_workspace_snapshot(
+        tenant, snapshot_two, workspace_two, 6, clock_timestamp(), digest,
+        replace(snapshot_two::text, '-', '') || '.snapshot'
+    ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'restore source snapshots were not catalogued';
+    END IF;
+
     IF platform.begin_workspace_restore(tenant, workspace, restore_one, snapshot_one, 5) IS NOT TRUE THEN
         RAISE EXCEPTION 'first restore claim was not created';
     END IF;
