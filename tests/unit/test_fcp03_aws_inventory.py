@@ -252,6 +252,7 @@ def ec2_client() -> FakeClient:
                     "SecurityGroups": [
                         {
                             "GroupId": "sg-worker",
+                            "IpPermissions": [],
                             "IpPermissionsEgress": [
                                 {
                                     "IpProtocol": "tcp",
@@ -648,3 +649,62 @@ def test_collector_captures_and_rejects_worker_security_group_ingress() -> None:
         {"protocol": "tcp", "port": 22, "cidr": "10.20.0.0/16"}
     ]
     assert "worker-security-group-ingress-not-empty" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_captures_ipv6_and_referenced_worker_ingress() -> None:
+    ec2 = ec2_client()
+    security_group = ec2.responses["describe_security_groups"][0]["SecurityGroups"][0]
+    security_group["IpPermissions"] = [
+        {
+            "IpProtocol": "-1",
+            "Ipv6Ranges": [{"CidrIpv6": "2001:db8::/32"}],
+            "PrefixListIds": [{"PrefixListId": "pl-approved"}],
+            "UserIdGroupPairs": [{"GroupId": "sg-peer"}],
+        }
+    ]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["security_group_ingress"] == [
+        {"protocol": "-1", "port": None, "cidr": "2001:db8::/32"},
+        {"protocol": "-1", "port": None, "cidr": None, "reference": "pl-approved"},
+        {"protocol": "-1", "port": None, "cidr": None, "reference": "sg-peer"},
+    ]
+
+
+def test_collector_fails_closed_when_worker_ingress_inventory_is_missing() -> None:
+    ec2 = ec2_client()
+    security_group = ec2.responses["describe_security_groups"][0]["SecurityGroups"][0]
+    security_group.pop("IpPermissions")
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["security_group_ingress"] is None
+    assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_fails_closed_when_worker_ingress_inventory_is_malformed() -> None:
+    ec2 = ec2_client()
+    security_group = ec2.responses["describe_security_groups"][0]["SecurityGroups"][0]
+    security_group["IpPermissions"] = "unknown"
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["security_group_ingress"] is None
+    assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(snapshot)
+
