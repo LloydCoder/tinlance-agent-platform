@@ -372,6 +372,15 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     ):
         findings.add("worker-nacl-ingress-policy-invalid")
 
+    security_group_ingress = worker.get("security_group_ingress")
+    if (
+        not isinstance(security_group_ingress, Sequence)
+        or isinstance(security_group_ingress, (str, bytes))
+    ):
+        findings.add("worker-security-group-ingress-inventory-invalid")
+    elif security_group_ingress:
+        findings.add("worker-security-group-ingress-not-empty")
+
     if _has_unrestricted_egress(worker.get("security_group_egress")):
         findings.add("unrestricted-security-group-egress")
 
