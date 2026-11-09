@@ -352,6 +352,40 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     if _has_unrestricted_egress(worker.get("security_group_egress")):
         findings.add("unrestricted-security-group-egress")
 
+    resolver_ip = worker.get("resolver_ip")
+    expected_security_group_egress = {
+        ("tcp", 443, "0.0.0.0/0"),
+        ("udp", 53, f"{resolver_ip}/32" if isinstance(resolver_ip, str) else None),
+        ("tcp", 53, f"{resolver_ip}/32" if isinstance(resolver_ip, str) else None),
+    }
+    raw_security_group_egress = worker.get("security_group_egress")
+    observed_security_group_egress: set[tuple[object, object, object]] = set()
+    if not isinstance(raw_security_group_egress, Sequence) or isinstance(
+        raw_security_group_egress, (str, bytes)
+    ):
+        findings.add("worker-security-group-egress-policy-invalid")
+    else:
+        for rule in raw_security_group_egress:
+            entry = _object(rule)
+            protocol, port, cidr = (
+                entry.get("protocol"),
+                entry.get("port"),
+                entry.get("cidr"),
+            )
+            if (
+                not isinstance(protocol, str)
+                or (port is not None and not isinstance(port, int))
+                or not isinstance(cidr, str)
+            ):
+                findings.add("worker-security-group-egress-policy-invalid")
+                continue
+            observed_security_group_egress.add((protocol, port, cidr))
+        if (
+            len(observed_security_group_egress) != len(raw_security_group_egress)
+            or observed_security_group_egress != expected_security_group_egress
+        ):
+            findings.add("worker-security-group-egress-policy-invalid")
+
     if not validation:
         findings.add("resolved-ip-validation-missing")
     else:

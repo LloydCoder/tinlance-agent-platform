@@ -262,6 +262,13 @@ def ec2_client() -> FakeClient:
                                     "IpRanges": [{"CidrIp": "10.20.0.2/32"}],
                                     "Ipv6Ranges": [],
                                 },
+                                {
+                                    "IpProtocol": "tcp",
+                                    "FromPort": 53,
+                                    "ToPort": 53,
+                                    "IpRanges": [{"CidrIp": "10.20.0.2/32"}],
+                                    "Ipv6Ranges": [],
+                                },
                             ],
                         }
                     ]

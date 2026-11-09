@@ -98,7 +98,7 @@ def valid_topology() -> dict[str, object]:
                 {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
             ],
             "security_group_egress": [
-                {"protocol": "tcp", "port": 443, "cidr": "10.20.10.0/24"},
+                {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
                 {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
                 {"protocol": "tcp", "port": 53, "cidr": "10.20.0.2/32"},
             ],
@@ -532,3 +532,26 @@ def test_fails_closed_when_worker_route_target_has_an_invalid_json_shape() -> No
     findings = evaluate_fcp03_topology(topology)
 
     assert "worker-route-inventory-invalid" in findings
+
+
+def test_rejects_noncanonical_or_additional_worker_security_group_egress() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_egress"] = [
+        {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
+        {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
+        {"protocol": "tcp", "port": 53, "cidr": "10.20.0.2/32"},
+        {"protocol": "tcp", "port": 22, "cidr": "10.20.0.0/16"},
+    ]
+
+    assert "worker-security-group-egress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_on_malformed_security_group_egress_entries() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_egress"] = [
+        {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
+        {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
+        {"protocol": "tcp", "port": 53, "cidr": ["10.20.0.2/32"]},
+    ]
+
+    assert "worker-security-group-egress-policy-invalid" in evaluate_fcp03_topology(topology)
