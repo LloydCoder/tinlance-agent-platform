@@ -162,6 +162,8 @@ def valid_topology() -> dict[str, object]:
             "rule_group_status": "COMPLETE",
             "association_statuses": ["COMPLETE"],
             "rule_statuses": ["COMPLETE", "COMPLETE"],
+            "rule_actions": ["ALLOW", "BLOCK"],
+            "rule_priorities": [100, 200],
             "domain_list_statuses": ["COMPLETE", "COMPLETE"],
         },
     }
@@ -674,3 +676,18 @@ def test_rejects_malformed_members_in_security_inventory_collections(
     mutate(topology)  # type: ignore[operator]
 
     assert finding in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_extra_dns_firewall_allow_rule_even_when_allowlist_matches() -> None:
+    topology = valid_topology()
+    topology["dns_firewall"]["rule_actions"] = ["ALLOW", "ALLOW", "BLOCK"]
+    topology["dns_firewall"]["rule_priorities"] = [100, 150, 200]
+
+    assert "dns-firewall-rule-set-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_duplicate_dns_firewall_rule_priorities() -> None:
+    topology = valid_topology()
+    topology["dns_firewall"]["rule_priorities"] = [100, 100]
+
+    assert "dns-firewall-rule-priority-invalid" in evaluate_fcp03_topology(topology)
