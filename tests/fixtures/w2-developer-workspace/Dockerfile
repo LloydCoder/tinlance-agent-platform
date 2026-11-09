@@ -1,42 +1,30 @@
+# syntax=docker/dockerfile:1.7
 ARG BASE_IMAGE=ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
 ARG APT_SNAPSHOT=20261106T000000Z
 FROM ${BASE_IMAGE}
 ARG APT_SNAPSHOT
 
-# Resolve every package from one immutable Ubuntu archive snapshot. Updating the
-# indexes and installing from that same snapshot avoids mixed-time package sets.
-# The package manifest emitted below is retained as guest-build provenance.
-# The minimal base has no CA bundle. Bootstrap the exact CA package over the
-# Ubuntu archive's HTTP transport, while retaining APT's signed InRelease and
-# package-hash verification. Then use the immutable Ubuntu snapshot over HTTPS
-# with normal certificate-peer verification for all workspace dependencies.
-RUN sed -i 's|https://archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources \
-    && DEBIAN_FRONTEND=noninteractive apt-get \
+# Bootstrap HTTPS trust from the ephemeral build runner without persisting its
+# trust bundle in an image layer. Both index resolution and package installation
+# use one immutable, signature-verified Ubuntu snapshot.
+RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true \
+    DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
-        -o APT::Update::Error-Mode=any \
-        update \
-    && DEBIAN_FRONTEND=noninteractive apt-get \
-        -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
-        install --yes --no-install-recommends \
-        ca-certificates=20260816ubuntu0.24.04.2 \
-        openssl=3.0.13-0ubuntu3.16 \
-        libssl3t64=3.0.13-0ubuntu3.16 \
-    && DEBIAN_FRONTEND=noninteractive apt-get \
-        -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
         --snapshot="${APT_SNAPSHOT}" update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
         --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
+        ca-certificates=20260816ubuntu0.24.04.2 \
+        openssl=3.0.13-0ubuntu3.16 \
+        libssl3t64=3.0.13-0ubuntu3.16 \
         git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
