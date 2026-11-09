@@ -34,7 +34,10 @@
     },
     "VpcCidr": {
       "Type": "String",
-      "Default": "10.42.0.0/16"
+      "Default": "10.42.0.0/16",
+      "AllowedValues": [
+        "10.42.0.0/16"
+      ]
     },
     "PublicSubnetCidr": {
       "Type": "String",
