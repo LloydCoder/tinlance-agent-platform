@@ -132,7 +132,7 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
     assert firecracker.count("needs: guest-boot") == 3
     assert (
-        firecracker.count("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093") == 3
+        firecracker.count("actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333") == 3
     )
     assert "gvisor-w2:" in firecracker
     assert "kata-w2:" in firecracker
