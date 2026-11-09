@@ -115,6 +115,83 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     ):
         findings.add("worker-firewall-route-missing")
 
+    # Validate both directions of the Network Firewall service chain. A correct
+    # worker default route is insufficient if the firewall subnet or NAT return
+    # route can bypass the same-AZ endpoint.
+    firewall_subnet_id = firewall.get("subnet_id")
+    nat_gateway_id = firewall.get("nat_gateway_id")
+    nat_subnet_id = firewall.get("nat_subnet_id")
+    if (
+        not isinstance(firewall_subnet_id, str)
+        or not firewall_subnet_id
+        or not isinstance(nat_gateway_id, str)
+        or not nat_gateway_id
+        or not isinstance(nat_subnet_id, str)
+        or not nat_subnet_id
+    ):
+        findings.add("firewall-return-path-identity-unknown")
+    if firewall.get("availability_zone") != availability_zone:
+        findings.add("firewall-endpoint-az-mismatch")
+    if firewall.get("nat_gateway_state") != "available":
+        findings.add("nat-gateway-not-available")
+
+    firewall_routes = firewall.get("route_entries")
+    if (
+        not isinstance(firewall_routes, Sequence)
+        or isinstance(firewall_routes, (str, bytes))
+        or not firewall_routes
+    ):
+        findings.add("firewall-route-inventory-unknown")
+    else:
+        expected_firewall_routes = {
+            (worker.get("vpc_cidr"), "local"),
+            ("0.0.0.0/0", nat_gateway_id),
+        }
+        observed_firewall_routes: set[tuple[object, object]] = set()
+        for raw_route in firewall_routes:
+            route = _object(raw_route)
+            destination, target = route.get("destination"), route.get("target")
+            if route.get("state") != "active":
+                findings.add("firewall-route-state-not-active")
+            observed_firewall_routes.add((destination, target))
+            if target not in {"local", nat_gateway_id}:
+                findings.add("firewall-subnet-route-bypasses-nat")
+        if observed_firewall_routes != expected_firewall_routes:
+            findings.add("firewall-subnet-route-set-invalid")
+
+    nat_routes = firewall.get("nat_route_entries")
+    if (
+        not isinstance(nat_routes, Sequence)
+        or isinstance(nat_routes, (str, bytes))
+        or not nat_routes
+    ):
+        findings.add("nat-return-route-inventory-unknown")
+    else:
+        expected_nat_routes = {
+            (worker.get("vpc_cidr"), "local"),
+            ("0.0.0.0/0", "internet-gateway"),
+            (worker.get("subnet_cidr"), endpoint),
+        }
+        observed_nat_routes: set[tuple[object, object]] = set()
+        for raw_route in nat_routes:
+            route = _object(raw_route)
+            destination, target = route.get("destination"), route.get("target")
+            if route.get("state") != "active":
+                findings.add("nat-route-state-not-active")
+            if destination == "0.0.0.0/0" and isinstance(target, str) and target.startswith("igw-"):
+                normalized_target = "internet-gateway"
+            else:
+                normalized_target = target
+            observed_nat_routes.add((destination, normalized_target))
+            if target not in {"local", endpoint} and not (
+                destination == "0.0.0.0/0"
+                and isinstance(target, str)
+                and target.startswith("igw-")
+            ):
+                findings.add("nat-return-route-bypasses-firewall")
+        if observed_nat_routes != expected_nat_routes:
+            findings.add("nat-return-route-set-invalid")
+
     route_entries = worker.get("route_entries")
     if (
         not isinstance(route_entries, Sequence)
