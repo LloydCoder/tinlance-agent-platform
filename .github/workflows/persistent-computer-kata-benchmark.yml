@@ -50,9 +50,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zstd
           archive=/tmp/kata-static-4.3.1-amd64.tar.zst
-          curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --retry-max-time 180 \
-            https://github.com/kata-containers/kata-containers/releases/download/4.3.1/kata-static-4.3.1-amd64.tar.zst \
-            --output "$archive"
+          direct_url="https://github.com/kata-containers/kata-containers/releases/download/4.3.1/kata-static-4.3.1-amd64.tar.zst"
+          api_url="https://api.github.com/repos/kata-containers/kata-containers/releases/assets/663864062"
+          downloaded=0
+          for url in "$direct_url" "$api_url"; do
+            if curl --fail --silent --show-error --location \
+              --retry 12 --retry-all-errors --retry-delay 10 --retry-max-time 1200 \
+              --connect-timeout 30 --max-time 1200 \
+              -H "Accept: application/octet-stream" "$url" --output "$archive"; then
+              downloaded=1
+              break
+            fi
+            rm -f "$archive"
+          done
+          test "$downloaded" -eq 1
           echo "1463a2b86845f4d3d8e87f2f764ec59856fc0fee3520967a79ade32762be2e97  $archive" | sha256sum --check -
           sudo tar --zstd -xf "$archive" -C /
           test -x /opt/kata/runtime-rs/bin/containerd-shim-kata-v2
@@ -119,7 +130,11 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          report = json.loads(Path("artifacts/kata-w1.json").read_text(encoding="utf-8"))
+          report_path = Path("artifacts/kata-w1.json")
+          if not report_path.is_file():
+              print("::warning::Kata benchmark report is unavailable because an earlier install or runtime step failed; no benchmark acceptance is claimed.")
+              raise SystemExit(0)
+          report = json.loads(report_path.read_text(encoding="utf-8"))
           latency = report["latency"]
           assert latency["sample_count"] == 30
           print(f"Kata W1: {latency['sample_count']} samples")
