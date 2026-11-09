@@ -14,11 +14,6 @@
       "Type": "String",
       "Description": "Required UTC timestamp YYYY-MM-DDTHH:MM:SS. Validate with scripts/validate_fcp03_teardown_at.py; must be 15 minutes to 2 hours after deployment."
     },
-    "WorkerInstanceProfileName": {
-      "Type": "String",
-      "Default": "TinlytTestRuntimeSSMProfile",
-      "Description": "Existing least-privilege SSM instance profile; this stack does not create or widen its IAM permissions."
-    },
     "WorkerInstanceType": {
       "Type": "String",
       "Default": "t4g.medium",
@@ -50,6 +45,12 @@
     "WorkerSubnetCidr": {
       "Type": "String",
       "Default": "10.42.2.0/24"
+    },
+    "ApprovedProbeDomain": {
+      "Type": "String",
+      "Default": "example.com",
+      "AllowedPattern": "^([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,63}$",
+      "Description": "A domain that is also included in ApprovedDomains; the worker performs one DNS and HTTPS smoke probe."
     }
   },
   "Resources": {
@@ -678,9 +679,6 @@
         "InstanceType": {
           "Ref": "WorkerInstanceType"
         },
-        "IamInstanceProfile": {
-          "Ref": "WorkerInstanceProfileName"
-        },
         "SubnetId": {
           "Ref": "WorkerSubnet"
         },
@@ -690,7 +688,7 @@
           }
         ],
         "MetadataOptions": {
-          "HttpEndpoint": "enabled",
+          "HttpEndpoint": "disabled",
           "HttpTokens": "required",
           "HttpPutResponseHopLimit": 1,
           "InstanceMetadataTags": "disabled"
@@ -729,7 +727,12 @@
             "Key": "TestScope",
             "Value": "isolated-egress-enforcement"
           }
-        ]
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/bin/bash\nset -u\nexec > >(tee /dev/console | logger -t fcp03-bootstrap -s 2>/dev/console) 2>&1\nprintf '%s\\n' 'FCP03_BOOTSTRAP_START metadata_endpoint=disabled instance_profile=none'\nprintf '%s\\n' 'FCP03_TEST_DNS_BEGIN'\nif getent ahostsv4 '${ApprovedProbeDomain}' >/dev/null 2>&1; then printf '%s\\n' 'FCP03_TEST_DNS_APPROVED=PASS'; else printf '%s\\n' 'FCP03_TEST_DNS_APPROVED=FAIL'; fi\nprintf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED_BEGIN'\nif timeout 12 curl --fail --silent --show-error --connect-timeout 5 --max-time 10 'https://${ApprovedProbeDomain}/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED=PASS'; else printf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED=FAIL'; fi\nprintf '%s\\n' 'FCP03_TEST_DIRECT_IP_BEGIN'\nif timeout 8 curl --insecure --silent --show-error --connect-timeout 3 --max-time 6 'https://1.1.1.1/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_DIRECT_IP=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_DIRECT_IP=EXPECTED_BLOCK_OR_UNAVAILABLE'; fi\nprintf '%s\\n' 'FCP03_BOOTSTRAP_COMPLETE retrieve_with_ec2_get_console_output=true'"
+          }
+        }
       }
     },
     "TeardownRole": {

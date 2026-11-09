@@ -6,12 +6,12 @@ This template is a **deployment candidate only**. It has not been deployed. It i
 
 The existing `tinlyt-test-runtime` is suitable as a controller and software-test runner, but its current subnet has a direct Internet Gateway default route and its security group allows unrestricted outbound IPv4. Changing those routes or rules would alter the W5 test host's network behavior. This lab therefore uses a dedicated VPC and keeps the existing host unchanged.
 
-The existing host can remain the controller and invoke the new worker through Systems Manager. The worker reuses the existing `TinlytTestRuntimeSSMProfile` instance profile; this template does not add permissions to that role. Supply the region-specific SSM control-plane FQDNs in `ApprovedDomains` so the worker can register with Systems Manager.
+The existing host remains an out-of-band controller. The disposable worker deliberately has **no instance profile and no SSM agent-management dependency**: EC2 metadata endpoint access is disabled, and test progress is emitted to the EC2 system console. Retrieve the worker transcript with the account's read-only `ec2:GetConsoleOutput` API after the instance reaches running state. This avoids granting the worker AWS credentials merely to collect test evidence. Set `ApprovedProbeDomain` to a domain also present in `ApprovedDomains`; the bootstrap runs DNS, approved HTTPS and direct-IP negative smoke probes.
 
 ## Topology
 
 - One VPC and one Availability Zone, with separate public-NAT, Network Firewall, and private-worker subnets.
-- The worker has no public IPv4 address, no IPv6 address or route, and no inbound security-group rules. **Metadata denial is not yet satisfied:** the worker retains an SSM instance profile and the EC2 metadata endpoint is enabled with IMDSv2 required and hop limit 1. IMDSv2 is hardening, not endpoint denial. The read-only FCP-03 preflight now reports `worker-metadata-endpoint-enabled` unless the endpoint is actually disabled, and reports `worker-metadata-protection-invalid` if IMDSv2/hop-limit hardening is absent. Do not treat this template as FCP-03 accepted or deploy it for acceptance until the worker-management design removes the metadata dependency or the residual risk is formally accepted.
+- The worker has no public IPv4 address, no IPv6 address or route, no inbound security-group rules, no EC2 instance profile, and the metadata endpoint is disabled. The bootstrap executes bounded DNS/HTTPS/direct-IP smoke probes and emits structured markers to the EC2 system console; the controller retrieves them with `GetConsoleOutput`. This is an out-of-band evidence channel, not a worker AWS credential or management API.
 - The worker's IPv4 default route targets the Network Firewall endpoint in the same AZ.
 - The firewall subnet's default route targets the NAT Gateway; the NAT subnet routes the worker CIDR back through the same Network Firewall endpoint before the worker's return traffic reaches the private subnet. The NAT subnet alone routes general Internet traffic to the Internet Gateway.
 - The worker security group permits TCP/443 egress for inspection and TCP/UDP 53 only to the VPC Resolver address. A dedicated subnet NACL allows DNS only to the resolver, denies all other VPC-CIDR egress before allowing inspected TCP/443, and allows only ephemeral return traffic inbound. This prevents local VPC destinations from bypassing the firewall through the VPC's more-specific local route. It does not permit UDP/443 (QUIC), TCP/853 (DoT), direct external DNS, or IPv6.
@@ -78,8 +78,14 @@ aws cloudformation create-stack \
   --capabilities CAPABILITY_IAM \
   --parameters \
     ParameterKey=AvailabilityZone,ParameterValue=eu-west-1a \
-    ParameterKey=ApprovedDomains,ParameterValue='example.com,ssm.eu-west-1.amazonaws.com,ssmmessages.eu-west-1.amazonaws.com,ec2messages.eu-west-1.amazonaws.com' \
-    ParameterKey=TeardownAtUtc,ParameterValue=2026-11-09T11:00:00
+    ParameterKey=ApprovedDomains,ParameterValue='example.com' \
+    ParameterKey=ApprovedProbeDomain,ParameterValue=example.com \
+    ParameterKey=TeardownAtUtc,ParameterValue='<validated-future-UTC-time>'
 ```
 
 Do not run the example with its illustrative domain list or timestamp without validating the actual test plan. No create-stack, change-set execution, or infrastructure mutation is authorized by this repository change.
+
+
+## Metadata-denial and worker evidence correction
+
+The lab worker no longer receives `TinlytTestRuntimeSSMProfile` or any EC2 instance profile. `MetadataOptions.HttpEndpoint` is set to `disabled`, not merely IMDSv2-required. The worker runs a small bounded bootstrap probe and writes structured results to the EC2 system console. The operator/controller retrieves the output with read-only `ec2:GetConsoleOutput`; no credentials are injected into the worker. The probe is only a smoke test: full adversarial acceptance still requires independent packet/flow evidence and exact firewall/DNS policy inspection.
