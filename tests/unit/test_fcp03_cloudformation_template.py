@@ -44,6 +44,7 @@ def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
     assert required_types <= {resource["Type"] for resource in resources.values()}
     assert template["Parameters"]["AvailabilityZone"]["Type"] == "AWS::EC2::AvailabilityZone::Name"
     assert template["Parameters"]["VpcCidr"]["AllowedValues"] == ["10.42.0.0/16"]
+    assert "ApprovedProbeDomain" not in template["Parameters"]
     assert "Default" not in template["Parameters"]["TeardownAtUtc"]
 
 
@@ -60,9 +61,15 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
     assert worker_instance["MetadataOptions"]["HttpTokens"] == "required"
     assert worker_instance["MetadataOptions"]["HttpPutResponseHopLimit"] == 1
     assert "IamInstanceProfile" not in worker_instance
-    assert worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"].find("FCP03_BOOTSTRAP_START") >= 0
-    assert "FCP03_TEST_DNS_APPROVED=PASS" in worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
-    assert "FCP03_TEST_HTTPS_APPROVED=PASS" in worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
+    bootstrap = worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"][0]
+    assert bootstrap.find("FCP03_BOOTSTRAP_START") >= 0
+    assert "FCP03_TEST_DNS_APPROVED=PASS" in bootstrap
+    bootstrap = worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
+    assert isinstance(bootstrap, list)
+    assert bootstrap[1] == {"ApprovedProbeDomain": {"Fn::Select": [0, {"Ref": "ApprovedDomains"}]}}
+    assert "FCP03_TEST_HTTPS_APPROVED=PASS" in bootstrap[0]
+    assert "FCP03_TEST_DIRECT_IP=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE" in bootstrap[0]
+    assert "FCP03_TEST_DIRECT_IP=EXPECTED_BLOCK_OR_UNAVAILABLE" not in bootstrap[0]
     assert worker_sg.get("SecurityGroupIngress", []) == []
 
     egress = worker_sg["SecurityGroupEgress"]
@@ -224,6 +231,6 @@ def test_worker_management_does_not_require_imds_or_an_instance_profile() -> Non
     assert "WorkerInstanceProfileName" not in template["Parameters"]
     assert "IamInstanceProfile" not in worker
     assert worker["MetadataOptions"]["HttpEndpoint"] == "disabled"
-    assert "amazon-ssm-agent" not in worker["UserData"]["Fn::Base64"]["Fn::Sub"].lower()
-    bootstrap = worker["UserData"]["Fn::Base64"]["Fn::Sub"]
+    assert "amazon-ssm-agent" not in worker["UserData"]["Fn::Base64"]["Fn::Sub"][0].lower()
+    bootstrap = worker["UserData"]["Fn::Base64"]["Fn::Sub"][0]
     assert "retrieve_with_ec2_get_console_output=true" in bootstrap

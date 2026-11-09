@@ -6,7 +6,7 @@ This template is a **deployment candidate only**. It has not been deployed. It i
 
 The existing `tinlyt-test-runtime` is suitable as a controller and software-test runner, but its current subnet has a direct Internet Gateway default route and its security group allows unrestricted outbound IPv4. Changing those routes or rules would alter the W5 test host's network behavior. This lab therefore uses a dedicated VPC and keeps the existing host unchanged.
 
-The existing host remains an out-of-band controller. The disposable worker deliberately has **no instance profile and no SSM agent-management dependency**: EC2 metadata endpoint access is disabled, and test progress is emitted to the EC2 system console. Retrieve the worker transcript with the account's read-only `ec2:GetConsoleOutput` API after the instance reaches running state. This avoids granting the worker AWS credentials merely to collect test evidence. Set `ApprovedProbeDomain` to a domain also present in `ApprovedDomains`; the bootstrap runs DNS, approved HTTPS and direct-IP negative smoke probes.
+The existing host remains an out-of-band controller. The disposable worker deliberately has **no instance profile and no SSM agent-management dependency**: EC2 metadata endpoint access is disabled, and test progress is emitted to the EC2 system console. Retrieve the worker transcript with the account's read-only `ec2:GetConsoleOutput` API after the instance reaches running state. This avoids granting the worker AWS credentials merely to collect test evidence. The bootstrap selects the first entry in `ApprovedDomains` for its DNS and approved-HTTPS smoke probes, so the probe cannot silently target a domain omitted from the DNS/firewall allowlist. The direct-IP probe is explicitly marked inconclusive unless its failure is correlated with firewall flow evidence.
 
 ## Topology
 
@@ -79,7 +79,6 @@ aws cloudformation create-stack \
   --parameters \
     ParameterKey=AvailabilityZone,ParameterValue=eu-west-1a \
     ParameterKey=ApprovedDomains,ParameterValue='example.com' \
-    ParameterKey=ApprovedProbeDomain,ParameterValue=example.com \
     ParameterKey=TeardownAtUtc,ParameterValue='<validated-future-UTC-time>'
 ```
 
