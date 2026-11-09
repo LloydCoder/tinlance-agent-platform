@@ -429,6 +429,7 @@ def _dns_firewall_snapshot(
         "domain_list_statuses": domain_list_statuses,
     }
 
+
 def _stateful_rule_group_snapshots(
     network_firewall: Any, policy: Mapping[str, Any]
 ) -> list[dict[str, object]]:
@@ -563,6 +564,7 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
         ingress_rules = None
         egress_rules = None
     else:
+
         def sort_key(rule: dict[str, object]) -> int:
             rule_number = rule["rule_number"]
             return rule_number if isinstance(rule_number, int) else 2**31
@@ -577,6 +579,7 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
         "ingress_rules": ingress_rules,
         "egress_rules": egress_rules,
     }
+
 
 def collect_fcp03_snapshot(
     *,
@@ -666,9 +669,7 @@ def collect_fcp03_snapshot(
         if len(exact) != 1:
             raise ValueError("the worker subnet has an ambiguous route-table association")
         route_tables = exact
-    raw_route_associations = (
-        route_tables[0].get("Associations", []) if route_tables else []
-    )
+    raw_route_associations = route_tables[0].get("Associations", []) if route_tables else []
     route_table_subnet_ids: list[object] = []
     if isinstance(raw_route_associations, list):
         for association in raw_route_associations:
