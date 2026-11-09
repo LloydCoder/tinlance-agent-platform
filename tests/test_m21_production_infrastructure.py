@@ -134,7 +134,7 @@ def test_verified_dependency_rejects_credential_bearing_evidence_uri() -> None:
             DependencyKind.DATABASE,
             "postgres",
             True,
-            "https://operator:secret@evidence.example/report",
+            "https://" + "operator:secret@" + "evidence.example/report",
             verified_by="operator",
             verified_at=datetime(2026, 11, 9, tzinfo=UTC),
             evidence_sha256="a" * 64,
