@@ -709,3 +709,20 @@ def test_collector_fails_closed_when_worker_ingress_inventory_is_malformed() -> 
     assert snapshot["worker"]["security_group_ingress"] is None
     findings = evaluate_fcp03_topology(snapshot)
     assert "worker-security-group-ingress-inventory-invalid" in findings
+
+
+def test_collector_fails_closed_when_any_worker_egress_group_inventory_is_missing() -> None:
+    ec2 = ec2_client()
+    groups = ec2.responses["describe_security_groups"][0]["SecurityGroups"]
+    groups.append({"GroupId": "sg-incomplete", "IpPermissions": []})
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["security_group_egress"] is None
+    findings = evaluate_fcp03_topology(snapshot)
+    assert "worker-security-group-egress-policy-invalid" in findings
