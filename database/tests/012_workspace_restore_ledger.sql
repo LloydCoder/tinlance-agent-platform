@@ -31,7 +31,9 @@ DECLARE
     restore_two uuid := '40000000-0000-0000-0000-000000000093';
     snapshot_one uuid := '50000000-0000-0000-0000-000000000093';
     snapshot_two uuid := '60000000-0000-0000-0000-000000000093';
+    snapshot_catalog_id uuid := '90000000-0000-0000-0000-000000000093';
     digest text := repeat('a', 64);
+    snapshot_count integer;
     event_count integer;
     visible_count integer;
 BEGIN
@@ -97,6 +99,33 @@ BEGIN
         NULL;
     END;
 
+    IF platform.record_workspace_snapshot(
+        tenant, snapshot_catalog_id, workspace, 5, clock_timestamp(), digest,
+        replace(snapshot_catalog_id::text, '-', '') || '.snapshot'
+    ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'snapshot catalog record was not created';
+    END IF;
+    IF platform.record_workspace_snapshot(
+        tenant, snapshot_catalog_id, workspace, 5, clock_timestamp(), digest,
+        replace(snapshot_catalog_id::text, '-', '') || '.snapshot'
+    ) IS NOT FALSE THEN
+        RAISE EXCEPTION 'duplicate snapshot catalog record was accepted';
+    END IF;
+    SELECT count(*) INTO snapshot_count
+      FROM platform.get_workspace_snapshot(tenant, workspace, snapshot_catalog_id);
+    IF snapshot_count <> 1 THEN
+        RAISE EXCEPTION 'tenant could not resolve its snapshot catalog entry';
+    END IF;
+
+    BEGIN
+        UPDATE platform.workspace_snapshot_events
+           SET event_type = 'tampered'
+         WHERE tenant_id = tenant AND snapshot_id = snapshot_catalog_id;
+        RAISE EXCEPTION 'snapshot event history was mutable';
+    EXCEPTION WHEN SQLSTATE '42501' THEN
+        NULL;
+    END;
+
     SELECT count(*) INTO visible_count FROM platform.workspace_restore_operations
      WHERE tenant_id = tenant;
     IF visible_count <> 2 THEN
@@ -114,6 +143,16 @@ BEGIN
     IF visible_count <> 0 THEN
         RAISE EXCEPTION 'cross-tenant restore events were visible';
     END IF;
+    SELECT count(*) INTO visible_count FROM platform.workspace_snapshots
+     WHERE tenant_id = tenant;
+    IF visible_count <> 0 THEN
+        RAISE EXCEPTION 'cross-tenant snapshots were visible';
+    END IF;
+    SELECT count(*) INTO visible_count FROM platform.workspace_snapshot_events
+     WHERE tenant_id = tenant;
+    IF visible_count <> 0 THEN
+        RAISE EXCEPTION 'cross-tenant snapshot events were visible';
+    END IF;
 
     IF NOT EXISTS (
         SELECT 1 FROM pg_policies
@@ -125,8 +164,18 @@ BEGIN
          WHERE schemaname = 'platform'
            AND tablename = 'workspace_restore_events'
            AND policyname = 'workspace_restore_events_tenant_isolation'
+    ) OR NOT EXISTS (
+        SELECT 1 FROM pg_policies
+         WHERE schemaname = 'platform'
+           AND tablename = 'workspace_snapshots'
+           AND policyname = 'workspace_snapshots_tenant_isolation'
+    ) OR NOT EXISTS (
+        SELECT 1 FROM pg_policies
+         WHERE schemaname = 'platform'
+           AND tablename = 'workspace_snapshot_events'
+           AND policyname = 'workspace_snapshot_events_tenant_isolation'
     ) THEN
-        RAISE EXCEPTION 'workspace restore RLS policies are missing';
+        RAISE EXCEPTION 'workspace restore or snapshot RLS policies are missing';
     END IF;
 END;
 $$;
