@@ -503,6 +503,16 @@ def collect_fcp03_snapshot(
         if len(exact) != 1:
             raise ValueError("the worker subnet has an ambiguous route-table association")
         route_tables = exact
+    route_table_subnet_ids = sorted(
+        {
+            association["SubnetId"]
+            for association in (
+                route_tables[0].get("Associations", []) if route_tables else []
+            )
+            if isinstance(association, Mapping)
+            and isinstance(association.get("SubnetId"), str)
+        }
+    )
     routes = route_tables[0].get("Routes", []) if route_tables else []
     route_entries = [
         {
@@ -585,6 +595,7 @@ def collect_fcp03_snapshot(
         ),
         "availability_zone": availability_zone,
         "default_route_target": _route_target(default_route) if default_route else None,
+        "route_table_subnet_ids": route_table_subnet_ids,
         "route_entries": route_entries,
         "ipv6_default_route_target": (
             _route_target(ipv6_default_route) if ipv6_default_route else None
