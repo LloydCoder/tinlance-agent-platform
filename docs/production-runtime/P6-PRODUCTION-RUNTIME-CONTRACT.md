@@ -47,6 +47,12 @@ Production acceptance must test:
 
 A recovery mechanism may resume or block execution, but it cannot grant authority.
 
+## Production dependency evidence
+
+The M21 readiness record requires exactly one entry for each dependency category. Every verified entry is scoped to the readiness environment and carries a stable evidence URI, SHA-256 digest, named verifier and timezone-aware verification timestamp. Optional expiry must be later than verification and still valid at readiness evaluation. Missing, duplicate, unverified, cross-environment, future-dated or expired evidence fails closed.
+
+Evidence references must not embed credentials, query strings or fragments. The repository contract validates metadata only; deployment automation and independent assurance must fetch and verify the referenced bytes and digest. A green repository test does not establish that PostgreSQL, queues, KMS, S3, secret managers, telemetry, backup systems or operational teams are actually deployed.
+
 ## Exit criterion
 
 P6 repository completion means the durable semantics, recovery invariants, deployment contract and failure model are executable/documented and CI-certified. Production completion additionally requires external infrastructure and DR evidence.
