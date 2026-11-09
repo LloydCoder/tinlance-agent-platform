@@ -132,6 +132,77 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
             if route.get("target") not in {"local", endpoint}:
                 findings.add("worker-route-bypasses-firewall")
 
+    network_acl = _object(worker.get("network_acl"))
+    subnet_id = worker.get("subnet_id")
+    if (
+        network_acl.get("associated") is not True
+        or not isinstance(subnet_id, str)
+        or _strings(network_acl.get("subnet_ids")) != {subnet_id}
+    ):
+        findings.add("worker-nacl-association-invalid")
+
+    vpc_cidr = worker.get("vpc_cidr")
+    resolver_ip = worker.get("resolver_ip")
+    expected_nacl_rules: list[dict[str, object]] = []
+    try:
+        vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
+        expected_resolver_ip = str(vpc_network.network_address + 2)
+        if resolver_ip != expected_resolver_ip or vpc_network.version != 4:
+            raise ValueError("VPC resolver address does not match the VPC primary CIDR")
+        resolver_cidr = f"{expected_resolver_ip}/32"
+        expected_nacl_rules = [
+            {
+                "rule_number": 90,
+                "protocol": "17",
+                "action": "allow",
+                "cidr": resolver_cidr,
+                "from_port": 53,
+                "to_port": 53,
+            },
+            {
+                "rule_number": 91,
+                "protocol": "6",
+                "action": "allow",
+                "cidr": resolver_cidr,
+                "from_port": 53,
+                "to_port": 53,
+            },
+            {
+                "rule_number": 100,
+                "protocol": "-1",
+                "action": "deny",
+                "cidr": str(vpc_network),
+                "from_port": None,
+                "to_port": None,
+            },
+            {
+                "rule_number": 110,
+                "protocol": "6",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "from_port": 443,
+                "to_port": 443,
+            },
+            {
+                "rule_number": 32766,
+                "protocol": "-1",
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "from_port": None,
+                "to_port": None,
+            },
+        ]
+    except (TypeError, ValueError):
+        findings.add("worker-nacl-egress-policy-invalid")
+
+    raw_nacl_rules = network_acl.get("egress_rules")
+    if (
+        not isinstance(raw_nacl_rules, Sequence)
+        or isinstance(raw_nacl_rules, (str, bytes))
+        or list(raw_nacl_rules) != expected_nacl_rules
+    ):
+        findings.add("worker-nacl-egress-policy-invalid")
+
     if _has_unrestricted_egress(worker.get("security_group_egress")):
         findings.add("unrestricted-security-group-egress")
 
