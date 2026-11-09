@@ -1,6 +1,6 @@
 # Persistent Computer Phase 2 Acceptance Record
 
-**Status as of 2026-11-08:** Phase 2 is not complete. W2, W3 and W4 implementation acceptance are complete at the repository ephemeral-CI feasibility level. W5 is the next serial phase. Production certification remains explicitly out of scope for these ephemeral CI artifacts.
+**Status as of 2026-11-09:** Phase 2 is not complete. W2–W4 are accepted for repository/ephemeral feasibility; W5's continuous controlled-host functional soak is complete; W6's snapshot/restore implementation is merged and accepted for repository implementation scope. Production enablement, production host assurance, economics/capacity benchmarks and independent security review remain open.
 
 This document is the implementation-side acceptance record. The canonical TSIC tracking issue is [tinlance-system-integration#102](https://github.com/LloydCoder/tinlance-system-integration/issues/102).
 
@@ -177,8 +177,33 @@ Regression coverage verifies that no `preexec_fn` is supplied, normal command ex
 
 **Acceptance boundary:** this removes a process-launch reliability/security hazard. It does not replace the continuous eight-hour controlled-host soak or production qualification.
 
-### W5 soak gate — not yet accepted
+### W5 soak gate — complete for controlled-host functional acceptance
 
-A genuine continuous eight-hour run remains mandatory and has not been evidenced by PR #201 or #202. The GitHub-hosted runner ceiling is six hours per job, so the soak must execute on a dedicated controlled persistent host or registered self-hosted runner. It must include real browser/profile persistence across process and supervisor restarts, lease renewal/expiry/revocation, stale-worker fencing, quota admission/overrun behavior, append-only audit continuity, crash/recovery and cleanup. The trusted supervisor must enforce the current fencing token at every consequential command boundary and terminate/reap workers on lease loss. Segmented hosted jobs or a synthetic clock do not count as an eight-hour soak.
+A genuine continuous eight-hour run completed on the isolated `tinlyt-test-runtime` host (EC2 `i-0bdb9c7cb13b1c9b8`, `t4g.medium`, `eu-west-1`) using the exact merged supervisor/sandbox commit `fe2f31837b67fcb5332591e31289fe2f0f23f3bb`. No Tinlyt production application service was modified.
 
-The active AWS instances identified during the infrastructure audit are named `fusionops-production` and `tinlyt-api-production`; neither is an acceptable W5 test host and neither was modified. A separately tagged, least-privilege W5 host is required. Until the continuous soak artifact is independently inspected and exact-head W5 workflows plus post-merge mainline checks pass, W5 remains open.
+The independently re-read artifact records:
+- Continuous interval: 2026-11-08 16:27:51 UTC through 2026-11-09 00:27:48 UTC; 28,800.03 seconds.
+- 96/96 five-minute browser/profile cycles; Chromium 156.0.8078.4; maximum adjacent cycle gap 304.82 seconds.
+- Lease expiry and revocation invalidated fence 1; replacement ownership advanced to fence 2.
+- 96 successful quota settlements; append-only audit deltas reconciled: lease events 52→149 and quota ledger rows 14→206.
+- Nine supervisor-death probes; every child started and none produced a post-crash side effect.
+- cgroup-v2 limits: memory.max 2 GiB, pids.max 128; observed memory peak approximately 340 MiB; final pids.current 1.
+- Cleanup verified; no residual browser, worker or Bubblewrap processes.
+- Artifact SHA-256: `798579f881ec884594753bd65a519dffb4bf1f0927a6db2836688f66c3a342e7`; sidecar digest matched.
+
+**Explicit qualification:** the harness disabled Chromium's internal sandbox. The outer Bubblewrap user/PID/mount/network namespaces, dropped capabilities and no-guest-network boundary were active. The artifact explicitly records `production_certification=false` and makes no renderer-seccomp claim. W5 is accepted for the stated controlled-host functional soak, not production browser isolation certification.
+
+### W6 snapshot/restore — implementation accepted; production enablement deferred
+
+Platform PR [#223](https://github.com/LloydCoder/tinlance-agent-platform/pull/223) merged as `9344315a9c867157f10bcfeb29369b86497f7f27`; the subsequent mainline commit `1bd86c24f0dd35baa8d5536d5c6f0197fe6ccf15` includes W6 plus the W2 CI repair and passed CI, CodeQL, Secret Scan, Supply Chain Attestation, Reference Agents and R10 Certification.
+
+Implementation includes authenticated tenant/workspace-bound manifests; path, type, mode and size validation; credential/identity exclusions; per-snapshot KMS data-key envelope encryption and separate KMS HMAC signing adapters; immutable conditional S3 writes with SSE-KMS verification; tenant-scoped PostgreSQL snapshot catalog and restore ledger; forced RLS; append-only events; one-shot restore claims; monotonic fencing; private staging and atomic clean-destination publication; and opaque credential-reference refresh after materialization.
+
+Validation included:
+- Full repository CI matrix and coverage gate on the combined mainline commit.
+- All 15 database migrations and 13 SQL acceptance tests on PostgreSQL 17; W6 SQL acceptance covers non-superuser tenant isolation, stale-fence rejection, append-only history, provenance and idempotent terminal transitions.
+- Focused snapshot/KMS/S3/catalog/ledger tests covering tampering, path traversal, sensitive credential exclusions, cross-tenant restore, stale fencing, lease revocation before and after materialization, replay, non-clean destinations, partial-tree cleanup, ambiguous completion acknowledgement and invalid credential references.
+- A real PostgreSQL 17 integration drill: snapshot catalog write; restore to a clean filesystem destination under fence 12 after snapshot fence 11; refreshed opaque credential reference; durable started/completed events; then a second restore attempt revoked before publication, which left no destination and recorded started/failed events.
+
+**Production enablement is not accepted:** production KMS encryption/HMAC keys, S3 bucket policy/versioning/Object Lock/retention, workload-identity IAM, production DB grants, durable storage lifecycle, ambiguous-restore reconciliation worker, monitoring, backup/replication and cross-AZ/region recovery drills have not been provisioned or qualified. Filesystem storage and test KMS adapters are not production substitutes. No production certification is implied.
+
