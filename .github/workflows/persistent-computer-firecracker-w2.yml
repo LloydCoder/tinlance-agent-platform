@@ -98,13 +98,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          install -m 0600 /etc/ssl/certs/ca-certificates.crt /tmp/tinlance-ca-bundle.crt
+          test -s /tmp/tinlance-ca-bundle.crt
+          test ! -L /tmp/tinlance-ca-bundle.crt
+          trap 'rm -f /tmp/tinlance-ca-bundle.crt' EXIT
           base_digest="ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
           docker pull --platform linux/amd64 "$base_digest"
           docker_engine_version="$(docker version --format '{{.Server.Version}}')"
           buildx_version="$(docker buildx version | awk '{print $2}')"
-          ca_bundle_sha256="$(sha256sum /etc/ssl/certs/ca-certificates.crt | awk '{print $1}')"
+          ca_bundle_sha256="$(sha256sum /tmp/tinlance-ca-bundle.crt | awk '{print $1}')"
           docker build --platform=linux/amd64 --pull --no-cache \
-            --secret id=ca_bundle,src=/etc/ssl/certs/ca-certificates.crt \
+            --secret id=ca_bundle,src=/tmp/tinlance-ca-bundle.crt \
             --build-arg BASE_IMAGE="$base_digest" \
             --build-arg APT_SNAPSHOT=20261106T000000Z \
             --file tests/fixtures/w2-developer-workspace/Dockerfile \
@@ -124,7 +128,7 @@ jobs:
           rootfs_sha256="$(sha256sum artifacts/w2-rootfs.tar | awk '{print $1}')"
 
           docker build --platform=linux/amd64 --pull --no-cache \
-            --secret id=ca_bundle,src=/etc/ssl/certs/ca-certificates.crt \
+            --secret id=ca_bundle,src=/tmp/tinlance-ca-bundle.crt \
             --build-arg BASE_IMAGE="$base_digest" \
             --build-arg APT_SNAPSHOT=20261106T000000Z \
             --file tests/fixtures/w2-developer-workspace/Dockerfile \
