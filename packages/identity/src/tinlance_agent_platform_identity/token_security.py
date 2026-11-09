@@ -76,9 +76,7 @@ class TokenSecurityContext:
             raise PermissionError("token is outside its validity window")
         if expected_nonce is not None and (
             self.nonce is None
-            or not hmac.compare_digest(
-                self.nonce.encode("utf-8"), expected_nonce.encode("utf-8")
-            )
+            or not hmac.compare_digest(self.nonce.encode("utf-8"), expected_nonce.encode("utf-8"))
         ):
             raise PermissionError("token nonce does not match the request")
         if self.sender_key_thumbprint is not None:
