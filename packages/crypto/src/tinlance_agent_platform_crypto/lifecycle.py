@@ -78,7 +78,9 @@ class KeyLifecycle:
     def active(self, *, now: datetime | None = None) -> KeyVersion:
         current = now or datetime.now(UTC)
         _require_aware(current, "current time")
-        active = [version for version in self.versions if version.usable(now=current)]
+        active = [version for version in self.versions if version.state is KeyState.ACTIVE]
         if len(active) != 1:
             raise RuntimeError("key lifecycle requires exactly one active usable key version")
+        if not active[0].usable(now=current):
+            raise RuntimeError("active key version is not yet usable")
         return active[0]
