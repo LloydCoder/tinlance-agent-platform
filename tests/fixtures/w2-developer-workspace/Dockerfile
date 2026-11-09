@@ -4,27 +4,38 @@ ARG APT_SNAPSHOT=20261106T000000Z
 FROM ${BASE_IMAGE}
 ARG APT_SNAPSHOT
 
-# Bootstrap HTTPS trust from the ephemeral build runner without persisting its
-# trust bundle in an image layer. Both index resolution and package installation
-# use one immutable, signature-verified Ubuntu snapshot.
+# The minimal Ubuntu base has no CA bundle. Bootstrap trust from the ephemeral
+# build runner through a BuildKit secret (never an image layer), switch Ubuntu
+# mirrors to HTTPS, and install the pinned CA package. All workspace packages
+# then resolve from one immutable Ubuntu snapshot with normal TLS verification.
 RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true \
-    DEBIAN_FRONTEND=noninteractive apt-get \
+    sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
+        -o Acquire::Retries=5 \
+        -o Acquire::https::Timeout=30 \
+        -o APT::Update::Error-Mode=any \
+        update \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
+        -o Acquire::Retries=5 \
+        -o Acquire::https::Timeout=30 \
+        install --yes --no-install-recommends \
+        ca-certificates=20260816ubuntu0.24.04.2 \
+        openssl=3.0.13-0ubuntu3.16 \
+        libssl3t64=3.0.13-0ubuntu3.16 \
+    && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
         --snapshot="${APT_SNAPSHOT}" update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
-        -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
         --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
-        ca-certificates=20260816ubuntu0.24.04.2 \
-        openssl=3.0.13-0ubuntu3.16 \
-        libssl3t64=3.0.13-0ubuntu3.16 \
         git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
