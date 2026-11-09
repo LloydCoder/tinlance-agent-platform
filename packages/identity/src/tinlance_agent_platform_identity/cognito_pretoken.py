@@ -101,9 +101,7 @@ class DynamoDBTenantMembershipResolver:
             or set(value) != {"S"}
             or not isinstance(value.get("S"), str)
         ):
-            raise CognitoTenantMembershipError(
-                f"tenant membership record has an invalid {name}"
-            )
+            raise CognitoTenantMembershipError(f"tenant membership record has an invalid {name}")
         return str(value["S"])
 
 
