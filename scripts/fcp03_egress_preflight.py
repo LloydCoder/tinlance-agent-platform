@@ -102,3 +102,41 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("dns-firewall-not-fail-closed")
 
     return tuple(sorted(findings))
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Validate a normalized inventory JSON file without contacting AWS."""
+    import argparse
+    import json
+    import sys
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--snapshot",
+        default="-",
+        help="normalized topology JSON path, or '-' to read standard input",
+    )
+    args = parser.parse_args(argv)
+    try:
+        raw = sys.stdin.read() if args.snapshot == "-" else Path(args.snapshot).read_text(
+            encoding="utf-8"
+        )
+        snapshot = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        parser.error(f"cannot read topology snapshot: {exc}")
+    if not isinstance(snapshot, Mapping):
+        parser.error("topology snapshot must be a JSON object")
+
+    findings = evaluate_fcp03_topology(snapshot)
+    print(
+        json.dumps(
+            {"status": "pass" if not findings else "fail", "findings": list(findings)},
+            sort_keys=True,
+        )
+    )
+    return 0 if not findings else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
