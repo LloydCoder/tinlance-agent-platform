@@ -53,8 +53,12 @@ class RestoreLeaseAuthority(Protocol):
 
 class RestoreLedger(Protocol):
     def begin(
-        self, tenant_id: UUID, workspace_id: UUID, restore_id: UUID,
-        snapshot_id: UUID, fencing_token: int,
+        self,
+        tenant_id: UUID,
+        workspace_id: UUID,
+        restore_id: UUID,
+        snapshot_id: UUID,
+        fencing_token: int,
     ) -> bool: ...
     def complete(self, restore_id: UUID, snapshot_digest: str) -> None: ...
     def fail(self, restore_id: UUID, reason_code: str) -> None: ...
@@ -189,15 +193,38 @@ class WorkspaceSnapshotService:
     MAX_FILES = 10_000
     MAX_FILE_BYTES = 16 * 1024 * 1024
     MAX_TOTAL_BYTES = 128 * 1024 * 1024
-    _SENSITIVE_SEGMENTS = frozenset({
-        ".aws", ".azure", ".gcloud", ".kube", ".ssh", ".env", ".env.local",
-        "secrets", "secret", "credentials", "credential", "tokens", "token",
-        "cookies", "cookies-journal", "login data", "web data", "local state",
-        "key4.db", "cert9.db", "private", "private_key",
-    })
+    _SENSITIVE_SEGMENTS = frozenset(
+        {
+            ".aws",
+            ".azure",
+            ".gcloud",
+            ".kube",
+            ".ssh",
+            ".env",
+            ".env.local",
+            "secrets",
+            "secret",
+            "credentials",
+            "credential",
+            "tokens",
+            "token",
+            "cookies",
+            "cookies-journal",
+            "login data",
+            "web data",
+            "local state",
+            "key4.db",
+            "cert9.db",
+            "private",
+            "private_key",
+        }
+    )
 
     def __init__(
-        self, *, store: SnapshotObjectStore, cipher: SnapshotCipher,
+        self,
+        *,
+        store: SnapshotObjectStore,
+        cipher: SnapshotCipher,
         signer: SnapshotSigner,
     ) -> None:
         self._store = store
@@ -242,8 +269,13 @@ class WorkspaceSnapshotService:
         return f"tinlance-workspace-snapshot:v1:{snapshot_id}:{tenant_id}:{workspace_id}".encode()
 
     def create(
-        self, *, tenant_id: UUID, workspace_id: UUID, fencing_token: int,
-        files: Mapping[str, bytes], file_modes: Mapping[str, int] | None = None,
+        self,
+        *,
+        tenant_id: UUID,
+        workspace_id: UUID,
+        fencing_token: int,
+        files: Mapping[str, bytes],
+        file_modes: Mapping[str, int] | None = None,
         created_at: datetime | None = None,
     ) -> SnapshotReference:
         self._identity(tenant_id, workspace_id, fencing_token)
@@ -270,13 +302,15 @@ class WorkspaceSnapshotService:
             mode = modes.get(raw_path, 0o600)
             if isinstance(mode, bool) or mode not in (0o600, 0o644, 0o700, 0o755):
                 raise SnapshotError("snapshot file mode is not an allowed regular-file mode")
-            entries.append({
-                "path": path,
-                "mode": mode,
-                "size": len(content),
-                "sha256": hashlib.sha256(content).hexdigest(),
-                "data": base64.b64encode(content).decode("ascii"),
-            })
+            entries.append(
+                {
+                    "path": path,
+                    "mode": mode,
+                    "size": len(content),
+                    "sha256": hashlib.sha256(content).hexdigest(),
+                    "data": base64.b64encode(content).decode("ascii"),
+                }
+            )
         timestamp = created_at or datetime.now(UTC)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise SnapshotError("snapshot timestamp must be timezone-aware")
@@ -294,13 +328,15 @@ class WorkspaceSnapshotService:
             payload_object, sort_keys=True, separators=(",", ":"), ensure_ascii=False
         ).encode("utf-8")
         signature = self._signer.sign(payload)
-        envelope = json.dumps({
-            "payload": base64.b64encode(payload).decode("ascii"),
-            "signature": base64.b64encode(signature).decode("ascii"),
-        }, sort_keys=True, separators=(",", ":")).encode("ascii")
-        ciphertext = self._cipher.encrypt(
-            envelope, self._aad(snapshot_id, tenant_id, workspace_id)
-        )
+        envelope = json.dumps(
+            {
+                "payload": base64.b64encode(payload).decode("ascii"),
+                "signature": base64.b64encode(signature).decode("ascii"),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("ascii")
+        ciphertext = self._cipher.encrypt(envelope, self._aad(snapshot_id, tenant_id, workspace_id))
         self._store.put_if_absent(snapshot_id, ciphertext)
         return SnapshotReference(
             snapshot_id=snapshot_id,
@@ -341,9 +377,16 @@ class WorkspaceSnapshotService:
         return decoded
 
     def restore(
-        self, *, reference: SnapshotReference, tenant_id: UUID, workspace_id: UUID,
-        restore_id: UUID, fencing_token: int, destination: Path,
-        lease_authority: RestoreLeaseAuthority, ledger: RestoreLedger,
+        self,
+        *,
+        reference: SnapshotReference,
+        tenant_id: UUID,
+        workspace_id: UUID,
+        restore_id: UUID,
+        fencing_token: int,
+        destination: Path,
+        lease_authority: RestoreLeaseAuthority,
+        ledger: RestoreLedger,
         credential_refresher: CredentialRefresher,
     ) -> RestoreResult:
         self._identity(tenant_id, workspace_id, fencing_token)
@@ -431,8 +474,10 @@ class WorkspaceSnapshotService:
             published = True
             ledger.complete(restore_id, reference.digest)
             return RestoreResult(
-                restore_id=restore_id, snapshot_id=reference.snapshot_id,
-                destination=target, fencing_token=fencing_token,
+                restore_id=restore_id,
+                snapshot_id=reference.snapshot_id,
+                destination=target,
+                fencing_token=fencing_token,
                 credential_references=dict(credentials),
             )
         except BaseException as exc:
