@@ -359,10 +359,6 @@ class WorkspaceSnapshotService:
         entries = decoded.get("files")
         if not isinstance(entries, list) or not entries or len(entries) > self.MAX_FILES:
             raise SnapshotIntegrityError("snapshot file manifest is invalid")
-        if not ledger.begin(
-            tenant_id, workspace_id, restore_id, reference.snapshot_id, fencing_token
-        ):
-            raise SnapshotConflictError("restore operation was already claimed")
         target = Path(destination)
         if target.exists() or target.is_symlink():
             raise SnapshotConflictError("restore destination must not exist on the clean host")
@@ -376,8 +372,10 @@ class WorkspaceSnapshotService:
         ):
             raise SnapshotConflictError("restore operation was already claimed")
         published = False
+        staging_created = False
         try:
             staging.mkdir(mode=0o700)
+            staging_created = True
             total = 0
             seen: set[str] = set()
             for entry in entries:
@@ -388,8 +386,11 @@ class WorkspaceSnapshotService:
                     raise SnapshotIntegrityError("snapshot contains duplicate file paths")
                 seen.add(path)
                 data = base64.b64decode(entry.get("data", ""), validate=True)
+                declared_size = entry.get("size")
                 if (
-                    len(data) != entry.get("size")
+                    isinstance(declared_size, bool)
+                    or not isinstance(declared_size, int)
+                    or len(data) != declared_size
                     or len(data) > self.MAX_FILE_BYTES
                     or hashlib.sha256(data).hexdigest() != entry.get("sha256")
                 ):
@@ -430,7 +431,7 @@ class WorkspaceSnapshotService:
                 credential_references=dict(credentials),
             )
         except BaseException as exc:
-            if staging.exists():
+            if staging_created and staging.exists():
                 shutil.rmtree(staging)
             if published and target.exists():
                 shutil.rmtree(target)
