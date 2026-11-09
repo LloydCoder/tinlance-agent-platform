@@ -390,14 +390,15 @@ class FakeDynamoDBClient:
         for action in actions:
             put = action["Put"]
             item = put["Item"]
-            assert all(
-                isinstance(value, dict) and len(value) == 1 and ("S" in value or "N" in value)
-                for value in item.values()
-            )
-            decoded = {
-                name: value["S"] if "S" in value else int(value["N"])
-                for name, value in item.items()
-            }
+            decoded: dict[str, object] = {}
+            for name, value in item.items():
+                assert isinstance(value, dict)
+                assert len(value) == 1
+                if "S" in value:
+                    decoded[name] = value["S"]
+                else:
+                    assert "N" in value
+                    decoded[name] = int(value["N"])
             pending[str(decoded["revocation_key"])] = decoded
         self.items = pending
         self.transactions.append(list(actions))
@@ -412,10 +413,12 @@ class FakeDynamoDBClient:
         item = self.items.get(str(key_value["S"]))
         if item is None:
             return {}
-        encoded = {
-            name: {"N": str(value)} if isinstance(value, int) else {"S": str(value)}
-            for name, value in item.items()
-        }
+        encoded: dict[str, dict[str, str]] = {}
+        for name, value in item.items():
+            if isinstance(value, int):
+                encoded[name] = {"N": str(value)}
+            else:
+                encoded[name] = {"S": str(value)}
         return {"Item": encoded}
 
 
