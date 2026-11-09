@@ -108,43 +108,72 @@ def _route_target(route: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _security_group_egress(groups: list[Mapping[str, Any]]) -> list[dict[str, object]]:
+def _security_group_egress(
+    groups: Sequence[Mapping[str, Any]],
+) -> list[dict[str, object]] | None:
+    """Normalize egress rules, returning None when any attached group is incomplete."""
+    if not isinstance(groups, Sequence) or isinstance(groups, (str, bytes)) or not groups:
+        return None
+
     rules: list[dict[str, object]] = []
     for group in groups:
-        for permission in group.get("IpPermissionsEgress", []):
+        if not isinstance(group, Mapping):
+            return None
+        permissions = group.get("IpPermissionsEgress")
+        if not isinstance(permissions, Sequence) or isinstance(permissions, (str, bytes)):
+            return None
+
+        for permission in permissions:
+            if not isinstance(permission, Mapping):
+                return None
             protocol = permission.get("IpProtocol")
             from_port = permission.get("FromPort")
             to_port = permission.get("ToPort")
             port = from_port if from_port == to_port else None
-            for item in permission.get("IpRanges", []):
-                rules.append(
-                    {
-                        "protocol": protocol,
-                        "port": port,
-                        "cidr": item.get("CidrIp"),
-                    }
-                )
-            for item in permission.get("Ipv6Ranges", []):
-                rules.append(
-                    {
-                        "protocol": protocol,
-                        "port": port,
-                        "cidr": item.get("CidrIpv6"),
-                    }
-                )
+            initial_rule_count = len(rules)
+
+            for field, cidr_field in (
+                ("IpRanges", "CidrIp"),
+                ("Ipv6Ranges", "CidrIpv6"),
+            ):
+                items = permission.get(field, [])
+                if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
+                    return None
+                for item in items:
+                    if not isinstance(item, Mapping):
+                        return None
+                    rules.append(
+                        {
+                            "protocol": protocol,
+                            "port": port,
+                            "cidr": item.get(cidr_field),
+                        }
+                    )
+
             # Prefix-list and security-group references are not expanded here.
             # Preserve them as unclassifiable rules so the preflight fails closed.
-            for item in permission.get("PrefixListIds", []) + permission.get(
-                "UserIdGroupPairs", []
+            for field, reference_field in (
+                ("PrefixListIds", "PrefixListId"),
+                ("UserIdGroupPairs", "GroupId"),
             ):
-                rules.append(
-                    {
-                        "protocol": protocol,
-                        "port": port,
-                        "cidr": None,
-                        "reference": item.get("PrefixListId") or item.get("GroupId"),
-                    }
-                )
+                items = permission.get(field, [])
+                if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
+                    return None
+                for item in items:
+                    if not isinstance(item, Mapping):
+                        return None
+                    rules.append(
+                        {
+                            "protocol": protocol,
+                            "port": port,
+                            "cidr": None,
+                            "reference": item.get(reference_field),
+                        }
+                    )
+
+            if len(rules) == initial_rule_count:
+                return None
+
     return rules
 
 
