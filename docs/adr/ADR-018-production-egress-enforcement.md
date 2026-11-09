@@ -32,6 +32,7 @@ The production target is a layered, independently enforced egress path. The brow
 - Permit only the required VPC-local, SSM, telemetry, DNS resolver and explicitly approved service paths. Use VPC endpoints for AWS control-plane services where supported; endpoint policies remain least-privilege.
 - Block direct UDP/53, TCP/53 and TCP/853 from worker workloads. Permit DNS only through the configured Route 53 VPC Resolver path. Block UDP/443 (QUIC/HTTP3) for the browser workload unless a separately inspected and tested policy is approved.
 - Route-table and firewall-policy changes must be staged and verified before worker placement. A missing, unhealthy or ambiguous firewall route must fail closed, not fall back to direct egress.
+- Verify the complete bidirectional service chain, not only the worker's default route: worker subnet → same-AZ Network Firewall endpoint → NAT Gateway → internet, with return traffic from the NAT subnet routed back through that same firewall endpoint before reaching the worker subnet. Firewall and NAT route tables must be dedicated to their respective subnets; the NAT Gateway and firewall endpoint must be in the worker's AZ. Any missing, shared, inactive, ambiguous or unexpected route is a deployment failure.
 
 AWS Network Firewall creates endpoints in dedicated firewall subnets and traffic is steered through them with VPC route tables. Firewall subnets must not also host workloads. See the AWS Network Firewall developer guide.
 
