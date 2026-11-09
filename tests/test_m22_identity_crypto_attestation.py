@@ -1,1 +1,379 @@
-@￾+￿￿j￿úw×·íÝ￿²Ü¥￿ù¶￿￿￿~æj￿Ü¢{-j{￿¶)￾z'q￿Ü¢jZ®+(￿ý￿~)^￾·¢¹¶×�É½´ÑÑ¥µ¥µÁ½ÉÐUQ°ÑÑ¥µ°Ñ¥µ±Ñ()¥µÁ½ÉÐÁåÑÍÐ()É½´Ñ¥¹±¹}¹Ñ}Á±Ñ½Éµ}ÑÑÍÑÑ¥½¸¥µÁ½ÉÐÑÑÍÑÑ¥½¹QÉÕÍÐ°IÙ½Ñ¥½¹I½É)É½´Ñ¥¹±¹}¹Ñ}Á±Ñ½Éµ}ÉåÁÑ¼¥µÁ½ÉÐ-å1¥å±°-åMÑÑ°-åYÉÍ¥½¸)É½´Ñ¥¹±¹}¹Ñ}Á±Ñ½Éµ}¥¹Ñ¥Ñä¥µÁ½ÉÐQ½­¹MÕÉ¥Ñå½¹ÑáÐ(()ÑÍÑ}Ñ½­¹}ÍÕÉ¥Ñå}¹½ÉÍ}¥ÍÍÕÉ}Õ¥¹}¹½¹}¹}Ñ¥µ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ñ½­¸ôQ½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð´Ä°(©Ñ¤´Ä°(¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÔ¤°(¹½¹ô¹½¹´Ä°(¤(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°(áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°(áÁÑ}¹½¹ô¹½¹´Ä°(¹½Üõ¹½Ü°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ô¥ÍÍÕÈ¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½½Ñ¡È¹¥¹Ù±¥°áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°¹½Üõ¹½Ü(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ôÕ¥¹¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°áÁÑ}Õ¥¹ôÁ¤è¼½½Ñ¡È°¹½Üõ¹½Ü(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ô¹½¹¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°(áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°(áÁÑ}¹½¹ôÝÉ½¹°(¹½Üõ¹½Ü°(¤(()ÑÍÑ}Ñ½­¹}ÍÕÉ¥Ñå}É©ÑÍ}µÁÑå}¥¹Ñ¥Ñå}±¥µÍ}¹}Õ¥¹ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÕ¥¹¤è(Q½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥° ¤°¹Ð°©Ñ¤°¹½Ü°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÅÕ¥É¤è(Q½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(°(©Ñ¤°(¹½Ü°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(¤(()ÑÍÑ}Ñ½­¹}ÍÕÉ¥Ñå}É©ÑÍ}¹¥Ù}½É}¥¹ÙÉÑ}Ñ¥µ}Ý¥¹½ÝÌ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÑ¥µé½¹µÝÉ¤è(Q½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð°(©Ñ¤°(ÑÑ¥µ ÈÀÈØ°Ä°Ä¤°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÙ±¥¥Ñä¤è(Q½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥° Á¤è¼½Á±Ñ½É´°¤°¹Ð°©Ñ¤°¹½Ü°¹½Ü(¤(()ÑÍÑ}Ñ½­¹}ÍÕÉ¥Ñå}¹½ÉÍ}¹½Ñ}½É}¹}áÑ}áÁ¥Éå}½Õ¹Éä ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ñ½­¸ôQ½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð°(©Ñ¤°(¹½Ü´Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(¹½Ñ}½Éõ¹½Ü¬Ñ¥µ±Ñ¡Í½¹ÌôÄ¤°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ô¹½ÐåÐÙ±¥¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°¹½Üõ¹½Ü(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ôÙ±¥¥ÑäÝ¥¹½Ü¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°(áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°(¹½Üõ¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(¤(()ÑÍÑ}Í¹É}½Õ¹}Ñ½­¹}ÉÅÕ¥ÉÍ}µÑ¡¥¹}ÉÅÕÍÑ}­å}Ñ¡ÕµÁÉ¥¹Ð ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ñ¡ÕµÁÉ¥¹Ðô¨ÐÌ(Ñ½­¸ôQ½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð°(©Ñ¤°(¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(Í¹É}­å}Ñ¡ÕµÁÉ¥¹ÐõÑ¡ÕµÁÉ¥¹Ð°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ôÉÅÕ¥ÉÌÉÅÕÍÐ­ä¥¹¥¹¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°¹½Üõ¹½Ü(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡AÉµ¥ÍÍ¥½¹ÉÉ½È°µÑ ôÍ¹È­ä¤è(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°(áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°(áÁÑ}Í¹É}­å}Ñ¡ÕµÁÉ¥¹Ðô¨ÐÌ°(¹½Üõ¹½Ü°(¤(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°(áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°(áÁÑ}Í¹É}­å}Ñ¡ÕµÁÉ¥¹ÐõÑ¡ÕµÁÉ¥¹Ð°(¹½Üõ¹½Ü°(¤(()ÑÍÑ}Í¹É}­å}Ñ¡ÕµÁÉ¥¹Ñ}µÕÍÑ}}¹½¹¥±}Í¡ÈÔÙ}ÍØÑÕÉ° ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÑ¡ÕµÁÉ¥¹Ð¤è(Q½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð°(©Ñ¤°(¹½Ü°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(Í¹É}­å}Ñ¡ÕµÁÉ¥¹Ðô¹½ÐµµÑ¡ÕµÁÉ¥¹Ð°(¤(()ÑÍÑ}­å}±¥å±}ÉÅÕ¥ÉÍ}½¹}Ñ¥Ù}ÙÉÍ¥½¹}½É}½¹}­ä ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ñ¥Ùô-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°È°M°-åMÑÑ¹Q%Y°¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤¤(ÉÑ¥Éô-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°(Ä°(M°(-åMÑÑ¹IQ%I°(¹½Ü´Ñ¥µ±Ñ¡åÌôÄ¤°(¹½Ü´Ñ¥µ±Ñ¡¡½ÕÉÌôÄ¤°(¤(±¥å±ô-å1¥å± ¡ÉÑ¥É°Ñ¥Ù¤¤(ÍÍÉÐÑ¥Ù¹ÕÍ±¡¹½Üõ¹½Ü¤(ÍÍÉÐ±¥å±¹Ñ¥Ù¡¹½Üõ¹½Ü¤¥ÌÑ¥Ù(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡IÕ¹Ñ¥µÉÉ½È°µÑ ôáÑ±ä½¹Ñ¥Ù¤è(-å1¥å± ¡ÉÑ¥É°¤¤¹Ñ¥Ù¡¹½Üõ¹½Ü¤(()ÑÍÑ}­å}±¥å±}É©ÑÍ}µÕ±Ñ¥Á±}Ñ¥Ù}ÙÉÍ¥½¹Í}¹}ÕÁ±¥Ñ}ÙÉÍ¥½¹Ì ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(¥ÉÍÐô-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹Q%Y°¹½Ü¤(Í½¹ô-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°È°M°-åMÑÑ¹Q%Y°¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡IÕ¹Ñ¥µÉÉ½È°µÑ ôáÑ±ä½¹Ñ¥Ù¤è(-å1¥å± ¡¥ÉÍÐ°Í½¹¤¤¹Ñ¥Ù¡¹½Üõ¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÕÁ±¥Ñ¤è(-å1¥å± ¡¥ÉÍÐ°¥ÉÍÐ¤¤(()ÑÍÑ}­å}±¥å±}É©ÑÍ}µ¥á}­å}¥Í}¹}¥¹Ù±¥}ÍÑÑ}Ñ¥µÍÑµÁÌ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(¥ÉÍÐô-åYÉÍ¥½¸ ­µÌ½½¹°Ä°M°-åMÑÑ¹Q%Y°¹½Ü¤(Í½¹ô-åYÉÍ¥½¸ ­µÌ½ÑÝ¼°Ä°M°-åMÑÑ¹IQ%I°¹½Ü°¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÍµ­ä¤è(-å1¥å± ¡¥ÉÍÐ°Í½¹¤¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÑ¥Éµ¹ÐÑ¥µÍÑµÀ¤è(-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹IQ%I°¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÙ½Ñ¥½¸Ñ¥µÍÑµÀ¤è(-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹IY=-°¹½Ü¤(()ÑÍÑ}­å}±¥å±}É©ÑÍ}¹¥Ù}Ñ¥µÍÑµÁÍ}¹}ÕÑÕÉ}Ñ¥ÙÑ¥½¸ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÑ¥µé½¹µÝÉ¤è(-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹Q%Y°ÑÑ¥µ ÈÀÈØ°Ä°Ä¤¤(ÕÑÕÉô-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹Q%Y°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤¤(ÍÍÉÐ¹½ÐÕÑÕÉ¹ÕÍ±¡¹½Üõ¹½Ü¤(()ÑÍÑ}ÉÙ½Ñ¥½¹}¹}ÑÑÍÑÑ¥½¹}áÁ¥Éå}É}¥±}±½Í ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(É½ÉôIÙ½Ñ¥½¹I½É ÑÐ´Ä°½µÁÉ½µ¥Í°¹½Ü¤(ÍÍÉÐÉ½É¹ÑÑÍÑÑ¥½¹}¥ôôÑÐ´Ä(ÍÍÉÐÑÑÍÑÑ¥½¹QÉÕÍÐ (ÑÐ´Ä°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÔ¤°Ù±¥}É½´õ¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤(¤¹ÕÍ±¡¹½Üõ¹½Ü¤(ÍÍÉÐ¹½ÐÑÑÍÑÑ¥½¹QÉÕÍÐ (ÑÐ´Ä°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÔ¤°ÉÙ½­õQÉÕ°ÉÙ½­}Ðõ¹½Ü(¤¹ÕÍ±¡¹½Üõ¹½Ü¤(ÍÍÉÐ¹½ÐÑÑÍÑÑ¥½¹QÉÕÍÐ ÑÐ´Ä°¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤¤¹ÕÍ±¡¹½Üõ¹½Ü¤(ÍÍÉÐ¹½ÐÑÑÍÑÑ¥½¹QÉÕÍÐ (ÑÐ´Ä°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÔ¤°Ù±¥}É½´õ¹½Ü¬Ñ¥µ±Ñ¡Í½¹ÌôÄ¤(¤¹ÕÍ±¡¹½Üõ¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ô¥¹Ñ¥¥È¹ÉÍ½¸¤è(IÙ½Ñ¥½¹I½É °ÉÍ½¸°¹½Ü¤(()ÑÍÑ}ÑÑÍÑÑ¥½¹}ÑÉÕÍÑ}É©ÑÍ}¹¥Ù}¹}¥¹ÙÉÑ}Ù±¥¥Ñå}Ý¥¹½ÝÌ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÑ¥µé½¹µÝÉ¤è(ÑÑÍÑÑ¥½¹QÉÕÍÐ ÑÐ´Ä°ÑÑ¥µ ÈÀÈØ°Ä°Ä¤¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÙ±¥¥Ñä¤è(ÑÑÍÑÑ¥½¹QÉÕÍÐ ÑÐ´Ä°¹½Ü°Ù±¥}É½´õ¹½Ü¬Ñ¥µ±Ñ¡Í½¹ÌôÄ¤¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÙ½Ñ¥½¸Ñ¥µÍÑµÀ¤è(ÑÑÍÑÑ¥½¹QÉÕÍÐ ÑÐ´Ä°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°ÉÙ½­õQÉÕ¤(()ÑÍÑ}Í¹É}­å}Ñ¡ÕµÁÉ¥¹Ñ}É©ÑÍ}¹½¹¹½¹¥±}ÍØÑÕÉ±}Ñ¥±}¥ÑÌ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ô¹½¹¥°¤è(Q½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð°(©Ñ¤°(¹½Ü°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(Í¹É}­å}Ñ¡ÕµÁÉ¥¹Ðô¨ÐÈ¬°(¤(()ÑÍÑ}­å}±¥å±}É©ÑÍ}½ÙÉ±ÁÁ¥¹}Ñ¥Ù}ÙÉÍ¥½¹}Ù¹}¥}½¹}¥Í}ÕÑÕÉ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(ÕÉÉ¹Ðô-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹Q%Y°¹½Ü¤(Í¡Õ±ô-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°È°M°-åMÑÑ¹Q%Y°¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÔ¤(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡IÕ¹Ñ¥µÉÉ½È°µÑ ôáÑ±ä½¹Ñ¥Ù¤è(-å1¥å± ¡ÕÉÉ¹Ð°Í¡Õ±¤¤¹Ñ¥Ù¡¹½Üõ¹½Ü¤(()ÑÍÑ}Ñ½­¹}ÍÕÉ¥Ñå}½¹ÍÑ¹Ñ}Ñ¥µ}±¥µ}½µÁÉ¥Í½¹}ÁÑÍ}Õ¹¥½}¹½¹ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ñ½­¸ôQ½­¹MÕÉ¥Ñå½¹ÑáÐ (¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°( Á¤è¼½Á±Ñ½É´°¤°(¹Ð°(©Ñ¤°(¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤°(¹½Ü¬Ñ¥µ±Ñ¡µ¥¹ÕÑÌôÄ¤°(¹½¹ô¹½¹·ð°(¤(Ñ½­¸¹Ù±¥Ñ (áÁÑ}¥ÍÍÕÈô¡ÑÑÁÌè¼½¥ÍÍÕÈ¹¥¹Ù±¥°(áÁÑ}Õ¥¹ôÁ¤è¼½Á±Ñ½É´°(áÁÑ}¹½¹ô¹½¹·ð°(¹½Üõ¹½Ü°(¤(()ÑÍÑ}­å}±¥å±}É©ÑÍ}¥¹Ù±¥}ÍÑÑ}ÑÉ¹Í¥Ñ¥½¹Í}¹}Ñ¥µÍÑµÁÌ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ô¥±ÌÉÉÅÕ¥É¤è(-åYÉÍ¥½¸ °Ä°M°-åMÑÑ¹Q%Y°¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÍÕÁÁ½ÉÑ-åMÑÑ¤è(-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°Ñ¥Ù°¹½Ü¤ÑåÁè¥¹½ÉmÉµÑåÁt(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÑ¥Éµ¹ÐÑ¥µÍÑµÀ¹¹½ÐÁÉ¤è(-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°(Ä°(M°(-åMÑÑ¹IQ%I°(¹½Ü°(¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÙ½Ñ¥½¸Ñ¥µÍÑµÀ¹¹½ÐÁÉÑ¥ÙÑ¥½¸¤è(-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°(Ä°(M°(-åMÑÑ¹IY=-°(¹½Ü°(ÉÙ½­}Ðõ¹½Ü´Ñ¥µ±Ñ¡Í½¹ÌôÄ¤°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÑ¥Ù­åÌ¹¹½Ð¤è(-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°(Ä°(M°(-åMÑÑ¹Q%Y°(¹½Ü°(ÉÑ¥É}Ðõ¹½Ü°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÑ¥É­åÌÉÅÕ¥É¤è(-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°(Ä°(M°(-åMÑÑ¹IQ%I°(¹½Ü°(ÉÑ¥É}Ðõ¹½Ü°(ÉÙ½­}Ðõ¹½Ü°(¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÉÙ½Ñ¥½¸Ñ¥µÍÑµÀ¹¹½ÐÁÉÉÑ¥Éµ¹Ð¤è(-åYÉÍ¥½¸ (­µÌ½Á±Ñ½É´°(Ä°(M°(-åMÑÑ¹IY=-°(¹½Ü´Ñ¥µ±Ñ¡åÌôÄ¤°(ÉÑ¥É}Ðõ¹½Ü´Ñ¥µ±Ñ¡¡½ÕÉÌôÄ¤°(ÉÙ½­}Ðõ¹½Ü´Ñ¥µ±Ñ¡¡½ÕÉÌôÈ¤°(¤(()ÑÍÑ}­å}±¥å±}É©ÑÍ}µÁÑå}±¥å±}¹}¹¥Ù}Í±Ñ¥½¹}Ñ¥µ ¤´ø9½¹è(¹½ÜôÑÑ¥µ¹¹½Ü¡UQ¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÐ±ÍÐ½¹ÙÉÍ¥½¸¤è(-å1¥å±  ¤¤(Ñ¥Ùô-åYÉÍ¥½¸ ­µÌ½Á±Ñ½É´°Ä°M°-åMÑÑ¹Q%Y°¹½Ü¤(Ý¥Ñ ÁåÑÍÐ¹É¥ÍÌ¡Y±ÕÉÉ½È°µÑ ôÑ¥µé½¹µÝÉ¤è(-å1¥å± ¡Ñ¥Ù°¤¤¹Ñ¥Ù¡¹½ÜõÑÑ¥µ ÈÀÈØ°Ä°Ä¤¤(￿￿￿
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from tinlance_agent_platform_attestation import AttestationTrust, RevocationRecord
+from tinlance_agent_platform_crypto import KeyLifecycle, KeyState, KeyVersion
+from tinlance_agent_platform_identity import TokenSecurityContext
+
+
+def test_token_security_enforces_issuer_audience_nonce_and_time() -> None:
+    now = datetime.now(UTC)
+    token = TokenSecurityContext(
+        "https://issuer.invalid",
+        ("api://platform",),
+        "agent-1",
+        "jti-1",
+        now - timedelta(seconds=1),
+        now + timedelta(minutes=5),
+        nonce="nonce-1",
+    )
+    token.validate(
+        expected_issuer="https://issuer.invalid",
+        expected_audience="api://platform",
+        expected_nonce="nonce-1",
+        now=now,
+    )
+    with pytest.raises(PermissionError, match="issuer"):
+        token.validate(
+            expected_issuer="https://other.invalid",
+            expected_audience="api://platform",
+            now=now,
+        )
+    with pytest.raises(PermissionError, match="audience"):
+        token.validate(
+            expected_issuer="https://issuer.invalid",
+            expected_audience="api://other",
+            now=now,
+        )
+    with pytest.raises(PermissionError, match="nonce"):
+        token.validate(
+            expected_issuer="https://issuer.invalid",
+            expected_audience="api://platform",
+            expected_nonce="wrong",
+            now=now,
+        )
+
+
+def test_token_security_rejects_empty_identity_claims_and_audience() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="audience"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            (),
+            "agent",
+            "jti",
+            now,
+            now + timedelta(minutes=1),
+        )
+    with pytest.raises(ValueError, match="required"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            ("api://platform",),
+            " ",
+            "jti",
+            now,
+            now + timedelta(minutes=1),
+        )
+
+
+def test_token_security_rejects_naive_or_inverted_time_windows() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            ("api://platform",),
+            "agent",
+            "jti",
+            datetime(2026, 1, 1),
+            now + timedelta(minutes=1),
+        )
+    with pytest.raises(ValueError, match="validity"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            ("api://platform",),
+            "agent",
+            "jti",
+            now,
+            now,
+        )
+
+
+def test_token_security_enforces_not_before_and_exact_expiry_boundary() -> None:
+    now = datetime.now(UTC)
+    token = TokenSecurityContext(
+        "https://issuer.invalid",
+        ("api://platform",),
+        "agent",
+        "jti",
+        now - timedelta(minutes=1),
+        now + timedelta(minutes=1),
+        not_before=now + timedelta(seconds=1),
+    )
+    with pytest.raises(PermissionError, match="not yet valid"):
+        token.validate(
+            expected_issuer="https://issuer.invalid",
+            expected_audience="api://platform",
+            now=now,
+        )
+    with pytest.raises(PermissionError, match="validity window"):
+        token.validate(
+            expected_issuer="https://issuer.invalid",
+            expected_audience="api://platform",
+            now=now + timedelta(minutes=1),
+        )
+
+
+def test_sender_bound_token_requires_matching_request_key_thumbprint() -> None:
+    now = datetime.now(UTC)
+    thumbprint = "A" * 43
+    token = TokenSecurityContext(
+        "https://issuer.invalid",
+        ("api://platform",),
+        "agent",
+        "jti",
+        now - timedelta(seconds=1),
+        now + timedelta(minutes=1),
+        sender_key_thumbprint=thumbprint,
+    )
+    with pytest.raises(PermissionError, match="requires request key binding"):
+        token.validate(
+            expected_issuer="https://issuer.invalid",
+            expected_audience="api://platform",
+            now=now,
+        )
+    with pytest.raises(PermissionError, match="sender key"):
+        token.validate(
+            expected_issuer="https://issuer.invalid",
+            expected_audience="api://platform",
+            expected_sender_key_thumbprint="B" * 43,
+            now=now,
+        )
+    token.validate(
+        expected_issuer="https://issuer.invalid",
+        expected_audience="api://platform",
+        expected_sender_key_thumbprint=thumbprint,
+        now=now,
+    )
+
+
+def test_sender_key_thumbprint_must_be_canonical_sha256_base64url() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="thumbprint"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            ("api://platform",),
+            "agent",
+            "jti",
+            now,
+            now + timedelta(minutes=1),
+            sender_key_thumbprint="not-a-thumbprint",
+        )
+
+
+def test_sender_key_thumbprint_rejects_noncanonical_base64url_tail_bits() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="canonical"):
+        TokenSecurityContext(
+            "https://issuer.invalid",
+            ("api://platform",),
+            "agent",
+            "jti",
+            now,
+            now + timedelta(minutes=1),
+            sender_key_thumbprint="A" * 42 + "B",
+        )
+
+
+def test_token_security_constant_time_claim_comparison_accepts_unicode_nonce() -> None:
+    now = datetime.now(UTC)
+    token = TokenSecurityContext(
+        "https://issuer.invalid",
+        ("api://platform",),
+        "agent",
+        "jti",
+        now - timedelta(seconds=1),
+        now + timedelta(minutes=1),
+        nonce="nonce-ü",
+    )
+    token.validate(
+        expected_issuer="https://issuer.invalid",
+        expected_audience="api://platform",
+        expected_nonce="nonce-ü",
+        now=now,
+    )
+
+
+def test_key_lifecycle_requires_one_active_version_for_one_key() -> None:
+    now = datetime.now(UTC)
+    active = KeyVersion(
+        "kms/platform",
+        "2",
+        "EdDSA",
+        KeyState.ACTIVE,
+        now - timedelta(seconds=1),
+    )
+    retired = KeyVersion(
+        "kms/platform",
+        "1",
+        "EdDSA",
+        KeyState.RETIRED,
+        now - timedelta(days=1),
+        now - timedelta(hours=1),
+    )
+    lifecycle = KeyLifecycle((retired, active))
+    assert active.usable(now=now)
+    assert lifecycle.active(now=now) is active
+    with pytest.raises(RuntimeError, match="exactly one active"):
+        KeyLifecycle((retired,)).active(now=now)
+
+
+def test_key_lifecycle_rejects_multiple_active_versions_and_duplicate_versions() -> None:
+    now = datetime.now(UTC)
+    first = KeyVersion("kms/platform", "1", "EdDSA", KeyState.ACTIVE, now)
+    second = KeyVersion("kms/platform", "2", "EdDSA", KeyState.ACTIVE, now)
+    with pytest.raises(RuntimeError, match="exactly one active"):
+        KeyLifecycle((first, second)).active(now=now)
+    with pytest.raises(ValueError, match="duplicate"):
+        KeyLifecycle((first, first))
+
+
+def test_key_lifecycle_rejects_mixed_key_ids_and_invalid_state_timestamps() -> None:
+    now = datetime.now(UTC)
+    first = KeyVersion("kms/one", "1", "EdDSA", KeyState.ACTIVE, now)
+    second = KeyVersion("kms/two", "1", "EdDSA", KeyState.RETIRED, now, now)
+    with pytest.raises(ValueError, match="same key"):
+        KeyLifecycle((first, second))
+    with pytest.raises(ValueError, match="retirement timestamp"):
+        KeyVersion("kms/platform", "1", "EdDSA", KeyState.RETIRED, now)
+    with pytest.raises(ValueError, match="revocation timestamp"):
+        KeyVersion("kms/platform", "1", "EdDSA", KeyState.REVOKED, now)
+
+
+def test_key_lifecycle_rejects_naive_timestamps_and_future_activation() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            KeyState.ACTIVE,
+            datetime(2026, 1, 1),
+        )
+    future = KeyVersion(
+        "kms/platform",
+        "1",
+        "EdDSA",
+        KeyState.ACTIVE,
+        now + timedelta(minutes=1),
+    )
+    assert not future.usable(now=now)
+
+
+def test_key_lifecycle_rejects_overlapping_active_version_even_if_one_is_future() -> None:
+    now = datetime.now(UTC)
+    current = KeyVersion("kms/platform", "1", "EdDSA", KeyState.ACTIVE, now)
+    scheduled = KeyVersion(
+        "kms/platform",
+        "2",
+        "EdDSA",
+        KeyState.ACTIVE,
+        now + timedelta(minutes=5),
+    )
+    with pytest.raises(RuntimeError, match="exactly one active"):
+        KeyLifecycle((current, scheduled)).active(now=now)
+
+
+def test_key_lifecycle_rejects_invalid_state_transitions_and_timestamps() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="fields are required"):
+        KeyVersion("", "1", "EdDSA", KeyState.ACTIVE, now)
+    with pytest.raises(ValueError, match="supported KeyState"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            "active",  # type: ignore[arg-type]
+            now,
+        )
+    with pytest.raises(ValueError, match="retirement timestamp cannot precede"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            KeyState.RETIRED,
+            now,
+            now - timedelta(seconds=1),
+        )
+    with pytest.raises(ValueError, match="revocation timestamp cannot precede activation"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            KeyState.REVOKED,
+            now,
+            revoked_at=now - timedelta(seconds=1),
+        )
+    with pytest.raises(ValueError, match="active keys cannot"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            KeyState.ACTIVE,
+            now,
+            retired_at=now,
+        )
+    with pytest.raises(ValueError, match="retired keys require"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            KeyState.RETIRED,
+            now,
+            retired_at=now,
+            revoked_at=now,
+        )
+    with pytest.raises(ValueError, match="revocation timestamp cannot precede retirement"):
+        KeyVersion(
+            "kms/platform",
+            "1",
+            "EdDSA",
+            KeyState.REVOKED,
+            now - timedelta(days=1),
+            retired_at=now - timedelta(hours=1),
+            revoked_at=now - timedelta(hours=2),
+        )
+
+
+def test_key_lifecycle_rejects_empty_lifecycle_and_naive_selection_time() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="at least one version"):
+        KeyLifecycle(())
+    active = KeyVersion("kms/platform", "1", "EdDSA", KeyState.ACTIVE, now)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        KeyLifecycle((active,)).active(now=datetime(2026, 1, 1))
+
+
+def test_revocation_and_attestation_expiry_are_fail_closed() -> None:
+    now = datetime.now(UTC)
+    record = RevocationRecord("att-1", "compromised", now)
+    assert record.attestation_id == "att-1"
+    assert AttestationTrust(
+        "att-1",
+        now + timedelta(minutes=5),
+        valid_from=now - timedelta(seconds=1),
+    ).usable(now=now)
+    assert not AttestationTrust(
+        "att-1",
+        now + timedelta(minutes=5),
+        revoked=True,
+        revoked_at=now,
+    ).usable(now=now)
+    assert not AttestationTrust("att-1", now - timedelta(seconds=1)).usable(now=now)
+    assert not AttestationTrust(
+        "att-1",
+        now + timedelta(minutes=5),
+        valid_from=now + timedelta(seconds=1),
+    ).usable(now=now)
+    with pytest.raises(ValueError, match="identifier and reason"):
+        RevocationRecord(" ", "reason", now)
+
+
+def test_attestation_trust_rejects_naive_and_inverted_validity_windows() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        AttestationTrust("att-1", datetime(2026, 1, 1))
+    with pytest.raises(ValueError, match="validity"):
+        AttestationTrust("att-1", now, valid_from=now + timedelta(seconds=1))
+    with pytest.raises(ValueError, match="revocation timestamp"):
+        AttestationTrust("att-1", now + timedelta(minutes=1), revoked=True)
