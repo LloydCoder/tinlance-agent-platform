@@ -407,3 +407,22 @@ def test_jwks_client_is_reused_across_token_verifications(monkeypatch: pytest.Mo
             {"cache_jwk_set": True, "lifespan": 300, "timeout": 5.0},
         )
     ]
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"tenant_id": "tenant-123\\x00forged"},
+        {"roles": ["operator\\x00admin"]},
+        {"scope": "agent:run\\x00admin"},
+        {"nonce": "nonce-123\\x00forged"},
+        {"client_id": "client-123\\x00forged"},
+    ],
+)
+def test_identity_claims_with_control_characters_are_rejected(
+    verifier: tuple[JWKSIdentityVerifier, Any], overrides: dict[str, object]
+) -> None:
+    service, private_key = verifier
+
+    with pytest.raises(PermissionError):
+        service.verify(make_token(private_key, **overrides))
