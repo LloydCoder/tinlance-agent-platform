@@ -98,7 +98,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
     assert dockerfile.count("--snapshot=") == 4
     bootstrap_update = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
-    bootstrap_ca = dockerfile.index("ca-certificates=20260816ubuntu0.24.0.2")
+    bootstrap_ca = dockerfile.index("ca-certificates=20260816ubuntu0.24.04.2")
     bootstrap_install = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
     assert bootstrap_update < bootstrap_ca < bootstrap_install
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
