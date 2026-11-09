@@ -1,6 +1,6 @@
 # ADR-017: Durable workspace snapshots and clean-host restore
 
-- **Status:** Proposed for acceptance with FCP-02 W6
+- **Status:** Accepted for repository implementation scope; production enablement deferred
 - **Date:** 2026-11-09
 - **Scope:** Tinlance Agent Platform persistent-computer durability
 
