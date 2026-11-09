@@ -112,7 +112,9 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert bootstrap_update < bootstrap_installs[0] < bootstrap_ca < workspace_update < bootstrap_installs[1]
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
     assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
-    assert "sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources" in dockerfile
+    assert "sed -i" in dockerfile
+    assert "s|http://|https://|g" in dockerfile
+    assert "s|https://ports.ubuntu.com/ubuntu-ports|https://archive.ubuntu.com/ubuntu|g" in dockerfile
     assert "RUN --network=none" in dockerfile
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
