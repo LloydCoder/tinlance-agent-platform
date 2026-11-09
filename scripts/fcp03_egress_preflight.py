@@ -221,6 +221,7 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     ):
         findings.add("worker-route-inventory-unknown")
     else:
+        observed_worker_routes: set[tuple[str, str]] = set()
         for raw_route in route_entries:
             route = _object(raw_route)
             destination, target = route.get("destination"), route.get("target")
@@ -234,8 +235,19 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
                 continue
             if route.get("state") != "active":
                 findings.add("worker-route-state-not-active")
+            observed_worker_routes.add((destination, target))
             if target not in {"local", endpoint}:
                 findings.add("worker-route-bypasses-firewall")
+
+        expected_worker_routes = {
+            (worker.get("vpc_cidr"), "local"),
+            ("0.0.0.0/0", endpoint),
+        }
+        if (
+            len(observed_worker_routes) != len(route_entries)
+            or observed_worker_routes != expected_worker_routes
+        ):
+            findings.add("worker-route-set-invalid")
 
     network_acl = _object(worker.get("network_acl"))
     subnet_id = worker.get("subnet_id")

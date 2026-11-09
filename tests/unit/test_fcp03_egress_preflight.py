@@ -555,3 +555,21 @@ def test_fails_closed_on_malformed_security_group_egress_entries() -> None:
     ]
 
     assert "worker-security-group-egress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_extra_worker_route_even_when_target_is_local() -> None:
+    topology = valid_topology()
+    topology["worker"]["route_entries"].append(
+        {"destination": "198.51.100.0/24", "target": "local", "state": "active"}
+    )
+
+    assert "worker-route-set-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_duplicate_worker_route_entries() -> None:
+    topology = valid_topology()
+    topology["worker"]["route_entries"].append(
+        {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"}
+    )
+
+    assert "worker-route-set-invalid" in evaluate_fcp03_topology(topology)

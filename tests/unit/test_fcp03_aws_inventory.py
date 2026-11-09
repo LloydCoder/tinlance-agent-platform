@@ -179,10 +179,15 @@ def ec2_client() -> FakeClient:
                             "Associations": [{"SubnetId": "subnet-worker"}],
                             "Routes": [
                                 {
+                                    "DestinationCidrBlock": "10.20.0.0/16",
+                                    "GatewayId": "local",
+                                    "State": "active",
+                                },
+                                {
                                     "DestinationCidrBlock": "0.0.0.0/0",
                                     "VpcEndpointId": "vpce-fw-a",
                                     "State": "active",
-                                }
+                                },
                             ],
                         }
                     ]
@@ -445,7 +450,8 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
     assert len(snapshot["worker"]["network_acl"]["ingress_rules"]) == 3
     assert len(snapshot["worker"]["network_acl"]["egress_rules"]) == 5
     assert snapshot["worker"]["route_entries"] == [
-        {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"}
+        {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
+        {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
     ]
 
 
