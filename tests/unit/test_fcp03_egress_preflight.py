@@ -397,7 +397,6 @@ def test_fails_closed_when_worker_subnet_nacl_association_is_missing_or_shared()
     assert "worker-nacl-association-invalid" in evaluate_fcp03_topology(topology)
 
 
-
 def test_rejects_worker_nacl_with_missing_or_unrestricted_ingress_policy() -> None:
     topology = valid_topology()
     topology["worker"]["network_acl"]["ingress_rules"] = []
