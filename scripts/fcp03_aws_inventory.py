@@ -7,6 +7,7 @@ associates, deletes, or otherwise mutates AWS resources.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 from collections.abc import Mapping
 from typing import Any
@@ -284,6 +285,72 @@ def _stateful_rule_group_snapshots(
     return snapshots
 
 
+
+def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
+    """Return the worker subnet's exact NACL association and normalized egress rules."""
+    network_acls = _all_pages(
+        ec2,
+        "describe_network_acls",
+        "NetworkAcls",
+        Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}],
+    )
+    matches = [
+        acl
+        for acl in network_acls
+        if any(
+            association.get("SubnetId") == subnet_id
+            for association in acl.get("Associations", [])
+        )
+    ]
+    if len(matches) != 1:
+        return {
+            "associated": False,
+            "network_acl_id": None,
+            "subnet_ids": [],
+            "egress_rules": [],
+        }
+
+    acl = matches[0]
+    subnet_ids = sorted(
+        {
+            association["SubnetId"]
+            for association in acl.get("Associations", [])
+            if isinstance(association.get("SubnetId"), str)
+        }
+    )
+    egress_rules: list[dict[str, object]] = []
+    entries = acl.get("Entries", [])
+    if not isinstance(entries, list):
+        entries = []
+    for entry in entries:
+        if not isinstance(entry, Mapping) or entry.get("Egress") is not True:
+            continue
+        raw_port_range = entry.get("PortRange")
+        port_range = raw_port_range if isinstance(raw_port_range, Mapping) else {}
+        egress_rules.append(
+            {
+                "rule_number": entry.get("RuleNumber"),
+                "protocol": entry.get("Protocol"),
+                "action": entry.get("RuleAction"),
+                "cidr": entry.get("CidrBlock") or entry.get("Ipv6CidrBlock"),
+                "from_port": port_range.get("From"),
+                "to_port": port_range.get("To"),
+            }
+        )
+    egress_rules.sort(
+        key=lambda rule: (
+            rule["rule_number"]
+            if isinstance(rule["rule_number"], int)
+            else 2**31
+        )
+    )
+    return {
+        "associated": True,
+        "network_acl_id": acl.get("NetworkAclId"),
+        "subnet_ids": subnet_ids,
+        "egress_rules": egress_rules,
+    }
+
 def collect_fcp03_snapshot(
     *,
     instance_id: str,
@@ -318,6 +385,19 @@ def collect_fcp03_snapshot(
     subnet = next((item for item in subnets if item.get("SubnetId") == subnet_id), None)
     if subnet is None:
         raise ValueError("the EC2 worker subnet could not be resolved")
+
+    vpcs = _all_pages(ec2, "describe_vpcs", "Vpcs", VpcIds=[vpc_id])
+    vpc = next((item for item in vpcs if item.get("VpcId") == vpc_id), None)
+    vpc_cidr = vpc.get("CidrBlock") if isinstance(vpc, Mapping) else None
+    try:
+        vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
+        resolver_ip = (
+            str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
+        )
+    except ValueError:
+        resolver_ip = None
+
+    network_acl = _network_acl_snapshot(ec2, subnet_id)
 
     route_tables = _all_pages(
         ec2,
@@ -405,6 +485,10 @@ def collect_fcp03_snapshot(
 
     worker = {
         "vpc_id": vpc_id,
+        "subnet_id": subnet_id,
+        "vpc_cidr": vpc_cidr,
+        "resolver_ip": resolver_ip,
+        "network_acl": network_acl,
         "subnet_cidr": subnet.get("CidrBlock"),
         "public_ip": instance.get("PublicIpAddress"),
         "map_public_ip_on_launch": subnet.get("MapPublicIpOnLaunch"),
