@@ -102,6 +102,17 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("dns-allowlist-incomplete")
     if dns_firewall.get("failure_mode") != "CLOSED":
         findings.add("dns-firewall-not-fail-closed")
+    if dns_firewall.get("rule_group_status") != "COMPLETE":
+        findings.add("dns-rule-group-not-ready")
+    association_statuses = _strings(dns_firewall.get("association_statuses"))
+    if not association_statuses or association_statuses != {"COMPLETE"}:
+        findings.add("dns-rule-group-association-not-ready")
+    rule_statuses = _strings(dns_firewall.get("rule_statuses"))
+    if not rule_statuses or rule_statuses != {"COMPLETE"}:
+        findings.add("dns-firewall-rule-not-ready")
+    domain_list_statuses = _strings(dns_firewall.get("domain_list_statuses"))
+    if not domain_list_statuses or domain_list_statuses != {"COMPLETE"}:
+        findings.add("dns-firewall-domain-list-not-ready")
 
     return tuple(sorted(findings))
 
