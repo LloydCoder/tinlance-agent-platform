@@ -8,7 +8,7 @@ ARG APT_SNAPSHOT
 # build runner through a BuildKit secret (never an image layer), switch Ubuntu
 # mirrors to HTTPS, and install the pinned CA package. All workspace packages
 # then resolve from one immutable Ubuntu snapshot with normal TLS verification.
-RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true \
+RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true,mode=0444 \
     sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
