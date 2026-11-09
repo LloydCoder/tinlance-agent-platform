@@ -75,6 +75,12 @@ class ProductionDependency:
                 raise ValueError("verified dependency evidence must use an approved URI scheme")
             if not parsed.netloc:
                 raise ValueError("verified dependency evidence URI must identify a resource")
+            if parsed.username or parsed.password:
+                raise ValueError("verified dependency evidence URI must not contain credentials")
+            if parsed.query or parsed.fragment:
+                raise ValueError("verified dependency evidence URI must not contain query or fragment data")
+            if parsed.scheme == "s3" and not parsed.path.strip("/"):
+                raise ValueError("S3 evidence URI must identify an object key")
             if not self.verified_by or not self.verified_by.strip():
                 raise ValueError("verified production dependencies require a named verifier")
             if self.verified_at is None:
