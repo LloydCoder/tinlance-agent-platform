@@ -392,6 +392,17 @@ def collect_fcp03_snapshot(
     vpcs = _all_pages(ec2, "describe_vpcs", "Vpcs", VpcIds=[vpc_id])
     vpc = next((item for item in vpcs if item.get("VpcId") == vpc_id), None)
     vpc_cidr = vpc.get("CidrBlock") if isinstance(vpc, Mapping) else None
+    raw_cidr_associations = (
+        vpc.get("CidrBlockAssociationSet", []) if isinstance(vpc, Mapping) else []
+    )
+    vpc_cidr_associations = [
+        {
+            "cidr": association.get("CidrBlock"),
+            "state": _object(association.get("CidrBlockState")).get("State"),
+        }
+        for association in raw_cidr_associations
+        if isinstance(association, Mapping)
+    ] if isinstance(raw_cidr_associations, list) else []
     try:
         vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
         resolver_ip = str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
@@ -488,6 +499,7 @@ def collect_fcp03_snapshot(
         "vpc_id": vpc_id,
         "subnet_id": subnet_id,
         "vpc_cidr": vpc_cidr,
+        "vpc_cidr_associations": vpc_cidr_associations,
         "resolver_ip": resolver_ip,
         "network_acl": network_acl,
         "subnet_cidr": subnet.get("CidrBlock"),
