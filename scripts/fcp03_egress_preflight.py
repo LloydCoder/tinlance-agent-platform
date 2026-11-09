@@ -215,10 +215,7 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
 
     worker_subnet_id = worker.get("subnet_id")
     worker_route_table_subnet_ids = _strings(worker.get("route_table_subnet_ids"))
-    if (
-        not isinstance(worker_subnet_id, str)
-        or worker_route_table_subnet_ids != {worker_subnet_id}
-    ):
+    if not isinstance(worker_subnet_id, str) or worker_route_table_subnet_ids != {worker_subnet_id}:
         findings.add("worker-route-table-not-dedicated")
 
     route_entries = worker.get("route_entries")
