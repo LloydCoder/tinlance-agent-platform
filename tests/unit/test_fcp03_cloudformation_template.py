@@ -119,7 +119,8 @@ def test_lab_has_an_automatic_stack_teardown_target_scoped_to_this_stack() -> No
     target = schedule["Target"]
     role_policy = resources["TeardownRole"]["Properties"]["Policies"][0]["PolicyDocument"]
 
-    assert schedule["ActionAfterCompletion"] == "DELETE"
+    assert schedule["State"] == "ENABLED"
+    assert schedule["ScheduleExpression"]["Fn::Sub"] == "at(${TeardownAtUtc})"
     assert schedule["FlexibleTimeWindow"]["Mode"] == "OFF"
     assert target["Arn"] == "arn:aws:scheduler:::aws-sdk:cloudformation:deleteStack"
     assert target["Input"]["Fn::Sub"] == "{\"StackName\":\"${AWS::StackName}\"}"
