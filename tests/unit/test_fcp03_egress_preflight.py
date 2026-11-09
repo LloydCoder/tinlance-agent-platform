@@ -619,3 +619,17 @@ def test_rejects_any_worker_security_group_ingress_rule() -> None:
     ]
 
     assert "worker-security-group-ingress-not-empty" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_worker_security_group_ingress_inventory_is_missing() -> None:
+    topology = valid_topology()
+    topology["worker"].pop("security_group_ingress")
+
+    assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_worker_security_group_ingress_inventory_is_malformed() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_ingress"] = "unknown"
+
+    assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(topology)
