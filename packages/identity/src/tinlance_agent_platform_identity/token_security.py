@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hmac
 import re
 from dataclasses import dataclass
@@ -44,10 +45,13 @@ class TokenSecurityContext:
             raise ValueError("token validity window has an invalid not-before time")
         if self.nonce is not None and not self.nonce.strip():
             raise ValueError("token nonce cannot be empty")
-        if self.sender_key_thumbprint is not None and not re.fullmatch(
-            r"[A-Za-z0-9_-]{43}", self.sender_key_thumbprint
-        ):
-            raise ValueError("sender key thumbprint must be a SHA-256 base64url value")
+        if self.sender_key_thumbprint is not None:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{43}", self.sender_key_thumbprint):
+                raise ValueError("sender key thumbprint must be a SHA-256 base64url value")
+            decoded = base64.urlsafe_b64decode(self.sender_key_thumbprint + "=")
+            canonical = base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=")
+            if len(decoded) != 32 or canonical != self.sender_key_thumbprint:
+                raise ValueError("sender key thumbprint must be canonical SHA-256 base64url")
 
     def validate(
         self,
@@ -60,7 +64,9 @@ class TokenSecurityContext:
     ) -> None:
         current = now or datetime.now(UTC)
         _require_aware(current, "validation time")
-        if not expected_issuer.strip() or not hmac.compare_digest(self.issuer, expected_issuer):
+        if not expected_issuer.strip() or not hmac.compare_digest(
+            self.issuer.encode("utf-8"), expected_issuer.encode("utf-8")
+        ):
             raise PermissionError("token issuer is not trusted")
         if not expected_audience.strip() or expected_audience not in self.audience:
             raise PermissionError("token audience is not trusted")
@@ -69,13 +75,19 @@ class TokenSecurityContext:
         if current >= self.expires_at:
             raise PermissionError("token is outside its validity window")
         if expected_nonce is not None and (
-            self.nonce is None or not hmac.compare_digest(self.nonce, expected_nonce)
+            self.nonce is None
+            or not hmac.compare_digest(
+                self.nonce.encode("utf-8"), expected_nonce.encode("utf-8")
+            )
         ):
             raise PermissionError("token nonce does not match the request")
         if self.sender_key_thumbprint is not None:
             if expected_sender_key_thumbprint is None:
                 raise PermissionError("sender-bound token requires request key binding")
-            if not hmac.compare_digest(self.sender_key_thumbprint, expected_sender_key_thumbprint):
+            if not hmac.compare_digest(
+                self.sender_key_thumbprint.encode("ascii"),
+                expected_sender_key_thumbprint.encode("ascii"),
+            ):
                 raise PermissionError("token sender key does not match the request")
         elif expected_sender_key_thumbprint is not None:
             raise PermissionError("token is missing the required sender key constraint")
