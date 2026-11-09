@@ -261,9 +261,7 @@ def _stateful_rule_group_snapshots(
         raw_domain_list = rules_source.get("RulesSourceList")
         domain_list = raw_domain_list if isinstance(raw_domain_list, Mapping) else {}
         raw_stateful_options = rule_group.get("StatefulRuleOptions")
-        stateful_options = (
-            raw_stateful_options if isinstance(raw_stateful_options, Mapping) else {}
-        )
+        stateful_options = raw_stateful_options if isinstance(raw_stateful_options, Mapping) else {}
         targets = domain_list.get("Targets", [])
         target_types = domain_list.get("TargetTypes", [])
         snapshots.append(
@@ -454,9 +452,7 @@ def collect_fcp03_snapshot(
         validation = _resolved_ip_validation(policy)
         policy_errors = policy_metadata.get("Errors")
         raw_engine_options = policy.get("StatefulEngineOptions")
-        engine_options = (
-            raw_engine_options if isinstance(raw_engine_options, Mapping) else {}
-        )
+        engine_options = raw_engine_options if isinstance(raw_engine_options, Mapping) else {}
         firewall_snapshot = {
             "endpoints_by_az": endpoints,
             "policy": {
@@ -465,9 +461,7 @@ def collect_fcp03_snapshot(
                 "errors": policy_errors if isinstance(policy_errors, list) else None,
                 "stateful_rule_order": engine_options.get("RuleOrder"),
                 "stateful_default_actions": policy.get("StatefulDefaultActions", []),
-                "stateful_rule_groups": _stateful_rule_group_snapshots(
-                    network_firewall, policy
-                ),
+                "stateful_rule_groups": _stateful_rule_group_snapshots(network_firewall, policy),
             },
         }
         group_id = validation.get("dns_firewall_rule_group_id") if validation else None
