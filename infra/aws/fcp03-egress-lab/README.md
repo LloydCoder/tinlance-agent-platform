@@ -13,7 +13,7 @@ The existing host can remain the controller and invoke the new worker through Sy
 - One VPC and one Availability Zone, with separate public-NAT, Network Firewall, and private-worker subnets.
 - The worker has no public IPv4 address, no IPv6 address or route, no inbound security-group rules, and IMDSv2 is required.
 - The worker's IPv4 default route targets the Network Firewall endpoint in the same AZ.
-- The firewall subnet's default route targets the NAT Gateway; the NAT subnet alone routes to the Internet Gateway.
+- The firewall subnet's default route targets the NAT Gateway; the NAT subnet routes the worker CIDR back through the same Network Firewall endpoint before the worker's return traffic reaches the private subnet. The NAT subnet alone routes general Internet traffic to the Internet Gateway.
 - The worker security group permits TCP/443 egress for inspection and TCP/UDP 53 only to the VPC Resolver address. It does not permit UDP/443 (QUIC), TCP/853 (DoT), direct external DNS, or IPv6.
 - Route 53 DNS Firewall allows the supplied domain list and then blocks the wildcard catch-all. DNS Firewall is configured fail-closed.
 - Network Firewall uses strict stateful rule order, an allowlist over TLS SNI, HTTP Host, and `AWS_ROUTE_53_RESOLVED_DOMAIN`, policy-level Route 53 resolved-IP validation, and a strict drop default.
