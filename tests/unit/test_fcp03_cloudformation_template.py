@@ -21,6 +21,9 @@ def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
     required_types = {
         "AWS::EC2::VPC",
         "AWS::EC2::Subnet",
+        "AWS::EC2::NetworkAcl",
+        "AWS::EC2::NetworkAclEntry",
+        "AWS::EC2::SubnetNetworkAclAssociation",
         "AWS::EC2::RouteTable",
         "AWS::EC2::Route",
         "AWS::EC2::NatGateway",
@@ -160,3 +163,35 @@ def test_nat_and_firewall_routes_are_symmetric_and_worker_volume_is_encrypted() 
     ebs = worker["BlockDeviceMappings"][0]["Ebs"]
     assert ebs["Encrypted"] is True
     assert ebs["DeleteOnTermination"] is True
+
+
+def test_worker_nacl_allows_only_resolver_dns_and_inspected_https_egress() -> None:
+    resources = load_template()["Resources"]
+    association = resources["WorkerNetworkAclAssociation"]["Properties"]
+    assert association == {
+        "SubnetId": {"Ref": "WorkerSubnet"},
+        "NetworkAclId": {"Ref": "WorkerNetworkAcl"},
+    }
+
+    entries = [
+        resource["Properties"]
+        for resource in resources.values()
+        if resource["Type"] == "AWS::EC2::NetworkAclEntry"
+    ]
+    egress = sorted((entry for entry in entries if entry["Egress"]), key=lambda entry: entry["RuleNumber"])
+    ingress = sorted((entry for entry in entries if not entry["Egress"]), key=lambda entry: entry["RuleNumber"])
+
+    assert [entry["RuleNumber"] for entry in egress] == [90, 91, 100, 110, 32766]
+    assert egress[0]["CidrBlock"] == "10.42.0.2/32"
+    assert egress[1]["CidrBlock"] == "10.42.0.2/32"
+    assert egress[2]["RuleAction"] == "deny"
+    assert egress[2]["CidrBlock"] == {"Ref": "VpcCidr"}
+    assert egress[3]["RuleAction"] == "allow"
+    assert egress[3]["Protocol"] == "6"
+    assert egress[3]["PortRange"] == {"From": 443, "To": 443}
+    assert egress[4]["RuleAction"] == "deny"
+
+    assert [entry["RuleNumber"] for entry in ingress] == [100, 110, 32766]
+    assert ingress[0]["PortRange"] == {"From": 1024, "To": 65535}
+    assert ingress[1]["PortRange"] == {"From": 1024, "To": 65535}
+    assert ingress[2]["RuleAction"] == "deny"
