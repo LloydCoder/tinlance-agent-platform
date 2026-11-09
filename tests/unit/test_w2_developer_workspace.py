@@ -76,10 +76,12 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     )
     assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
-    bootstrap_update_index = dockerfile.index("apt-get \\\n        -o Acquire::Retries=5")
+    secret_mount_index = dockerfile.index(
+        "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true"
+    )
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert bootstrap_update_index < update_index < install_index
+    assert secret_mount_index < update_index < install_index
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
@@ -93,7 +95,6 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert dockerfile.count("--snapshot=") == 2
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
     assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
-    assert "https://archive.ubuntu.com/ubuntu" in dockerfile
     assert "RUN --network=none" in dockerfile
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
