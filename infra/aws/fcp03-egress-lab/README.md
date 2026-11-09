@@ -29,7 +29,7 @@ This is a single-AZ provider-level test topology. It does not, by itself, prove 
 python scripts/validate_fcp03_teardown_at.py --teardown-at 2026-11-09T11:00:00
 ```
 
-The validator requires a UTC timestamp 15 minutes to 2 hours in the future. EventBridge Scheduler then invokes CloudFormation `DeleteStack` on this stack only. The Scheduler role is scoped to this stack ARN and trusts only the exact schedule ARN and account.
+The validator requires a UTC timestamp 15 minutes to 2 hours in the future. EventBridge Scheduler then invokes CloudFormation `DeleteStack` on this stack only. The Scheduler role is scoped to this stack ARN and trusts only the exact schedule ARN and account. The schedule name is deliberately fixed, so only one lab stack may be active in the account at a time.
 
 Automatic teardown is a guardrail, **not a hard spend cap**. A failed scheduler delivery or failed resource deletion can leave billable resources behind. Verify the stack reaches `DELETE_COMPLETE` after every run.
 
