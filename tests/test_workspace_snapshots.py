@@ -520,7 +520,11 @@ class FakeS3:
             }
             raise error
         self.objects[key] = kwargs["Body"]
-        return {"ETag": '"immutable"'}
+        return {
+            "ETag": '"immutable"',
+            "ServerSideEncryption": "aws:kms",
+            "SSEKMSKeyId": "arn:aws:kms:eu-west-1:123456789012:key/example",
+        }
 
     def get_object(self, **kwargs):
         self.get_calls.append(kwargs)
