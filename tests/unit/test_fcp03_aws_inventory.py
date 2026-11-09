@@ -346,6 +346,9 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
     assert snapshot["worker"]["metadata_endpoint_enabled"] is False
     assert snapshot["worker"]["metadata_tokens_required"] is True
     assert snapshot["worker"]["metadata_hop_limit"] == 1
+    assert snapshot["worker"]["vpc_cidr_associations"] == [
+        {"cidr": "10.20.0.0/16", "state": "associated"}
+    ]
     assert snapshot["worker"]["network_acl"]["subnet_ids"] == ["subnet-worker"]
     assert len(snapshot["worker"]["network_acl"]["ingress_rules"]) == 3
     assert len(snapshot["worker"]["network_acl"]["egress_rules"]) == 5
