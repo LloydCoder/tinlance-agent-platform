@@ -237,10 +237,12 @@ class WorkspaceSnapshotService:
         store: SnapshotObjectStore,
         cipher: SnapshotCipher,
         signer: SnapshotSigner,
+        catalog: SnapshotCatalog | None = None,
     ) -> None:
         self._store = store
         self._cipher = cipher
         self._signer = signer
+        self._catalog = catalog
 
     @classmethod
     def _safe_path(cls, value: str) -> str:
