@@ -813,7 +813,6 @@ def test_collector_rejects_network_acl_entries_with_unknown_direction() -> None:
     assert "worker-nacl-ingress-policy-invalid" in findings
 
 
-
 def test_collector_rejects_malformed_network_acl_record_even_with_valid_match() -> None:
     ec2 = ec2_client()
     ec2.responses["describe_network_acls"][0]["NetworkAcls"].append(None)
