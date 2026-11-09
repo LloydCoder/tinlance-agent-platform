@@ -80,14 +80,18 @@ class VerifiedAgentIdentity:
             or self.client_id != self.client_id.strip()
             or any(ord(character) < 0x21 or ord(character) == 0x7F for character in self.client_id)
         ):
-            raise PermissionError("identity client_id is not normalized or contains control characters")
+            raise PermissionError(
+                "identity client_id is not normalized or contains control characters"
+            )
         if any(
             not scope
             or scope != scope.strip()
             or any(ord(character) < 0x21 or ord(character) == 0x7F for character in scope)
             for scope in self.scopes
         ):
-            raise PermissionError("identity scopes are not normalized or contain control characters")
+            raise PermissionError(
+                "identity scopes are not normalized or contain control characters"
+            )
         if any(
             not role
             or role != role.strip()
