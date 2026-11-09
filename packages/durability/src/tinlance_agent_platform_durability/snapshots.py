@@ -411,18 +411,20 @@ class WorkspaceSnapshotService:
         ):
             raise SnapshotConflictError("restore operation was already claimed")
         target = Path(destination)
-        if target.exists() or target.is_symlink():
-            with suppress(Exception):
-                ledger.fail(tenant_id, workspace_id, restore_id, "destination_not_clean")
-            raise SnapshotConflictError("restore destination must not exist on the clean host")
-        parent = target.parent.resolve(strict=True)
-        target = parent / target.name
-        staging = parent / f".{target.name}.restore-{restore_id.hex}"
-        if staging.exists() or staging.is_symlink():
-            raise SnapshotConflictError("restore staging path already exists")
         published = False
         staging_created = False
+        target_reserved = False
+        staging: Path | None = None
         try:
+            if target.exists() or target.is_symlink():
+                raise SnapshotConflictError(
+                    "restore destination must not exist on the clean host"
+                )
+            parent = target.parent.resolve(strict=True)
+            target = parent / target.name
+            staging = parent / f".{target.name}.restore-{restore_id.hex}"
+            if staging.exists() or staging.is_symlink():
+                raise SnapshotConflictError("restore staging path already exists")
             staging.mkdir(mode=0o700)
             staging_created = True
             total = 0
@@ -474,7 +476,9 @@ class WorkspaceSnapshotService:
             # Reserve the final path exclusively, then atomically replace the empty
             # reservation with the fully materialized tree.
             target.mkdir(mode=0o700)
+            target_reserved = True
             os.replace(staging, target)
+            target_reserved = False
             published = True
             ledger.complete(tenant_id, workspace_id, restore_id, reference.digest)
             return RestoreResult(
@@ -485,11 +489,11 @@ class WorkspaceSnapshotService:
                 credential_references=dict(credentials),
             )
         except BaseException as exc:
-            if staging_created and staging.exists():
+            if staging_created and staging is not None and staging.exists():
                 shutil.rmtree(staging)
             if published and target.exists():
                 shutil.rmtree(target)
-            elif target.exists() and not any(target.iterdir()):
+            elif target_reserved and target.exists() and not any(target.iterdir()):
                 target.rmdir()
             with suppress(Exception):
                 ledger.fail(tenant_id, workspace_id, restore_id, type(exc).__name__)
