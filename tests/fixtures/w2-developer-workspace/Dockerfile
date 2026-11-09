@@ -10,21 +10,24 @@ ARG APT_SNAPSHOT
 # the ports mirror does not honor the dated snapshot URL. All packages remain
 # architecture-filtered by APT and resolve from one immutable snapshot.
 RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true,mode=0444 \
-    sed -i \
-        -e 's|http://|https://|g' \
-        -e 's|https://ports.ubuntu.com/ubuntu-ports|https://archive.ubuntu.com/ubuntu|g' \
+    case "${APT_SNAPSHOT}" in \
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;; \
+        *) echo "Invalid Ubuntu snapshot identifier"; exit 1 ;; \
+    esac \
+    && sed -i -E "s|^URIs: .*|URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}|" \
         /etc/apt/sources.list.d/ubuntu.sources \
+    && test "$(grep -c "^URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}$" /etc/apt/sources.list.d/ubuntu.sources)" -eq 2 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
-        --snapshot="${APT_SNAPSHOT}" update \
+        update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
-        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
+        install --yes --no-install-recommends \
         ca-certificates=20260816ubuntu0.24.04.2 \
         openssl=3.0.13-0ubuntu3.16 \
         libssl3t64=3.0.13-0ubuntu3.16 \
@@ -32,11 +35,11 @@ RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=tru
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
-        --snapshot="${APT_SNAPSHOT}" update \
+        update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
-        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
+        install --yes --no-install-recommends \
         git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
     && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
