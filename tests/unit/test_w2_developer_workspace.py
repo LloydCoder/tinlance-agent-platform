@@ -121,8 +121,10 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "byte_identical" in firecracker
     assert "firecracker-w2-${{ github.run_id }}" in firecracker
     assert "path: artifacts/" in firecracker
-    assert firecracker.count("--secret id=ca_bundle,src=/etc/ssl/certs/ca-certificates.crt") == 2
+    assert firecracker.count("--secret id=ca_bundle,src=/tmp/tinlance-ca-bundle.crt") == 2
     assert "ca_bundle_sha256" in firecracker
+    assert "install -m 0600 /etc/ssl/certs/ca-certificates.crt /tmp/tinlance-ca-bundle.crt" in firecracker
+    assert "test ! -L /tmp/tinlance-ca-bundle.crt" in firecracker
     assert "curl --fail --silent --show-error --location --retry 5 --retry-all-errors" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
     assert firecracker.count("needs: guest-boot") == 3
