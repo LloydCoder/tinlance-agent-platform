@@ -169,7 +169,14 @@ BEGIN
        AND status = 'started'
     RETURNING * INTO current_operation;
     IF NOT FOUND THEN
-        RETURN false;
+        RETURN EXISTS (
+            SELECT 1 FROM platform.workspace_restore_operations
+             WHERE tenant_id = p_tenant_id
+               AND workspace_id = p_workspace_id
+               AND restore_id = p_restore_id
+               AND status = 'completed'
+               AND snapshot_digest = p_snapshot_digest
+        );
     END IF;
 
     INSERT INTO platform.workspace_restore_events (
@@ -214,7 +221,14 @@ BEGIN
        AND status = 'started'
     RETURNING * INTO current_operation;
     IF NOT FOUND THEN
-        RETURN false;
+        RETURN EXISTS (
+            SELECT 1 FROM platform.workspace_restore_operations
+             WHERE tenant_id = p_tenant_id
+               AND workspace_id = p_workspace_id
+               AND restore_id = p_restore_id
+               AND status = 'failed'
+               AND failure_code = p_reason_code
+        );
     END IF;
 
     INSERT INTO platform.workspace_restore_events (
