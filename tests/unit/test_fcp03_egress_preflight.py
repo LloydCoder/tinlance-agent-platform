@@ -38,6 +38,10 @@ def valid_topology() -> dict[str, object]:
             "allowlist_domains": ["approved.example"],
             "terminal_block": True,
             "failure_mode": "CLOSED",
+            "rule_group_status": "COMPLETE",
+            "association_statuses": ["COMPLETE"],
+            "rule_statuses": ["COMPLETE", "COMPLETE"],
+            "domain_list_statuses": ["COMPLETE", "COMPLETE"],
         },
     }
 
@@ -159,3 +163,25 @@ def test_cli_returns_nonzero_and_findings_for_invalid_snapshot(tmp_path, capsys)
     output = capsys.readouterr().out
     assert '"status": "fail"' in output
     assert '"worker-public-address"' in output
+
+
+def test_rejects_worker_ipv6_address_or_default_route() -> None:
+    topology = valid_topology()
+    topology["worker"]["ipv6_enabled"] = True
+    topology["worker"]["ipv6_addresses"] = ["2001:db8::10"]
+    topology["worker"]["ipv6_default_route_target"] = "igw-123"
+
+    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_incomplete_dns_firewall_resources() -> None:
+    topology = valid_topology()
+    topology["dns_firewall"]["association_statuses"] = ["UPDATING"]
+    topology["dns_firewall"]["rule_statuses"] = ["COMPLETE", "UPDATING"]
+    topology["dns_firewall"]["domain_list_statuses"] = ["IMPORTING"]
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "dns-rule-group-association-not-ready" in findings
+    assert "dns-firewall-rule-not-ready" in findings
+    assert "dns-firewall-domain-list-not-ready" in findings

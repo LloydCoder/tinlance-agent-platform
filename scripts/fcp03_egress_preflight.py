@@ -58,6 +58,12 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("worker-public-address")
     if worker.get("map_public_ip_on_launch") is not False:
         findings.add("worker-public-subnet")
+    if (
+        worker.get("ipv6_enabled")
+        or worker.get("ipv6_addresses")
+        or worker.get("ipv6_default_route_target")
+    ):
+        findings.add("worker-ipv6-egress-enabled")
 
     availability_zone = worker.get("availability_zone")
     endpoints = _object(firewall.get("endpoints_by_az"))
@@ -100,6 +106,17 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("dns-allowlist-incomplete")
     if dns_firewall.get("failure_mode") != "CLOSED":
         findings.add("dns-firewall-not-fail-closed")
+    if dns_firewall.get("rule_group_status") != "COMPLETE":
+        findings.add("dns-rule-group-not-ready")
+    association_statuses = _strings(dns_firewall.get("association_statuses"))
+    if not association_statuses or association_statuses != {"COMPLETE"}:
+        findings.add("dns-rule-group-association-not-ready")
+    rule_statuses = _strings(dns_firewall.get("rule_statuses"))
+    if not rule_statuses or rule_statuses != {"COMPLETE"}:
+        findings.add("dns-firewall-rule-not-ready")
+    domain_list_statuses = _strings(dns_firewall.get("domain_list_statuses"))
+    if not domain_list_statuses or domain_list_statuses != {"COMPLETE"}:
+        findings.add("dns-firewall-domain-list-not-ready")
 
     return tuple(sorted(findings))
 
