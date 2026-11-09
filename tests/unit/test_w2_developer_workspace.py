@@ -125,9 +125,15 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "path: artifacts/" in firecracker
     assert firecracker.count("--secret id=ca_bundle,src=/tmp/tinlance-ca-bundle.crt") == 2
     assert "ca_bundle_sha256" in firecracker
-    assert "install -m 0600 /etc/ssl/certs/ca-certificates.crt /tmp/tinlance-ca-bundle.crt" in firecracker
+    assert (
+        "install -m 0600 /etc/ssl/certs/ca-certificates.crt /tmp/tinlance-ca-bundle.crt"
+        in firecracker
+    )
     assert "test ! -L /tmp/tinlance-ca-bundle.crt" in firecracker
-    assert "curl --fail --silent --show-error --location --retry 5 --retry-all-errors" in firecracker
+    assert (
+        "curl --fail --silent --show-error --location --retry 5 --retry-all-errors"
+        in firecracker
+    )
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
     assert firecracker.count("needs: guest-boot") == 3
     assert (
@@ -153,8 +159,13 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
-    kata_workflow = (workflow_root / "persistent-computer-kata-benchmark.yml").read_text(encoding="utf-8")
-    assert "curl --fail --silent --show-error --location --retry 5 --retry-all-errors" in kata_workflow
+    kata_workflow = (
+        workflow_root / "persistent-computer-kata-benchmark.yml"
+    ).read_text(encoding="utf-8")
+    assert (
+        "curl --fail --silent --show-error --location --retry 5 --retry-all-errors"
+        in kata_workflow
+    )
     for name in (
         "persistent-computer-gvisor-benchmark.yml",
         "persistent-computer-kata-benchmark.yml",
