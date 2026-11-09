@@ -54,8 +54,8 @@ BEGIN
     IF platform.complete_workspace_restore(tenant, workspace, restore_one, digest) IS NOT TRUE THEN
         RAISE EXCEPTION 'started restore did not complete';
     END IF;
-    IF platform.complete_workspace_restore(tenant, workspace, restore_one, digest) IS NOT FALSE THEN
-        RAISE EXCEPTION 'completed restore was not one-way';
+    IF platform.complete_workspace_restore(tenant, workspace, restore_one, digest) IS NOT TRUE THEN
+        RAISE EXCEPTION 'completed restore retry was not idempotent';
     END IF;
     IF platform.fail_workspace_restore(tenant, workspace, restore_one, 'late_failure') IS NOT FALSE THEN
         RAISE EXCEPTION 'completed restore was changed to failed';
@@ -66,6 +66,9 @@ BEGIN
     END IF;
     IF platform.fail_workspace_restore(tenant, workspace_two, restore_two, 'credential_refresh_failed') IS NOT TRUE THEN
         RAISE EXCEPTION 'started restore did not record failure';
+    END IF;
+    IF platform.fail_workspace_restore(tenant, workspace_two, restore_two, 'credential_refresh_failed') IS NOT TRUE THEN
+        RAISE EXCEPTION 'failed restore retry was not idempotent';
     END IF;
     IF platform.complete_workspace_restore(tenant, workspace_two, restore_two, digest) IS NOT FALSE THEN
         RAISE EXCEPTION 'failed restore was changed to completed';
