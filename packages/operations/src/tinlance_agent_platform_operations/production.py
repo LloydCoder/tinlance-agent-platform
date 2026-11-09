@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from urllib.parse import urlsplit
 
-
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ENVIRONMENT_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _EVIDENCE_SCHEMES = frozenset({"evidence", "https", "s3"})
@@ -58,9 +57,7 @@ class ProductionDependency:
             ):
                 raise ValueError(f"{label} timestamp must be timezone-aware")
 
-        if self.evidence_sha256 is not None and not _SHA256_PATTERN.fullmatch(
-            self.evidence_sha256
-        ):
+        if self.evidence_sha256 is not None and not _SHA256_PATTERN.fullmatch(self.evidence_sha256):
             raise ValueError("evidence digest must be a lowercase SHA-256 hex value")
 
         if (
@@ -81,9 +78,13 @@ class ProductionDependency:
             if not self.verified_by or not self.verified_by.strip():
                 raise ValueError("verified production dependencies require a named verifier")
             if self.verified_at is None:
-                raise ValueError("verified production dependencies require a verification timestamp")
+                raise ValueError(
+                    "verified production dependencies require a verification timestamp"
+                )
             if self.evidence_sha256 is None:
-                raise ValueError("verified production dependencies require a SHA-256 evidence digest")
+                raise ValueError(
+                    "verified production dependencies require a SHA-256 evidence digest"
+                )
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,20 +135,17 @@ class ProductionReadiness:
         future_dated = [
             dependency.kind.value
             for dependency in self.dependencies
-            if dependency.verified_at is not None
-            and dependency.verified_at > verification_time
+            if dependency.verified_at is not None and dependency.verified_at > verification_time
         ]
         if future_dated:
             raise RuntimeError(
-                "production readiness contains future-dated evidence: "
-                + ", ".join(future_dated)
+                "production readiness contains future-dated evidence: " + ", ".join(future_dated)
             )
 
         expired = [
             dependency.kind.value
             for dependency in self.dependencies
-            if dependency.expires_at is not None
-            and dependency.expires_at <= verification_time
+            if dependency.expires_at is not None and dependency.expires_at <= verification_time
         ]
         if expired:
             raise RuntimeError(
