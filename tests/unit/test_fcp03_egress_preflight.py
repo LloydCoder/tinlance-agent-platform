@@ -505,3 +505,30 @@ def test_rejects_secondary_or_pending_vpc_cidr_associations() -> None:
     topology["worker"]["vpc_cidr_associations"] = [{"cidr": "10.20.0.0/16", "state": "associating"}]
 
     assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_firewall_route_target_has_an_invalid_json_shape() -> None:
+    topology = valid_topology()
+    topology["firewall"]["route_entries"][1]["target"] = {"NatGatewayId": "nat-123"}
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "firewall-route-inventory-invalid" in findings
+
+
+def test_fails_closed_when_nat_route_destination_has_an_invalid_json_shape() -> None:
+    topology = valid_topology()
+    topology["firewall"]["nat_route_entries"][1]["destination"] = ["10.20.1.0/24"]
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "nat-return-route-inventory-invalid" in findings
+
+
+def test_fails_closed_when_worker_route_target_has_an_invalid_json_shape() -> None:
+    topology = valid_topology()
+    topology["worker"]["route_entries"][1]["target"] = ["vpce-fw-a"]
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "worker-route-inventory-invalid" in findings
