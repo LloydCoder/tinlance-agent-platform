@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from json import loads
-from pathlib import Path
-from typing import Any
+import json
+import pathlib
+import typing
 
 
 TEMPLATE_PATH = (
-    Path(__file__).parents[2] / "infra" / "aws" / "fcp03-egress-lab" / "template.json"
+    pathlib.Path(__file__).parents[2] / "infra" / "aws" / "fcp03-egress-lab" / "template.json"
 )
 
 
-def load_template() -> dict[str, Any]:
-    return loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+def load_template() -> dict[str, typing.Any]:
+    return json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
 def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
