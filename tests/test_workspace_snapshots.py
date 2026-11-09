@@ -404,3 +404,55 @@ def test_filesystem_snapshot_store_rejects_symlink_root(tmp_path):
     link.symlink_to(actual, target_is_directory=True)
     with pytest.raises(ValueError, match="real directory"):
         FilesystemSnapshotStore(link)
+
+
+class Catalog:
+    def __init__(self):
+        self.references = {}
+
+    def record(self, reference):
+        key = (reference.tenant_id, reference.workspace_id, reference.snapshot_id)
+        if key in self.references:
+            raise SnapshotConflictError("snapshot catalog entry already exists")
+        self.references[key] = reference
+
+    def get(self, tenant_id, workspace_id, snapshot_id):
+        return self.references.get((tenant_id, workspace_id, snapshot_id))
+
+
+def test_snapshot_catalog_records_and_requires_exact_tenant_scoped_reference(tmp_path):
+    store = FilesystemSnapshotStore(tmp_path / "catalog-objects")
+    catalog = Catalog()
+    snapshots = WorkspaceSnapshotService(
+        store=store,
+        cipher=AESGCMCipher(b"e" * 32),
+        signer=HMACSnapshotSigner(b"s" * 32),
+        catalog=catalog,
+    )
+    reference = snapshots.create(
+        tenant_id=TENANT,
+        workspace_id=WORKSPACE,
+        fencing_token=4,
+        files={"workspace/a": b"catalog-bound"},
+    )
+    assert catalog.get(TENANT, WORKSPACE, reference.snapshot_id) == reference
+
+    untrusted = WorkspaceSnapshotService(
+        store=store,
+        cipher=AESGCMCipher(b"e" * 32),
+        signer=HMACSnapshotSigner(b"s" * 32),
+    )
+    assert untrusted.restore is not None
+
+    with pytest.raises(SnapshotIntegrityError, match="catalog"):
+        snapshots.restore(
+            reference=reference,
+            tenant_id=uuid4(),
+            workspace_id=WORKSPACE,
+            restore_id=uuid4(),
+            fencing_token=5,
+            destination=tmp_path / "clean-host" / "workspace",
+            lease_authority=LeaseAuthority(),
+            ledger=Ledger(),
+            credential_refresher=Credentials(),
+        )
