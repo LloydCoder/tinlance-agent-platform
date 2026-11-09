@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS platform.workspace_restore_operations (
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     completed_at timestamptz,
     PRIMARY KEY (tenant_id, restore_id),
+    UNIQUE (tenant_id, workspace_id, restore_id, snapshot_id, fencing_token),
     FOREIGN KEY (tenant_id, workspace_id)
         REFERENCES platform.workspace_leases (tenant_id, workspace_id),
     CHECK ((status = 'completed') = (completed_at IS NOT NULL)),
@@ -41,8 +42,12 @@ CREATE TABLE IF NOT EXISTS platform.workspace_restore_events (
         failure_code IS NULL OR failure_code ~ '^[A-Za-z][A-Za-z0-9_]{0,63}$'
     ),
     occurred_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    FOREIGN KEY (tenant_id, restore_id)
-        REFERENCES platform.workspace_restore_operations (tenant_id, restore_id)
+    FOREIGN KEY (tenant_id, workspace_id, restore_id, snapshot_id, fencing_token)
+        REFERENCES platform.workspace_restore_operations (
+            tenant_id, workspace_id, restore_id, snapshot_id, fencing_token
+        ),
+    CHECK ((event_type = 'completed') = (snapshot_digest IS NOT NULL)),
+    CHECK ((event_type = 'failed') = (failure_code IS NOT NULL))
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspace_restore_events_history
@@ -261,9 +266,15 @@ CREATE TABLE IF NOT EXISTS platform.workspace_snapshots (
     status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'deleted')),
     PRIMARY KEY (tenant_id, snapshot_id),
     UNIQUE (tenant_id, workspace_id, snapshot_id),
+    UNIQUE (tenant_id, workspace_id, snapshot_id, fencing_token, digest),
     FOREIGN KEY (tenant_id, workspace_id)
         REFERENCES platform.workspace_leases (tenant_id, workspace_id)
 );
+
+ALTER TABLE platform.workspace_restore_operations
+    ADD CONSTRAINT workspace_restore_snapshot_reference_fk
+    FOREIGN KEY (tenant_id, workspace_id, snapshot_id)
+    REFERENCES platform.workspace_snapshots (tenant_id, workspace_id, snapshot_id);
 
 CREATE INDEX IF NOT EXISTS idx_workspace_snapshots_workspace
     ON platform.workspace_snapshots (tenant_id, workspace_id, created_at DESC);
@@ -277,8 +288,10 @@ CREATE TABLE IF NOT EXISTS platform.workspace_snapshot_events (
     event_type text NOT NULL CHECK (event_type IN ('created')),
     digest text NOT NULL CHECK (digest ~ '^[0-9a-f]{64}$'),
     occurred_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    FOREIGN KEY (tenant_id, snapshot_id)
-        REFERENCES platform.workspace_snapshots (tenant_id, snapshot_id)
+    FOREIGN KEY (tenant_id, workspace_id, snapshot_id, fencing_token, digest)
+        REFERENCES platform.workspace_snapshots (
+            tenant_id, workspace_id, snapshot_id, fencing_token, digest
+        )
 );
 
 ALTER TABLE platform.workspace_snapshots ENABLE ROW LEVEL SECURITY;
