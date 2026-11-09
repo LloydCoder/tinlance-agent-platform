@@ -6,10 +6,10 @@ has deployed external production infrastructure.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+import re
 from urllib.parse import urlsplit
 
 
@@ -63,9 +63,12 @@ class ProductionDependency:
         ):
             raise ValueError("evidence digest must be a lowercase SHA-256 hex value")
 
-        if self.expires_at is not None and self.verified_at is not None:
-            if self.expires_at <= self.verified_at:
-                raise ValueError("evidence expiry must be later than verification time")
+        if (
+            self.expires_at is not None
+            and self.verified_at is not None
+            and self.expires_at <= self.verified_at
+        ):
+            raise ValueError("evidence expiry must be later than verification time")
 
         if self.verified:
             if not self.evidence_ref:
