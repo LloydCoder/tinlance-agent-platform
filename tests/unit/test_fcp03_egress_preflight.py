@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from copy import deepcopy
-
 import pytest
+from copy import deepcopy
 
 from scripts.fcp03_egress_preflight import evaluate_fcp03_topology
 
