@@ -402,9 +402,7 @@ def collect_fcp03_snapshot(
                 continue
             raw_state = association.get("CidrBlockState")
             state = raw_state.get("State") if isinstance(raw_state, Mapping) else None
-            vpc_cidr_associations.append(
-                {"cidr": association.get("CidrBlock"), "state": state}
-            )
+            vpc_cidr_associations.append({"cidr": association.get("CidrBlock"), "state": state})
     try:
         vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
         resolver_ip = str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
