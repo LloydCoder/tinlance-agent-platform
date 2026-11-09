@@ -6,6 +6,19 @@ VALUES
     ('00000000-0000-0000-0000-000000000093', 'w6-restore-tenant-a'),
     ('00000000-0000-0000-0000-000000000094', 'w6-restore-tenant-b');
 
+INSERT INTO platform.workspace_leases (
+    tenant_id, workspace_id, lease_id, owner_subject_id, worker_id,
+    fencing_token, status, lease_expires_at
+) VALUES
+    ('00000000-0000-0000-0000-000000000093',
+     '20000000-0000-0000-0000-000000000093',
+     '80000000-0000-0000-0000-000000000093',
+     'w6-owner', 'w6-worker-a', 5, 'active', clock_timestamp() + interval '1 hour'),
+    ('00000000-0000-0000-0000-000000000093',
+     '20000000-0000-0000-0000-000000000094',
+     '80000000-0000-0000-0000-000000000094',
+     'w6-owner', 'w6-worker-b', 6, 'active', clock_timestamp() + interval '1 hour');
+
 SELECT set_config('platform.tenant_id', '00000000-0000-0000-0000-000000000093', true);
 
 DO $$
@@ -13,6 +26,7 @@ DECLARE
     tenant uuid := '00000000-0000-0000-0000-000000000093';
     other_tenant uuid := '00000000-0000-0000-0000-000000000094';
     workspace uuid := '20000000-0000-0000-0000-000000000093';
+    workspace_two uuid := '20000000-0000-0000-0000-000000000094';
     restore_one uuid := '30000000-0000-0000-0000-000000000093';
     restore_two uuid := '40000000-0000-0000-0000-000000000093';
     snapshot_one uuid := '50000000-0000-0000-0000-000000000093';
@@ -37,13 +51,13 @@ BEGIN
         RAISE EXCEPTION 'completed restore was changed to failed';
     END IF;
 
-    IF platform.begin_workspace_restore(tenant, workspace, restore_two, snapshot_two, 6) IS NOT TRUE THEN
+    IF platform.begin_workspace_restore(tenant, workspace_two, restore_two, snapshot_two, 6) IS NOT TRUE THEN
         RAISE EXCEPTION 'second restore claim was not created';
     END IF;
-    IF platform.fail_workspace_restore(tenant, workspace, restore_two, 'credential_refresh_failed') IS NOT TRUE THEN
+    IF platform.fail_workspace_restore(tenant, workspace_two, restore_two, 'credential_refresh_failed') IS NOT TRUE THEN
         RAISE EXCEPTION 'started restore did not record failure';
     END IF;
-    IF platform.complete_workspace_restore(tenant, workspace, restore_two, digest) IS NOT FALSE THEN
+    IF platform.complete_workspace_restore(tenant, workspace_two, restore_two, digest) IS NOT FALSE THEN
         RAISE EXCEPTION 'failed restore was changed to completed';
     END IF;
 
@@ -59,6 +73,13 @@ BEGIN
          WHERE tenant_id = tenant AND workspace_id = workspace;
         RAISE EXCEPTION 'restore event history was mutable';
     EXCEPTION WHEN SQLSTATE '42501' THEN
+        NULL;
+    END;
+
+    BEGIN
+        PERFORM platform.begin_workspace_restore(tenant, workspace, '70000000-0000-0000-0000-000000000093', snapshot_one, 4);
+        RAISE EXCEPTION 'stale workspace fencing token was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN
         NULL;
     END;
 
