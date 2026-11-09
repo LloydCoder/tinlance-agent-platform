@@ -272,6 +272,8 @@ def test_approved_domains_parameter_rejects_wildcards_and_non_fqdns() -> None:
     parameter = load_template()["Parameters"]["ApprovedDomains"]
     pattern = parameter["AllowedPattern"]
 
+    assert parameter["Type"] == "CommaDelimitedList"
+    assert "wildcards" in parameter["ConstraintDescription"].lower()
     assert re.fullmatch(pattern, "approved.example")
     assert re.fullmatch(pattern, "api.eu.example.com")
     assert not re.fullmatch(pattern, "*.example.com")
