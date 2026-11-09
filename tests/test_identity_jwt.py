@@ -109,7 +109,7 @@ def test_wrong_algorithm_is_rejected(verifier: tuple[JWKSIdentityVerifier, Any])
     service, _ = verifier
     token = jwt.encode(
         {"iss": ISSUER, "sub": "user-123", "aud": AUDIENCE},
-        "not-a-public-key",
+        "not-a-public-key-material-at-least-32-bytes",
         algorithm="HS256",
         headers={"typ": "at+jwt"},
     )
