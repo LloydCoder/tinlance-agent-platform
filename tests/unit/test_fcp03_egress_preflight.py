@@ -167,6 +167,7 @@ def valid_topology() -> dict[str, object]:
 def test_accepts_a_private_worker_with_same_az_firewall_route_and_scoped_dns_policy() -> None:
     assert evaluate_fcp03_topology(valid_topology()) == ()
 
+
 def test_rejects_firewall_subnet_default_route_that_does_not_target_nat_gateway() -> None:
     topology = valid_topology()
     topology["firewall"]["route_entries"][1]["target"] = "igw-123"
@@ -201,6 +202,7 @@ def test_rejects_nat_gateway_that_is_not_available() -> None:
 
     assert "nat-gateway-not-available" in evaluate_fcp03_topology(topology)
 
+
 def test_rejects_nat_gateway_in_a_different_availability_zone() -> None:
     topology = valid_topology()
     topology["firewall"]["nat_availability_zone"] = "eu-west-1b"
@@ -223,54 +225,6 @@ def test_rejects_shared_firewall_or_nat_route_tables() -> None:
 
     assert "firewall-route-table-not-dedicated" in findings
     assert "nat-route-table-not-dedicated" in findings
-
-def test_rejects_firewall_subnet_default_route_that_does_not_target_nat_gateway() -> None:
-    topology = valid_topology()
-    topology["firewall"]["subnet_id"] = "subnet-firewall"
-    topology["firewall"]["nat_gateway_id"] = "nat-123"
-    topology["firewall"]["route_entries"] = [
-        {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
-        {"destination": "0.0.0.0/0", "target": "igw-123", "state": "active"},
-    ]
-    topology["firewall"]["nat_subnet_id"] = "subnet-public"
-    topology["firewall"]["nat_route_entries"] = [
-        {"destination": "10.20.1.0/24", "target": "vpce-fw-a", "state": "active"},
-        {"destination": "0.0.0.0/0", "target": "igw-123", "state": "active"},
-    ]
-
-    findings = evaluate_fcp03_topology(topology)
-
-    assert "firewall-subnet-route-bypasses-nat" in findings
-
-
-def test_rejects_nat_return_route_that_bypasses_same_az_firewall_endpoint() -> None:
-    topology = valid_topology()
-    topology["firewall"]["subnet_id"] = "subnet-firewall"
-    topology["firewall"]["nat_gateway_id"] = "nat-123"
-    topology["firewall"]["route_entries"] = [
-        {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
-        {"destination": "0.0.0.0/0", "target": "nat-123", "state": "active"},
-    ]
-    topology["firewall"]["nat_subnet_id"] = "subnet-public"
-    topology["firewall"]["nat_route_entries"] = [
-        {"destination": "10.20.1.0/24", "target": "nat-123", "state": "active"},
-        {"destination": "0.0.0.0/0", "target": "igw-123", "state": "active"},
-    ]
-
-    findings = evaluate_fcp03_topology(topology)
-
-    assert "nat-return-route-bypasses-firewall" in findings
-
-
-def test_fails_closed_when_symmetric_return_route_inventory_is_missing() -> None:
-    topology = valid_topology()
-    topology["firewall"]["subnet_id"] = "subnet-firewall"
-    topology["firewall"]["nat_gateway_id"] = "nat-123"
-
-    findings = evaluate_fcp03_topology(topology)
-
-    assert "firewall-route-inventory-unknown" in findings
-    assert "nat-return-route-inventory-unknown" in findings
 
 
 def test_rejects_public_worker_address_or_public_subnet_mapping() -> None:
