@@ -84,6 +84,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
     assert secret_mount_index < update_index < install_index
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
+    assert "https://ports.ubuntu.com/ubuntu-ports|https://archive.ubuntu.com/ubuntu" in dockerfile
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" in dockerfile
