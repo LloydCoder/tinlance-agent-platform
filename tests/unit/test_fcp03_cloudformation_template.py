@@ -72,6 +72,11 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
     assert "GatewayId" not in worker_route
     assert "NatGatewayId" not in worker_route
 
+    return_route = resources["PublicReturnRoute"]["Properties"]
+    assert return_route["RouteTableId"] == {"Ref": "PublicRouteTable"}
+    assert return_route["DestinationCidrBlock"] == {"Ref": "WorkerSubnetCidr"}
+    assert return_route["VpcEndpointId"] == worker_route["VpcEndpointId"]
+
 
 def test_firewall_policy_requires_resolved_ip_validation_and_strict_domain_allowlisting() -> None:
     resources = load_template()["Resources"]
