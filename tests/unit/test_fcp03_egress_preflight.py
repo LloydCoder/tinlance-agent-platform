@@ -167,6 +167,7 @@ def test_cli_returns_nonzero_and_findings_for_invalid_snapshot(tmp_path, capsys)
 
 def test_rejects_worker_ipv6_address_or_default_route() -> None:
     topology = valid_topology()
+    topology["worker"]["ipv6_enabled"] = True
     topology["worker"]["ipv6_addresses"] = ["2001:db8::10"]
     topology["worker"]["ipv6_default_route_target"] = "igw-123"
 
