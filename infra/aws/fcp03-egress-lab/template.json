@@ -870,7 +870,17 @@
         "NetworkAclId": {
           "Ref": "WorkerNetworkAcl"
         }
-      }
+      },
+      "DependsOn": [
+        "WorkerNaclEgressDnsUdp",
+        "WorkerNaclEgressDnsTcp",
+        "WorkerNaclEgressDenyVpc",
+        "WorkerNaclEgressHttps",
+        "WorkerNaclEgressDenyRest",
+        "WorkerNaclIngressTcpEphemeral",
+        "WorkerNaclIngressUdpEphemeral",
+        "WorkerNaclIngressDenyRest"
+      ]
     },
     "WorkerNaclEgressDnsUdp": {
       "Type": "AWS::EC2::NetworkAclEntry",
