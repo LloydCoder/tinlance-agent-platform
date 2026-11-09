@@ -30,7 +30,7 @@ def _all_pages(client: Any, operation: str, result_key: str, **params: Any) -> l
 
 def _route_entries_for_subnet(
     ec2: Any, *, vpc_id: str, subnet_id: str
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], list[str]]:
     """Return the complete route table for a subnet, failing on ambiguity."""
     tables = _all_pages(
         ec2,
@@ -61,19 +61,29 @@ def _route_entries_for_subnet(
             raise ValueError(f"subnet {subnet_id} has an ambiguous route-table association")
         tables = exact
     if len(tables) != 1:
-        return []
-    return [
+        return [], []
+    associated_subnets = sorted(
         {
-            "destination": (
-                route.get("DestinationCidrBlock")
-                or route.get("DestinationIpv6CidrBlock")
-                or route.get("DestinationPrefixListId")
-            ),
-            "target": _route_target(route),
-            "state": route.get("State", "UNKNOWN"),
+            association["SubnetId"]
+            for association in tables[0].get("Associations", [])
+            if isinstance(association.get("SubnetId"), str)
         }
-        for route in tables[0].get("Routes", [])
-    ]
+    )
+    return (
+        [
+            {
+                "destination": (
+                    route.get("DestinationCidrBlock")
+                    or route.get("DestinationIpv6CidrBlock")
+                    or route.get("DestinationPrefixListId")
+                ),
+                "target": _route_target(route),
+                "state": route.get("State", "UNKNOWN"),
+            }
+            for route in tables[0].get("Routes", [])
+        ],
+        associated_subnets,
+    )
 
 
 def _route_target(route: Mapping[str, Any]) -> str | None:
@@ -621,10 +631,13 @@ def collect_fcp03_snapshot(
 
         firewall_subnet = None
         firewall_route_entries: list[dict[str, object]] = []
+        firewall_route_table_subnet_ids: list[str] = []
         nat_gateway_id = None
         nat_gateway_state = "UNKNOWN"
         nat_subnet_id = None
         nat_route_entries: list[dict[str, object]] = []
+        nat_route_table_subnet_ids: list[str] = []
+        nat_az = None
         firewall_az = None
         if isinstance(firewall_subnet_id, str):
             firewall_subnets = _all_pages(
@@ -640,7 +653,10 @@ def collect_fcp03_snapshot(
             )
             if isinstance(firewall_subnet, Mapping):
                 firewall_az = firewall_subnet.get("AvailabilityZone")
-                firewall_route_entries = _route_entries_for_subnet(
+                (
+                    firewall_route_entries,
+                    firewall_route_table_subnet_ids,
+                ) = _route_entries_for_subnet(
                     ec2, vpc_id=vpc_id, subnet_id=firewall_subnet_id
                 )
                 nat_route = next(
@@ -673,9 +689,25 @@ def collect_fcp03_snapshot(
                         raw_nat_subnet_id = nat_gateway.get("SubnetId")
                         if isinstance(raw_nat_subnet_id, str):
                             nat_subnet_id = raw_nat_subnet_id
-                            nat_route_entries = _route_entries_for_subnet(
+                            (
+                                nat_route_entries,
+                                nat_route_table_subnet_ids,
+                            ) = _route_entries_for_subnet(
                                 ec2, vpc_id=vpc_id, subnet_id=nat_subnet_id
                             )
+                            nat_subnets = _all_pages(
+                                ec2, "describe_subnets", "Subnets", SubnetIds=[nat_subnet_id]
+                            )
+                            nat_subnet = next(
+                                (
+                                    item
+                                    for item in nat_subnets
+                                    if item.get("SubnetId") == nat_subnet_id
+                                ),
+                                None,
+                            )
+                            if isinstance(nat_subnet, Mapping):
+                                nat_az = nat_subnet.get("AvailabilityZone")
 
         policy_arn = firewall.get("FirewallPolicyArn")
         policy_response = (
@@ -697,7 +729,10 @@ def collect_fcp03_snapshot(
             "nat_gateway_state": nat_gateway_state,
             "nat_subnet_id": nat_subnet_id,
             "route_entries": firewall_route_entries,
+            "route_table_subnet_ids": firewall_route_table_subnet_ids,
             "nat_route_entries": nat_route_entries,
+            "nat_route_table_subnet_ids": nat_route_table_subnet_ids,
+            "nat_availability_zone": nat_az,
             "policy": {
                 "route53_resolved_ip_validation": validation,
                 "status": policy_metadata.get("FirewallPolicyStatus", "UNKNOWN"),
