@@ -154,6 +154,9 @@ def firewall_client() -> FakeClient:
 def resolver_client() -> FakeClient:
     return FakeClient(
         {
+            "describe_firewall_rule_group": [
+                {"FirewallRuleGroup": {"Status": "COMPLETE"}}
+            ],
             "list_firewall_rule_group_associations": [
                 {
                     "FirewallRuleGroupAssociations": [
@@ -168,14 +171,20 @@ def resolver_client() -> FakeClient:
                             "Action": "ALLOW",
                             "FirewallDomainListId": "domain-allow",
                             "Priority": 100,
+                            "Status": "COMPLETE",
                         },
                         {
                             "Action": "BLOCK",
                             "FirewallDomainListId": "domain-block",
                             "Priority": 200,
+                            "Status": "COMPLETE",
                         },
                     ]
                 }
+            ],
+            "get_firewall_domain_list": [
+                {"FirewallDomainList": {"Status": "COMPLETE"}},
+                {"FirewallDomainList": {"Status": "COMPLETE"}},
             ],
             "list_firewall_domains": [
                 {"Domains": ["approved.example"]},
