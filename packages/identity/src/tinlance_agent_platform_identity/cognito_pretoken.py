@@ -15,6 +15,8 @@ class CognitoTenantMembershipError(PermissionError):
 
 
 class DynamoDBMembershipClient(Protocol):
+    """Subset of boto3's low-level DynamoDB client API."""
+
     def get_item(self, **kwargs: Any) -> Mapping[str, object]: ...
 
 
@@ -70,24 +72,37 @@ class DynamoDBTenantMembershipResolver:
         key = self.subject_key(user_pool_id, subject_id)
         response = self.client.get_item(
             TableName=self.table_name,
-            Key={"subject_key": key},
+            Key={"subject_key": {"S": key}},
             ConsistentRead=True,
         )
         item = response.get("Item")
         if item is None:
             raise CognitoTenantMembershipError("user has no active tenant membership")
-        if not isinstance(item, Mapping) or (
-            item.get("subject_key") != key
-            or item.get("user_pool_id") != user_pool_id
-            or item.get("subject_id") != subject_id
+        if not isinstance(item, Mapping):
+            raise CognitoTenantMembershipError("tenant membership record is malformed")
+        if (
+            self._string_attribute(item, "subject_key") != key
+            or self._string_attribute(item, "user_pool_id") != user_pool_id
+            or self._string_attribute(item, "subject_id") != subject_id
         ):
             raise CognitoTenantMembershipError("tenant membership record does not match the user")
-        if item.get("status") != "active":
+        if self._string_attribute(item, "status") != "active":
             raise CognitoTenantMembershipError("user has no active tenant membership")
-        tenant_id = item.get("tenant_id")
-        if not isinstance(tenant_id, str) or not _TENANT_ID.fullmatch(tenant_id):
+        tenant_id = self._string_attribute(item, "tenant_id")
+        if not _TENANT_ID.fullmatch(tenant_id):
             raise CognitoTenantMembershipError("tenant identifier in membership record is invalid")
         return tenant_id
+
+    @staticmethod
+    def _string_attribute(item: Mapping[str, object], name: str) -> str:
+        value = item.get(name)
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != {"S"}
+            or not isinstance(value.get("S"), str)
+        ):
+            raise CognitoTenantMembershipError(f"tenant membership record has an invalid {name}")
+        return str(value["S"])
 
 
 @dataclass(frozen=True, slots=True)

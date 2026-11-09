@@ -29,9 +29,14 @@ class FakeMembershipClient:
         if self.fail_read:
             raise OSError("DynamoDB membership lookup unavailable")
         self.calls.append(kwargs)
-        key = str(kwargs["Key"]["subject_key"])
+        key_value = kwargs["Key"]["subject_key"]
+        assert isinstance(key_value, dict) and "S" in key_value
+        key = str(key_value["S"])
         item = self.items.get(key)
-        return {"Item": dict(item)} if item is not None else {}
+        if item is None:
+            return {}
+        encoded = {name: {"S": value} for name, value in item.items()}
+        return {"Item": encoded}
 
 
 def membership_key(user_pool_id: str, subject_id: str) -> str:
@@ -180,6 +185,9 @@ def test_pre_token_v2_uses_authoritative_membership_and_preserves_other_override
     assert event == original
     assert client.calls[0]["ConsistentRead"] is True
     assert client.calls[0]["TableName"] == TABLE_NAME
+    assert client.calls[0]["Key"] == {
+        "subject_key": {"S": membership_key(USER_POOL_ID, SUBJECT_ID)}
+    }
 
 
 def test_pre_token_v2_accepts_aws_empty_override_array() -> None:
