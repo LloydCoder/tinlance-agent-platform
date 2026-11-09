@@ -60,8 +60,12 @@ class RestoreLedger(Protocol):
         snapshot_id: UUID,
         fencing_token: int,
     ) -> bool: ...
-    def complete(self, restore_id: UUID, snapshot_digest: str) -> None: ...
-    def fail(self, restore_id: UUID, reason_code: str) -> None: ...
+    def complete(
+        self, tenant_id: UUID, workspace_id: UUID, restore_id: UUID, snapshot_digest: str
+    ) -> None: ...
+    def fail(
+        self, tenant_id: UUID, workspace_id: UUID, restore_id: UUID, reason_code: str
+    ) -> None: ...
 
 
 class CredentialRefresher(Protocol):
@@ -409,7 +413,7 @@ class WorkspaceSnapshotService:
         target = Path(destination)
         if target.exists() or target.is_symlink():
             with suppress(Exception):
-                ledger.fail(restore_id, "destination_not_clean")
+                ledger.fail(tenant_id, workspace_id, restore_id, "destination_not_clean")
             raise SnapshotConflictError("restore destination must not exist on the clean host")
         parent = target.parent.resolve(strict=True)
         target = parent / target.name
@@ -472,7 +476,7 @@ class WorkspaceSnapshotService:
             target.mkdir(mode=0o700)
             os.replace(staging, target)
             published = True
-            ledger.complete(restore_id, reference.digest)
+            ledger.complete(tenant_id, workspace_id, restore_id, reference.digest)
             return RestoreResult(
                 restore_id=restore_id,
                 snapshot_id=reference.snapshot_id,
@@ -488,5 +492,5 @@ class WorkspaceSnapshotService:
             elif target.exists() and not any(target.iterdir()):
                 target.rmdir()
             with suppress(Exception):
-                ledger.fail(restore_id, type(exc).__name__)
+                ledger.fail(tenant_id, workspace_id, restore_id, type(exc).__name__)
             raise
