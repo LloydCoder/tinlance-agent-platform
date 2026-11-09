@@ -60,7 +60,9 @@ class RestoreLedger(Protocol):
 
 
 class CredentialRefresher(Protocol):
-    def refresh(self, tenant_id: UUID, workspace_id: UUID, fencing_token: int) -> Mapping[str, str]: ...
+    def refresh(
+        self, tenant_id: UUID, workspace_id: UUID, fencing_token: int
+    ) -> Mapping[str, str]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,7 +229,11 @@ class WorkspaceSnapshotService:
     def _identity(tenant_id: UUID, workspace_id: UUID, fencing_token: int) -> None:
         if not isinstance(tenant_id, UUID) or not isinstance(workspace_id, UUID):
             raise TypeError("tenant_id and workspace_id must be UUID values")
-        if isinstance(fencing_token, bool) or not isinstance(fencing_token, int) or fencing_token < 1:
+        if (
+            isinstance(fencing_token, bool)
+            or not isinstance(fencing_token, int)
+            or fencing_token < 1
+        ):
             raise ValueError("fencing_token must be a positive integer")
 
     @staticmethod
@@ -396,7 +402,9 @@ class WorkspaceSnapshotService:
                 not isinstance(k, str) or not isinstance(v, str) or not k or not v
                 for k, v in credentials.items()
             ):
-                raise SnapshotError("credential refresher must return non-empty credential references")
+                raise SnapshotError(
+                    "credential refresher must return non-empty credential references"
+                )
             if not lease_authority.assert_active(tenant_id, workspace_id, fencing_token):
                 raise SnapshotError("restore lease was revoked before publication")
             if target.exists() or target.is_symlink():
