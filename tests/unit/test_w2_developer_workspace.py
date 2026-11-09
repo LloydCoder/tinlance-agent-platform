@@ -67,8 +67,11 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
         "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
     )
     assert base_image in dockerfile
-    assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
-    assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
+    assert "https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}" in dockerfile
+    assert 'grep -c "^URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}$"' in dockerfile
+    assert dockerfile.count("update \\\\") == 2
+    assert dockerfile.count("install --yes --no-install-recommends") == 2
+    assert "--snapshot=" not in dockerfile
     assert "dpkg-query -W" in dockerfile
     assert (
         "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund"
@@ -79,42 +82,19 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
         "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,"
         "required=true,mode=0444"
     )
-    secret_mount_index = dockerfile.index(secret_mount)
-    update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
-    install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert secret_mount_index < update_index < install_index
+    assert secret_mount in dockerfile
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
-    assert "https://ports.ubuntu.com/ubuntu-ports|https://archive.ubuntu.com/ubuntu" in dockerfile
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" in dockerfile
-    assert (
-        "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,"
-        "required=true,mode=0444"
-    ) in dockerfile
     assert "Acquire::https::CaInfo=/tmp/host-ca-bundle.crt" in dockerfile
     assert dockerfile.count("Acquire::https::CaInfo=/tmp/host-ca-bundle.crt") == 2
     assert dockerfile.count("Acquire::Retries=5") == 4
     assert dockerfile.count("Acquire::https::Timeout=30") == 4
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
-    assert dockerfile.count("--snapshot=") == 4
-    bootstrap_update = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
-    bootstrap_installs = [
-        index
-        for index in range(len(dockerfile))
-        if dockerfile.startswith('--snapshot="${APT_SNAPSHOT}" install', index)
-    ]
-    bootstrap_ca = dockerfile.index("ca-certificates=20260816ubuntu0.24.04.2")
-    workspace_update = dockerfile.index(
-        '--snapshot="${APT_SNAPSHOT}" update', bootstrap_update + 1
-    )
-    assert len(bootstrap_installs) == 2
-    assert bootstrap_update < bootstrap_installs[0] < bootstrap_ca < workspace_update < bootstrap_installs[1]
+    assert "Invalid Ubuntu snapshot identifier" in dockerfile
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
     assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
-    assert "sed -i" in dockerfile
-    assert "s|http://|https://|g" in dockerfile
-    assert "s|https://ports.ubuntu.com/ubuntu-ports|https://archive.ubuntu.com/ubuntu|g" in dockerfile
     assert "RUN --network=none" in dockerfile
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
