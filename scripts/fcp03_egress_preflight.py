@@ -21,7 +21,6 @@ def _strings(value: object) -> set[str]:
     return set()
 
 
-
 def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     """Return stable finding codes for an unsafe or incomplete worker egress topology.
 
@@ -338,9 +337,8 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     }
     raw_security_group_egress = worker.get("security_group_egress")
     observed_security_group_egress: set[tuple[object, object, object]] = set()
-    if (
-        not isinstance(raw_security_group_egress, Sequence)
-        or isinstance(raw_security_group_egress, (str, bytes))
+    if not isinstance(raw_security_group_egress, Sequence) or isinstance(
+        raw_security_group_egress, (str, bytes)
     ):
         findings.add("worker-security-group-egress-policy-invalid")
     else:
