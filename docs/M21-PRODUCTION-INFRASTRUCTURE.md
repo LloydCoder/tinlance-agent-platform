@@ -6,16 +6,25 @@ Turn the M19 production boundary into an explicit, evidence-backed readiness con
 
 ## Readiness dependencies
 
-M21 tracks eight external dependency categories:
+M21 tracks seventeen independently evidenced production control dependencies:
 
 1. durable database;
 2. transactional outbox/queue delivery;
 3. external secret manager;
 4. isolated sandbox/runtime;
 5. telemetry backend;
-6. backup and restore capability;
+6. backup capability;
 7. incident-response controls;
-8. operational/security ownership.
+8. provider-attested hardware/firmware/microcode/SMT posture;
+9. destination-level egress enforcement independent of the browser proxy;
+10. explicit DNS query policy;
+11. live identity and revocation propagation;
+12. encrypted durable browser/workspace profile storage;
+13. production CPU, memory, process and storage resource isolation;
+14. disaster-recovery and restore qualification;
+15. spend limits, budget/credit coverage and cost reconciliation;
+16. independent security assessment and residual-risk disposition;
+17. named operational ownership.
 
 A verified dependency must have an evidence reference. Missing or unverified dependencies block production readiness.
 
