@@ -9,8 +9,8 @@ import json
 import os
 import shutil
 import stat
-from contextlib import suppress
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
