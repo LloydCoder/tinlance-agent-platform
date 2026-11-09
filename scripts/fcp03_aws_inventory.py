@@ -127,8 +127,16 @@ def _dns_firewall_snapshot(
             "allowlist_domains": [],
             "terminal_block": False,
             "failure_mode": "UNKNOWN",
+            "rule_group_status": "UNKNOWN",
+            "association_statuses": [],
+            "rule_statuses": [],
+            "domain_list_statuses": [],
         }
 
+    group_response = resolver.describe_firewall_rule_group(
+        FirewallRuleGroupId=rule_group_id
+    )
+    rule_group_status = group_response.get("FirewallRuleGroup", {}).get("Status", "UNKNOWN")
     associations = _all_pages(
         resolver,
         "list_firewall_rule_group_associations",
@@ -142,27 +150,51 @@ def _dns_firewall_snapshot(
             if isinstance(association.get("VpcId"), str)
         }
     )
+    association_statuses = sorted(
+        {
+            association.get("Status", "UNKNOWN")
+            for association in associations
+            if isinstance(association.get("Status", "UNKNOWN"), str)
+        }
+    )
     rules = _all_pages(
         resolver,
         "list_firewall_rules",
         "FirewallRules",
         FirewallRuleGroupId=rule_group_id,
     )
+    rule_statuses = sorted(
+        {
+            rule.get("Status", "UNKNOWN")
+            for rule in rules
+            if isinstance(rule.get("Status", "UNKNOWN"), str)
+        }
+    )
 
     allowlist_domains: set[str] = set()
     allow_priorities: list[int] = []
     wildcard_block_priorities: list[int] = []
+    domain_list_statuses: set[str] = set()
+    domain_list_cache: dict[str, list[str]] = {}
     for rule in rules:
         domain_list_id = rule.get("FirewallDomainListId")
         priority = rule.get("Priority")
         if not isinstance(domain_list_id, str):
             continue
-        domains = _all_pages(
-            resolver,
-            "list_firewall_domains",
-            "Domains",
-            FirewallDomainListId=domain_list_id,
-        )
+        if domain_list_id not in domain_list_cache:
+            metadata = resolver.get_firewall_domain_list(
+                FirewallDomainListId=domain_list_id
+            ).get("FirewallDomainList", {})
+            status = metadata.get("Status", "UNKNOWN")
+            if isinstance(status, str):
+                domain_list_statuses.add(status)
+            domain_list_cache[domain_list_id] = _all_pages(
+                resolver,
+                "list_firewall_domains",
+                "Domains",
+                FirewallDomainListId=domain_list_id,
+            )
+        domains = domain_list_cache[domain_list_id]
         if rule.get("Action") == "ALLOW":
             allowlist_domains.update(domain for domain in domains if isinstance(domain, str))
             if isinstance(priority, int):
@@ -183,6 +215,10 @@ def _dns_firewall_snapshot(
         "allowlist_domains": sorted(allowlist_domains),
         "terminal_block": terminal_block,
         "failure_mode": failure_mode,
+        "rule_group_status": rule_group_status,
+        "association_statuses": association_statuses,
+        "rule_statuses": rule_statuses,
+        "domain_list_statuses": sorted(domain_list_statuses),
     }
 
 
