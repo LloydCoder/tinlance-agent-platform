@@ -71,6 +71,16 @@ def ec2_client() -> FakeClient:
                         }
                     ]
                 },
+                {
+                    "Subnets": [
+                        {
+                            "SubnetId": "subnet-public",
+                            "VpcId": "vpc-worker",
+                            "CidrBlock": "10.20.3.0/24",
+                            "AvailabilityZone": "eu-west-1a",
+                        }
+                    ]
+                },
             ],
             "describe_vpcs": [
                 {
@@ -371,6 +381,14 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
 
     assert evaluate_fcp03_topology(snapshot) == ()
     assert snapshot["firewall"]["endpoints_by_az"] == {"eu-west-1a": "vpce-fw-a"}
+    assert snapshot["firewall"]["subnet_id"] == "subnet-firewall"
+    assert snapshot["firewall"]["availability_zone"] == "eu-west-1a"
+    assert snapshot["firewall"]["nat_gateway_id"] == "nat-123"
+    assert snapshot["firewall"]["nat_gateway_state"] == "available"
+    assert snapshot["firewall"]["nat_subnet_id"] == "subnet-public"
+    assert snapshot["firewall"]["nat_availability_zone"] == "eu-west-1a"
+    assert snapshot["firewall"]["route_table_subnet_ids"] == ["subnet-firewall"]
+    assert snapshot["firewall"]["nat_route_table_subnet_ids"] == ["subnet-public"]
     assert snapshot["firewall"]["policy"]["stateful_rule_groups"] == [
         {
             "status": "ACTIVE",
