@@ -599,6 +599,84 @@ def collect_fcp03_snapshot(
                 if attachment.get("Status") == "READY" and isinstance(endpoint_id, str):
                     endpoints[az] = endpoint_id
 
+        # Capture the reverse service-chain path as well as the worker route.
+        # AWS Network Firewall is stateful: the firewall subnet must send approved
+        # traffic to NAT, and the NAT subnet must return worker-subnet traffic
+        # through the same-AZ firewall endpoint.
+        sync_states = firewall_status.get("SyncStates", {})
+        az_state = sync_states.get(availability_zone, {}) if isinstance(sync_states, Mapping) else {}
+        attachment = az_state.get("Attachment", {}) if isinstance(az_state, Mapping) else {}
+        firewall_subnet_id = attachment.get("SubnetId")
+        if not isinstance(firewall_subnet_id, str):
+            mappings = firewall.get("SubnetMappings", [])
+            matching_mappings = [
+                mapping
+                for mapping in mappings
+                if isinstance(mapping, Mapping)
+                and mapping.get("SubnetId")
+                and mapping.get("AvailabilityZone") == availability_zone
+            ]
+            if len(matching_mappings) == 1:
+                firewall_subnet_id = matching_mappings[0].get("SubnetId")
+
+        firewall_subnet = None
+        firewall_route_entries: list[dict[str, object]] = []
+        nat_gateway_id = None
+        nat_gateway_state = "UNKNOWN"
+        nat_subnet_id = None
+        nat_route_entries: list[dict[str, object]] = []
+        firewall_az = None
+        if isinstance(firewall_subnet_id, str):
+            firewall_subnets = _all_pages(
+                ec2, "describe_subnets", "Subnets", SubnetIds=[firewall_subnet_id]
+            )
+            firewall_subnet = next(
+                (
+                    item
+                    for item in firewall_subnets
+                    if item.get("SubnetId") == firewall_subnet_id
+                ),
+                None,
+            )
+            if isinstance(firewall_subnet, Mapping):
+                firewall_az = firewall_subnet.get("AvailabilityZone")
+                firewall_route_entries = _route_entries_for_subnet(
+                    ec2, vpc_id=vpc_id, subnet_id=firewall_subnet_id
+                )
+                nat_route = next(
+                    (
+                        route
+                        for route in firewall_route_entries
+                        if route.get("destination") == "0.0.0.0/0"
+                    ),
+                    None,
+                )
+                candidate_nat_id = nat_route.get("target") if isinstance(nat_route, Mapping) else None
+                if isinstance(candidate_nat_id, str) and candidate_nat_id.startswith("nat-"):
+                    nat_gateway_id = candidate_nat_id
+                    nat_gateways = _all_pages(
+                        ec2,
+                        "describe_nat_gateways",
+                        "NatGateways",
+                        NatGatewayIds=[nat_gateway_id],
+                    )
+                    nat_gateway = next(
+                        (
+                            item
+                            for item in nat_gateways
+                            if item.get("NatGatewayId") == nat_gateway_id
+                        ),
+                        None,
+                    )
+                    if isinstance(nat_gateway, Mapping):
+                        nat_gateway_state = nat_gateway.get("State", "UNKNOWN")
+                        raw_nat_subnet_id = nat_gateway.get("SubnetId")
+                        if isinstance(raw_nat_subnet_id, str):
+                            nat_subnet_id = raw_nat_subnet_id
+                            nat_route_entries = _route_entries_for_subnet(
+                                ec2, vpc_id=vpc_id, subnet_id=nat_subnet_id
+                            )
+
         policy_arn = firewall.get("FirewallPolicyArn")
         policy_response = (
             network_firewall.describe_firewall_policy(FirewallPolicyArn=policy_arn)
@@ -613,6 +691,13 @@ def collect_fcp03_snapshot(
         engine_options = raw_engine_options if isinstance(raw_engine_options, Mapping) else {}
         firewall_snapshot = {
             "endpoints_by_az": endpoints,
+            "subnet_id": firewall_subnet_id,
+            "availability_zone": firewall_az,
+            "nat_gateway_id": nat_gateway_id,
+            "nat_gateway_state": nat_gateway_state,
+            "nat_subnet_id": nat_subnet_id,
+            "route_entries": firewall_route_entries,
+            "nat_route_entries": nat_route_entries,
             "policy": {
                 "route53_resolved_ip_validation": validation,
                 "status": policy_metadata.get("FirewallPolicyStatus", "UNKNOWN"),
