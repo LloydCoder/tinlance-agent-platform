@@ -237,3 +237,44 @@ def test_collector_is_read_only_and_uses_the_requested_instance_id() -> None:
 
     assert ec2.calls[0] == ("describe_instances", {"InstanceIds": ["i-test"]})
     assert all(not operation.startswith(("create_", "delete_", "update_", "associate_")) for operation, _ in ec2.calls)
+
+
+def test_rejects_dns_wildcard_block_that_precedes_allow_rules() -> None:
+    resolver = resolver_client()
+    resolver.responses["list_firewall_rules"][0]["FirewallRules"][1]["Priority"] = 50
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall_client(),
+        resolver=resolver,
+    )
+
+    assert snapshot["dns_firewall"]["terminal_block"] is False
+    assert "dns-allowlist-incomplete" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_surfaces_ipv6_addresses_and_default_routes() -> None:
+    ec2 = ec2_client()
+    instance = ec2.responses["describe_instances"][0]["Reservations"][0]["Instances"][0]
+    instance["NetworkInterfaces"] = [
+        {"Ipv6Addresses": [{"Ipv6Address": "2001:db8::10"}]}
+    ]
+    ec2.responses["describe_route_tables"][0]["RouteTables"][0]["Routes"].append(
+        {
+            "DestinationIpv6CidrBlock": "::/0",
+            "EgressOnlyInternetGatewayId": "eigw-123",
+            "State": "active",
+        }
+    )
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["ipv6_addresses"] == ["2001:db8::10"]
+    assert snapshot["worker"]["ipv6_default_route_target"] == "eigw-123"
+    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
