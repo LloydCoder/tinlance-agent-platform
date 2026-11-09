@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from argparse import ArgumentParser
-from datetime import UTC, datetime, timedelta
+import argparse
+import datetime
 
 
-MINIMUM_WINDOW = timedelta(minutes=15)
-MAXIMUM_WINDOW = timedelta(hours=2)
+MINIMUM_WINDOW = datetime.timedelta(minutes=15)
+MAXIMUM_WINDOW = datetime.timedelta(hours=2)
 UTC_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
@@ -16,14 +16,14 @@ def validate_teardown_at(
 ) -> datetime:
     """Require a naive-formatted UTC timestamp 15 minutes to 2 hours ahead."""
     try:
-        deadline = datetime.strptime(value, UTC_FORMAT).replace(tzinfo=UTC)
+        deadline = datetime.datetime.strptime(value, UTC_FORMAT).replace(tzinfo=datetime.UTC)
     except (TypeError, ValueError) as exc:
         raise ValueError(
             f"teardown time must use {UTC_FORMAT} in UTC, without a timezone suffix"
         ) from exc
 
-    reference = now if now is not None else datetime.now(UTC)
-    if reference.tzinfo is None or reference.utcoffset() != timedelta(0):
+    reference = now if now is not None else datetime.datetime.now(datetime.UTC)
+    if reference.tzinfo is None or reference.utcoffset() != datetime.timedelta(0):
         raise ValueError("reference clock must be timezone-aware UTC")
 
     remaining = deadline - reference
@@ -35,7 +35,7 @@ def validate_teardown_at(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--teardown-at",
         required=True,
