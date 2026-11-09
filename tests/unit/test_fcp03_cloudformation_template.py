@@ -237,3 +237,31 @@ def test_worker_management_does_not_require_imds_or_an_instance_profile() -> Non
     assert "amazon-ssm-agent" not in worker["UserData"]["Fn::Base64"]["Fn::Sub"][0].lower()
     bootstrap = worker["UserData"]["Fn::Base64"]["Fn::Sub"][0]
     assert "retrieve_with_ec2_get_console_output=true" in bootstrap
+
+
+def test_worker_security_group_egress_is_exact_and_has_no_protocol_bypass() -> None:
+    worker_sg = load_template()["Resources"]["WorkerSecurityGroup"]["Properties"]
+    assert worker_sg["SecurityGroupIngress"] == []
+    assert worker_sg["SecurityGroupEgress"] == [
+        {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTPS routed through Network Firewall",
+        },
+        {
+            "IpProtocol": "udp",
+            "FromPort": 53,
+            "ToPort": 53,
+            "CidrIp": "10.42.0.2/32",
+            "Description": "VPC Resolver only",
+        },
+        {
+            "IpProtocol": "tcp",
+            "FromPort": 53,
+            "ToPort": 53,
+            "CidrIp": "10.42.0.2/32",
+            "Description": "VPC Resolver TCP fallback only",
+        },
+    ]
