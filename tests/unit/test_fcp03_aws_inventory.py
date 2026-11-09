@@ -447,6 +447,7 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
         {"cidr": "10.20.0.0/16", "state": "associated"}
     ]
     assert snapshot["worker"]["network_acl"]["subnet_ids"] == ["subnet-worker"]
+    assert snapshot["worker"]["route_table_subnet_ids"] == ["subnet-worker"]
     assert len(snapshot["worker"]["network_acl"]["ingress_rules"]) == 3
     assert len(snapshot["worker"]["network_acl"]["egress_rules"]) == 5
     assert snapshot["worker"]["route_entries"] == [
@@ -599,3 +600,23 @@ def test_rejects_repeated_aws_pagination_token() -> None:
 
     with pytest.raises(ValueError, match="repeated pagination token"):
         _all_pages(client, "list_items", "Items")
+
+
+def test_collector_exposes_shared_worker_route_table_associations() -> None:
+    ec2 = ec2_client()
+    ec2.responses["describe_route_tables"][0]["RouteTables"][0]["Associations"].append(
+        {"SubnetId": "subnet-other"}
+    )
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["route_table_subnet_ids"] == [
+        "subnet-other",
+        "subnet-worker",
+    ]
+    assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(snapshot)
