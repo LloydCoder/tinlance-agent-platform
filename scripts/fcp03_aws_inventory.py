@@ -847,14 +847,11 @@ def collect_fcp03_snapshot(
         firewall_subnet_id = attachment.get("SubnetId")
         if not isinstance(firewall_subnet_id, str):
             mappings = firewall.get("SubnetMappings")
-            mappings_are_complete = (
-                isinstance(mappings, list)
-                and all(
-                    isinstance(mapping, Mapping)
-                    and isinstance(mapping.get("SubnetId"), str)
-                    and bool(mapping.get("SubnetId"))
-                    for mapping in mappings
-                )
+            mappings_are_complete = isinstance(mappings, list) and all(
+                isinstance(mapping, Mapping)
+                and isinstance(mapping.get("SubnetId"), str)
+                and bool(mapping.get("SubnetId"))
+                for mapping in mappings
             )
             matching_mappings = (
                 [
