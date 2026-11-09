@@ -489,3 +489,78 @@ def test_restore_preserves_published_tree_when_ledger_completion_is_ambiguous(tm
 
     assert (destination / "workspace/README.md").read_bytes() == b"published atomically"
     assert not ledger.failed
+
+
+class S3Body:
+    def __init__(self, value):
+        self.value = value
+        self.closed = False
+
+    def read(self, size):
+        return self.value[:size]
+
+    def close(self):
+        self.closed = True
+
+
+class FakeS3:
+    def __init__(self):
+        self.objects = {}
+        self.put_calls = []
+        self.get_calls = []
+
+    def put_object(self, **kwargs):
+        self.put_calls.append(kwargs)
+        key = (kwargs["Bucket"], kwargs["Key"])
+        if key in self.objects:
+            error = RuntimeError("precondition failed")
+            error.response = {
+                "Error": {"Code": "PreconditionFailed"},
+                "ResponseMetadata": {"HTTPStatusCode": 412},
+            }
+            raise error
+        self.objects[key] = kwargs["Body"]
+        return {"ETag": '"immutable"'}
+
+    def get_object(self, **kwargs):
+        self.get_calls.append(kwargs)
+        value = self.objects[(kwargs["Bucket"], kwargs["Key"])]
+        return {"Body": S3Body(value), "ContentLength": len(value)}
+
+
+def test_s3_snapshot_store_uses_conditional_create_and_sse_kms(tmp_path):
+    from tinlance_agent_platform_durability.snapshots import S3SnapshotStore
+
+    s3 = FakeS3()
+    store = S3SnapshotStore(
+        s3_client=s3,
+        bucket="tinlance-snapshots",
+        sse_kms_key_id="arn:aws:kms:eu-west-1:123456789012:key/example",
+    )
+    snapshot_id = uuid4()
+    store.put_if_absent(snapshot_id, b"encrypted snapshot")
+    with pytest.raises(SnapshotConflictError, match="already exists"):
+        store.put_if_absent(snapshot_id, b"replacement")
+    assert s3.put_calls[0]["IfNoneMatch"] == "*"
+    assert s3.put_calls[0]["ServerSideEncryption"] == "aws:kms"
+    assert s3.put_calls[0]["SSEKMSKeyId"].endswith("key/example")
+    assert store.get(snapshot_id) == b"encrypted snapshot"
+
+
+def test_s3_snapshot_store_rejects_invalid_prefix_and_oversized_objects():
+    from tinlance_agent_platform_durability.snapshots import S3SnapshotStore
+
+    with pytest.raises(ValueError, match="normalized"):
+        S3SnapshotStore(
+            s3_client=FakeS3(),
+            bucket="tinlance-snapshots",
+            sse_kms_key_id="kms-key",
+            prefix="../escape",
+        )
+    store = S3SnapshotStore(
+        s3_client=FakeS3(),
+        bucket="tinlance-snapshots",
+        sse_kms_key_id="kms-key",
+    )
+    with pytest.raises(ValueError, match="size limit"):
+        store.put_if_absent(uuid4(), b"x" * (store.MAX_OBJECT_BYTES + 1))
