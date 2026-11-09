@@ -383,7 +383,10 @@ class WorkspaceSnapshotService:
             for entry in entries:
                 if not isinstance(entry, dict):
                     raise SnapshotIntegrityError("snapshot file entry is malformed")
-                path = self._safe_path(entry.get("path"))
+                raw_path = entry.get("path")
+                if not isinstance(raw_path, str):
+                    raise SnapshotIntegrityError("snapshot file path must be text")
+                path = self._safe_path(raw_path)
                 if path in seen:
                     raise SnapshotIntegrityError("snapshot contains duplicate file paths")
                 seen.add(path)
