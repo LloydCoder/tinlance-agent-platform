@@ -119,3 +119,15 @@ def test_does_not_mutate_the_supplied_inventory_snapshot() -> None:
     evaluate_fcp03_topology(topology)
 
     assert topology == original
+
+
+def test_rejects_world_http_and_ipv6_https_egress() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_egress"].extend(
+        [
+            {"protocol": "tcp", "port": 80, "cidr": "0.0.0.0/0"},
+            {"protocol": "tcp", "port": 443, "cidr": "::/0"},
+        ]
+    )
+
+    assert "unrestricted-security-group-egress" in evaluate_fcp03_topology(topology)
