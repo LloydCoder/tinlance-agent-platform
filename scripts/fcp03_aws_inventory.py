@@ -395,14 +395,16 @@ def collect_fcp03_snapshot(
     raw_cidr_associations = (
         vpc.get("CidrBlockAssociationSet", []) if isinstance(vpc, Mapping) else []
     )
-    vpc_cidr_associations = [
-        {
-            "cidr": association.get("CidrBlock"),
-            "state": _object(association.get("CidrBlockState")).get("State"),
-        }
-        for association in raw_cidr_associations
-        if isinstance(association, Mapping)
-    ] if isinstance(raw_cidr_associations, list) else []
+    vpc_cidr_associations: list[dict[str, object]] = []
+    if isinstance(raw_cidr_associations, list):
+        for association in raw_cidr_associations:
+            if not isinstance(association, Mapping):
+                continue
+            raw_state = association.get("CidrBlockState")
+            state = raw_state.get("State") if isinstance(raw_state, Mapping) else None
+            vpc_cidr_associations.append(
+                {"cidr": association.get("CidrBlock"), "state": state}
+            )
     try:
         vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
         resolver_ip = str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
