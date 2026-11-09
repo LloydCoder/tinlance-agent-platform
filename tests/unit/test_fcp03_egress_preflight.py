@@ -17,6 +17,10 @@ def valid_topology() -> dict[str, object]:
             "metadata_hop_limit": 1,
             "availability_zone": "eu-west-1a",
             "default_route_target": "vpce-fw-a",
+            "route_entries": [
+                {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
+                {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
+            ],
             "security_group_egress": [
                 {"protocol": "tcp", "port": 443, "cidr": "10.20.10.0/24"},
                 {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
@@ -226,3 +230,26 @@ def test_requires_imdsv2_and_a_single_hop_metadata_limit() -> None:
     findings = evaluate_fcp03_topology(topology)
 
     assert "worker-metadata-protection-invalid" in findings
+
+
+def test_rejects_more_specific_route_that_bypasses_firewall_endpoint() -> None:
+    topology = valid_topology()
+    topology["worker"]["route_entries"] = [
+        {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
+        {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
+        {"destination": "203.0.113.0/24", "target": "nat-123", "state": "active"},
+    ]
+
+    assert "worker-route-bypasses-firewall" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_route_inventory_is_missing_or_incomplete() -> None:
+    topology = valid_topology()
+    topology["worker"].pop("route_entries")
+
+    assert "worker-route-inventory-unknown" in evaluate_fcp03_topology(topology)
+
+    topology["worker"]["route_entries"] = [
+        {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "unknown"},
+    ]
+    assert "worker-route-state-not-active" in evaluate_fcp03_topology(topology)

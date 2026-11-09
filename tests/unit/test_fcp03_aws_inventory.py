@@ -257,6 +257,9 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
     assert snapshot["worker"]["metadata_endpoint_enabled"] is False
     assert snapshot["worker"]["metadata_tokens_required"] is True
     assert snapshot["worker"]["metadata_hop_limit"] == 1
+    assert snapshot["worker"]["route_entries"] == [
+        {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"}
+    ]
 
 
 def test_missing_network_firewall_is_reported_as_incomplete_not_pass() -> None:
@@ -338,7 +341,9 @@ def test_collector_surfaces_ipv6_addresses_and_default_routes() -> None:
     assert snapshot["worker"]["ipv6_enabled"] is True
     assert snapshot["worker"]["ipv6_addresses"] == ["2001:db8::10"]
     assert snapshot["worker"]["ipv6_default_route_target"] == "eigw-123"
-    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
+    findings = evaluate_fcp03_topology(snapshot)
+    assert "worker-ipv6-egress-enabled" in findings
+    assert "worker-route-bypasses-firewall" in findings
 
 
 def test_rejects_stateful_rule_group_without_resolved_domain_target() -> None:

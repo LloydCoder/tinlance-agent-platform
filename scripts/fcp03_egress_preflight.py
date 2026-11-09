@@ -115,6 +115,23 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     ):
         findings.add("worker-firewall-route-missing")
 
+    route_entries = worker.get("route_entries")
+    if (
+        not isinstance(route_entries, Sequence)
+        or isinstance(route_entries, (str, bytes))
+        or not route_entries
+    ):
+        findings.add("worker-route-inventory-unknown")
+    else:
+        for raw_route in route_entries:
+            route = _object(raw_route)
+            if not isinstance(route.get("destination"), str) or not route.get("destination"):
+                findings.add("worker-route-inventory-unknown")
+            if route.get("state") != "active":
+                findings.add("worker-route-state-not-active")
+            if route.get("target") not in {"local", endpoint}:
+                findings.add("worker-route-bypasses-firewall")
+
     if _has_unrestricted_egress(worker.get("security_group_egress")):
         findings.add("unrestricted-security-group-egress")
 
