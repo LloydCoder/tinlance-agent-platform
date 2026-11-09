@@ -187,7 +187,7 @@ def ec2_client() -> FakeClient:
                                     "DestinationCidrBlock": "0.0.0.0/0",
                                     "VpcEndpointId": "vpce-fw-a",
                                     "State": "active",
-                                }
+                                },
                             ],
                         }
                     ]
