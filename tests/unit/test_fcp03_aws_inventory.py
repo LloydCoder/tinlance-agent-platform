@@ -269,6 +269,9 @@ def test_collector_surfaces_ipv6_addresses_and_default_routes() -> None:
     instance["NetworkInterfaces"] = [
         {"Ipv6Addresses": [{"Ipv6Address": "2001:db8::10"}]}
     ]
+    ec2.responses["describe_subnets"][0]["Subnets"][0]["Ipv6CidrBlockAssociationSet"] = [
+        {"Ipv6CidrBlock": "2001:db8:1::/64"}
+    ]
     ec2.responses["describe_route_tables"][0]["RouteTables"][0]["Routes"].append(
         {
             "DestinationIpv6CidrBlock": "::/0",
@@ -284,6 +287,7 @@ def test_collector_surfaces_ipv6_addresses_and_default_routes() -> None:
         resolver=resolver_client(),
     )
 
+    assert snapshot["worker"]["ipv6_enabled"] is True
     assert snapshot["worker"]["ipv6_addresses"] == ["2001:db8::10"]
     assert snapshot["worker"]["ipv6_default_route_target"] == "eigw-123"
     assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
