@@ -315,6 +315,8 @@ def _dns_firewall_snapshot(
             "rule_group_status": "UNKNOWN",
             "association_statuses": [],
             "rule_statuses": [],
+            "rule_actions": [],
+            "rule_priorities": [],
             "domain_list_statuses": [],
         }
 
@@ -348,6 +350,8 @@ def _dns_firewall_snapshot(
         FirewallRuleGroupId=rule_group_id,
     )
     rule_statuses: list[object] = []
+    rule_actions: list[object] = []
+    rule_priorities: list[object] = []
     allowlist_domains: set[str] = set()
     allowlist_has_malformed_domain = False
     allow_priorities: list[int] = []
@@ -358,6 +362,8 @@ def _dns_firewall_snapshot(
     for rule in rules:
         if not isinstance(rule, Mapping):
             rule_statuses.append(None)
+            rule_actions.append(None)
+            rule_priorities.append(None)
             domain_list_statuses.append(None)
             allowlist_has_malformed_domain = True
             continue
@@ -367,10 +373,13 @@ def _dns_firewall_snapshot(
         domain_list_id = rule.get("FirewallDomainListId")
         priority = rule.get("Priority")
         action = rule.get("Action")
+        priority_is_valid = type(priority) is int and 1 <= priority <= 10000
+        rule_actions.append(action if action in {"ALLOW", "BLOCK"} else None)
+        rule_priorities.append(priority if priority_is_valid else None)
         if (
             not isinstance(domain_list_id, str)
             or not domain_list_id
-            or not isinstance(priority, int)
+            or not priority_is_valid
             or action not in {"ALLOW", "BLOCK"}
         ):
             domain_list_statuses.append(None)
@@ -435,6 +444,8 @@ def _dns_firewall_snapshot(
         "rule_group_status": rule_group_status,
         "association_statuses": association_statuses,
         "rule_statuses": rule_statuses,
+        "rule_actions": rule_actions,
+        "rule_priorities": rule_priorities,
         "domain_list_statuses": domain_list_statuses,
     }
 
