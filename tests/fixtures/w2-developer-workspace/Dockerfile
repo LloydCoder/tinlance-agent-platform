@@ -24,7 +24,7 @@ RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=tru
         libssl3t64=3.0.13-0ubuntu3.16 \
         git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
