@@ -87,7 +87,9 @@ def _firewall_for_vpc(network_firewall: Any, vpc_id: str) -> Mapping[str, Any] |
     firewalls = _all_pages(network_firewall, "list_firewalls", "Firewalls")
     matches = [firewall for firewall in firewalls if firewall.get("VpcId") == vpc_id]
     if len(matches) > 1:
-        raise ValueError("multiple Network Firewalls found for the worker VPC; select a policy domain")
+        raise ValueError(
+            "multiple Network Firewalls found for the worker VPC; select a policy domain"
+        )
     return matches[0] if matches else None
 
 
@@ -207,7 +209,11 @@ def _dns_firewall_snapshot(
 
     config = resolver.get_firewall_config(ResourceId=vpc_id).get("FirewallConfig", {})
     fail_open = config.get("FirewallFailOpen")
-    failure_mode = "CLOSED" if fail_open == "DISABLED" else "OPEN" if fail_open == "ENABLED" else "UNKNOWN"
+    failure_mode = (
+        "CLOSED"
+        if fail_open == "DISABLED"
+        else "OPEN" if fail_open == "ENABLED" else "UNKNOWN"
+    )
 
     return {
         "rule_group_id": rule_group_id,
@@ -247,7 +253,10 @@ def collect_fcp03_snapshot(
     vpc_id = instance.get("VpcId")
     subnet_id = instance.get("SubnetId")
     availability_zone = instance.get("Placement", {}).get("AvailabilityZone")
-    if not all(isinstance(value, str) and value for value in (vpc_id, subnet_id, availability_zone)):
+    if not all(
+        isinstance(value, str) and value
+        for value in (vpc_id, subnet_id, availability_zone)
+    ):
         raise ValueError("the EC2 instance is missing VPC, subnet, or Availability Zone metadata")
 
     subnets = _all_pages(ec2, "describe_subnets", "Subnets", SubnetIds=[subnet_id])
