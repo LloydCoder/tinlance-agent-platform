@@ -878,3 +878,21 @@ def test_collector_rejects_malformed_firewall_subnet_mapping() -> None:
 
     findings = evaluate_fcp03_topology(snapshot)
     assert "firewall-return-path-identity-unknown" in findings
+
+
+def test_collector_rejects_incomplete_firewall_list_metadata() -> None:
+    firewall = firewall_client()
+    firewall.responses["list_firewalls"][0]["Firewalls"].append(
+        {
+            "FirewallArn": "arn:aws:network-firewall:eu-west-1:123:firewall/unknown",
+            "VpcId": None,
+        }
+    )
+
+    with pytest.raises(ValueError, match="incomplete firewall inventory"):
+        collect_fcp03_snapshot(
+            instance_id="i-test",
+            ec2=ec2_client(),
+            network_firewall=firewall,
+            resolver=resolver_client(),
+        )
