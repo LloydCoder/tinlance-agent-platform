@@ -4,20 +4,15 @@
   "Parameters": {
     "AvailabilityZone": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
-      "Description": "One AZ only. The single endpoint is selected deterministically from Network Firewall EndpointIds."
+      "Description": "Must match the existing controller subnet AZ; one AZ only."
     },
     "ApprovedDomains": {
       "Type": "CommaDelimitedList",
-      "Description": "Exact approved FQDNs, including region-specific SSM control-plane endpoints required to manage the private worker."
+      "Description": "Exact approved FQDNs for the controlled egress test; the worker is managed by SSH from the existing controller, not Systems Manager."
     },
     "TeardownAtUtc": {
       "Type": "String",
       "Description": "Required UTC timestamp YYYY-MM-DDTHH:MM:SS. Validate with scripts/validate_fcp03_teardown_at.py; must be 15 minutes to 2 hours after deployment."
-    },
-    "WorkerInstanceProfileName": {
-      "Type": "String",
-      "Default": "TinlytTestRuntimeSSMProfile",
-      "Description": "Existing least-privilege SSM instance profile; this stack does not create or widen its IAM permissions."
     },
     "WorkerInstanceType": {
       "Type": "String",
@@ -34,103 +29,60 @@
     },
     "VpcCidr": {
       "Type": "String",
-      "Default": "10.42.0.0/16",
-      "AllowedValues": [
-        "10.42.0.0/16"
-      ]
-    },
-    "PublicSubnetCidr": {
-      "Type": "String",
-      "Default": "10.42.0.0/24"
+      "AllowedPattern": "^\\d{1,3}(\\.\\d{1,3}){3}/\\d{1,2}$",
+      "Description": "CIDR of the existing VPC; preflight verifies it matches VpcId."
     },
     "FirewallSubnetCidr": {
       "Type": "String",
-      "Default": "10.42.1.0/24"
+      "AllowedPattern": "^\\d{1,3}(\\.\\d{1,3}){3}/\\d{1,2}$",
+      "Description": "Unused non-overlapping /24 CIDR for the Network Firewall endpoint subnet in the existing VPC."
     },
     "WorkerSubnetCidr": {
       "Type": "String",
-      "Default": "10.42.2.0/24"
+      "AllowedPattern": "^\\d{1,3}(\\.\\d{1,3}){3}/\\d{1,2}$",
+      "Description": "Unused non-overlapping /24 CIDR for the private worker subnet in the existing VPC."
+    },
+    "VpcId": {
+      "Type": "AWS::EC2::VPC::Id",
+      "Description": "Existing non-production VPC containing the SSM-managed FCP-03 controller."
+    },
+    "ControllerSubnetId": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "Existing public subnet of the SSM-managed controller; its route table association is temporarily managed by this stack and restored on teardown."
+    },
+    "ControllerPrivateIp": {
+      "Type": "String",
+      "AllowedPattern": "^\\d{1,3}(\\.\\d{1,3}){3}$",
+      "Description": "Private IPv4 address of the existing controller; used for the SSH management exception."
+    },
+    "ControllerSecurityGroupId": {
+      "Type": "AWS::EC2::SecurityGroup::Id",
+      "Description": "Existing controller security group; worker SSH ingress is restricted to this group."
+    },
+    "ControllerPublicKey": {
+      "Type": "String",
+      "MinLength": 80,
+      "MaxLength": 800,
+      "AllowedPattern": "^ssh-ed25519 [A-Za-z0-9+/=]+ [A-Za-z0-9._@-]+$",
+      "Description": "Ephemeral Ed25519 public key generated and retained on the existing controller."
+    },
+    "InternetGatewayId": {
+      "Type": "String",
+      "AllowedPattern": "^igw-[0-9a-f]+$",
+      "Description": "Existing Internet Gateway already attached to VpcId."
+    },
+    "VpcResolverIp": {
+      "Type": "String",
+      "AllowedPattern": "^\\d{1,3}(\\.\\d{1,3}){3}$",
+      "Description": "Existing VPC Route 53 Resolver address (VPC primary CIDR base address + 2); preflight verifies it."
     }
   },
   "Resources": {
-    "Vpc": {
-      "Type": "AWS::EC2::VPC",
-      "Properties": {
-        "CidrBlock": {
-          "Ref": "VpcCidr"
-        },
-        "EnableDnsSupport": true,
-        "EnableDnsHostnames": true,
-        "Tags": [
-          {
-            "Key": "Project",
-            "Value": "Tinlance"
-          },
-          {
-            "Key": "FCPPhase",
-            "Value": "FCP-03"
-          },
-          {
-            "Key": "Environment",
-            "Value": "disposable-test"
-          }
-        ]
-      }
-    },
-    "InternetGateway": {
-      "Type": "AWS::EC2::InternetGateway",
-      "Properties": {
-        "Tags": [
-          {
-            "Key": "FCPPhase",
-            "Value": "FCP-03"
-          }
-        ]
-      }
-    },
-    "InternetGatewayAttachment": {
-      "Type": "AWS::EC2::VPCGatewayAttachment",
-      "Properties": {
-        "VpcId": {
-          "Ref": "Vpc"
-        },
-        "InternetGatewayId": {
-          "Ref": "InternetGateway"
-        }
-      }
-    },
-    "PublicSubnet": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "VpcId": {
-          "Ref": "Vpc"
-        },
-        "AvailabilityZone": {
-          "Ref": "AvailabilityZone"
-        },
-        "CidrBlock": {
-          "Ref": "PublicSubnetCidr"
-        },
-        "MapPublicIpOnLaunch": false,
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": {
-              "Fn::Sub": "${AWS::StackName}-nat"
-            }
-          },
-          {
-            "Key": "FCPPhase",
-            "Value": "FCP-03"
-          }
-        ]
-      }
-    },
     "FirewallSubnet": {
       "Type": "AWS::EC2::Subnet",
       "Properties": {
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         },
         "AvailabilityZone": {
           "Ref": "AvailabilityZone"
@@ -157,7 +109,7 @@
       "Type": "AWS::EC2::Subnet",
       "Properties": {
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         },
         "AvailabilityZone": {
           "Ref": "AvailabilityZone"
@@ -184,7 +136,7 @@
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         }
       }
     },
@@ -192,7 +144,7 @@
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         }
       }
     },
@@ -200,7 +152,7 @@
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         }
       }
     },
@@ -208,12 +160,16 @@
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {
-          "Ref": "PublicSubnet"
+          "Ref": "ControllerSubnetId"
         },
         "RouteTableId": {
           "Ref": "PublicRouteTable"
         }
-      }
+      },
+      "DependsOn": [
+        "PublicDefaultRoute",
+        "PublicReturnRoute"
+      ]
     },
     "FirewallRouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
@@ -239,14 +195,13 @@
     },
     "PublicDefaultRoute": {
       "Type": "AWS::EC2::Route",
-      "DependsOn": "InternetGatewayAttachment",
       "Properties": {
         "RouteTableId": {
           "Ref": "PublicRouteTable"
         },
         "DestinationCidrBlock": "0.0.0.0/0",
         "GatewayId": {
-          "Ref": "InternetGateway"
+          "Ref": "InternetGatewayId"
         }
       }
     },
@@ -273,7 +228,7 @@
           ]
         },
         "SubnetId": {
-          "Ref": "PublicSubnet"
+          "Ref": "ControllerSubnetId"
         },
         "ConnectivityType": "public",
         "Tags": [
@@ -306,9 +261,19 @@
       "Properties": {
         "GroupDescription": "FCP-03 worker: no ingress; DNS only to VPC resolver; HTTPS egress is inspected by Network Firewall.",
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         },
-        "SecurityGroupIngress": [],
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "SourceSecurityGroupId": {
+              "Ref": "ControllerSecurityGroupId"
+            },
+            "Description": "SSH management only from the existing SSM-managed controller"
+          }
+        ],
         "SecurityGroupEgress": [
           {
             "IpProtocol": "tcp",
@@ -321,14 +286,18 @@
             "IpProtocol": "udp",
             "FromPort": 53,
             "ToPort": 53,
-            "CidrIp": "10.42.0.2/32",
+            "CidrIp": {
+              "Fn::Sub": "${VpcResolverIp}/32"
+            },
             "Description": "VPC Resolver only"
           },
           {
             "IpProtocol": "tcp",
             "FromPort": 53,
             "ToPort": 53,
-            "CidrIp": "10.42.0.2/32",
+            "CidrIp": {
+              "Fn::Sub": "${VpcResolverIp}/32"
+            },
             "Description": "VPC Resolver TCP fallback only"
           }
         ],
@@ -426,7 +395,7 @@
           "Ref": "DNSFirewallRuleGroup"
         },
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         },
         "Priority": 101,
         "MutationProtection": "DISABLED",
@@ -446,7 +415,7 @@
       "DependsOn": "DNSFirewallAssociation",
       "Properties": {
         "ResourceId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         },
         "FirewallFailOpen": "DISABLED"
       }
@@ -508,11 +477,20 @@
             {
               "ResourceArn": {
                 "Fn::GetAtt": [
-                  "ResolvedDomainRuleGroup",
+                  "ManagementSshRuleGroup",
                   "RuleGroupArn"
                 ]
               },
               "Priority": 1
+            },
+            {
+              "ResourceArn": {
+                "Fn::GetAtt": [
+                  "ResolvedDomainRuleGroup",
+                  "RuleGroupArn"
+                ]
+              },
+              "Priority": 10
             }
           ],
           "StatefulEngineOptions": {
@@ -563,7 +541,7 @@
           ]
         },
         "VpcId": {
-          "Ref": "Vpc"
+          "Ref": "VpcId"
         },
         "SubnetMappings": [
           {
@@ -664,11 +642,13 @@
       "Type": "AWS::EC2::Instance",
       "DependsOn": [
         "WorkerDefaultRoute",
+        "WorkerRouteToController",
         "DNSFirewallAssociation",
         "DNSFirewallConfig",
         "NetworkFirewallLogging",
         "AutomaticTeardown",
         "PublicReturnRoute",
+        "PublicRouteTableAssociation",
         "WorkerNetworkAclAssociation"
       ],
       "Properties": {
@@ -677,9 +657,6 @@
         },
         "InstanceType": {
           "Ref": "WorkerInstanceType"
-        },
-        "IamInstanceProfile": {
-          "Ref": "WorkerInstanceProfileName"
         },
         "SubnetId": {
           "Ref": "WorkerSubnet"
@@ -690,7 +667,7 @@
           }
         ],
         "MetadataOptions": {
-          "HttpEndpoint": "enabled",
+          "HttpEndpoint": "disabled",
           "HttpTokens": "required",
           "HttpPutResponseHopLimit": 1,
           "InstanceMetadataTags": "disabled"
@@ -729,7 +706,12 @@
             "Key": "TestScope",
             "Value": "isolated-egress-enforcement"
           }
-        ]
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/bin/bash\nset -euo pipefail\ninstall -d -m 0700 -o ec2-user -g ec2-user /home/ec2-user/.ssh\ncat > /home/ec2-user/.ssh/authorized_keys <<'TINLANCE_FCP03_KEY'\n${ControllerPublicKey}\nTINLANCE_FCP03_KEY\nchown ec2-user:ec2-user /home/ec2-user/.ssh/authorized_keys\nchmod 0600 /home/ec2-user/.ssh/authorized_keys\n"
+          }
+        }
       }
     },
     "TeardownRole": {
@@ -877,9 +859,11 @@
       "DependsOn": [
         "WorkerNaclEgressDnsUdp",
         "WorkerNaclEgressDnsTcp",
+        "WorkerNaclEgressSshReturn",
         "WorkerNaclEgressDenyVpc",
         "WorkerNaclEgressHttps",
         "WorkerNaclEgressDenyRest",
+        "WorkerNaclIngressSsh",
         "WorkerNaclIngressTcpEphemeral",
         "WorkerNaclIngressUdpEphemeral",
         "WorkerNaclIngressDenyRest"
@@ -895,7 +879,9 @@
         "Protocol": "17",
         "RuleAction": "allow",
         "Egress": true,
-        "CidrBlock": "10.42.0.2/32",
+        "CidrBlock": {
+          "Fn::Sub": "${VpcResolverIp}/32"
+        },
         "PortRange": {
           "From": 53,
           "To": 53
@@ -912,7 +898,9 @@
         "Protocol": "6",
         "RuleAction": "allow",
         "Egress": true,
-        "CidrBlock": "10.42.0.2/32",
+        "CidrBlock": {
+          "Fn::Sub": "${VpcResolverIp}/32"
+        },
         "PortRange": {
           "From": 53,
           "To": 53
@@ -1009,6 +997,108 @@
         "RuleAction": "deny",
         "Egress": false,
         "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ManagementSshRuleGroup": {
+      "Type": "AWS::NetworkFirewall::RuleGroup",
+      "Properties": {
+        "RuleGroupName": {
+          "Fn::Sub": "${AWS::StackName}-controller-ssh"
+        },
+        "Capacity": 10,
+        "Description": "Allow only the existing trusted controller to SSH to the disposable worker through the same-AZ firewall endpoint.",
+        "RuleGroup": {
+          "RulesSource": {
+            "RulesString": {
+              "Fn::Sub": "pass tcp ${ControllerPrivateIp}/32 any -> ${WorkerSubnetCidr} 22 (msg:\"FCP-03 trusted controller SSH management\"; sid:100; rev:1;)"
+            }
+          },
+          "StatefulRuleOptions": {
+            "RuleOrder": "STRICT_ORDER"
+          }
+        },
+        "Type": "STATEFUL",
+        "Tags": [
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Environment",
+            "Value": "disposable-test"
+          }
+        ]
+      }
+    },
+    "WorkerRouteToController": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "WorkerRouteTable"
+        },
+        "DestinationCidrBlock": {
+          "Fn::Sub": "${ControllerPrivateIp}/32"
+        },
+        "VpcEndpointId": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::Split": [
+                ":",
+                {
+                  "Fn::Select": [
+                    0,
+                    {
+                      "Fn::GetAtt": [
+                        "NetworkFirewall",
+                        "EndpointIds"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "DependsOn": "NetworkFirewall"
+    },
+    "WorkerNaclEgressSshReturn": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WorkerNetworkAcl"
+        },
+        "RuleNumber": 95,
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": true,
+        "CidrBlock": {
+          "Fn::Sub": "${ControllerPrivateIp}/32"
+        },
+        "PortRange": {
+          "From": 1024,
+          "To": 65535
+        }
+      }
+    },
+    "WorkerNaclIngressSsh": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WorkerNetworkAcl"
+        },
+        "RuleNumber": 90,
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": false,
+        "CidrBlock": {
+          "Fn::Sub": "${ControllerPrivateIp}/32"
+        },
+        "PortRange": {
+          "From": 22,
+          "To": 22
+        }
       }
     }
   },
