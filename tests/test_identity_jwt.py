@@ -412,11 +412,11 @@ def test_jwks_client_is_reused_across_token_verifications(monkeypatch: pytest.Mo
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"tenant_id": "tenant-123\\x00forged"},
-        {"roles": ["operator\\x00admin"]},
-        {"scope": "agent:run\\x00admin"},
-        {"nonce": "nonce-123\\x00forged"},
-        {"client_id": "client-123\\x00forged"},
+        {"tenant_id": "tenant-123" + chr(0) + "forged"},
+        {"roles": ["operator" + chr(0) + "admin"]},
+        {"scope": "agent:run" + chr(0) + "admin"},
+        {"nonce": "nonce-123" + chr(0) + "forged"},
+        {"client_id": "client-123" + chr(0) + "forged"},
     ],
 )
 def test_identity_claims_with_control_characters_are_rejected(
