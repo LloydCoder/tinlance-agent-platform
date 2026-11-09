@@ -221,9 +221,6 @@ class KMSSnapshotSigner:
         return valid
 
 
-
-
-
 class AESGCMCipher:
     """AES-256-GCM using a KMS-issued data key supplied by the caller."""
 
