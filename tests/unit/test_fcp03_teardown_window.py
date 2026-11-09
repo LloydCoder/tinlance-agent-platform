@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import UTC, datetime, timedelta
+from pytest import mark, raises
 
 from scripts.validate_fcp03_teardown_at import validate_teardown_at
 
 
-NOW = datetime(2026, 11, 9, 9, 0, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 9, 9, 0, 0, tzinfo=UTC)
 
 
 def test_accepts_a_teardown_deadline_inside_the_bounded_window() -> None:
@@ -16,7 +15,7 @@ def test_accepts_a_teardown_deadline_inside_the_bounded_window() -> None:
     assert result == NOW + timedelta(minutes=90)
 
 
-@pytest.mark.parametrize(
+@mark.parametrize(
     "value",
     [
         "2026-11-09T09:14:59",
@@ -27,7 +26,7 @@ def test_accepts_a_teardown_deadline_inside_the_bounded_window() -> None:
     ],
 )
 def test_rejects_deadlines_outside_the_bounded_utc_window(value: str) -> None:
-    with pytest.raises(ValueError):
+    with raises(ValueError):
         validate_teardown_at(value, now=NOW)
 
 
