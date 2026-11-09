@@ -150,9 +150,11 @@ def _dns_firewall_snapshot(
     )
 
     allowlist_domains: set[str] = set()
-    terminal_block = False
+    allow_priorities: list[int] = []
+    wildcard_block_priorities: list[int] = []
     for rule in rules:
         domain_list_id = rule.get("FirewallDomainListId")
+        priority = rule.get("Priority")
         if not isinstance(domain_list_id, str):
             continue
         domains = _all_pages(
@@ -163,8 +165,13 @@ def _dns_firewall_snapshot(
         )
         if rule.get("Action") == "ALLOW":
             allowlist_domains.update(domain for domain in domains if isinstance(domain, str))
-        if rule.get("Action") == "BLOCK" and "*" in domains:
-            terminal_block = True
+            if isinstance(priority, int):
+                allow_priorities.append(priority)
+        if rule.get("Action") == "BLOCK" and "*" in domains and isinstance(priority, int):
+            wildcard_block_priorities.append(priority)
+    terminal_block = bool(allow_priorities) and bool(wildcard_block_priorities) and (
+        min(wildcard_block_priorities) > max(allow_priorities)
+    )
 
     config = resolver.get_firewall_config(ResourceId=vpc_id).get("FirewallConfig", {})
     fail_open = config.get("FirewallFailOpen")
@@ -245,6 +252,23 @@ def collect_fcp03_snapshot(
         ),
         None,
     )
+    ipv6_default_route = next(
+        (
+            route
+            for route in routes
+            if route.get("DestinationIpv6CidrBlock") == "::/0"
+            and route.get("State", "active") == "active"
+        ),
+        None,
+    )
+    ipv6_addresses = sorted(
+        {
+            address["Ipv6Address"]
+            for interface in instance.get("NetworkInterfaces", [])
+            for address in interface.get("Ipv6Addresses", [])
+            if isinstance(address.get("Ipv6Address"), str)
+        }
+    )
 
     security_group_ids = sorted(
         {
@@ -266,6 +290,10 @@ def collect_fcp03_snapshot(
         "map_public_ip_on_launch": subnet.get("MapPublicIpOnLaunch"),
         "availability_zone": availability_zone,
         "default_route_target": _route_target(default_route) if default_route else None,
+        "ipv6_default_route_target": (
+            _route_target(ipv6_default_route) if ipv6_default_route else None
+        ),
+        "ipv6_addresses": ipv6_addresses,
         "security_group_egress": _security_group_egress(security_groups),
     }
 
