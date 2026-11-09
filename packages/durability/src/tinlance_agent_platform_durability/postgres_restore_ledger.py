@@ -74,7 +74,7 @@ class PostgresRestoreLedger:
                 raise RuntimeError("workspace restore begin returned an unexpected result")
             return row[0]
 
-        return self._transaction(tenant_id, operation)
+        return bool(self._transaction(tenant_id, operation))
 
     def complete(
         self,
