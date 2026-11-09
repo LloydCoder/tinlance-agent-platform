@@ -615,9 +615,7 @@ def collect_fcp03_snapshot(
         # through the same-AZ firewall endpoint.
         sync_states = firewall_status.get("SyncStates", {})
         az_state = (
-            sync_states.get(availability_zone, {})
-            if isinstance(sync_states, Mapping)
-            else {}
+            sync_states.get(availability_zone, {}) if isinstance(sync_states, Mapping) else {}
         )
         attachment = az_state.get("Attachment", {}) if isinstance(az_state, Mapping) else {}
         firewall_subnet_id = attachment.get("SubnetId")
@@ -648,11 +646,7 @@ def collect_fcp03_snapshot(
                 ec2, "describe_subnets", "Subnets", SubnetIds=[firewall_subnet_id]
             )
             firewall_subnet = next(
-                (
-                    item
-                    for item in firewall_subnets
-                    if item.get("SubnetId") == firewall_subnet_id
-                ),
+                (item for item in firewall_subnets if item.get("SubnetId") == firewall_subnet_id),
                 None,
             )
             if isinstance(firewall_subnet, Mapping):
@@ -660,9 +654,7 @@ def collect_fcp03_snapshot(
                 (
                     firewall_route_entries,
                     firewall_route_table_subnet_ids,
-                ) = _route_entries_for_subnet(
-                    ec2, vpc_id=vpc_id, subnet_id=firewall_subnet_id
-                )
+                ) = _route_entries_for_subnet(ec2, vpc_id=vpc_id, subnet_id=firewall_subnet_id)
                 nat_route = next(
                     (
                         route
