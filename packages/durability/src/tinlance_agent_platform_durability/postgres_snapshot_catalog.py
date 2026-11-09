@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from .snapshots import SnapshotConflictError, SnapshotReference
@@ -102,4 +102,4 @@ class PostgresSnapshotCatalog:
                 digest=digest,
             )
 
-        return self._transaction(tenant_id, operation)
+        return cast(SnapshotReference | None, self._transaction(tenant_id, operation))
