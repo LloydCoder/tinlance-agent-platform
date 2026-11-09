@@ -131,3 +131,31 @@ def test_rejects_world_http_and_ipv6_https_egress() -> None:
     )
 
     assert "unrestricted-security-group-egress" in evaluate_fcp03_topology(topology)
+
+
+def test_cli_returns_zero_and_machine_readable_pass_for_valid_snapshot(tmp_path, capsys) -> None:
+    import json
+
+    from scripts.fcp03_egress_preflight import main
+
+    snapshot_path = tmp_path / "topology.json"
+    snapshot_path.write_text(json.dumps(valid_topology()), encoding="utf-8")
+
+    assert main(["--snapshot", str(snapshot_path)]) == 0
+    assert capsys.readouterr().out == '{"findings": [], "status": "pass"}\\n'
+
+
+def test_cli_returns_nonzero_and_findings_for_invalid_snapshot(tmp_path, capsys) -> None:
+    import json
+
+    from scripts.fcp03_egress_preflight import main
+
+    topology = valid_topology()
+    topology["worker"]["public_ip"] = "198.51.100.20"
+    snapshot_path = tmp_path / "topology.json"
+    snapshot_path.write_text(json.dumps(topology), encoding="utf-8")
+
+    assert main(["--snapshot", str(snapshot_path)]) == 1
+    output = capsys.readouterr().out
+    assert '"status": "fail"' in output
+    assert '"worker-public-address"' in output
