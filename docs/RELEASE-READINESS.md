@@ -2,7 +2,7 @@
 
 The canonical M0-M14 platform roadmap and post-M14 enterprise phases are complete only when the repository's CI and security gates are green. The repository enforces package quality, PostgreSQL migration/RLS/integrity tests, R10 certification, Reference Agents certification, CodeQL and secret scanning. Tagged release artifacts are built and Sigstore-signed by the release workflow.
 
-M19-M28 established production acceptance, control expansion, identity/trust, registry governance, adversarial security, recovery, capacity, SRE and release assurance. M29 adds the final independent-assurance evidence contract.
+M19-M28 established production acceptance, control expansion, identity/trust, registry governance, adversarial security, recovery, capacity, SRE and release assurance. M22 adds fail-closed token-context, sender-binding, key-lifecycle and attestation-revocation contracts; these do not replace live signature/proof verification, KMS/HSM custody or durable revocation infrastructure. M29 adds the final independent-assurance evidence contract.
 
 ## M29 gate
 
