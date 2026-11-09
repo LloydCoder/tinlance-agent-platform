@@ -238,18 +238,21 @@ def test_missing_network_firewall_is_reported_as_incomplete_not_pass() -> None:
 
 def test_collector_is_read_only_and_uses_the_requested_instance_id() -> None:
     ec2 = ec2_client()
+    firewall = firewall_client()
+    resolver = resolver_client()
 
     collect_fcp03_snapshot(
         instance_id="i-test",
         ec2=ec2,
-        network_firewall=firewall_client(),
-        resolver=resolver_client(),
+        network_firewall=firewall,
+        resolver=resolver,
     )
 
     assert ec2.calls[0] == ("describe_instances", {"InstanceIds": ["i-test"]})
     assert all(
-        not operation.startswith(("create_", "delete_", "update_", "associate_"))
-        for operation, _ in ec2.calls
+        operation.startswith(("describe_", "list_", "get_"))
+        for client in (ec2, firewall, resolver)
+        for operation, _ in client.calls
     )
 
 
