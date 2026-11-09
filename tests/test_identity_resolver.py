@@ -390,7 +390,16 @@ class FakeDynamoDBClient:
         for action in actions:
             put = action["Put"]
             item = put["Item"]
-            pending[str(item["revocation_key"])] = dict(item)
+            decoded: dict[str, object] = {}
+            for name, value in item.items():
+                assert isinstance(value, dict)
+                assert len(value) == 1
+                if "S" in value:
+                    decoded[name] = value["S"]
+                else:
+                    assert "N" in value
+                    decoded[name] = int(value["N"])
+            pending[str(decoded["revocation_key"])] = decoded
         self.items = pending
         self.transactions.append(list(actions))
         return {}
@@ -399,9 +408,18 @@ class FakeDynamoDBClient:
         if self.fail_read:
             raise OSError("DynamoDB read unavailable")
         self.last_read_consistent = kwargs["ConsistentRead"]
-        key = kwargs["Key"]["revocation_key"]
-        item = self.items.get(str(key))
-        return {"Item": dict(item)} if item is not None else {}
+        key_value = kwargs["Key"]["revocation_key"]
+        assert isinstance(key_value, dict) and "S" in key_value
+        item = self.items.get(str(key_value["S"]))
+        if item is None:
+            return {}
+        encoded: dict[str, dict[str, str]] = {}
+        for name, value in item.items():
+            if isinstance(value, int):
+                encoded[name] = {"N": str(value)}
+            else:
+                encoded[name] = {"S": str(value)}
+        return {"Item": encoded}
 
 
 def test_dynamodb_revocation_store_atomically_writes_token_and_family_ids(

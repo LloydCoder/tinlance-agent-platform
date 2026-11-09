@@ -152,7 +152,8 @@ class SQLiteTokenRevocationStore:
 class DynamoDBTokenRevocationStore:
     """Shared, atomic token-family revocation backed by a DynamoDB table.
 
-    Pass the auto-marshalling client from boto3.resource("dynamodb").meta.client.
+    Pass a low-level boto3 DynamoDB client (for example, boto3.client("dynamodb")).
+    This adapter serializes and deserializes DynamoDB AttributeValue maps itself.
     The table must use a string partition key named revocation_key and have TTL
     enabled on the numeric expires_at attribute.
     """
@@ -249,10 +250,53 @@ class DynamoDBTokenRevocationStore:
             }
             if request_id is not None:
                 item["request_id"] = request_id
-            actions.append({"Put": {"TableName": self.table_name, "Item": item}})
+            actions.append(
+                {
+                    "Put": {
+                        "TableName": self.table_name,
+                        "Item": {
+                            name: self._serialize_attribute(value) for name, value in item.items()
+                        },
+                    }
+                }
+            )
 
         self.client.transact_write_items(TransactItems=actions)
         return identifiers
+
+    @staticmethod
+    def _serialize_attribute(value: str | int) -> dict[str, str]:
+        """Serialize the primitive values used by this record for boto3's low-level API."""
+        if isinstance(value, str):
+            return {"S": value}
+        if isinstance(value, int) and not isinstance(value, bool):
+            return {"N": str(value)}
+        raise TypeError("DynamoDB revocation attributes must be strings or integers")
+
+    @staticmethod
+    def _deserialize_string(item: Mapping[str, object], name: str) -> str:
+        value = item.get(name)
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != {"S"}
+            or not isinstance(value.get("S"), str)
+        ):
+            raise RuntimeError(f"DynamoDB revocation record has an invalid {name}")
+        return str(value["S"])
+
+    @staticmethod
+    def _deserialize_expiry(item: Mapping[str, object]) -> Decimal:
+        value = item.get("expires_at")
+        if not isinstance(value, Mapping) or set(value) != {"N"}:
+            raise RuntimeError("DynamoDB revocation record has an invalid TTL")
+        raw = value.get("N")
+        try:
+            expiry = Decimal(str(raw))
+        except Exception as exc:
+            raise RuntimeError("DynamoDB revocation record has an invalid TTL") from exc
+        if not expiry.is_finite() or expiry != expiry.to_integral_value():
+            raise RuntimeError("DynamoDB revocation record has an invalid TTL")
+        return expiry
 
     def is_revoked(self, issuer: str, token_id: str) -> bool:
         """Read revocation state consistently; malformed records fail closed."""
@@ -260,17 +304,16 @@ class DynamoDBTokenRevocationStore:
         self._validate_identity(issuer, token_id)
         response = self.client.get_item(
             TableName=self.table_name,
-            Key={"revocation_key": self._revocation_key(issuer, token_id)},
+            Key={"revocation_key": {"S": self._revocation_key(issuer, token_id)}},
             ConsistentRead=True,
         )
         item = response.get("Item")
         if item is None:
             return False
         if not isinstance(item, Mapping) or (
-            item.get("issuer") != issuer or item.get("token_id") != token_id
+            self._deserialize_string(item, "issuer") != issuer
+            or self._deserialize_string(item, "token_id") != token_id
         ):
             raise RuntimeError("DynamoDB revocation record does not match its lookup key")
-        expires_at = item.get("expires_at")
-        if isinstance(expires_at, bool) or not isinstance(expires_at, (int, float, Decimal)):
-            raise RuntimeError("DynamoDB revocation record has an invalid TTL")
-        return int(expires_at) > int(time.time())
+        expires_at = self._deserialize_expiry(item)
+        return expires_at > Decimal(str(int(time.time())))
