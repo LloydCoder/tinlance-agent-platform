@@ -95,9 +95,10 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     associated_vpcs = _strings(dns_firewall.get("associated_vpc_ids"))
     if not isinstance(worker_vpc, str) or associated_vpcs != {worker_vpc}:
         findings.add("dns-resolution-pool-cross-vpc")
-    if not _strings(dns_firewall.get("allowlist_domains")) or dns_firewall.get(
-        "terminal_block"
-    ) is not True:
+    if (
+        not _strings(dns_firewall.get("allowlist_domains"))
+        or dns_firewall.get("terminal_block") is not True
+    ):
         findings.add("dns-allowlist-incomplete")
     if dns_firewall.get("failure_mode") != "CLOSED":
         findings.add("dns-firewall-not-fail-closed")
