@@ -283,6 +283,7 @@ def _stateful_rule_group_snapshots(
         )
     return snapshots
 
+
 def collect_fcp03_snapshot(
     *,
     instance_id: str,
