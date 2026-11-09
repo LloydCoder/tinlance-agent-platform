@@ -25,6 +25,15 @@ class DependencyKind(StrEnum):
     TELEMETRY = "telemetry"
     BACKUP = "backup"
     INCIDENT_RESPONSE = "incident_response"
+    HARDWARE_ATTESTATION = "hardware_attestation"
+    EGRESS_ENFORCEMENT = "egress_enforcement"
+    DNS_POLICY = "dns_policy"
+    IDENTITY_REVOCATION = "identity_revocation"
+    ENCRYPTED_PROFILE_STORAGE = "encrypted_profile_storage"
+    RESOURCE_ISOLATION = "resource_isolation"
+    DISASTER_RECOVERY = "disaster_recovery"
+    COST_GOVERNANCE = "cost_governance"
+    SECURITY_REVIEW = "security_review"
     OWNERSHIP = "ownership"
 
 
