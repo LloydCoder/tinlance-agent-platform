@@ -58,6 +58,16 @@ The template is JSON so it can be checked with standard tooling. CloudFormation 
 
 This schema audit is stronger than JSON syntax validation, but it still does not prove runtime dependency ordering, IAM authorization at deployment, service quota availability, route convergence, endpoint readiness, or packet-level enforcement.
 
+Run the focused regression suite with:
+
+```bash
+pytest -q \
+  tests/unit/test_fcp03_aws_inventory.py \
+  tests/unit/test_fcp03_egress_preflight.py \
+  tests/unit/test_fcp03_cloudformation_template.py \
+  tests/unit/test_fcp03_teardown_window.py
+```
+
 Example command after the cost gate is accepted:
 
 ```bash
