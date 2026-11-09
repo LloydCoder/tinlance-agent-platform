@@ -525,7 +525,12 @@ class FakeS3:
     def get_object(self, **kwargs):
         self.get_calls.append(kwargs)
         value = self.objects[(kwargs["Bucket"], kwargs["Key"])]
-        return {"Body": S3Body(value), "ContentLength": len(value)}
+        return {
+            "Body": S3Body(value),
+            "ContentLength": len(value),
+            "ServerSideEncryption": "aws:kms",
+            "SSEKMSKeyId": "arn:aws:kms:eu-west-1:123456789012:key/example",
+        }
 
 
 def test_s3_snapshot_store_uses_conditional_create_and_sse_kms(tmp_path):
@@ -554,7 +559,7 @@ def test_s3_snapshot_store_rejects_invalid_prefix_and_oversized_objects():
         S3SnapshotStore(
             s3_client=FakeS3(),
             bucket="tinlance-snapshots",
-            sse_kms_key_id="kms-key",
+            sse_kms_key_id="arn:aws:kms:eu-west-1:123456789012:key/example",
             prefix="../escape",
         )
     store = S3SnapshotStore(
