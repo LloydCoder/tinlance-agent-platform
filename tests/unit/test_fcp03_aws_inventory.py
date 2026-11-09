@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import pytest
 from scripts.fcp03_aws_inventory import _all_pages, collect_fcp03_snapshot
 from scripts.fcp03_egress_preflight import evaluate_fcp03_topology
-
-import pytest
 
 
 class FakeClient:
