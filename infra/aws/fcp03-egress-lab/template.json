@@ -14,11 +14,6 @@
       "Type": "String",
       "Description": "Required UTC timestamp YYYY-MM-DDTHH:MM:SS. Validate with scripts/validate_fcp03_teardown_at.py; must be 15 minutes to 2 hours after deployment."
     },
-    "WorkerInstanceProfileName": {
-      "Type": "String",
-      "Default": "TinlytTestRuntimeSSMProfile",
-      "Description": "Existing least-privilege SSM instance profile; this stack does not create or widen its IAM permissions."
-    },
     "WorkerInstanceType": {
       "Type": "String",
       "Default": "t4g.medium",
@@ -669,7 +664,8 @@
         "NetworkFirewallLogging",
         "AutomaticTeardown",
         "PublicReturnRoute",
-        "WorkerNetworkAclAssociation"
+        "WorkerNetworkAclAssociation",
+        "SSMHybridActivation"
       ],
       "Properties": {
         "ImageId": {
@@ -677,9 +673,6 @@
         },
         "InstanceType": {
           "Ref": "WorkerInstanceType"
-        },
-        "IamInstanceProfile": {
-          "Ref": "WorkerInstanceProfileName"
         },
         "SubnetId": {
           "Ref": "WorkerSubnet"
@@ -690,7 +683,7 @@
           }
         ],
         "MetadataOptions": {
-          "HttpEndpoint": "enabled",
+          "HttpEndpoint": "disabled",
           "HttpTokens": "required",
           "HttpPutResponseHopLimit": 1,
           "InstanceMetadataTags": "disabled"
@@ -729,7 +722,12 @@
             "Key": "TestScope",
             "Value": "isolated-egress-enforcement"
           }
-        ]
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/bin/bash\nset -euo pipefail\nsystemctl stop amazon-ssm-agent || true\nactivation_code=\"$(printf '%s' '${SSMHybridActivation.ActivationCodeB64}' | base64 -d)\"\nactivation_id=\"$(printf '%s' '${SSMHybridActivation.ActivationIdB64}' | base64 -d)\"\namazon-ssm-agent -register -code \"$activation_code\" -id \"$activation_id\" -region \"${AWS::Region}\"\nunset activation_code activation_id\nsystemctl enable --now amazon-ssm-agent\n"
+          }
+        }
       }
     },
     "TeardownRole": {
@@ -1009,6 +1007,231 @@
         "RuleAction": "deny",
         "Egress": false,
         "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "SSMHybridManagedNodeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ssm.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        ],
+        "Tags": [
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Environment",
+            "Value": "disposable-test"
+          }
+        ]
+      }
+    },
+    "ActivationLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "FCP03ScopedHybridActivationLifecycle",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "CreateOnlyTaggedFcp03Activation",
+                  "Effect": "Allow",
+                  "Action": "ssm:CreateActivation",
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:RequestTag/FCPPhase": "FCP-03",
+                      "aws:RequestTag/Environment": "disposable-test"
+                    }
+                  }
+                },
+                {
+                  "Sid": "DeleteOnlyFcp03Activations",
+                  "Effect": "Allow",
+                  "Action": "ssm:DeleteActivation",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:activation/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "ssm:resourceTag/FCPPhase": "FCP-03"
+                    }
+                  }
+                },
+                {
+                  "Sid": "ReadManagedNodeRegistrationForActivation",
+                  "Effect": "Allow",
+                  "Action": "ssm:DescribeInstanceInformation",
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "DeregisterOnlyFcp03ManagedNodes",
+                  "Effect": "Allow",
+                  "Action": "ssm:DeregisterManagedInstance",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:managed-instance/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "ssm:resourceTag/FCPPhase": "FCP-03"
+                    }
+                  }
+                },
+                {
+                  "Sid": "PassOnlyHybridNodeRoleToSystemsManager",
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "SSMHybridManagedNodeRole",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "iam:PassedToService": "ssm.amazonaws.com"
+                    }
+                  }
+                },
+                {
+                  "Sid": "WriteActivationLambdaLogs",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-fcp03-activation:*"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Environment",
+            "Value": "disposable-test"
+          }
+        ]
+      }
+    },
+    "ActivationLambdaLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-fcp03-activation"
+        },
+        "RetentionInDays": 7
+      }
+    },
+    "ActivationLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}-fcp03-activation"
+        },
+        "Runtime": "python3.12",
+        "Handler": "index.handler",
+        "Timeout": 60,
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "ActivationLambdaRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "ZipFile": "import base64\nimport json\nimport urllib.request\nfrom datetime import datetime, timedelta, timezone\n\nimport boto3\nfrom botocore.exceptions import ClientError\n\nssm = boto3.client(\"ssm\")\n\n\ndef _respond(event, context, status, data=None, physical_id=None, reason=None):\n    body = {\n        \"Status\": status,\n        \"Reason\": reason or f\"See CloudWatch log stream {context.log_stream_name}\",\n        \"PhysicalResourceId\": physical_id or event.get(\"PhysicalResourceId\") or context.log_stream_name,\n        \"StackId\": event[\"StackId\"],\n        \"RequestId\": event[\"RequestId\"],\n        \"LogicalResourceId\": event[\"LogicalResourceId\"],\n        \"NoEcho\": True,\n        \"Data\": data or {},\n    }\n    payload = json.dumps(body).encode(\"utf-8\")\n    request = urllib.request.Request(\n        event[\"ResponseURL\"],\n        data=payload,\n        headers={\"content-type\": \"\", \"content-length\": str(len(payload))},\n        method=\"PUT\",\n    )\n    with urllib.request.urlopen(request, timeout=10):\n        pass\n\n\ndef _delete_activation(activation_id):\n    if not activation_id or activation_id == \"NONE\":\n        return\n    paginator = ssm.get_paginator(\"describe_instance_information\")\n    for page in paginator.paginate(\n        Filters=[{\"Key\": \"ActivationIds\", \"Values\": [activation_id]}]\n    ):\n        for node in page.get(\"InstanceInformationList\", []):\n            instance_id = node.get(\"InstanceId\")\n            if instance_id and instance_id.startswith(\"mi-\"):\n                try:\n                    ssm.deregister_managed_instance(InstanceId=instance_id)\n                except ClientError as exc:\n                    if exc.response.get(\"Error\", {}).get(\"Code\") not in {\n                        \"InvalidInstanceId\", \"InvalidInstanceInformation\"\n                    }:\n                        raise\n    try:\n        ssm.delete_activation(ActivationId=activation_id)\n    except ClientError as exc:\n        if exc.response.get(\"Error\", {}).get(\"Code\") not in {\n            \"InvalidActivation\", \"InvalidActivationId\", \"ActivationNotFound\"\n        }:\n            raise\n\n\ndef handler(event, context):\n    request_type = event.get(\"RequestType\")\n    if request_type == \"Delete\":\n        activation_id = event.get(\"PhysicalResourceId\")\n        try:\n            _delete_activation(activation_id)\n            _respond(event, context, \"SUCCESS\", physical_id=activation_id)\n        except Exception as exc:\n            _respond(event, context, \"FAILED\", physical_id=activation_id, reason=str(exc))\n        return\n\n    activation_id = None\n    try:\n        props = event[\"ResourceProperties\"]\n        expires = datetime.now(timezone.utc) + timedelta(hours=2)\n        response = ssm.create_activation(\n            IamRole=props[\"IamRole\"],\n            RegistrationLimit=1,\n            ExpirationDate=expires,\n            DefaultInstanceName=props[\"DefaultInstanceName\"],\n            Description=props[\"Description\"],\n            Tags=[\n                {\"Key\": \"FCPPhase\", \"Value\": \"FCP-03\"},\n                {\"Key\": \"Environment\", \"Value\": \"disposable-test\"},\n                {\"Key\": \"ManagedBy\", \"Value\": \"Tinlance-FCP\"},\n            ],\n        )\n        activation_id = response[\"ActivationId\"]\n        data = {\n            \"ActivationId\": activation_id,\n            \"ActivationCodeB64\": base64.b64encode(\n                response[\"ActivationCode\"].encode(\"utf-8\")\n            ).decode(\"ascii\"),\n        }\n        _respond(event, context, \"SUCCESS\", data=data, physical_id=activation_id)\n    except Exception as exc:\n        if activation_id:\n            try:\n                _delete_activation(activation_id)\n            except Exception:\n                pass\n        _respond(event, context, \"FAILED\", physical_id=activation_id, reason=str(exc))\n"
+        },
+        "Tags": [
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Environment",
+            "Value": "disposable-test"
+          }
+        ]
+      }
+    },
+    "ActivationLambdaPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ActivationLambda",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "cloudformation.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*"
+        }
+      }
+    },
+    "SSMHybridActivation": {
+      "Type": "Custom::FCP03SSMHybridActivation",
+      "DependsOn": [
+        "ActivationLambdaPermission",
+        "ActivationLambdaLogGroup",
+        "SSMHybridManagedNodeRole"
+      ],
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "ActivationLambda",
+            "Arn"
+          ]
+        },
+        "IamRole": {
+          "Fn::GetAtt": [
+            "SSMHybridManagedNodeRole",
+            "RoleName"
+          ]
+        },
+        "DefaultInstanceName": {
+          "Fn::Sub": "${AWS::StackName}-worker"
+        },
+        "Description": "Single-use FCP-03 disposable worker registration; expires after two hours."
       }
     }
   },
