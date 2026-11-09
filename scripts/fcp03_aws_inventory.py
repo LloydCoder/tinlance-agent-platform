@@ -285,7 +285,6 @@ def _stateful_rule_group_snapshots(
     return snapshots
 
 
-
 def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
     """Return the worker subnet's exact NACL association and normalized egress rules."""
     network_acls = _all_pages(
@@ -298,8 +297,7 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
         acl
         for acl in network_acls
         if any(
-            association.get("SubnetId") == subnet_id
-            for association in acl.get("Associations", [])
+            association.get("SubnetId") == subnet_id for association in acl.get("Associations", [])
         )
     ]
     if len(matches) != 1:
@@ -338,11 +336,7 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
             }
         )
     egress_rules.sort(
-        key=lambda rule: (
-            rule["rule_number"]
-            if isinstance(rule["rule_number"], int)
-            else 2**31
-        )
+        key=lambda rule: rule["rule_number"] if isinstance(rule["rule_number"], int) else 2**31
     )
     return {
         "associated": True,
@@ -350,6 +344,7 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
         "subnet_ids": subnet_ids,
         "egress_rules": egress_rules,
     }
+
 
 def collect_fcp03_snapshot(
     *,
@@ -391,9 +386,7 @@ def collect_fcp03_snapshot(
     vpc_cidr = vpc.get("CidrBlock") if isinstance(vpc, Mapping) else None
     try:
         vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
-        resolver_ip = (
-            str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
-        )
+        resolver_ip = str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
     except ValueError:
         resolver_ip = None
 
