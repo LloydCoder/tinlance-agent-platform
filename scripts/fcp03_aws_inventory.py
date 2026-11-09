@@ -506,11 +506,8 @@ def collect_fcp03_snapshot(
     route_table_subnet_ids = sorted(
         {
             association["SubnetId"]
-            for association in (
-                route_tables[0].get("Associations", []) if route_tables else []
-            )
-            if isinstance(association, Mapping)
-            and isinstance(association.get("SubnetId"), str)
+            for association in (route_tables[0].get("Associations", []) if route_tables else [])
+            if isinstance(association, Mapping) and isinstance(association.get("SubnetId"), str)
         }
     )
     routes = route_tables[0].get("Routes", []) if route_tables else []
