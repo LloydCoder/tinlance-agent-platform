@@ -311,6 +311,98 @@ class FilesystemSnapshotStore:
             return stream.read()
 
 
+
+class S3SnapshotStore:
+    """Immutable S3 object storage with conditional creation and SSE-KMS."""
+
+    MAX_OBJECT_BYTES = 160 * 1024 * 1024
+
+    def __init__(
+        self,
+        *,
+        s3_client: object,
+        bucket: str,
+        sse_kms_key_id: str,
+        prefix: str = "tinlance/workspace-snapshots/v1",
+    ) -> None:
+        if not isinstance(bucket, str) or not bucket or "/" in bucket:
+            raise ValueError("snapshot S3 bucket name is invalid")
+        if not isinstance(sse_kms_key_id, str) or not sse_kms_key_id:
+            raise ValueError("snapshot S3 storage requires an SSE-KMS key identifier")
+        if (
+            not isinstance(prefix, str)
+            or not prefix
+            or prefix.startswith("/")
+            or any(part in ("", ".", "..") for part in prefix.split("/"))
+        ):
+            raise ValueError("snapshot S3 prefix must be a normalized relative key prefix")
+        self._s3 = s3_client
+        self._bucket = bucket
+        self._kms_key_id = sse_kms_key_id
+        self._prefix = prefix
+
+    def _key(self, snapshot_id: UUID) -> str:
+        if not isinstance(snapshot_id, UUID):
+            raise TypeError("snapshot_id must be a UUID")
+        return f"{self._prefix}/{snapshot_id.hex}.snapshot"
+
+    def put_if_absent(self, snapshot_id: UUID, value: bytes) -> None:
+        if not isinstance(value, bytes) or not value or len(value) > self.MAX_OBJECT_BYTES:
+            raise ValueError("snapshot object must be non-empty bytes within the storage size limit")
+        try:
+            self._s3.put_object(  # type: ignore[attr-defined]
+                Bucket=self._bucket,
+                Key=self._key(snapshot_id),
+                Body=value,
+                ContentType="application/octet-stream",
+                IfNoneMatch="*",
+                ServerSideEncryption="aws:kms",
+                SSEKMSKeyId=self._kms_key_id,
+            )
+        except Exception as exc:
+            response = getattr(exc, "response", {})
+            error = response.get("Error", {}) if isinstance(response, dict) else {}
+            metadata = response.get("ResponseMetadata", {}) if isinstance(response, dict) else {}
+            if error.get("Code") in {"PreconditionFailed", "ConditionalRequestConflict"} or metadata.get(
+                "HTTPStatusCode"
+            ) in {409, 412}:
+                raise SnapshotConflictError("snapshot identifier already exists in S3") from exc
+            raise
+
+    def get(self, snapshot_id: UUID) -> bytes:
+        try:
+            response = self._s3.get_object(  # type: ignore[attr-defined]
+                Bucket=self._bucket,
+                Key=self._key(snapshot_id),
+            )
+        except Exception as exc:
+            response = getattr(exc, "response", {})
+            error = response.get("Error", {}) if isinstance(response, dict) else {}
+            metadata = response.get("ResponseMetadata", {}) if isinstance(response, dict) else {}
+            if error.get("Code") in {"NoSuchKey", "NotFound"} or metadata.get("HTTPStatusCode") == 404:
+                raise SnapshotError("snapshot object does not exist in S3") from exc
+            raise
+        body = response.get("Body")
+        length = response.get("ContentLength")
+        if (
+            body is None
+            or isinstance(length, bool)
+            or not isinstance(length, int)
+            or length < 1
+            or length > self.MAX_OBJECT_BYTES
+        ):
+            if body is not None:
+                body.close()
+            raise SnapshotIntegrityError("S3 snapshot object type or size is invalid")
+        try:
+            value = body.read(self.MAX_OBJECT_BYTES + 1)
+        finally:
+            body.close()
+        if not isinstance(value, bytes) or len(value) != length or len(value) > self.MAX_OBJECT_BYTES:
+            raise SnapshotIntegrityError("S3 snapshot object length does not match its metadata")
+        return value
+
+
 class WorkspaceSnapshotService:
     """Creates authenticated snapshots and restores them under a newer lease fence.
 
