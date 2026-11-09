@@ -159,3 +159,11 @@ def test_cli_returns_nonzero_and_findings_for_invalid_snapshot(tmp_path, capsys)
     output = capsys.readouterr().out
     assert '"status": "fail"' in output
     assert '"worker-public-address"' in output
+
+
+def test_rejects_worker_ipv6_address_or_default_route() -> None:
+    topology = valid_topology()
+    topology["worker"]["ipv6_addresses"] = ["2001:db8::10"]
+    topology["worker"]["ipv6_default_route_target"] = "igw-123"
+
+    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(topology)
