@@ -38,6 +38,10 @@ def valid_topology() -> dict[str, object]:
             "allowlist_domains": ["approved.example"],
             "terminal_block": True,
             "failure_mode": "CLOSED",
+            "rule_group_status": "COMPLETE",
+            "association_statuses": ["COMPLETE"],
+            "rule_statuses": ["COMPLETE", "COMPLETE"],
+            "domain_list_statuses": ["COMPLETE", "COMPLETE"],
         },
     }
 
@@ -167,3 +171,16 @@ def test_rejects_worker_ipv6_address_or_default_route() -> None:
     topology["worker"]["ipv6_default_route_target"] = "igw-123"
 
     assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_incomplete_dns_firewall_resources() -> None:
+    topology = valid_topology()
+    topology["dns_firewall"]["association_statuses"] = ["UPDATING"]
+    topology["dns_firewall"]["rule_statuses"] = ["COMPLETE", "UPDATING"]
+    topology["dns_firewall"]["domain_list_statuses"] = ["IMPORTING"]
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "dns-rule-group-association-not-ready" in findings
+    assert "dns-firewall-rule-not-ready" in findings
+    assert "dns-firewall-domain-list-not-ready" in findings
