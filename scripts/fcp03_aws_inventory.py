@@ -272,12 +272,16 @@ def _stateful_rule_group_snapshots(
                 "type": response_metadata.get("Type", "UNKNOWN"),
                 "rule_order": stateful_options.get("RuleOrder"),
                 "generated_rules_type": domain_list.get("GeneratedRulesType"),
-                "targets": sorted(
-                    value for value in targets if isinstance(value, str)
-                ) if isinstance(targets, list) else [],
-                "target_types": sorted(
-                    value for value in target_types if isinstance(value, str)
-                ) if isinstance(target_types, list) else [],
+                "targets": (
+                    sorted(value for value in targets if isinstance(value, str))
+                    if isinstance(targets, list)
+                    else []
+                ),
+                "target_types": (
+                    sorted(value for value in target_types if isinstance(value, str))
+                    if isinstance(target_types, list)
+                    else []
+                ),
             }
         )
     return snapshots
