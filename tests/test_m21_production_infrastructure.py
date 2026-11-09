@@ -102,7 +102,7 @@ def test_verified_dependency_requires_a_sha256_evidence_digest() -> None:
 
 
 def test_production_readiness_rejects_expired_dependency_evidence() -> None:
-    expired = datetime(2026, 11, 8, tzinfo=UTC)
+    expired = datetime(2026, 11, 9, 12, tzinfo=UTC)
     dependencies = tuple(
         ProductionDependency(
             dependency.kind,
@@ -118,7 +118,7 @@ def test_production_readiness_rejects_expired_dependency_evidence() -> None:
     )
     with pytest.raises(RuntimeError, match="expired"):
         ProductionReadiness("1.1.0", dependencies).verify(
-            now=datetime(2026, 11, 9, tzinfo=UTC)
+            now=datetime(2026, 11, 10, tzinfo=UTC)
         )
 
 
