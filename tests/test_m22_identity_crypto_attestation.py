@@ -261,3 +261,48 @@ def test_token_security_constant_time_claim_comparison_accepts_unicode_nonce() -
         expected_nonce="nonce-ü",
         now=now,
     )
+
+
+
+def test_key_lifecycle_rejects_invalid_state_transitions_and_timestamps() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="fields are required"):
+        KeyVersion("", "1", "EdDSA", KeyState.ACTIVE, now)
+    with pytest.raises(ValueError, match="supported KeyState"):
+        KeyVersion("kms/platform", "1", "EdDSA", "active", now)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="retirement timestamp cannot precede"):
+        KeyVersion(
+            "kms/platform", "1", "EdDSA", KeyState.RETIRED,
+            now, now - timedelta(seconds=1),
+        )
+    with pytest.raises(ValueError, match="revocation timestamp cannot precede activation"):
+        KeyVersion(
+            "kms/platform", "1", "EdDSA", KeyState.REVOKED,
+            now, revoked_at=now - timedelta(seconds=1),
+        )
+    with pytest.raises(ValueError, match="active keys cannot"):
+        KeyVersion(
+            "kms/platform", "1", "EdDSA", KeyState.ACTIVE,
+            now, retired_at=now,
+        )
+    with pytest.raises(ValueError, match="retired keys require"):
+        KeyVersion(
+            "kms/platform", "1", "EdDSA", KeyState.RETIRED,
+            now, retired_at=now, revoked_at=now,
+        )
+    with pytest.raises(ValueError, match="revocation timestamp cannot precede retirement"):
+        KeyVersion(
+            "kms/platform", "1", "EdDSA", KeyState.REVOKED,
+            now - timedelta(days=1),
+            retired_at=now - timedelta(hours=1),
+            revoked_at=now - timedelta(hours=2),
+        )
+
+
+def test_key_lifecycle_rejects_empty_lifecycle_and_naive_selection_time() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="at least one version"):
+        KeyLifecycle(())
+    active = KeyVersion("kms/platform", "1", "EdDSA", KeyState.ACTIVE, now)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        KeyLifecycle((active,)).active(now=datetime(2026, 1, 1))
