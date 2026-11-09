@@ -456,3 +456,36 @@ def test_snapshot_catalog_records_and_requires_exact_tenant_scoped_reference(tmp
             ledger=Ledger(),
             credential_refresher=Credentials(),
         )
+
+
+def test_restore_preserves_published_tree_when_ledger_completion_is_ambiguous(tmp_path):
+    class AmbiguousCompletionLedger(Ledger):
+        def complete(self, tenant_id, workspace_id, restore_id, snapshot_digest):
+            raise RuntimeError("database connection lost after commit")
+
+    snapshots = service(tmp_path)
+    reference = snapshots.create(
+        tenant_id=TENANT,
+        workspace_id=WORKSPACE,
+        fencing_token=4,
+        files={"workspace/README.md": b"published atomically"},
+    )
+    destination = tmp_path / "host" / "workspace"
+    destination.parent.mkdir()
+    ledger = AmbiguousCompletionLedger()
+
+    with pytest.raises(RuntimeError, match="database connection lost"):
+        snapshots.restore(
+            reference=reference,
+            tenant_id=TENANT,
+            workspace_id=WORKSPACE,
+            restore_id=uuid4(),
+            fencing_token=5,
+            destination=destination,
+            lease_authority=LeaseAuthority(),
+            ledger=ledger,
+            credential_refresher=Credentials(),
+        )
+
+    assert (destination / "workspace/README.md").read_bytes() == b"published atomically"
+    assert not ledger.failed
