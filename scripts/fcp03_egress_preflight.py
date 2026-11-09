@@ -16,9 +16,19 @@ def _object(value: object) -> Mapping[str, Any]:
 
 
 def _strings(value: object) -> set[str]:
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return {item for item in value if isinstance(item, str) and item}
-    return set()
+    """Return a set only when the entire inventory collection is well-formed.
+
+    Silently filtering malformed members can turn an incomplete AWS response
+    into an apparently valid allowlist or route-table association.
+    """
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return set()
+    if any(not isinstance(item, str) or not item for item in value):
+        return set()
+    values = set(value)
+    if len(values) != len(value):
+        return set()
+    return values
 
 
 def _has_unrestricted_egress(rules: object) -> bool:
