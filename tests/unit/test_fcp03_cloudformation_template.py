@@ -61,8 +61,9 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
     assert worker_instance["MetadataOptions"]["HttpTokens"] == "required"
     assert worker_instance["MetadataOptions"]["HttpPutResponseHopLimit"] == 1
     assert "IamInstanceProfile" not in worker_instance
-    assert worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"].find("FCP03_BOOTSTRAP_START") >= 0
-    assert "FCP03_TEST_DNS_APPROVED=PASS" in worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
+    bootstrap = worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"][0]
+    assert bootstrap.find("FCP03_BOOTSTRAP_START") >= 0
+    assert "FCP03_TEST_DNS_APPROVED=PASS" in bootstrap
     bootstrap = worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
     assert isinstance(bootstrap, list)
     assert bootstrap[1] == {"ApprovedProbeDomain": {"Fn::Select": [0, {"Ref": "ApprovedDomains"}]}}
