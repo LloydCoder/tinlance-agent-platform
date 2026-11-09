@@ -330,11 +330,25 @@ def collect_fcp03_snapshot(
         else []
     )
 
+    metadata_options = instance.get("MetadataOptions")
+    metadata_options = metadata_options if isinstance(metadata_options, Mapping) else {}
+
     worker = {
         "vpc_id": vpc_id,
         "subnet_cidr": subnet.get("CidrBlock"),
         "public_ip": instance.get("PublicIpAddress"),
         "map_public_ip_on_launch": subnet.get("MapPublicIpOnLaunch"),
+        "metadata_endpoint_enabled": (
+            metadata_options.get("HttpEndpoint") == "enabled"
+            if metadata_options.get("HttpEndpoint") in {"enabled", "disabled"}
+            else None
+        ),
+        "metadata_tokens_required": (
+            metadata_options.get("HttpTokens") == "required"
+            if metadata_options.get("HttpTokens") in {"required", "optional"}
+            else None
+        ),
+        "metadata_hop_limit": metadata_options.get("HttpPutResponseHopLimit"),
         "ipv6_enabled": bool(
             subnet.get("AssignIpv6AddressOnCreation") or subnet.get("Ipv6CidrBlockAssociationSet")
         ),
