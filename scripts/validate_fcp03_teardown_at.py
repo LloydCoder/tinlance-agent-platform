@@ -1,5 +1,7 @@
 """Validate the required disposable FCP-03 stack auto-teardown deadline."""
 
+# isort: skip_file
+
 from __future__ import annotations
 
 import argparse
