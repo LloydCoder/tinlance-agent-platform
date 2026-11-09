@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+from json import loads
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +11,7 @@ TEMPLATE_PATH = (
 
 
 def load_template() -> dict[str, Any]:
-    return json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+    return loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
 def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
@@ -127,16 +127,22 @@ def test_lab_has_an_automatic_stack_teardown_target_scoped_to_this_stack() -> No
     assert schedule["Name"] == "tinlance-fcp03-auto-teardown"
     assert schedule["FlexibleTimeWindow"]["Mode"] == "OFF"
     trust = resources["TeardownRole"]["Properties"]["AssumeRolePolicyDocument"]
+    expected_schedule_arn = (
+        "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:"
+        "schedule/default/tinlance-fcp03-auto-teardown"
+    )
     assert trust["Statement"][0]["Condition"]["ArnEquals"]["aws:SourceArn"] == {
-        "Fn::Sub": "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/tinlance-fcp03-auto-teardown"
+        "Fn::Sub": expected_schedule_arn
     }
     assert target["Arn"] == "arn:aws:scheduler:::aws-sdk:cloudformation:deleteStack"
     assert target["Input"]["Fn::Sub"] == "{\"StackName\":\"${AWS::StackName}\"}"
     statement = role_policy["Statement"][0]
     assert statement["Action"] == ["cloudformation:DeleteStack"]
-    assert statement["Resource"] == {
-        "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*"
-    }
+    expected_stack_arn = (
+        "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:"
+        "stack/${AWS::StackName}/*"
+    )
+    assert statement["Resource"] == {"Fn::Sub": expected_stack_arn}
 
 
 def test_lab_reuses_the_existing_ssm_instance_profile_without_widening_it() -> None:
@@ -188,8 +194,14 @@ def test_worker_nacl_allows_only_resolver_dns_and_inspected_https_egress() -> No
         for resource in resources.values()
         if resource["Type"] == "AWS::EC2::NetworkAclEntry"
     ]
-    egress = sorted((entry for entry in entries if entry["Egress"]), key=lambda entry: entry["RuleNumber"])
-    ingress = sorted((entry for entry in entries if not entry["Egress"]), key=lambda entry: entry["RuleNumber"])
+    egress = sorted(
+        (entry for entry in entries if entry["Egress"]),
+        key=lambda entry: entry["RuleNumber"],
+    )
+    ingress = sorted(
+        (entry for entry in entries if not entry["Egress"]),
+        key=lambda entry: entry["RuleNumber"],
+    )
 
     assert [entry["RuleNumber"] for entry in egress] == [90, 91, 100, 110, 32766]
     assert egress[0]["CidrBlock"] == "10.42.0.2/32"
