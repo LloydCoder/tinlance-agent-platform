@@ -80,5 +80,5 @@ class KeyLifecycle:
         _require_aware(current, "current time")
         active = [version for version in self.versions if version.usable(now=current)]
         if len(active) != 1:
-            raise RuntimeError("key lifecycle requires exactly one usable active version")
+            raise RuntimeError("key lifecycle requires exactly one active usable key version")
         return active[0]
