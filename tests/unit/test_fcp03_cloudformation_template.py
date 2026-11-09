@@ -67,6 +67,7 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
             "FromPort": 443,
             "ToPort": 443,
             "CidrIp": "0.0.0.0/0",
+            "Description": "HTTPS routed through Network Firewall",
         }
     ]
 
