@@ -36,6 +36,8 @@ class FakeConnection:
         self.calls.append((sql, params))
         if self.fail:
             raise RuntimeError("database unavailable")
+        if sql.startswith("SELECT set_config"):
+            return FakeCursor(("tenant-scoped",))
         return FakeCursor(self.rows.pop(0) if self.rows else (True,))
 
     def commit(self):
