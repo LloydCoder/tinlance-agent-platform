@@ -54,6 +54,42 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     validation = _object(policy.get("route53_resolved_ip_validation"))
     dns_firewall = _object(snapshot.get("dns_firewall"))
 
+    if policy.get("status") != "ACTIVE":
+        findings.add("firewall-policy-not-active")
+    policy_errors = policy.get("errors")
+    if policy_errors is None:
+        findings.add("firewall-policy-errors-unknown")
+    elif policy_errors:
+        findings.add("firewall-policy-errors-present")
+    if policy.get("stateful_rule_order") != "STRICT_ORDER":
+        findings.add("firewall-stateful-order-not-strict")
+    if policy.get("stateful_default_actions") != ["aws:drop_strict"]:
+        findings.add("firewall-stateful-default-not-drop")
+    stateful_groups = policy.get("stateful_rule_groups")
+    if not isinstance(stateful_groups, Sequence) or isinstance(stateful_groups, (str, bytes)):
+        stateful_groups = []
+    if len(stateful_groups) != 1:
+        findings.add("stateful-domain-allowlist-count-invalid")
+    else:
+        stateful_group = _object(stateful_groups[0])
+        if stateful_group.get("status") != "ACTIVE" or stateful_group.get("type") != "STATEFUL":
+            findings.add("stateful-domain-rule-group-not-active")
+        if stateful_group.get("rule_order") != "STRICT_ORDER":
+            findings.add("stateful-domain-rule-order-not-strict")
+        if stateful_group.get("generated_rules_type") != "ALLOWLIST":
+            findings.add("stateful-domain-generated-rules-not-allowlist")
+        required_target_types = {
+            "TLS_SNI",
+            "HTTP_HOST",
+            "AWS_ROUTE_53_RESOLVED_DOMAIN",
+        }
+        if _strings(stateful_group.get("target_types")) != required_target_types:
+            findings.add("stateful-domain-target-types-invalid")
+        if _strings(stateful_group.get("targets")) != _strings(
+            dns_firewall.get("allowlist_domains")
+        ):
+            findings.add("stateful-domain-targets-mismatch")
+
     if worker.get("public_ip"):
         findings.add("worker-public-address")
     if worker.get("map_public_ip_on_launch") is not False:

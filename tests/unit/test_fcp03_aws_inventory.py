@@ -150,8 +150,38 @@ def firewall_client() -> FakeClient:
                             "DNSExpiryExceptionPolicy": "DROP",
                             "SourceIPRanges": [{"AddressDefinition": "10.20.1.0/24"}],
                             "BypassDestinationValidationIPRanges": [],
-                        }
-                    }
+                        },
+                        "StatefulRuleGroupReferences": [
+                            {
+                                "ResourceArn": (
+                                    "arn:aws:network-firewall:eu-west-1:123:"
+                                    "stateful-rulegroup/allowlist"
+                                )
+                            }
+                        ],
+                        "StatefulEngineOptions": {"RuleOrder": "STRICT_ORDER"},
+                        "StatefulDefaultActions": ["aws:drop_strict"],
+                    },
+                    "FirewallPolicyResponse": {"FirewallPolicyStatus": "ACTIVE", "Errors": []},
+                }
+            ],
+            "describe_rule_group": [
+                {
+                    "RuleGroup": {
+                        "RulesSource": {
+                            "RulesSourceList": {
+                                "Targets": ["approved.example"],
+                                "TargetTypes": [
+                                    "TLS_SNI",
+                                    "HTTP_HOST",
+                                    "AWS_ROUTE_53_RESOLVED_DOMAIN",
+                                ],
+                                "GeneratedRulesType": "ALLOWLIST",
+                            }
+                        },
+                        "StatefulRuleOptions": {"RuleOrder": "STRICT_ORDER"},
+                    },
+                    "RuleGroupResponse": {"RuleGroupStatus": "ACTIVE", "Type": "STATEFUL"},
                 }
             ],
         }
@@ -210,6 +240,18 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
 
     assert evaluate_fcp03_topology(snapshot) == ()
     assert snapshot["firewall"]["endpoints_by_az"] == {"eu-west-1a": "vpce-fw-a"}
+    assert snapshot["firewall"]["policy"]["stateful_rule_groups"] == [
+        {
+            "status": "ACTIVE",
+            "type": "STATEFUL",
+            "rule_order": "STRICT_ORDER",
+            "generated_rules_type": "ALLOWLIST",
+            "targets": ["approved.example"],
+            "target_types": ["AWS_ROUTE_53_RESOLVED_DOMAIN", "HTTP_HOST", "TLS_SNI"],
+        }
+    ]
+    assert snapshot["firewall"]["policy"]["status"] == "ACTIVE"
+    assert snapshot["firewall"]["policy"]["errors"] == []
     assert snapshot["dns_firewall"]["allowlist_domains"] == ["approved.example"]
     assert snapshot["dns_firewall"]["terminal_block"] is True
     assert snapshot["worker"]["metadata_endpoint_enabled"] is False
@@ -297,3 +339,51 @@ def test_collector_surfaces_ipv6_addresses_and_default_routes() -> None:
     assert snapshot["worker"]["ipv6_addresses"] == ["2001:db8::10"]
     assert snapshot["worker"]["ipv6_default_route_target"] == "eigw-123"
     assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
+
+
+def test_rejects_stateful_rule_group_without_resolved_domain_target() -> None:
+    firewall = firewall_client()
+    firewall.responses["describe_rule_group"][0]["RuleGroup"]["RulesSource"]["RulesSourceList"][
+        "TargetTypes"
+    ] = ["TLS_SNI", "HTTP_HOST"]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver_client(),
+    )
+
+    assert "stateful-domain-target-types-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+def test_rejects_stateful_rule_group_targets_that_differ_from_dns_allowlist() -> None:
+    firewall = firewall_client()
+    firewall.responses["describe_rule_group"][0]["RuleGroup"]["RulesSource"]["RulesSourceList"][
+        "Targets"
+    ] = ["different.example"]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver_client(),
+    )
+
+    assert "stateful-domain-targets-mismatch" in evaluate_fcp03_topology(snapshot)
+
+
+def test_rejects_network_firewall_policy_with_async_configuration_errors() -> None:
+    firewall = firewall_client()
+    firewall.responses["describe_firewall_policy"][0]["FirewallPolicyResponse"]["Errors"] = [
+        {"Code": "DNS_FIREWALL_RULE_GROUP_UNAVAILABLE", "Message": "DNS group unavailable"}
+    ]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver_client(),
+    )
+
+    assert "firewall-policy-errors-present" in evaluate_fcp03_topology(snapshot)

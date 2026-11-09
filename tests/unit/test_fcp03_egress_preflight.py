@@ -32,7 +32,25 @@ def valid_topology() -> dict[str, object]:
                     "dns_expiry_exception_action": "DROP",
                     "source_ip_ranges": ["10.20.1.0/24"],
                     "bypass_destination_validation_ip_ranges": [],
-                }
+                },
+                "status": "ACTIVE",
+                "errors": [],
+                "stateful_rule_order": "STRICT_ORDER",
+                "stateful_default_actions": ["aws:drop_strict"],
+                "stateful_rule_groups": [
+                    {
+                        "status": "ACTIVE",
+                        "type": "STATEFUL",
+                        "rule_order": "STRICT_ORDER",
+                        "generated_rules_type": "ALLOWLIST",
+                        "targets": ["approved.example"],
+                        "target_types": [
+                            "AWS_ROUTE_53_RESOLVED_DOMAIN",
+                            "HTTP_HOST",
+                            "TLS_SNI",
+                        ],
+                    }
+                ],
             },
         },
         "dns_firewall": {
