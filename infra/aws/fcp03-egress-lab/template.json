@@ -664,7 +664,8 @@
         "DNSFirewallAssociation",
         "DNSFirewallConfig",
         "NetworkFirewallLogging",
-        "AutomaticTeardown"
+        "AutomaticTeardown",
+        "PublicReturnRoute"
       ],
       "Properties": {
         "ImageId": {
@@ -808,6 +809,39 @@
           "Input": {
             "Fn::Sub": "{\"StackName\":\"${AWS::StackName}\"}"
           }
+        }
+      }
+    },
+    "PublicReturnRoute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "NetworkFirewall",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRouteTable"
+        },
+        "DestinationCidrBlock": {
+          "Ref": "WorkerSubnetCidr"
+        },
+        "VpcEndpointId": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::Split": [
+                ":",
+                {
+                  "Fn::Select": [
+                    0,
+                    {
+                      "Fn::GetAtt": [
+                        "NetworkFirewall",
+                        "EndpointIds"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       }
     }
