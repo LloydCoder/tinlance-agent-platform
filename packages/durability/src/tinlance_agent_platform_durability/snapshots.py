@@ -348,7 +348,9 @@ class S3SnapshotStore:
 
     def put_if_absent(self, snapshot_id: UUID, value: bytes) -> None:
         if not isinstance(value, bytes) or not value or len(value) > self.MAX_OBJECT_BYTES:
-            raise ValueError("snapshot object must be non-empty bytes within the storage size limit")
+            raise ValueError(
+                "snapshot object must be non-empty bytes within the storage size limit"
+            )
         try:
             response = self._s3.put_object(  # type: ignore[attr-defined]
                 Bucket=self._bucket,
@@ -368,9 +370,10 @@ class S3SnapshotStore:
             response = getattr(exc, "response", {})
             error = response.get("Error", {}) if isinstance(response, dict) else {}
             metadata = response.get("ResponseMetadata", {}) if isinstance(response, dict) else {}
-            if error.get("Code") in {"PreconditionFailed", "ConditionalRequestConflict"} or metadata.get(
-                "HTTPStatusCode"
-            ) in {409, 412}:
+            if (
+                error.get("Code") in {"PreconditionFailed", "ConditionalRequestConflict"}
+                or metadata.get("HTTPStatusCode") in {409, 412}
+            ):
                 raise SnapshotConflictError("snapshot identifier already exists in S3") from exc
             raise
 
@@ -384,7 +387,10 @@ class S3SnapshotStore:
             response = getattr(exc, "response", {})
             error = response.get("Error", {}) if isinstance(response, dict) else {}
             metadata = response.get("ResponseMetadata", {}) if isinstance(response, dict) else {}
-            if error.get("Code") in {"NoSuchKey", "NotFound"} or metadata.get("HTTPStatusCode") == 404:
+            if (
+                error.get("Code") in {"NoSuchKey", "NotFound"}
+                or metadata.get("HTTPStatusCode") == 404
+            ):
                 raise SnapshotError("snapshot object does not exist in S3") from exc
             raise
         body = response.get("Body")
@@ -394,7 +400,9 @@ class S3SnapshotStore:
         ):
             if body is not None:
                 body.close()
-            raise SnapshotIntegrityError("S3 snapshot object is not encrypted with the configured KMS key")
+            raise SnapshotIntegrityError(
+                "S3 snapshot object is not encrypted with the configured KMS key"
+            )
         length = response.get("ContentLength")
         if (
             body is None
@@ -410,7 +418,11 @@ class S3SnapshotStore:
             value = body.read(self.MAX_OBJECT_BYTES + 1)
         finally:
             body.close()
-        if not isinstance(value, bytes) or len(value) != length or len(value) > self.MAX_OBJECT_BYTES:
+        if (
+            not isinstance(value, bytes)
+            or len(value) != length
+            or len(value) > self.MAX_OBJECT_BYTES
+        ):
             raise SnapshotIntegrityError("S3 snapshot object length does not match its metadata")
         return value
 
@@ -592,7 +604,9 @@ class WorkspaceSnapshotService:
                 reference.tenant_id, reference.workspace_id, reference.snapshot_id
             )
             if stored != reference:
-                raise SnapshotIntegrityError("snapshot reference is absent or differs from its catalog")
+                raise SnapshotIntegrityError(
+                    "snapshot reference is absent or differs from its catalog"
+                )
         ciphertext = self._store.get(reference.snapshot_id)
         envelope_bytes = self._cipher.decrypt(
             ciphertext,
