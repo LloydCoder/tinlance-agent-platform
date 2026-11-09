@@ -454,7 +454,6 @@
         "RuleGroupName": {
           "Fn::Sub": "${AWS::StackName}-resolved-domain-allowlist"
         },
-        "RuleGroupType": "STATEFUL",
         "Capacity": 100,
         "Description": "Require TLS SNI or HTTP Host and Route 53 resolved destination domain to match the approved allowlist.",
         "RuleGroup": {
@@ -484,7 +483,8 @@
             "Key": "Environment",
             "Value": "disposable-test"
           }
-        ]
+        ],
+        "Type": "STATEFUL"
       }
     },
     "FirewallPolicy": {
@@ -797,7 +797,6 @@
           "Mode": "OFF"
         },
         "State": "ENABLED",
-        "ActionAfterCompletion": "DELETE",
         "Target": {
           "Arn": "arn:aws:scheduler:::aws-sdk:cloudformation:deleteStack",
           "RoleArn": {
