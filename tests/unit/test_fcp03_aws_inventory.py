@@ -179,6 +179,11 @@ def ec2_client() -> FakeClient:
                             "Associations": [{"SubnetId": "subnet-worker"}],
                             "Routes": [
                                 {
+                                    "DestinationCidrBlock": "10.20.0.0/16",
+                                    "GatewayId": "local",
+                                    "State": "active",
+                                },
+                                {
                                     "DestinationCidrBlock": "0.0.0.0/0",
                                     "VpcEndpointId": "vpce-fw-a",
                                     "State": "active",
