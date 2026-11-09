@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS platform.workspace_restore_operations (
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     completed_at timestamptz,
     PRIMARY KEY (tenant_id, restore_id),
+    FOREIGN KEY (tenant_id, workspace_id)
+        REFERENCES platform.workspace_leases (tenant_id, workspace_id),
     CHECK ((status = 'completed') = (completed_at IS NOT NULL)),
     CHECK ((status = 'completed') = (snapshot_digest IS NOT NULL)),
     CHECK ((status = 'failed') = (failure_code IS NOT NULL))
@@ -102,6 +104,17 @@ BEGIN
     IF p_workspace_id IS NULL OR p_restore_id IS NULL OR p_snapshot_id IS NULL
        OR p_fencing_token IS NULL OR p_fencing_token < 1 THEN
         RAISE EXCEPTION 'invalid workspace restore identity or fencing token' USING ERRCODE = '22023';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM platform.workspace_leases
+         WHERE tenant_id = p_tenant_id
+           AND workspace_id = p_workspace_id
+           AND fencing_token = p_fencing_token
+           AND status = 'active'
+           AND lease_expires_at > clock_timestamp()
+    ) THEN
+        RAISE EXCEPTION 'workspace restore requires the current active lease fence'
+            USING ERRCODE = '55000';
     END IF;
 
     INSERT INTO platform.workspace_restore_operations (
@@ -233,7 +246,9 @@ CREATE TABLE IF NOT EXISTS platform.workspace_snapshots (
     storage_key text NOT NULL CHECK (storage_key ~ '^[0-9a-f]{32}\\.snapshot$'),
     status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'deleted')),
     PRIMARY KEY (tenant_id, snapshot_id),
-    UNIQUE (tenant_id, workspace_id, snapshot_id)
+    UNIQUE (tenant_id, workspace_id, snapshot_id),
+    FOREIGN KEY (tenant_id, workspace_id)
+        REFERENCES platform.workspace_leases (tenant_id, workspace_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspace_snapshots_workspace
@@ -339,3 +354,37 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION platform.record_workspace_snapshot(uuid, uuid, uuid, bigint, timestamptz, text, text) FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION platform.get_workspace_snapshot(
+    p_tenant_id uuid,
+    p_workspace_id uuid,
+    p_snapshot_id uuid
+) RETURNS TABLE (
+    snapshot_id uuid,
+    tenant_id uuid,
+    workspace_id uuid,
+    fencing_token bigint,
+    created_at timestamptz,
+    digest text,
+    status text
+)
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, platform
+AS $$
+BEGIN
+    IF platform.current_tenant_id() IS DISTINCT FROM p_tenant_id THEN
+        RAISE EXCEPTION 'tenant scope mismatch' USING ERRCODE = '42501';
+    END IF;
+    RETURN QUERY
+    SELECT s.snapshot_id, s.tenant_id, s.workspace_id, s.fencing_token,
+           s.created_at, s.digest, s.status
+      FROM platform.workspace_snapshots AS s
+     WHERE s.tenant_id = p_tenant_id
+       AND s.workspace_id = p_workspace_id
+       AND s.snapshot_id = p_snapshot_id
+       AND s.status = 'available';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION platform.get_workspace_snapshot(uuid, uuid, uuid) FROM PUBLIC;
