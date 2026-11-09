@@ -63,7 +63,7 @@ BEGIN
     END;
 
     BEGIN
-        PERFORM platform.begin_workspace_restore(tenant, workspace, uuid_generate_v4(), snapshot_one, 0);
+        PERFORM platform.begin_workspace_restore(tenant, workspace, '70000000-0000-0000-0000-000000000093', snapshot_one, 0);
         RAISE EXCEPTION 'zero fencing token was accepted';
     EXCEPTION WHEN SQLSTATE '22023' THEN
         NULL;
