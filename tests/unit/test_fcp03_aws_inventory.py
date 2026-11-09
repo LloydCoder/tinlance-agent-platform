@@ -60,7 +60,17 @@ def ec2_client() -> FakeClient:
                             "MapPublicIpOnLaunch": False,
                         }
                     ]
-                }
+                },
+                {
+                    "Subnets": [
+                        {
+                            "SubnetId": "subnet-firewall",
+                            "VpcId": "vpc-worker",
+                            "CidrBlock": "10.20.2.0/24",
+                            "AvailabilityZone": "eu-west-1a",
+                        }
+                    ]
+                },
             ],
             "describe_vpcs": [
                 {
@@ -165,6 +175,36 @@ def ec2_client() -> FakeClient:
                             ],
                         }
                     ]
+                },
+                {
+                    "RouteTables": [
+                        {
+                            "Associations": [{"SubnetId": "subnet-firewall"}],
+                            "Routes": [
+                                {"DestinationCidrBlock": "10.20.0.0/16", "GatewayId": "local", "State": "active"},
+                                {"DestinationCidrBlock": "0.0.0.0/0", "NatGatewayId": "nat-123", "State": "active"},
+                            ],
+                        }
+                    ]
+                },
+                {
+                    "RouteTables": [
+                        {
+                            "Associations": [{"SubnetId": "subnet-public"}],
+                            "Routes": [
+                                {"DestinationCidrBlock": "10.20.0.0/16", "GatewayId": "local", "State": "active"},
+                                {"DestinationCidrBlock": "10.20.1.0/24", "VpcEndpointId": "vpce-fw-a", "State": "active"},
+                                {"DestinationCidrBlock": "0.0.0.0/0", "GatewayId": "igw-123", "State": "active"},
+                            ],
+                        }
+                    ]
+                },
+            ],
+            "describe_nat_gateways": [
+                {
+                    "NatGateways": [
+                        {"NatGatewayId": "nat-123", "State": "available", "SubnetId": "subnet-public"}
+                    ]
                 }
             ],
             "describe_security_groups": [
@@ -214,7 +254,8 @@ def firewall_client() -> FakeClient:
                     "Firewall": {
                         "FirewallPolicyArn": (
                             "arn:aws:network-firewall:eu-west-1:123:firewall-policy/test"
-                        )
+                        ),
+                        "SubnetMappings": [{"SubnetId": "subnet-firewall"}],
                     },
                     "FirewallStatus": {
                         "Status": "READY",
@@ -223,6 +264,7 @@ def firewall_client() -> FakeClient:
                             "eu-west-1a": {
                                 "Attachment": {
                                     "EndpointId": "vpce-fw-a",
+                                    "SubnetId": "subnet-firewall",
                                     "Status": "READY",
                                 }
                             }
