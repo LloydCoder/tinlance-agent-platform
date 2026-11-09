@@ -98,6 +98,7 @@ def valid_topology() -> dict[str, object]:
                 {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
                 {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
             ],
+            "security_group_ingress": [],
             "security_group_egress": [
                 {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
                 {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
@@ -591,3 +592,12 @@ def test_fails_closed_when_worker_route_table_association_is_unknown() -> None:
     topology["worker"].pop("route_table_subnet_ids")
 
     assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_any_worker_security_group_ingress_rule() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_ingress"] = [
+        {"protocol": "tcp", "port": 22, "cidr": "10.20.0.0/16"}
+    ]
+
+    assert "worker-security-group-ingress-not-empty" in evaluate_fcp03_topology(topology)
