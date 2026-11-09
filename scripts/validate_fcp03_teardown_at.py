@@ -13,9 +13,7 @@ MAXIMUM_WINDOW = datetime.timedelta(hours=2)
 UTC_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
-def validate_teardown_at(
-    value: str, *, now: datetime.datetime | None = None
-) -> datetime.datetime:
+def validate_teardown_at(value: str, *, now: datetime.datetime | None = None) -> datetime.datetime:
     """Require a naive-formatted UTC timestamp 15 minutes to 2 hours ahead."""
     try:
         deadline = datetime.datetime.strptime(value, UTC_FORMAT).replace(tzinfo=datetime.UTC)
