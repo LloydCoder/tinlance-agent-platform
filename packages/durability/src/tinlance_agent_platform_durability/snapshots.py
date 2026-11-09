@@ -100,7 +100,6 @@ class RestoreResult:
     credential_references: Mapping[str, str]
 
 
-
 class KMSAESGCMCipher:
     """Envelope encryption using an AWS KMS-managed AES-256 data key per snapshot."""
 
@@ -311,7 +310,6 @@ class FilesystemSnapshotStore:
             if not stat.S_ISREG(info.st_mode) or info.st_size > 160 * 1024 * 1024:
                 raise SnapshotIntegrityError("snapshot object type or size is invalid")
             return stream.read()
-
 
 
 class S3SnapshotStore:
