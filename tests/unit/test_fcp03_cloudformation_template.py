@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import typing
 
 
@@ -265,3 +266,17 @@ def test_worker_security_group_egress_is_exact_and_has_no_protocol_bypass() -> N
             "Description": "VPC Resolver TCP fallback only",
         },
     ]
+
+
+def test_approved_domains_parameter_rejects_wildcards_and_non_fqdns() -> None:
+    parameter = load_template()["Parameters"]["ApprovedDomains"]
+    pattern = parameter["AllowedPattern"]
+
+    assert re.fullmatch(pattern, "approved.example")
+    assert re.fullmatch(pattern, "api.eu.example.com")
+    assert not re.fullmatch(pattern, "*.example.com")
+    assert not re.fullmatch(pattern, "*")
+    assert not re.fullmatch(pattern, "localhost")
+    assert not re.fullmatch(pattern, "192.0.2.1")
+    assert not re.fullmatch(pattern, "bad..example")
+    assert not re.fullmatch(pattern, "bad_domain.example")
