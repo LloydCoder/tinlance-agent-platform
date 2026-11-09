@@ -21,25 +21,6 @@ def _strings(value: object) -> set[str]:
     return set()
 
 
-def _has_unrestricted_egress(rules: object) -> bool:
-    if not isinstance(rules, Sequence) or isinstance(rules, (str, bytes)):
-        return True
-
-    for raw_rule in rules:
-        rule = _object(raw_rule)
-        cidr = rule.get("cidr")
-        protocol = rule.get("protocol")
-        port = rule.get("port")
-        if not isinstance(cidr, str):
-            return True
-        try:
-            network = ipaddress.ip_network(cidr, strict=False)
-        except ValueError:
-            return True
-        if network.prefixlen == 0 and (network.version == 6 or protocol != "tcp" or port != 443):
-            return True
-    return False
-
 
 def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     """Return stable finding codes for an unsafe or incomplete worker egress topology.
