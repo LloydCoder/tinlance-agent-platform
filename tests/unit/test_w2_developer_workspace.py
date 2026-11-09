@@ -75,9 +75,11 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
         in dockerfile
     )
     assert "w2-package-manifest.lock" in dockerfile
-    secret_mount_index = dockerfile.index(
-        "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true,mode=0444"
+    secret_mount = (
+        "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,"
+        "required=true,mode=0444"
     )
+    secret_mount_index = dockerfile.index(secret_mount)
     update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
     install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
     assert secret_mount_index < update_index < install_index
