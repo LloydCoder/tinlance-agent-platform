@@ -316,32 +316,38 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
             if isinstance(association.get("SubnetId"), str)
         }
     )
+    ingress_rules: list[dict[str, object]] = []
     egress_rules: list[dict[str, object]] = []
     entries = acl.get("Entries", [])
     if not isinstance(entries, list):
         entries = []
     for entry in entries:
-        if not isinstance(entry, Mapping) or entry.get("Egress") is not True:
+        if not isinstance(entry, Mapping):
             continue
         raw_port_range = entry.get("PortRange")
         port_range = raw_port_range if isinstance(raw_port_range, Mapping) else {}
-        egress_rules.append(
-            {
-                "rule_number": entry.get("RuleNumber"),
-                "protocol": entry.get("Protocol"),
-                "action": entry.get("RuleAction"),
-                "cidr": entry.get("CidrBlock") or entry.get("Ipv6CidrBlock"),
-                "from_port": port_range.get("From"),
-                "to_port": port_range.get("To"),
-            }
-        )
-    egress_rules.sort(
-        key=lambda rule: rule["rule_number"] if isinstance(rule["rule_number"], int) else 2**31
+        rule = {
+            "rule_number": entry.get("RuleNumber"),
+            "protocol": entry.get("Protocol"),
+            "action": entry.get("RuleAction"),
+            "cidr": entry.get("CidrBlock") or entry.get("Ipv6CidrBlock"),
+            "from_port": port_range.get("From"),
+            "to_port": port_range.get("To"),
+        }
+        if entry.get("Egress") is True:
+            egress_rules.append(rule)
+        elif entry.get("Egress") is False:
+            ingress_rules.append(rule)
+    sort_key = lambda rule: (
+        rule["rule_number"] if isinstance(rule["rule_number"], int) else 2**31
     )
+    ingress_rules.sort(key=sort_key)
+    egress_rules.sort(key=sort_key)
     return {
         "associated": True,
         "network_acl_id": acl.get("NetworkAclId"),
         "subnet_ids": subnet_ids,
+        "ingress_rules": ingress_rules,
         "egress_rules": egress_rules,
     }
 
