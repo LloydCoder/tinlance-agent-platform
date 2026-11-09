@@ -171,7 +171,10 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
             observed_firewall_routes.add((destination, target))
             if target not in {"local", nat_gateway_id}:
                 findings.add("firewall-subnet-route-bypasses-nat")
-        if observed_firewall_routes != expected_firewall_routes:
+        if (
+            len(observed_firewall_routes) != len(firewall_routes)
+            or observed_firewall_routes != expected_firewall_routes
+        ):
             findings.add("firewall-subnet-route-set-invalid")
 
     nat_routes = firewall.get("nat_route_entries")
@@ -210,7 +213,10 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
                 destination == "0.0.0.0/0" and target.startswith("igw-")
             ):
                 findings.add("nat-return-route-bypasses-firewall")
-        if observed_nat_routes != expected_nat_routes:
+        if (
+            len(observed_nat_routes) != len(nat_routes)
+            or observed_nat_routes != expected_nat_routes
+        ):
             findings.add("nat-return-route-set-invalid")
 
     worker_subnet_id = worker.get("subnet_id")
