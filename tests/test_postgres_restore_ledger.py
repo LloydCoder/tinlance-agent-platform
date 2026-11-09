@@ -55,9 +55,7 @@ def test_begin_sets_tenant_scope_and_claims_once():
     ledger = PostgresRestoreLedger(connection_factory=lambda: connection)
     assert ledger.begin(TENANT, WORKSPACE, RESTORE, SNAPSHOT, 7) is True
     assert connection.calls[0][0] == "SELECT set_config('platform.tenant_id', %s, true)"
-    assert connection.calls[1][0] == (
-        "SELECT platform.begin_workspace_restore(%s, %s, %s, %s, %s)"
-    )
+    assert connection.calls[1][0] == ("SELECT platform.begin_workspace_restore(%s, %s, %s, %s, %s)")
     assert connection.calls[1][1] == (TENANT, WORKSPACE, RESTORE, SNAPSHOT, 7)
     assert connection.committed and connection.closed
 
@@ -75,12 +73,8 @@ def test_complete_and_fail_use_tenant_scoped_functions():
     digest = "a" * 64
     ledger.complete(TENANT, WORKSPACE, RESTORE, digest)
     ledger.fail(TENANT, WORKSPACE, RESTORE, "credential_refresh_failed")
-    assert connection.calls[1][0] == (
-        "SELECT platform.complete_workspace_restore(%s, %s, %s, %s)"
-    )
-    assert connection.calls[3][0] == (
-        "SELECT platform.fail_workspace_restore(%s, %s, %s, %s)"
-    )
+    assert connection.calls[1][0] == ("SELECT platform.complete_workspace_restore(%s, %s, %s, %s)")
+    assert connection.calls[3][0] == ("SELECT platform.fail_workspace_restore(%s, %s, %s, %s)")
     assert connection.committed
 
 
