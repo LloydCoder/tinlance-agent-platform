@@ -660,9 +660,9 @@ def test_fails_closed_when_worker_security_group_ingress_inventory_is_malformed(
             "firewall-route-table-not-dedicated",
         ),
         (
-            lambda topology: topology["firewall"]["policy"][
-                "route53_resolved_ip_validation"
-            ]["source_ip_ranges"].append(None),
+            lambda topology: topology["firewall"]["policy"]["route53_resolved_ip_validation"][
+                "source_ip_ranges"
+            ].append(None),
             "resolved-ip-source-range-incomplete",
         ),
     ],
