@@ -154,4 +154,9 @@ def test_nat_and_firewall_routes_are_symmetric_and_worker_volume_is_encrypted() 
 
     assert public_route["GatewayId"] == {"Ref": "InternetGateway"}
     assert firewall_route["NatGatewayId"] == {"Ref": "NatGateway"}
-    assert "PublicReturnRoute" in worker and False
+    dependencies = resources["WorkerInstance"]["DependsOn"]
+    assert "PublicReturnRoute" in dependencies
+    assert "AutomaticTeardown" in dependencies
+    ebs = worker["BlockDeviceMappings"][0]["Ebs"]
+    assert ebs["Encrypted"] is True
+    assert ebs["DeleteOnTermination"] is True
