@@ -25,10 +25,7 @@ def _strings(value: object) -> set[str]:
         return set()
     if any(not isinstance(item, str) or not item for item in value):
         return set()
-    values = set(value)
-    if len(values) != len(value):
-        return set()
-    return values
+    return set(value)
 
 
 def _has_unrestricted_egress(rules: object) -> bool:
