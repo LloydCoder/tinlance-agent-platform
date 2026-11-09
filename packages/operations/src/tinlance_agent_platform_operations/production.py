@@ -78,7 +78,9 @@ class ProductionDependency:
             if parsed.username or parsed.password:
                 raise ValueError("verified dependency evidence URI must not contain credentials")
             if parsed.query or parsed.fragment:
-                raise ValueError("verified dependency evidence URI must not contain query or fragment data")
+                raise ValueError(
+                    "verified dependency evidence URI must not contain query or fragment data"
+                )
             if parsed.scheme == "s3" and not parsed.path.strip("/"):
                 raise ValueError("S3 evidence URI must identify an object key")
             if not self.verified_by or not self.verified_by.strip():
