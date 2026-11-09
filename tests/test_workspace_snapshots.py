@@ -573,3 +573,28 @@ def test_s3_snapshot_store_rejects_invalid_prefix_and_oversized_objects():
     )
     with pytest.raises(ValueError, match="size limit"):
         store.put_if_absent(uuid4(), b"x" * (store.MAX_OBJECT_BYTES + 1))
+
+
+def test_s3_snapshot_store_closes_body_when_kms_key_does_not_match():
+    from tinlance_agent_platform_durability.snapshots import S3SnapshotStore
+
+    class WrongKeyS3(FakeS3):
+        def get_object(self, **kwargs):
+            body = S3Body(b"encrypted")
+            self.last_body = body
+            return {
+                "Body": body,
+                "ContentLength": 9,
+                "ServerSideEncryption": "aws:kms",
+                "SSEKMSKeyId": "arn:aws:kms:eu-west-1:123456789012:key/other",
+            }
+
+    s3 = WrongKeyS3()
+    store = S3SnapshotStore(
+        s3_client=s3,
+        bucket="tinlance-snapshots",
+        sse_kms_key_id="arn:aws:kms:eu-west-1:123456789012:key/example",
+    )
+    with pytest.raises(SnapshotIntegrityError, match="configured KMS key"):
+        store.get(uuid4())
+    assert s3.last_body.closed
