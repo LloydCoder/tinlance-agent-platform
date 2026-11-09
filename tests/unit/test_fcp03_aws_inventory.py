@@ -191,8 +191,16 @@ def ec2_client() -> FakeClient:
                         {
                             "Associations": [{"SubnetId": "subnet-firewall"}],
                             "Routes": [
-                                {"DestinationCidrBlock": "10.20.0.0/16", "GatewayId": "local", "State": "active"},
-                                {"DestinationCidrBlock": "0.0.0.0/0", "NatGatewayId": "nat-123", "State": "active"},
+                                {
+                                    "DestinationCidrBlock": "10.20.0.0/16",
+                                    "GatewayId": "local",
+                                    "State": "active",
+                                },
+                                {
+                                    "DestinationCidrBlock": "0.0.0.0/0",
+                                    "NatGatewayId": "nat-123",
+                                    "State": "active",
+                                },
                             ],
                         }
                     ]
@@ -202,9 +210,21 @@ def ec2_client() -> FakeClient:
                         {
                             "Associations": [{"SubnetId": "subnet-public"}],
                             "Routes": [
-                                {"DestinationCidrBlock": "10.20.0.0/16", "GatewayId": "local", "State": "active"},
-                                {"DestinationCidrBlock": "10.20.1.0/24", "VpcEndpointId": "vpce-fw-a", "State": "active"},
-                                {"DestinationCidrBlock": "0.0.0.0/0", "GatewayId": "igw-123", "State": "active"},
+                                {
+                                    "DestinationCidrBlock": "10.20.0.0/16",
+                                    "GatewayId": "local",
+                                    "State": "active",
+                                },
+                                {
+                                    "DestinationCidrBlock": "10.20.1.0/24",
+                                    "VpcEndpointId": "vpce-fw-a",
+                                    "State": "active",
+                                },
+                                {
+                                    "DestinationCidrBlock": "0.0.0.0/0",
+                                    "GatewayId": "igw-123",
+                                    "State": "active",
+                                },
                             ],
                         }
                     ]
@@ -213,7 +233,11 @@ def ec2_client() -> FakeClient:
             "describe_nat_gateways": [
                 {
                     "NatGateways": [
-                        {"NatGatewayId": "nat-123", "State": "available", "SubnetId": "subnet-public"}
+                        {
+                            "NatGatewayId": "nat-123",
+                            "State": "available",
+                            "SubnetId": "subnet-public",
+                        },
                     ]
                 }
             ],
