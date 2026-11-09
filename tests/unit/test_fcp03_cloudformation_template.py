@@ -56,8 +56,13 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
     assert worker_subnet["MapPublicIpOnLaunch"] is False
     assert "Ipv6CidrBlock" not in worker_subnet
     assert "PublicIp" not in worker_instance
+    assert worker_instance["MetadataOptions"]["HttpEndpoint"] == "disabled"
     assert worker_instance["MetadataOptions"]["HttpTokens"] == "required"
     assert worker_instance["MetadataOptions"]["HttpPutResponseHopLimit"] == 1
+    assert "IamInstanceProfile" not in worker_instance
+    assert worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"].find("FCP03_BOOTSTRAP_START") >= 0
+    assert "FCP03_TEST_DNS_APPROVED=PASS" in worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
+    assert "FCP03_TEST_HTTPS_APPROVED=PASS" in worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
     assert worker_sg.get("SecurityGroupIngress", []) == []
 
     egress = worker_sg["SecurityGroupEgress"]
@@ -148,16 +153,6 @@ def test_lab_has_an_automatic_stack_teardown_target_scoped_to_this_stack() -> No
     assert statement["Resource"] == {"Fn::Sub": expected_stack_arn}
 
 
-def test_lab_reuses_the_existing_ssm_instance_profile_without_widening_it() -> None:
-    template = load_template()
-    profile = template["Parameters"]["WorkerInstanceProfileName"]
-
-    assert profile["Default"] == "TinlytTestRuntimeSSMProfile"
-    assert template["Resources"]["WorkerInstance"]["Properties"]["IamInstanceProfile"] == {
-        "Ref": "WorkerInstanceProfileName"
-    }
-
-
 def test_nat_and_firewall_routes_are_symmetric_and_worker_volume_is_encrypted() -> None:
     resources = load_template()["Resources"]
     public_route = resources["PublicDefaultRoute"]["Properties"]
@@ -220,3 +215,14 @@ def test_worker_nacl_allows_only_resolver_dns_and_inspected_https_egress() -> No
     assert ingress[0]["PortRange"] == {"From": 1024, "To": 65535}
     assert ingress[1]["PortRange"] == {"From": 1024, "To": 65535}
     assert ingress[2]["RuleAction"] == "deny"
+
+
+def test_worker_management_does_not_require_imds_or_an_instance_profile() -> None:
+    template = load_template()
+    worker = template["Resources"]["WorkerInstance"]["Properties"]
+
+    assert "WorkerInstanceProfileName" not in template["Parameters"]
+    assert "IamInstanceProfile" not in worker
+    assert worker["MetadataOptions"]["HttpEndpoint"] == "disabled"
+    assert "ssm" not in worker["UserData"]["Fn::Base64"]["Fn::Sub"].lower()
+    assert "retrieve_with_ec2_get_console_output=true" in worker["UserData"]["Fn::Base64"]["Fn::Sub"]
