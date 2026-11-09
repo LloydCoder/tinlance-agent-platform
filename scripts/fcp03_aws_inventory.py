@@ -252,17 +252,25 @@ def _stateful_rule_group_snapshots(
             continue
 
         response = network_firewall.describe_rule_group(RuleGroupArn=arn)
-        rule_group = response.get("RuleGroup", {})
-        response_metadata = response.get("RuleGroupResponse", {})
-        rules_source = rule_group.get("RulesSource", {})
-        domain_list = rules_source.get("RulesSourceList", {})
+        raw_rule_group = response.get("RuleGroup")
+        rule_group = raw_rule_group if isinstance(raw_rule_group, Mapping) else {}
+        raw_metadata = response.get("RuleGroupResponse")
+        response_metadata = raw_metadata if isinstance(raw_metadata, Mapping) else {}
+        raw_rules_source = rule_group.get("RulesSource")
+        rules_source = raw_rules_source if isinstance(raw_rules_source, Mapping) else {}
+        raw_domain_list = rules_source.get("RulesSourceList")
+        domain_list = raw_domain_list if isinstance(raw_domain_list, Mapping) else {}
+        raw_stateful_options = rule_group.get("StatefulRuleOptions")
+        stateful_options = (
+            raw_stateful_options if isinstance(raw_stateful_options, Mapping) else {}
+        )
         targets = domain_list.get("Targets", [])
         target_types = domain_list.get("TargetTypes", [])
         snapshots.append(
             {
                 "status": response_metadata.get("RuleGroupStatus", "UNKNOWN"),
                 "type": response_metadata.get("Type", "UNKNOWN"),
-                "rule_order": rule_group.get("StatefulRuleOptions", {}).get("RuleOrder"),
+                "rule_order": stateful_options.get("RuleOrder"),
                 "generated_rules_type": domain_list.get("GeneratedRulesType"),
                 "targets": sorted(
                     value for value in targets if isinstance(value, str)
@@ -441,13 +449,17 @@ def collect_fcp03_snapshot(
         policy_metadata = policy_response.get("FirewallPolicyResponse", {})
         validation = _resolved_ip_validation(policy)
         policy_errors = policy_metadata.get("Errors")
+        raw_engine_options = policy.get("StatefulEngineOptions")
+        engine_options = (
+            raw_engine_options if isinstance(raw_engine_options, Mapping) else {}
+        )
         firewall_snapshot = {
             "endpoints_by_az": endpoints,
             "policy": {
                 "route53_resolved_ip_validation": validation,
                 "status": policy_metadata.get("FirewallPolicyStatus", "UNKNOWN"),
                 "errors": policy_errors if isinstance(policy_errors, list) else None,
-                "stateful_rule_order": policy.get("StatefulEngineOptions", {}).get("RuleOrder"),
+                "stateful_rule_order": engine_options.get("RuleOrder"),
                 "stateful_default_actions": policy.get("StatefulDefaultActions", []),
                 "stateful_rule_groups": _stateful_rule_group_snapshots(
                     network_firewall, policy
