@@ -93,6 +93,7 @@ def valid_topology() -> dict[str, object]:
             "metadata_hop_limit": 1,
             "availability_zone": "eu-west-1a",
             "default_route_target": "vpce-fw-a",
+            "route_table_subnet_ids": ["subnet-worker-a"],
             "route_entries": [
                 {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
                 {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
@@ -573,3 +574,20 @@ def test_rejects_duplicate_worker_route_entries() -> None:
     )
 
     assert "worker-route-set-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_shared_worker_route_table_association() -> None:
+    topology = valid_topology()
+    topology["worker"]["route_table_subnet_ids"] = [
+        "subnet-worker-a",
+        "subnet-other",
+    ]
+
+    assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_worker_route_table_association_is_unknown() -> None:
+    topology = valid_topology()
+    topology["worker"].pop("route_table_subnet_ids")
+
+    assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(topology)
