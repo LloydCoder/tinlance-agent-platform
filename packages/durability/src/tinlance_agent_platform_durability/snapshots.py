@@ -387,12 +387,14 @@ class S3SnapshotStore:
             if error.get("Code") in {"NoSuchKey", "NotFound"} or metadata.get("HTTPStatusCode") == 404:
                 raise SnapshotError("snapshot object does not exist in S3") from exc
             raise
+        body = response.get("Body")
         if (
             response.get("ServerSideEncryption") != "aws:kms"
             or response.get("SSEKMSKeyId") != self._kms_key_id
         ):
+            if body is not None:
+                body.close()
             raise SnapshotIntegrityError("S3 snapshot object is not encrypted with the configured KMS key")
-        body = response.get("Body")
         length = response.get("ContentLength")
         if (
             body is None
