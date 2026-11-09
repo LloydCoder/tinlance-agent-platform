@@ -217,3 +217,22 @@ def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> N
     assert "--runs 30 --profile W2" in workflow
     assert 'report.get("sample_count") != 30' in workflow
     assert "len(markers) != 30" in workflow
+
+
+def test_release_download_workflows_use_pinned_api_fallbacks_and_bounded_retries() -> None:
+    workflow_root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+    firecracker = (workflow_root / "persistent-computer-firecracker-w2.yml").read_text(
+        encoding="utf-8"
+    )
+    kata = (workflow_root / "persistent-computer-kata-benchmark.yml").read_text(
+        encoding="utf-8"
+    )
+    for workflow in (firecracker, kata):
+        assert "api.github.com/repos/" in workflow
+        assert "--retry 12 --retry-all-errors --retry-delay 10" in workflow
+        assert "--connect-timeout 30 --max-time" in workflow
+        assert 'test "$downloaded" -eq 1' in workflow
+    assert "releases/assets/555159508" in firecracker
+    assert "releases/assets/663864062" in kata
+    assert "no guest acceptance is claimed" in firecracker
+    assert "no benchmark acceptance is claimed" in kata
