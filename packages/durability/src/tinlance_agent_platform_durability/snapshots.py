@@ -143,7 +143,15 @@ class KMSAESGCMCipher:
             raise RuntimeError("KMS returned an invalid snapshot data key")
         nonce = os.urandom(12)
         ciphertext = AESGCM(data_key).encrypt(nonce, plaintext, associated_data)
-        return self.MAGIC + len(encrypted_key).to_bytes(4, "big") + encrypted_key + nonce + ciphertext
+        return b"".join(
+            (
+                self.MAGIC,
+                len(encrypted_key).to_bytes(4, "big"),
+                encrypted_key,
+                nonce,
+                ciphertext,
+            )
+        )
 
     def decrypt(self, ciphertext: bytes, associated_data: bytes) -> bytes:
         minimum = len(self.MAGIC) + 4 + 1 + 12 + 16
