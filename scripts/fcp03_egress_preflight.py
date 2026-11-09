@@ -473,7 +473,10 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         not isinstance(rule_priorities, Sequence)
         or isinstance(rule_priorities, (str, bytes))
         or len(rule_priorities) != 2
-        or any(type(priority) is not int or not 1 <= priority <= 10000 for priority in rule_priorities)
+        or any(
+            type(priority) is not int or not 1 <= priority <= 10000
+            for priority in rule_priorities
+        )
         or len(set(rule_priorities)) != len(rule_priorities)
     ):
         findings.add("dns-firewall-rule-priority-invalid")
