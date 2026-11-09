@@ -100,6 +100,125 @@ class RestoreResult:
     credential_references: Mapping[str, str]
 
 
+
+class KMSAESGCMCipher:
+    """Envelope encryption using an AWS KMS-managed AES-256 data key per snapshot."""
+
+    MAGIC = b"TLW6"
+    MAX_ENCRYPTED_DATA_KEY_BYTES = 65_536
+
+    def __init__(self, *, kms_client: object, key_arn: str) -> None:
+        if not isinstance(key_arn, str) or not key_arn.startswith("arn:aws:kms:"):
+            raise ValueError("snapshot KMS key must be an AWS KMS key ARN")
+        self._kms = kms_client
+        self._key_arn = key_arn
+
+    @staticmethod
+    def _context(associated_data: bytes) -> dict[str, str]:
+        if not isinstance(associated_data, bytes) or not associated_data:
+            raise ValueError("snapshot associated data must be non-empty bytes")
+        return {
+            "purpose": "tinlance-workspace-snapshot-v1",
+            "associated_data_sha256": hashlib.sha256(associated_data).hexdigest(),
+        }
+
+    def encrypt(self, plaintext: bytes, associated_data: bytes) -> bytes:
+        if not isinstance(plaintext, bytes):
+            raise TypeError("snapshot plaintext must be bytes")
+        context = self._context(associated_data)
+        result = self._kms.generate_data_key(  # type: ignore[attr-defined]
+            KeyId=self._key_arn,
+            KeySpec="AES_256",
+            EncryptionContext=context,
+        )
+        data_key = result.get("Plaintext")
+        encrypted_key = result.get("CiphertextBlob")
+        if (
+            not isinstance(data_key, bytes)
+            or len(data_key) != 32
+            or not isinstance(encrypted_key, bytes)
+            or not encrypted_key
+            or len(encrypted_key) > self.MAX_ENCRYPTED_DATA_KEY_BYTES
+        ):
+            raise RuntimeError("KMS returned an invalid snapshot data key")
+        nonce = os.urandom(12)
+        ciphertext = AESGCM(data_key).encrypt(nonce, plaintext, associated_data)
+        return (
+            self.MAGIC
+            + len(encrypted_key).to_bytes(4, "big")
+            + encrypted_key
+            + nonce
+            + ciphertext
+        )
+
+    def decrypt(self, ciphertext: bytes, associated_data: bytes) -> bytes:
+        minimum = len(self.MAGIC) + 4 + 1 + 12 + 16
+        if not isinstance(ciphertext, bytes) or len(ciphertext) < minimum:
+            raise SnapshotIntegrityError("KMS snapshot envelope is truncated")
+        if not ciphertext.startswith(self.MAGIC):
+            raise SnapshotIntegrityError("KMS snapshot envelope version is invalid")
+        key_length = int.from_bytes(ciphertext[4:8], "big")
+        if not 1 <= key_length <= self.MAX_ENCRYPTED_DATA_KEY_BYTES:
+            raise SnapshotIntegrityError("KMS encrypted data key length is invalid")
+        key_start = 8
+        nonce_start = key_start + key_length
+        payload_start = nonce_start + 12
+        if len(ciphertext) < payload_start + 16:
+            raise SnapshotIntegrityError("KMS snapshot envelope is truncated")
+        encrypted_key = ciphertext[key_start:nonce_start]
+        nonce = ciphertext[nonce_start:payload_start]
+        encrypted_payload = ciphertext[payload_start:]
+        context = self._context(associated_data)
+        result = self._kms.decrypt(  # type: ignore[attr-defined]
+            CiphertextBlob=encrypted_key,
+            EncryptionContext=context,
+        )
+        data_key = result.get("Plaintext")
+        if not isinstance(data_key, bytes) or len(data_key) != 32:
+            raise SnapshotIntegrityError("KMS returned an invalid decrypted snapshot key")
+        try:
+            return AESGCM(data_key).decrypt(nonce, encrypted_payload, associated_data)
+        except Exception as exc:
+            raise SnapshotIntegrityError("KMS snapshot authenticated decryption failed") from exc
+
+
+class KMSSnapshotSigner:
+    """HMAC-SHA-256 signatures backed by a dedicated AWS KMS HMAC key."""
+
+    def __init__(self, *, kms_client: object, key_arn: str) -> None:
+        if not isinstance(key_arn, str) or not key_arn.startswith("arn:aws:kms:"):
+            raise ValueError("snapshot signing key must be an AWS KMS key ARN")
+        self._kms = kms_client
+        self._key_arn = key_arn
+
+    def sign(self, payload: bytes) -> bytes:
+        if not isinstance(payload, bytes):
+            raise TypeError("snapshot signature payload must be bytes")
+        result = self._kms.generate_mac(  # type: ignore[attr-defined]
+            KeyId=self._key_arn,
+            Message=payload,
+            MacAlgorithm="HMAC_SHA_256",
+        )
+        signature = result.get("Mac")
+        if not isinstance(signature, bytes) or len(signature) != 32:
+            raise RuntimeError("KMS returned an invalid HMAC snapshot signature")
+        return signature
+
+    def verify(self, payload: bytes, signature: bytes) -> bool:
+        if not isinstance(payload, bytes) or not isinstance(signature, bytes):
+            return False
+        result = self._kms.verify_mac(  # type: ignore[attr-defined]
+            KeyId=self._key_arn,
+            Message=payload,
+            Mac=signature,
+            MacAlgorithm="HMAC_SHA_256",
+        )
+        valid = result.get("MacValid")
+        if not isinstance(valid, bool):
+            raise RuntimeError("KMS returned an invalid MAC verification result")
+        return valid
+
+
 class AESGCMCipher:
     """AES-256-GCM using a KMS-issued data key supplied by the caller."""
 
