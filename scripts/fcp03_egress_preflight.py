@@ -58,6 +58,8 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("worker-public-address")
     if worker.get("map_public_ip_on_launch") is not False:
         findings.add("worker-public-subnet")
+    if worker.get("ipv6_addresses") or worker.get("ipv6_default_route_target"):
+        findings.add("worker-ipv6-egress-enabled")
 
     availability_zone = worker.get("availability_zone")
     endpoints = _object(firewall.get("endpoints_by_az"))
