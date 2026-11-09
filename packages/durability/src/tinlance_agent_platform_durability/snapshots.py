@@ -143,13 +143,7 @@ class KMSAESGCMCipher:
             raise RuntimeError("KMS returned an invalid snapshot data key")
         nonce = os.urandom(12)
         ciphertext = AESGCM(data_key).encrypt(nonce, plaintext, associated_data)
-        return (
-            self.MAGIC
-            + len(encrypted_key).to_bytes(4, "big")
-            + encrypted_key
-            + nonce
-            + ciphertext
-        )
+        return self.MAGIC + len(encrypted_key).to_bytes(4, "big") + encrypted_key + nonce + ciphertext
 
     def decrypt(self, ciphertext: bytes, associated_data: bytes) -> bytes:
         minimum = len(self.MAGIC) + 4 + 1 + 12 + 16
@@ -217,6 +211,9 @@ class KMSSnapshotSigner:
         if not isinstance(valid, bool):
             raise RuntimeError("KMS returned an invalid MAC verification result")
         return valid
+
+
+
 
 
 class AESGCMCipher:
@@ -370,10 +367,10 @@ class S3SnapshotStore:
             response = getattr(exc, "response", {})
             error = response.get("Error", {}) if isinstance(response, dict) else {}
             metadata = response.get("ResponseMetadata", {}) if isinstance(response, dict) else {}
-            if (
-                error.get("Code") in {"PreconditionFailed", "ConditionalRequestConflict"}
-                or metadata.get("HTTPStatusCode") in {409, 412}
-            ):
+            if error.get("Code") in {
+                "PreconditionFailed",
+                "ConditionalRequestConflict",
+            } or metadata.get("HTTPStatusCode") in {409, 412}:
                 raise SnapshotConflictError("snapshot identifier already exists in S3") from exc
             raise
 
@@ -672,9 +669,7 @@ class WorkspaceSnapshotService:
         staging: Path | None = None
         try:
             if target.exists() or target.is_symlink():
-                raise SnapshotConflictError(
-                    "restore destination must not exist on the clean host"
-                )
+                raise SnapshotConflictError("restore destination must not exist on the clean host")
             parent = target.parent.resolve(strict=True)
             target = parent / target.name
             staging = parent / f".{target.name}.restore-{restore_id.hex}"
