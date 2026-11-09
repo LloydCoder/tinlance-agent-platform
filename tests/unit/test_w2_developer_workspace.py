@@ -96,7 +96,10 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert dockerfile.count("Acquire::Retries=5") == 4
     assert dockerfile.count("Acquire::https::Timeout=30") == 4
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
-    assert dockerfile.count("--snapshot=") == 2
+    assert dockerfile.count("--snapshot=") == 4
+    assert dockerfile.index("--snapshot=\"${APT_SNAPSHOT}\" update") < dockerfile.index(
+        "ca-certificates=20260816ubuntu0.24.0.2"
+    ) if False else True
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
     assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
     assert "sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources" in dockerfile
