@@ -122,6 +122,16 @@ BEGIN
     ) IS NOT FALSE THEN
         RAISE EXCEPTION 'duplicate snapshot catalog record was accepted';
     END IF;
+    BEGIN
+        PERFORM platform.record_workspace_snapshot(
+            tenant, '91000000-0000-0000-0000-000000000093',
+            workspace, 4, clock_timestamp(), digest,
+            '91000000000000000000000000000093.snapshot'
+        );
+        RAISE EXCEPTION 'snapshot with a stale workspace fence was accepted';
+    EXCEPTION WHEN SQLSTATE '55000' THEN
+        NULL;
+    END;
     SELECT count(*) INTO snapshot_count
       FROM platform.get_workspace_snapshot(tenant, workspace, snapshot_catalog_id);
     IF snapshot_count <> 1 THEN
