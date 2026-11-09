@@ -110,6 +110,9 @@ def valid_topology() -> dict[str, object]:
             "nat_gateway_id": "nat-123",
             "nat_gateway_state": "available",
             "nat_subnet_id": "subnet-public-a",
+            "nat_availability_zone": "eu-west-1a",
+            "route_table_subnet_ids": ["subnet-firewall-a"],
+            "nat_route_table_subnet_ids": ["subnet-public-a"],
             "route_entries": [
                 {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
                 {"destination": "0.0.0.0/0", "target": "nat-123", "state": "active"},
@@ -197,6 +200,29 @@ def test_rejects_nat_gateway_that_is_not_available() -> None:
     topology["firewall"]["nat_gateway_state"] = "pending"
 
     assert "nat-gateway-not-available" in evaluate_fcp03_topology(topology)
+
+def test_rejects_nat_gateway_in_a_different_availability_zone() -> None:
+    topology = valid_topology()
+    topology["firewall"]["nat_availability_zone"] = "eu-west-1b"
+
+    assert "nat-gateway-az-mismatch" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_shared_firewall_or_nat_route_tables() -> None:
+    topology = valid_topology()
+    topology["firewall"]["route_table_subnet_ids"] = [
+        "subnet-firewall-a",
+        "subnet-other",
+    ]
+    topology["firewall"]["nat_route_table_subnet_ids"] = [
+        "subnet-public-a",
+        "subnet-other",
+    ]
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "firewall-route-table-not-dedicated" in findings
+    assert "nat-route-table-not-dedicated" in findings
 
 def test_rejects_firewall_subnet_default_route_that_does_not_target_nat_gateway() -> None:
     topology = valid_topology()
