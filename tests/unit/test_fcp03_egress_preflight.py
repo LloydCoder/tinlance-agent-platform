@@ -9,7 +9,83 @@ def valid_topology() -> dict[str, object]:
     return {
         "worker": {
             "vpc_id": "vpc-worker-a",
+            "subnet_id": "subnet-worker-a",
+            "vpc_cidr": "10.20.0.0/16",
+            "vpc_cidr_associations": [{"cidr": "10.20.0.0/16", "state": "associated"}],
+            "resolver_ip": "10.20.0.2",
             "subnet_cidr": "10.20.1.0/24",
+            "network_acl": {
+                "associated": True,
+                "subnet_ids": ["subnet-worker-a"],
+                "ingress_rules": [
+                    {
+                        "rule_number": 100,
+                        "protocol": "6",
+                        "action": "allow",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": 1024,
+                        "to_port": 65535,
+                    },
+                    {
+                        "rule_number": 110,
+                        "protocol": "17",
+                        "action": "allow",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": 1024,
+                        "to_port": 65535,
+                    },
+                    {
+                        "rule_number": 32766,
+                        "protocol": "-1",
+                        "action": "deny",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": None,
+                        "to_port": None,
+                    },
+                ],
+                "egress_rules": [
+                    {
+                        "rule_number": 90,
+                        "protocol": "17",
+                        "action": "allow",
+                        "cidr": "10.20.0.2/32",
+                        "from_port": 53,
+                        "to_port": 53,
+                    },
+                    {
+                        "rule_number": 91,
+                        "protocol": "6",
+                        "action": "allow",
+                        "cidr": "10.20.0.2/32",
+                        "from_port": 53,
+                        "to_port": 53,
+                    },
+                    {
+                        "rule_number": 100,
+                        "protocol": "-1",
+                        "action": "deny",
+                        "cidr": "10.20.0.0/16",
+                        "from_port": None,
+                        "to_port": None,
+                    },
+                    {
+                        "rule_number": 110,
+                        "protocol": "6",
+                        "action": "allow",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": 443,
+                        "to_port": 443,
+                    },
+                    {
+                        "rule_number": 32766,
+                        "protocol": "-1",
+                        "action": "deny",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": None,
+                        "to_port": None,
+                    },
+                ],
+            },
             "public_ip": None,
             "map_public_ip_on_launch": False,
             "metadata_endpoint_enabled": False,
@@ -253,3 +329,103 @@ def test_fails_closed_when_route_inventory_is_missing_or_incomplete() -> None:
         {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "unknown"},
     ]
     assert "worker-route-state-not-active" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_worker_nacl_that_allows_vpc_local_egress_bypass() -> None:
+    topology = valid_topology()
+    topology["worker"]["network_acl"] = {
+        "associated": True,
+        "subnet_ids": ["subnet-worker-a"],
+        "egress_rules": [
+            {
+                "rule_number": 90,
+                "protocol": "17",
+                "action": "allow",
+                "cidr": "10.20.0.2/32",
+                "from_port": 53,
+                "to_port": 53,
+            },
+            {
+                "rule_number": 91,
+                "protocol": "6",
+                "action": "allow",
+                "cidr": "10.20.0.2/32",
+                "from_port": 53,
+                "to_port": 53,
+            },
+            {
+                "rule_number": 100,
+                "protocol": "-1",
+                "action": "allow",
+                "cidr": "10.20.0.0/16",
+                "from_port": None,
+                "to_port": None,
+            },
+            {
+                "rule_number": 110,
+                "protocol": "6",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "from_port": 443,
+                "to_port": 443,
+            },
+            {
+                "rule_number": 32766,
+                "protocol": "-1",
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "from_port": None,
+                "to_port": None,
+            },
+        ],
+    }
+    topology["worker"]["subnet_id"] = "subnet-worker-a"
+    topology["worker"]["vpc_cidr"] = "10.20.0.0/16"
+    topology["worker"]["resolver_ip"] = "10.20.0.2"
+
+    assert "worker-nacl-egress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_worker_subnet_nacl_association_is_missing_or_shared() -> None:
+    topology = valid_topology()
+    topology["worker"]["network_acl"] = {
+        "associated": False,
+        "subnet_ids": [],
+        "egress_rules": [],
+    }
+    topology["worker"]["subnet_id"] = "subnet-worker-a"
+
+    assert "worker-nacl-association-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_worker_nacl_with_missing_or_unrestricted_ingress_policy() -> None:
+    topology = valid_topology()
+    topology["worker"]["network_acl"]["ingress_rules"] = []
+
+    assert "worker-nacl-ingress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+    topology["worker"]["network_acl"]["ingress_rules"] = [
+        {
+            "rule_number": 100,
+            "protocol": "-1",
+            "action": "allow",
+            "cidr": "0.0.0.0/0",
+            "from_port": None,
+            "to_port": None,
+        },
+    ]
+
+    assert "worker-nacl-ingress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_secondary_or_pending_vpc_cidr_associations() -> None:
+    topology = valid_topology()
+    topology["worker"]["vpc_cidr_associations"].append(
+        {"cidr": "10.30.0.0/16", "state": "associated"}
+    )
+
+    assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
+
+    topology["worker"]["vpc_cidr_associations"] = [{"cidr": "10.20.0.0/16", "state": "associating"}]
+
+    assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
