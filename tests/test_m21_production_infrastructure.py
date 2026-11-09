@@ -178,7 +178,6 @@ def test_dependency_expiry_must_follow_verification_time() -> None:
         )
 
 
-
 @pytest.mark.parametrize(
     "evidence_ref",
     (
