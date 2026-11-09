@@ -620,3 +620,31 @@ def test_collector_exposes_shared_worker_route_table_associations() -> None:
         "subnet-worker",
     ]
     assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_captures_and_rejects_worker_security_group_ingress() -> None:
+    ec2 = ec2_client()
+    security_group = ec2.responses["describe_security_groups"][0]["SecurityGroups"][0]
+    security_group["IpPermissions"] = [
+        {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "IpRanges": [{"CidrIp": "10.20.0.0/16"}],
+            "Ipv6Ranges": [],
+            "PrefixListIds": [],
+            "UserIdGroupPairs": [],
+        }
+    ]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["security_group_ingress"] == [
+        {"protocol": "tcp", "port": 22, "cidr": "10.20.0.0/16"}
+    ]
+    assert "worker-security-group-ingress-not-empty" in evaluate_fcp03_topology(snapshot)
