@@ -709,4 +709,3 @@ def test_collector_fails_closed_when_worker_ingress_inventory_is_malformed() -> 
     assert snapshot["worker"]["security_group_ingress"] is None
     findings = evaluate_fcp03_topology(snapshot)
     assert "worker-security-group-ingress-inventory-invalid" in findings
-
