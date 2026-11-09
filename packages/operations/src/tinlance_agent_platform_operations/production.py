@@ -6,10 +6,10 @@ has deployed external production infrastructure.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-import re
 from urllib.parse import urlsplit
 
 
