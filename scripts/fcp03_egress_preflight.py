@@ -119,8 +119,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        raw = sys.stdin.read() if args.snapshot == "-" else Path(args.snapshot).read_text(
-            encoding="utf-8"
+        raw = (
+            sys.stdin.read()
+            if args.snapshot == "-"
+            else Path(args.snapshot).read_text(encoding="utf-8")
         )
         snapshot = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc:
