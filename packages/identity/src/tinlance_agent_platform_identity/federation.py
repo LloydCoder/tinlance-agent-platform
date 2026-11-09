@@ -67,16 +67,40 @@ class VerifiedAgentIdentity:
             (self.token_id, "token identifier"),
             (self.principal_type, "principal type"),
         ):
-            if not value or value != value.strip():
-                raise PermissionError(f"identity {name} is incomplete or not normalized")
+            if (
+                not value
+                or value != value.strip()
+                or any(ord(character) < 0x21 or ord(character) == 0x7F for character in value)
+            ):
+                raise PermissionError(
+                    f"identity {name} is incomplete, not normalized, or contains control characters"
+                )
         if self.client_id is not None and (
-            not self.client_id or self.client_id != self.client_id.strip()
+            not self.client_id
+            or self.client_id != self.client_id.strip()
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in self.client_id)
         ):
-            raise PermissionError("identity client_id must be normalized when provided")
-        if any(not scope or scope != scope.strip() for scope in self.scopes):
-            raise PermissionError("identity scopes must be normalized")
-        if any(not role or role != role.strip() for role in self.roles):
-            raise PermissionError("identity roles must be normalized")
+            raise PermissionError("identity client_id is not normalized or contains control characters")
+        if any(
+            not scope
+            or scope != scope.strip()
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in scope)
+            for scope in self.scopes
+        ):
+            raise PermissionError("identity scopes are not normalized or contain control characters")
+        if any(
+            not role
+            or role != role.strip()
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in role)
+            for role in self.roles
+        ):
+            raise PermissionError("identity roles are not normalized or contain control characters")
+        if self.nonce is not None and (
+            not self.nonce
+            or self.nonce != self.nonce.strip()
+            or any(ord(character) < 0x21 or ord(character) == 0x7F for character in self.nonce)
+        ):
+            raise PermissionError("identity nonce is not normalized or contains control characters")
         if any(
             not isinstance(revocation_id, str)
             or not revocation_id
