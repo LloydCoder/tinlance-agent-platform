@@ -28,6 +28,54 @@ def _all_pages(client: Any, operation: str, result_key: str, **params: Any) -> l
         request["NextToken"] = token
 
 
+def _route_entries_for_subnet(
+    ec2: Any, *, vpc_id: str, subnet_id: str
+) -> list[dict[str, object]]:
+    """Return the complete route table for a subnet, failing on ambiguity."""
+    tables = _all_pages(
+        ec2,
+        "describe_route_tables",
+        "RouteTables",
+        Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}],
+    )
+    if not tables:
+        tables = _all_pages(
+            ec2,
+            "describe_route_tables",
+            "RouteTables",
+            Filters=[
+                {"Name": "vpc-id", "Values": [vpc_id]},
+                {"Name": "association.main", "Values": ["true"]},
+            ],
+        )
+    if len(tables) > 1:
+        exact = [
+            table
+            for table in tables
+            if any(
+                association.get("SubnetId") == subnet_id
+                for association in table.get("Associations", [])
+            )
+        ]
+        if len(exact) != 1:
+            raise ValueError(f"subnet {subnet_id} has an ambiguous route-table association")
+        tables = exact
+    if len(tables) != 1:
+        return []
+    return [
+        {
+            "destination": (
+                route.get("DestinationCidrBlock")
+                or route.get("DestinationIpv6CidrBlock")
+                or route.get("DestinationPrefixListId")
+            ),
+            "target": _route_target(route),
+            "state": route.get("State", "UNKNOWN"),
+        }
+        for route in tables[0].get("Routes", [])
+    ]
+
+
 def _route_target(route: Mapping[str, Any]) -> str | None:
     for key in (
         "VpcEndpointId",
