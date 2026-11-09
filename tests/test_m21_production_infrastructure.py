@@ -69,9 +69,7 @@ def test_production_readiness_rejects_evidence_from_another_environment() -> Non
         for dependency in _verified_dependencies()
     )
     with pytest.raises(RuntimeError, match="environment"):
-        ProductionReadiness("1.1.0", dependencies).verify(
-            now=datetime(2026, 11, 9, tzinfo=UTC)
-        )
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 9, tzinfo=UTC))
 
 
 def test_verified_dependency_requires_a_named_verifier_and_timestamp() -> None:
