@@ -343,6 +343,17 @@ BEGIN
        OR p_storage_key IS DISTINCT FROM replace(p_snapshot_id::text, '-', '') || '.snapshot' THEN
         RAISE EXCEPTION 'invalid workspace snapshot metadata' USING ERRCODE = '22023';
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM platform.workspace_leases
+         WHERE tenant_id = p_tenant_id
+           AND workspace_id = p_workspace_id
+           AND fencing_token = p_fencing_token
+           AND status = 'active'
+           AND lease_expires_at > clock_timestamp()
+    ) THEN
+        RAISE EXCEPTION 'workspace snapshot requires the current active lease fence'
+            USING ERRCODE = '55000';
+    END IF;
 
     INSERT INTO platform.workspace_snapshots (
         tenant_id, snapshot_id, workspace_id, fencing_token,
