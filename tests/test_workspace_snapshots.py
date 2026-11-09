@@ -41,10 +41,10 @@ class Ledger:
         self.claimed.add(restore_id)
         return True
 
-    def complete(self, restore_id, snapshot_digest):
+    def complete(self, tenant_id, workspace_id, restore_id, snapshot_digest):
         self.completed[restore_id] = snapshot_digest
 
-    def fail(self, restore_id, reason_code):
+    def fail(self, tenant_id, workspace_id, restore_id, reason_code):
         self.failed[restore_id] = reason_code
 
 
