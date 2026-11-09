@@ -36,7 +36,7 @@ def _all_pages(client: Any, operation: str, result_key: str, **params: Any) -> l
 
 def _route_entries_for_subnet(
     ec2: Any, *, vpc_id: str, subnet_id: str
-) -> tuple[list[dict[str, object]], list[str]]:
+) -> tuple[list[dict[str, object]], list[object]]:
     """Return the complete route table for a subnet, failing on ambiguity."""
     tables = _all_pages(
         ec2,
@@ -68,13 +68,21 @@ def _route_entries_for_subnet(
         tables = exact
     if len(tables) != 1:
         return [], []
-    associated_subnets = sorted(
-        {
-            association["SubnetId"]
-            for association in tables[0].get("Associations", [])
-            if isinstance(association.get("SubnetId"), str)
-        }
-    )
+    raw_associations = tables[0].get("Associations", [])
+    associated_subnets: list[object] = []
+    if isinstance(raw_associations, list):
+        for association in raw_associations:
+            if not isinstance(association, Mapping):
+                associated_subnets.append(None)
+                continue
+            subnet_value = association.get("SubnetId")
+            associated_subnets.append(
+                subnet_value if isinstance(subnet_value, str) and subnet_value else None
+            )
+    else:
+        associated_subnets.append(None)
+    if all(isinstance(value, str) for value in associated_subnets):
+        associated_subnets = sorted(associated_subnets)
     return (
         [
             {
@@ -259,15 +267,20 @@ def _resolved_ip_validation(policy: Mapping[str, Any]) -> dict[str, object] | No
     if not isinstance(validation, Mapping):
         return None
 
-    def address_ranges(name: str) -> list[str]:
+    def address_ranges(name: str) -> list[str] | None:
         values = validation.get(name, [])
         if not isinstance(values, list):
-            return []
-        return [
-            value["AddressDefinition"]
-            for value in values
-            if isinstance(value, Mapping) and isinstance(value.get("AddressDefinition"), str)
-        ]
+            return None
+        normalized: list[str] = []
+        for value in values:
+            if (
+                not isinstance(value, Mapping)
+                or not isinstance(value.get("AddressDefinition"), str)
+                or not value.get("AddressDefinition")
+            ):
+                return None
+            normalized.append(value["AddressDefinition"])
+        return normalized
 
     return {
         "dns_firewall_rule_group_id": validation.get("DNSFirewallRuleGroupId"),
@@ -297,93 +310,123 @@ def _dns_firewall_snapshot(
         }
 
     group_response = resolver.describe_firewall_rule_group(FirewallRuleGroupId=rule_group_id)
-    rule_group_status = group_response.get("FirewallRuleGroup", {}).get("Status", "UNKNOWN")
+    raw_group = group_response.get("FirewallRuleGroup")
+    group = raw_group if isinstance(raw_group, Mapping) else {}
+    rule_group_status = group.get("Status", "UNKNOWN")
+
     associations = _all_pages(
         resolver,
         "list_firewall_rule_group_associations",
         "FirewallRuleGroupAssociations",
         FirewallRuleGroupId=rule_group_id,
     )
-    associated_vpcs = sorted(
-        {
-            association["VpcId"]
-            for association in associations
-            if isinstance(association.get("VpcId"), str)
-        }
-    )
-    association_statuses = sorted(
-        {
-            association.get("Status", "UNKNOWN")
-            for association in associations
-            if isinstance(association.get("Status", "UNKNOWN"), str)
-        }
-    )
+    associated_vpcs: list[object] = []
+    association_statuses: list[object] = []
+    for association in associations:
+        if not isinstance(association, Mapping):
+            associated_vpcs.append(None)
+            association_statuses.append(None)
+            continue
+        vpc_value = association.get("VpcId")
+        associated_vpcs.append(vpc_value if isinstance(vpc_value, str) and vpc_value else None)
+        status = association.get("Status", "UNKNOWN")
+        association_statuses.append(status if isinstance(status, str) and status else None)
+
     rules = _all_pages(
         resolver,
         "list_firewall_rules",
         "FirewallRules",
         FirewallRuleGroupId=rule_group_id,
     )
-    rule_statuses = sorted(
-        {
-            rule.get("Status", "UNKNOWN")
-            for rule in rules
-            if isinstance(rule.get("Status", "UNKNOWN"), str)
-        }
-    )
-
+    rule_statuses: list[object] = []
     allowlist_domains: set[str] = set()
+    allowlist_has_malformed_domain = False
     allow_priorities: list[int] = []
     wildcard_block_priorities: list[int] = []
-    domain_list_statuses: set[str] = set()
-    domain_list_cache: dict[str, list[str]] = {}
+    domain_list_statuses: list[object] = []
+    domain_list_cache: dict[str, list[object]] = {}
+
     for rule in rules:
+        if not isinstance(rule, Mapping):
+            rule_statuses.append(None)
+            domain_list_statuses.append(None)
+            allowlist_has_malformed_domain = True
+            continue
+
+        status = rule.get("Status", "UNKNOWN")
+        rule_statuses.append(status if isinstance(status, str) and status else None)
         domain_list_id = rule.get("FirewallDomainListId")
         priority = rule.get("Priority")
-        if not isinstance(domain_list_id, str):
+        action = rule.get("Action")
+        if (
+            not isinstance(domain_list_id, str)
+            or not domain_list_id
+            or not isinstance(priority, int)
+            or action not in {"ALLOW", "BLOCK"}
+        ):
+            domain_list_statuses.append(None)
+            allowlist_has_malformed_domain = True
             continue
+
         if domain_list_id not in domain_list_cache:
-            metadata = resolver.get_firewall_domain_list(FirewallDomainListId=domain_list_id).get(
-                "FirewallDomainList", {}
+            metadata_response = resolver.get_firewall_domain_list(
+                FirewallDomainListId=domain_list_id
             )
-            status = metadata.get("Status", "UNKNOWN")
-            if isinstance(status, str):
-                domain_list_statuses.add(status)
-            domain_list_cache[domain_list_id] = _all_pages(
+            raw_metadata = metadata_response.get("FirewallDomainList")
+            metadata = raw_metadata if isinstance(raw_metadata, Mapping) else {}
+            domain_status = metadata.get("Status", "UNKNOWN")
+            domain_list_statuses.append(
+                domain_status if isinstance(domain_status, str) and domain_status else None
+            )
+            raw_domains = _all_pages(
                 resolver,
                 "list_firewall_domains",
                 "Domains",
                 FirewallDomainListId=domain_list_id,
             )
+            domains: list[object] = [
+                value if isinstance(value, str) and value else None for value in raw_domains
+            ]
+            domain_list_cache[domain_list_id] = domains
+            if any(value is None for value in domains):
+                allowlist_has_malformed_domain = True
+
         domains = domain_list_cache[domain_list_id]
-        if rule.get("Action") == "ALLOW":
-            allowlist_domains.update(domain for domain in domains if isinstance(domain, str))
-            if isinstance(priority, int):
-                allow_priorities.append(priority)
-        if rule.get("Action") == "BLOCK" and "*" in domains and isinstance(priority, int):
+        if action == "ALLOW":
+            allowlist_domains.update(value for value in domains if isinstance(value, str))
+        if action == "BLOCK" and "*" in domains:
             wildcard_block_priorities.append(priority)
+        if action == "ALLOW":
+            allow_priorities.append(priority)
+
     terminal_block = (
         bool(allow_priorities)
         and bool(wildcard_block_priorities)
-        and (min(wildcard_block_priorities) > max(allow_priorities))
+        and min(wildcard_block_priorities) > max(allow_priorities)
     )
 
-    config = resolver.get_firewall_config(ResourceId=vpc_id).get("FirewallConfig", {})
+    config_response = resolver.get_firewall_config(ResourceId=vpc_id)
+    raw_config = config_response.get("FirewallConfig")
+    config = raw_config if isinstance(raw_config, Mapping) else {}
     fail_open = config.get("FirewallFailOpen")
     failure_mode = (
         "CLOSED" if fail_open == "DISABLED" else "OPEN" if fail_open == "ENABLED" else "UNKNOWN"
     )
 
+    normalized_allowlist: list[object] = sorted(allowlist_domains)
+    if allowlist_has_malformed_domain:
+        normalized_allowlist.append(None)
+
     return {
         "rule_group_id": rule_group_id,
         "associated_vpc_ids": associated_vpcs,
-        "allowlist_domains": sorted(allowlist_domains),
+        "allowlist_domains": normalized_allowlist,
         "terminal_block": terminal_block,
         "failure_mode": failure_mode,
         "rule_group_status": rule_group_status,
         "association_statuses": association_statuses,
         "rule_statuses": rule_statuses,
-        "domain_list_statuses": sorted(domain_list_statuses),
+        "domain_list_statuses": domain_list_statuses,
     }
 
 
@@ -424,22 +467,22 @@ def _stateful_rule_group_snapshots(
         stateful_options = raw_stateful_options if isinstance(raw_stateful_options, Mapping) else {}
         targets = domain_list.get("Targets", [])
         target_types = domain_list.get("TargetTypes", [])
+
+        def preserve_string_collection(values: object) -> list[object] | None:
+            if not isinstance(values, list):
+                return None
+            if all(isinstance(value, str) and value for value in values):
+                return sorted(values)
+            return list(values)
+
         snapshots.append(
             {
                 "status": response_metadata.get("RuleGroupStatus", "UNKNOWN"),
                 "type": response_metadata.get("Type", "UNKNOWN"),
                 "rule_order": stateful_options.get("RuleOrder"),
                 "generated_rules_type": domain_list.get("GeneratedRulesType"),
-                "targets": (
-                    sorted(value for value in targets if isinstance(value, str))
-                    if isinstance(targets, list)
-                    else []
-                ),
-                "target_types": (
-                    sorted(value for value in target_types if isinstance(value, str))
-                    if isinstance(target_types, list)
-                    else []
-                ),
+                "targets": preserve_string_collection(targets),
+                "target_types": preserve_string_collection(target_types),
             }
         )
     return snapshots
@@ -453,38 +496,56 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
         "NetworkAcls",
         Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}],
     )
-    matches = [
-        acl
-        for acl in network_acls
-        if any(
-            association.get("SubnetId") == subnet_id for association in acl.get("Associations", [])
-        )
-    ]
+    matches = []
+    for acl in network_acls:
+        if not isinstance(acl, Mapping):
+            continue
+        associations = acl.get("Associations", [])
+        if isinstance(associations, list) and any(
+            isinstance(association, Mapping) and association.get("SubnetId") == subnet_id
+            for association in associations
+        ):
+            matches.append(acl)
     if len(matches) != 1:
         return {
             "associated": False,
             "network_acl_id": None,
             "subnet_ids": [],
             "egress_rules": [],
+            "ingress_rules": [],
         }
 
     acl = matches[0]
-    subnet_ids = sorted(
-        {
-            association["SubnetId"]
-            for association in acl.get("Associations", [])
-            if isinstance(association.get("SubnetId"), str)
-        }
-    )
-    ingress_rules: list[dict[str, object]] = []
-    egress_rules: list[dict[str, object]] = []
+    raw_associations = acl.get("Associations", [])
+    subnet_ids: list[object] = []
+    if isinstance(raw_associations, list):
+        for association in raw_associations:
+            if not isinstance(association, Mapping):
+                subnet_ids.append(None)
+                continue
+            subnet_value = association.get("SubnetId")
+            subnet_ids.append(
+                subnet_value if isinstance(subnet_value, str) and subnet_value else None
+            )
+    else:
+        subnet_ids.append(None)
+    if all(isinstance(value, str) for value in subnet_ids):
+        subnet_ids = sorted(subnet_ids)
+
+    ingress_rules: list[dict[str, object]] | None = []
+    egress_rules: list[dict[str, object]] | None = []
     entries = acl.get("Entries", [])
+    invalid_entry_inventory = not isinstance(entries, list)
     if not isinstance(entries, list):
         entries = []
     for entry in entries:
-        if not isinstance(entry, Mapping):
+        if not isinstance(entry, Mapping) or not isinstance(entry.get("Egress"), bool):
+            invalid_entry_inventory = True
             continue
         raw_port_range = entry.get("PortRange")
+        if raw_port_range is not None and not isinstance(raw_port_range, Mapping):
+            invalid_entry_inventory = True
+            continue
         port_range = raw_port_range if isinstance(raw_port_range, Mapping) else {}
         rule = {
             "rule_number": entry.get("RuleNumber"),
@@ -494,17 +555,23 @@ def _network_acl_snapshot(ec2: Any, subnet_id: str) -> dict[str, object]:
             "from_port": port_range.get("From"),
             "to_port": port_range.get("To"),
         }
-        if entry.get("Egress") is True:
+        if entry["Egress"] is True:
             egress_rules.append(rule)
-        elif entry.get("Egress") is False:
+        else:
             ingress_rules.append(rule)
 
-    def sort_key(rule: dict[str, object]) -> int:
-        rule_number = rule["rule_number"]
-        return rule_number if isinstance(rule_number, int) else 2**31
+    if invalid_entry_inventory:
+        ingress_rules = None
+        egress_rules = None
+    else:
 
-    ingress_rules.sort(key=sort_key)
-    egress_rules.sort(key=sort_key)
+        def sort_key(rule: dict[str, object]) -> int:
+            rule_number = rule["rule_number"]
+            return rule_number if isinstance(rule_number, int) else 2**31
+
+        ingress_rules.sort(key=sort_key)
+        egress_rules.sort(key=sort_key)
+
     return {
         "associated": True,
         "network_acl_id": acl.get("NetworkAclId"),
@@ -559,10 +626,13 @@ def collect_fcp03_snapshot(
     if isinstance(raw_cidr_associations, list):
         for association in raw_cidr_associations:
             if not isinstance(association, Mapping):
+                vpc_cidr_associations.append({"cidr": None, "state": None})
                 continue
             raw_state = association.get("CidrBlockState")
             state = raw_state.get("State") if isinstance(raw_state, Mapping) else None
             vpc_cidr_associations.append({"cidr": association.get("CidrBlock"), "state": state})
+    else:
+        vpc_cidr_associations.append({"cidr": None, "state": None})
     try:
         vpc_network = ipaddress.ip_network(vpc_cidr, strict=False)
         resolver_ip = str(vpc_network.network_address + 2) if vpc_network.version == 4 else None
@@ -599,13 +669,21 @@ def collect_fcp03_snapshot(
         if len(exact) != 1:
             raise ValueError("the worker subnet has an ambiguous route-table association")
         route_tables = exact
-    route_table_subnet_ids = sorted(
-        {
-            association["SubnetId"]
-            for association in (route_tables[0].get("Associations", []) if route_tables else [])
-            if isinstance(association, Mapping) and isinstance(association.get("SubnetId"), str)
-        }
-    )
+    raw_route_associations = route_tables[0].get("Associations", []) if route_tables else []
+    route_table_subnet_ids: list[object] = []
+    if isinstance(raw_route_associations, list):
+        for association in raw_route_associations:
+            if not isinstance(association, Mapping):
+                route_table_subnet_ids.append(None)
+                continue
+            subnet_value = association.get("SubnetId")
+            route_table_subnet_ids.append(
+                subnet_value if isinstance(subnet_value, str) and subnet_value else None
+            )
+    else:
+        route_table_subnet_ids.append(None)
+    if all(isinstance(value, str) for value in route_table_subnet_ids):
+        route_table_subnet_ids = sorted(route_table_subnet_ids)
     routes = route_tables[0].get("Routes", []) if route_tables else []
     route_entries = [
         {
@@ -646,16 +724,21 @@ def collect_fcp03_snapshot(
         }
     )
 
-    security_group_ids = sorted(
-        {
-            group["GroupId"]
-            for group in instance.get("SecurityGroups", [])
-            if isinstance(group.get("GroupId"), str)
-        }
+    raw_security_groups = instance.get("SecurityGroups", [])
+    security_group_inventory_valid = isinstance(raw_security_groups, list) and all(
+        isinstance(group, Mapping)
+        and isinstance(group.get("GroupId"), str)
+        and bool(group.get("GroupId"))
+        for group in raw_security_groups
+    )
+    security_group_ids = (
+        sorted({group["GroupId"] for group in raw_security_groups})
+        if security_group_inventory_valid
+        else []
     )
     security_groups = (
         _all_pages(ec2, "describe_security_groups", "SecurityGroups", GroupIds=security_group_ids)
-        if security_group_ids
+        if security_group_ids and security_group_inventory_valid
         else []
     )
 
@@ -694,8 +777,12 @@ def collect_fcp03_snapshot(
             _route_target(ipv6_default_route) if ipv6_default_route else None
         ),
         "ipv6_addresses": ipv6_addresses,
-        "security_group_ingress": _security_group_ingress(security_groups),
-        "security_group_egress": _security_group_egress(security_groups),
+        "security_group_ingress": (
+            _security_group_ingress(security_groups) if security_group_inventory_valid else None
+        ),
+        "security_group_egress": (
+            _security_group_egress(security_groups) if security_group_inventory_valid else None
+        ),
     }
 
     firewall_summary = _firewall_for_vpc(network_firewall, vpc_id)
