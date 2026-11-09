@@ -152,7 +152,12 @@ def firewall_client() -> FakeClient:
                             "BypassDestinationValidationIPRanges": [],
                         },
                         "StatefulRuleGroupReferences": [
-                            {"ResourceArn": "arn:aws:network-firewall:eu-west-1:123:stateful-rulegroup/allowlist"}
+                            {
+                                "ResourceArn": (
+                                    "arn:aws:network-firewall:eu-west-1:123:"
+                                    "stateful-rulegroup/allowlist"
+                                )
+                            }
                         ],
                         "StatefulEngineOptions": {"RuleOrder": "STRICT_ORDER"},
                         "StatefulDefaultActions": ["aws:drop_strict"],
@@ -166,7 +171,11 @@ def firewall_client() -> FakeClient:
                         "RulesSource": {
                             "RulesSourceList": {
                                 "Targets": ["approved.example"],
-                                "TargetTypes": ["TLS_SNI", "HTTP_HOST", "AWS_ROUTE_53_RESOLVED_DOMAIN"],
+                                "TargetTypes": [
+                                    "TLS_SNI",
+                                    "HTTP_HOST",
+                                    "AWS_ROUTE_53_RESOLVED_DOMAIN",
+                                ],
                                 "GeneratedRulesType": "ALLOWLIST",
                             }
                         },
