@@ -59,19 +59,20 @@ import boto3
 
 from tinlance_agent_platform_identity import DynamoDBTokenRevocationStore
 
-dynamodb = boto3.resource("dynamodb", region_name="eu-west-1")
-table = dynamodb.Table("tinlyt-platform-token-revocations")
+dynamodb = boto3.client("dynamodb", region_name="eu-west-1")
 revocations = DynamoDBTokenRevocationStore(
-    table.meta.client,
-    table_name=table.name,
+    dynamodb,
+    table_name="tinlyt-platform-token-revocations",
     token_retention_seconds=600,
     family_retention_seconds=31 * 24 * 60 * 60,
 )
 ```
 
-The table resource's `meta.client` is the boto3 DynamoDB client with the resource's automatic
-Python-type marshalling handlers. Do not pass a separately-created low-level
-`boto3.client("dynamodb")` unless you also implement explicit AttributeValue serialization.
+The adapter accepts boto3's low-level DynamoDB client and performs explicit
+`AttributeValue` serialization/deserialization for its string and numeric fields. A
+`Table.meta.client` is also a low-level client; it does not provide automatic Python-type
+marshalling. Do not pass a `Table` resource itself. The adapter requires the low-level client's
+`GetItem` and `TransactWriteItems` operations.
 
 Pass the same store instance as both the `JWKSPrincipalResolver` revocation checker and its
 session-revocation writer. The API must return success only after the transaction completes.

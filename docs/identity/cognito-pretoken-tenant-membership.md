@@ -81,9 +81,11 @@ TENANT_MEMBERSHIP_TABLE=tinlyt-user-tenant-memberships
 ```
 
 The Lambda entrypoint initializes the boto3 DynamoDB resource once at cold start with bounded
-connection/read timeouts and a small retry budget. It uses the resource's auto-marshalling client,
-performs one strongly consistent `GetItem` per token issuance and does not cache tenant membership
-across invocations, so administrative revocation takes effect on the next issuance.
+connection/read timeouts and a small retry budget. Its `meta.client` is the low-level DynamoDB
+client, not an auto-marshalling Table resource. The resolver serializes the partition key as a
+DynamoDB `AttributeValue` string and strictly deserializes the strongly consistent `GetItem`
+response. It performs one read per token issuance and does not cache tenant membership across
+invocations, so administrative revocation takes effect on the next issuance.
 
 ## Least-privilege IAM
 
