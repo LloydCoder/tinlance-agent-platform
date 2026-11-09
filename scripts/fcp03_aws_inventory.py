@@ -275,9 +275,14 @@ def collect_fcp03_snapshot(
         exact = [
             table
             for table in route_tables
-            if any(association.get("SubnetId") == subnet_id for association in table.get("Associations", []))
+            if any(
+                association.get("SubnetId") == subnet_id
+                for association in table.get("Associations", [])
+            )
         ]
-        route_tables = exact if len(exact) == 1 else route_tables[:1]
+        if len(exact) != 1:
+            raise ValueError("the worker subnet has an ambiguous route-table association")
+        route_tables = exact
     routes = route_tables[0].get("Routes", []) if route_tables else []
     default_route = next(
         (
@@ -324,6 +329,10 @@ def collect_fcp03_snapshot(
         "subnet_cidr": subnet.get("CidrBlock"),
         "public_ip": instance.get("PublicIpAddress"),
         "map_public_ip_on_launch": subnet.get("MapPublicIpOnLaunch"),
+        "ipv6_enabled": bool(
+            subnet.get("AssignIpv6AddressOnCreation")
+            or subnet.get("Ipv6CidrBlockAssociationSet")
+        ),
         "availability_zone": availability_zone,
         "default_route_target": _route_target(default_route) if default_route else None,
         "ipv6_default_route_target": (
