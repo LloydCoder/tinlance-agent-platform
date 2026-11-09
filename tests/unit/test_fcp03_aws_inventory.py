@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from scripts.fcp03_aws_inventory import collect_fcp03_snapshot
+import pytest
+
+from scripts.fcp03_aws_inventory import _all_pages, collect_fcp03_snapshot
 from scripts.fcp03_egress_preflight import evaluate_fcp03_topology
 
 
@@ -574,10 +576,6 @@ def test_rejects_network_firewall_policy_with_async_configuration_errors() -> No
 
 
 def test_rejects_repeated_aws_pagination_token() -> None:
-    import pytest
-
-    from scripts.fcp03_aws_inventory import _all_pages
-
     client = FakeClient(
         {
             "list_items": [
