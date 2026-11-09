@@ -135,9 +135,7 @@ def _dns_firewall_snapshot(
             "domain_list_statuses": [],
         }
 
-    group_response = resolver.describe_firewall_rule_group(
-        FirewallRuleGroupId=rule_group_id
-    )
+    group_response = resolver.describe_firewall_rule_group(FirewallRuleGroupId=rule_group_id)
     rule_group_status = group_response.get("FirewallRuleGroup", {}).get("Status", "UNKNOWN")
     associations = _all_pages(
         resolver,
@@ -184,9 +182,9 @@ def _dns_firewall_snapshot(
         if not isinstance(domain_list_id, str):
             continue
         if domain_list_id not in domain_list_cache:
-            metadata = resolver.get_firewall_domain_list(
-                FirewallDomainListId=domain_list_id
-            ).get("FirewallDomainList", {})
+            metadata = resolver.get_firewall_domain_list(FirewallDomainListId=domain_list_id).get(
+                "FirewallDomainList", {}
+            )
             status = metadata.get("Status", "UNKNOWN")
             if isinstance(status, str):
                 domain_list_statuses.add(status)
@@ -203,16 +201,16 @@ def _dns_firewall_snapshot(
                 allow_priorities.append(priority)
         if rule.get("Action") == "BLOCK" and "*" in domains and isinstance(priority, int):
             wildcard_block_priorities.append(priority)
-    terminal_block = bool(allow_priorities) and bool(wildcard_block_priorities) and (
-        min(wildcard_block_priorities) > max(allow_priorities)
+    terminal_block = (
+        bool(allow_priorities)
+        and bool(wildcard_block_priorities)
+        and (min(wildcard_block_priorities) > max(allow_priorities))
     )
 
     config = resolver.get_firewall_config(ResourceId=vpc_id).get("FirewallConfig", {})
     fail_open = config.get("FirewallFailOpen")
     failure_mode = (
-        "CLOSED"
-        if fail_open == "DISABLED"
-        else "OPEN" if fail_open == "ENABLED" else "UNKNOWN"
+        "CLOSED" if fail_open == "DISABLED" else "OPEN" if fail_open == "ENABLED" else "UNKNOWN"
     )
 
     return {
@@ -254,8 +252,7 @@ def collect_fcp03_snapshot(
     subnet_id = instance.get("SubnetId")
     availability_zone = instance.get("Placement", {}).get("AvailabilityZone")
     if not all(
-        isinstance(value, str) and value
-        for value in (vpc_id, subnet_id, availability_zone)
+        isinstance(value, str) and value for value in (vpc_id, subnet_id, availability_zone)
     ):
         raise ValueError("the EC2 instance is missing VPC, subnet, or Availability Zone metadata")
 
@@ -339,8 +336,7 @@ def collect_fcp03_snapshot(
         "public_ip": instance.get("PublicIpAddress"),
         "map_public_ip_on_launch": subnet.get("MapPublicIpOnLaunch"),
         "ipv6_enabled": bool(
-            subnet.get("AssignIpv6AddressOnCreation")
-            or subnet.get("Ipv6CidrBlockAssociationSet")
+            subnet.get("AssignIpv6AddressOnCreation") or subnet.get("Ipv6CidrBlockAssociationSet")
         ),
         "availability_zone": availability_zone,
         "default_route_target": _route_target(default_route) if default_route else None,
