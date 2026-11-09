@@ -43,6 +43,7 @@ def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
 
     assert required_types <= {resource["Type"] for resource in resources.values()}
     assert template["Parameters"]["AvailabilityZone"]["Type"] == "AWS::EC2::AvailabilityZone::Name"
+    assert template["Parameters"]["VpcCidr"]["AllowedValues"] == ["10.42.0.0/16"]
     assert "Default" not in template["Parameters"]["TeardownAtUtc"]
 
 
