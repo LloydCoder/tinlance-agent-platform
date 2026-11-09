@@ -46,6 +46,9 @@ def test_template_defines_a_single_az_disposable_fcp03_lab() -> None:
     assert template["Parameters"]["VpcCidr"]["AllowedValues"] == ["10.42.0.0/16"]
     assert "ApprovedProbeDomain" not in template["Parameters"]
     assert "Default" not in template["Parameters"]["TeardownAtUtc"]
+    approved_domains = template["Parameters"]["ApprovedDomains"]["Description"].lower()
+    assert "ssm control-plane" not in approved_domains
+    assert "instance-profile" in approved_domains
 
 
 def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> None:
