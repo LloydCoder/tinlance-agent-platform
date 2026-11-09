@@ -8,7 +8,7 @@
     },
     "ApprovedDomains": {
       "Type": "CommaDelimitedList",
-      "Description": "Exact approved FQDNs, including region-specific SSM control-plane endpoints required to manage the private worker."
+      "Description": "Exact approved FQDNs for the worker's bounded DNS and HTTPS smoke probes; the worker has no SSM or instance-profile dependency."
     },
     "TeardownAtUtc": {
       "Type": "String",
