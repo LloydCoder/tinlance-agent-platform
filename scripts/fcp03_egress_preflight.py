@@ -132,8 +132,15 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("firewall-return-path-identity-unknown")
     if firewall.get("availability_zone") != availability_zone:
         findings.add("firewall-endpoint-az-mismatch")
+    if firewall.get("nat_availability_zone") != availability_zone:
+        findings.add("nat-gateway-az-mismatch")
     if firewall.get("nat_gateway_state") != "available":
         findings.add("nat-gateway-not-available")
+
+    if _strings(firewall.get("route_table_subnet_ids")) != {firewall_subnet_id}:
+        findings.add("firewall-route-table-not-dedicated")
+    if _strings(firewall.get("nat_route_table_subnet_ids")) != {nat_subnet_id}:
+        findings.add("nat-route-table-not-dedicated")
 
     firewall_routes = firewall.get("route_entries")
     if (
