@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from tinlance_agent_platform_operations import (
@@ -9,7 +11,15 @@ from tinlance_agent_platform_operations import (
 
 def _verified_dependencies() -> tuple[ProductionDependency, ...]:
     return tuple(
-        ProductionDependency(kind, kind.value, True, "evidence://" + kind.value)
+        ProductionDependency(
+            kind,
+            kind.value,
+            True,
+            "evidence://" + kind.value,
+            verified_by="production-operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
         for kind in DependencyKind
     )
 
@@ -35,3 +45,183 @@ def test_production_readiness_rejects_unverified_dependency() -> None:
 def test_verified_dependency_requires_evidence() -> None:
     with pytest.raises(ValueError):
         ProductionDependency(DependencyKind.DATABASE, "postgres", True)
+
+
+def test_production_readiness_rejects_duplicate_dependency_kinds() -> None:
+    dependencies = _verified_dependencies() + (_verified_dependencies()[0],)
+    with pytest.raises(ValueError, match="duplicate"):
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 9, tzinfo=UTC))
+
+
+def test_production_readiness_rejects_evidence_from_another_environment() -> None:
+    dependencies = tuple(
+        ProductionDependency(
+            dependency.kind,
+            dependency.name,
+            dependency.verified,
+            dependency.evidence_ref,
+            verified_by=dependency.verified_by,
+            verified_at=dependency.verified_at,
+            evidence_sha256=dependency.evidence_sha256,
+            environment="staging",
+        )
+        for dependency in _verified_dependencies()
+    )
+    with pytest.raises(RuntimeError, match="environment"):
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 9, tzinfo=UTC))
+
+
+def test_verified_dependency_requires_a_named_verifier_and_timestamp() -> None:
+    with pytest.raises(ValueError, match="verifier"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://localhost/report",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
+
+
+def test_verified_dependency_requires_a_sha256_evidence_digest() -> None:
+    with pytest.raises(ValueError, match="SHA-256"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://localhost/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="not-a-digest",
+        )
+
+
+def test_production_readiness_rejects_expired_dependency_evidence() -> None:
+    expired = datetime(2026, 11, 9, 12, tzinfo=UTC)
+    dependencies = tuple(
+        ProductionDependency(
+            dependency.kind,
+            dependency.name,
+            dependency.verified,
+            dependency.evidence_ref,
+            verified_by=dependency.verified_by,
+            verified_at=dependency.verified_at,
+            expires_at=expired,
+            evidence_sha256=dependency.evidence_sha256,
+        )
+        for dependency in _verified_dependencies()
+    )
+    with pytest.raises(RuntimeError, match="expired"):
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 10, tzinfo=UTC))
+
+
+def test_production_readiness_rejects_naive_evidence_timestamps() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://localhost/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9),
+            evidence_sha256="a" * 64,
+        )
+
+
+def test_verified_dependency_rejects_credential_bearing_evidence_uri() -> None:
+    with pytest.raises(ValueError, match="credentials"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://" + "operator:secret@" + "localhost/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
+
+
+def test_production_readiness_rejects_future_dated_evidence() -> None:
+    future = datetime(2026, 11, 10, tzinfo=UTC)
+    dependencies = tuple(
+        ProductionDependency(
+            dependency.kind,
+            dependency.name,
+            dependency.verified,
+            dependency.evidence_ref,
+            verified_by=dependency.verified_by,
+            verified_at=future,
+            evidence_sha256=dependency.evidence_sha256,
+        )
+        for dependency in _verified_dependencies()
+    )
+    with pytest.raises(RuntimeError, match="future-dated"):
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 9, tzinfo=UTC))
+
+
+def test_production_readiness_rejects_naive_verification_clock() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ProductionReadiness("1.1.0", _verified_dependencies()).verify(now=datetime(2026, 11, 9))
+
+
+def test_dependency_expiry_must_follow_verification_time() -> None:
+    with pytest.raises(ValueError, match="later than verification"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://localhost/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            expires_at=datetime(2026, 11, 8, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
+
+
+@pytest.mark.parametrize(
+    "evidence_ref",
+    (
+        "file:///tmp/report",
+        "https:///report",
+        "https://localhost/report?token=secret",
+        "https://localhost/report#section",
+        "s3://evidence-bucket",
+    ),
+)
+def test_verified_dependency_rejects_non_durable_or_ambiguous_evidence_uris(
+    evidence_ref: str,
+) -> None:
+    with pytest.raises(ValueError):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            evidence_ref,
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
+
+
+def test_dependency_environment_must_be_normalized() -> None:
+    with pytest.raises(ValueError, match="normalized identifier"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            False,
+            environment="Production",
+        )
+
+
+def test_dependency_expiry_timestamp_must_be_timezone_aware() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://localhost/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            expires_at=datetime(2026, 11, 10),
+            evidence_sha256="a" * 64,
+        )
