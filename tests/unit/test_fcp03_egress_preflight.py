@@ -105,6 +105,20 @@ def valid_topology() -> dict[str, object]:
         },
         "firewall": {
             "endpoints_by_az": {"eu-west-1a": "vpce-fw-a"},
+            "subnet_id": "subnet-firewall-a",
+            "availability_zone": "eu-west-1a",
+            "nat_gateway_id": "nat-123",
+            "nat_gateway_state": "available",
+            "nat_subnet_id": "subnet-public-a",
+            "route_entries": [
+                {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
+                {"destination": "0.0.0.0/0", "target": "nat-123", "state": "active"},
+            ],
+            "nat_route_entries": [
+                {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
+                {"destination": "10.20.1.0/24", "target": "vpce-fw-a", "state": "active"},
+                {"destination": "0.0.0.0/0", "target": "igw-123", "state": "active"},
+            ],
             "policy": {
                 "route53_resolved_ip_validation": {
                     "dns_firewall_rule_group_id": "rslvr-frg-123",
@@ -149,6 +163,40 @@ def valid_topology() -> dict[str, object]:
 
 def test_accepts_a_private_worker_with_same_az_firewall_route_and_scoped_dns_policy() -> None:
     assert evaluate_fcp03_topology(valid_topology()) == ()
+
+def test_rejects_firewall_subnet_default_route_that_does_not_target_nat_gateway() -> None:
+    topology = valid_topology()
+    topology["firewall"]["route_entries"][1]["target"] = "igw-123"
+
+    assert "firewall-subnet-route-bypasses-nat" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_nat_return_route_that_bypasses_same_az_firewall_endpoint() -> None:
+    topology = valid_topology()
+    topology["firewall"]["nat_route_entries"][1]["target"] = "nat-123"
+
+    assert "nat-return-route-bypasses-firewall" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_symmetric_return_route_inventory_is_missing() -> None:
+    topology = valid_topology()
+    topology["firewall"].pop("nat_route_entries")
+
+    assert "nat-return-route-inventory-unknown" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_firewall_subnet_in_a_different_availability_zone() -> None:
+    topology = valid_topology()
+    topology["firewall"]["availability_zone"] = "eu-west-1b"
+
+    assert "firewall-endpoint-az-mismatch" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_nat_gateway_that_is_not_available() -> None:
+    topology = valid_topology()
+    topology["firewall"]["nat_gateway_state"] = "pending"
+
+    assert "nat-gateway-not-available" in evaluate_fcp03_topology(topology)
 
 def test_rejects_firewall_subnet_default_route_that_does_not_target_nat_gateway() -> None:
     topology = valid_topology()
