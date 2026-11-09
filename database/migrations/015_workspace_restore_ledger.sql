@@ -243,7 +243,7 @@ CREATE TABLE IF NOT EXISTS platform.workspace_snapshots (
     fencing_token bigint NOT NULL CHECK (fencing_token > 0),
     created_at timestamptz NOT NULL,
     digest text NOT NULL CHECK (digest ~ '^[0-9a-f]{64}$'),
-    storage_key text NOT NULL CHECK (storage_key ~ '^[0-9a-f]{32}\\.snapshot$'),
+    storage_key text NOT NULL CHECK (storage_key ~ '^[0-9a-f]{32}[.]snapshot$'),
     status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'deleted')),
     PRIMARY KEY (tenant_id, snapshot_id),
     UNIQUE (tenant_id, workspace_id, snapshot_id),
