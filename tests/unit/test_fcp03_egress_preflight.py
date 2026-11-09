@@ -98,6 +98,7 @@ def valid_topology() -> dict[str, object]:
                 {"destination": "10.20.0.0/16", "target": "local", "state": "active"},
                 {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
             ],
+            "security_group_ingress": [],
             "security_group_egress": [
                 {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
                 {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
@@ -591,3 +592,44 @@ def test_fails_closed_when_worker_route_table_association_is_unknown() -> None:
     topology["worker"].pop("route_table_subnet_ids")
 
     assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_duplicate_firewall_subnet_route_entries() -> None:
+    topology = valid_topology()
+    topology["firewall"]["route_entries"].append(
+        {"destination": "0.0.0.0/0", "target": "nat-123", "state": "active"}
+    )
+
+    assert "firewall-subnet-route-set-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_duplicate_nat_return_route_entries() -> None:
+    topology = valid_topology()
+    topology["firewall"]["nat_route_entries"].append(
+        {"destination": "10.20.1.0/24", "target": "vpce-fw-a", "state": "active"}
+    )
+
+    assert "nat-return-route-set-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_any_worker_security_group_ingress_rule() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_ingress"] = [
+        {"protocol": "tcp", "port": 22, "cidr": "10.20.0.0/16"}
+    ]
+
+    assert "worker-security-group-ingress-not-empty" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_worker_security_group_ingress_inventory_is_missing() -> None:
+    topology = valid_topology()
+    topology["worker"].pop("security_group_ingress")
+
+    assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_when_worker_security_group_ingress_inventory_is_malformed() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_ingress"] = "unknown"
+
+    assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(topology)

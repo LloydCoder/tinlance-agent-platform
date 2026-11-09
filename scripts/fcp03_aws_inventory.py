@@ -148,6 +148,46 @@ def _security_group_egress(groups: list[Mapping[str, Any]]) -> list[dict[str, ob
     return rules
 
 
+def _security_group_ingress(groups: list[Mapping[str, Any]]) -> list[dict[str, object]]:
+    """Normalize all worker security-group ingress rules for fail-closed evaluation."""
+    rules: list[dict[str, object]] = []
+    for group in groups:
+        for permission in group.get("IpPermissions", []):
+            protocol = permission.get("IpProtocol")
+            from_port = permission.get("FromPort")
+            to_port = permission.get("ToPort")
+            port = from_port if from_port == to_port else None
+            for item in permission.get("IpRanges", []):
+                rules.append(
+                    {
+                        "protocol": protocol,
+                        "port": port,
+                        "cidr": item.get("CidrIp"),
+                    }
+                )
+            for item in permission.get("Ipv6Ranges", []):
+                rules.append(
+                    {
+                        "protocol": protocol,
+                        "port": port,
+                        "cidr": item.get("CidrIpv6"),
+                    }
+                )
+            # Preserve referenced groups/prefix lists as non-empty, unclassifiable ingress.
+            for item in permission.get("PrefixListIds", []) + permission.get(
+                "UserIdGroupPairs", []
+            ):
+                rules.append(
+                    {
+                        "protocol": protocol,
+                        "port": port,
+                        "cidr": None,
+                        "reference": item.get("PrefixListId") or item.get("GroupId"),
+                    }
+                )
+    return rules
+
+
 def _firewall_for_vpc(network_firewall: Any, vpc_id: str) -> Mapping[str, Any] | None:
     firewalls = _all_pages(network_firewall, "list_firewalls", "Firewalls")
     matches = [firewall for firewall in firewalls if firewall.get("VpcId") == vpc_id]
@@ -598,6 +638,7 @@ def collect_fcp03_snapshot(
             _route_target(ipv6_default_route) if ipv6_default_route else None
         ),
         "ipv6_addresses": ipv6_addresses,
+        "security_group_ingress": _security_group_ingress(security_groups),
         "security_group_egress": _security_group_egress(security_groups),
     }
 
