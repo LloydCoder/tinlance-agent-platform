@@ -747,9 +747,9 @@ def test_collector_rejects_malformed_route53_validation_ranges() -> None:
 
 def test_collector_preserves_malformed_stateful_rule_target_types() -> None:
     firewall = firewall_client()
-    firewall.responses["describe_rule_group"][0]["RuleGroup"]["RulesSource"][
-        "RulesSourceList"
-    ]["TargetTypes"].append(None)
+    firewall.responses["describe_rule_group"][0]["RuleGroup"]["RulesSource"]["RulesSourceList"][
+        "TargetTypes"
+    ].append(None)
 
     snapshot = collect_fcp03_snapshot(
         instance_id="i-test",
