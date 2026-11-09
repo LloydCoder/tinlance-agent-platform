@@ -35,18 +35,20 @@ Automatic teardown is a guardrail, **not a hard spend cap**. A failed scheduler 
 
 ## Cost model
 
-Indicative `eu-west-1` baseline, excluding traffic, data transfer, logs, and taxes:
+Indicative `eu-west-1` baseline, excluding variable query volume, data transfer, logs, EBS storage, and taxes:
 
 | Component | Approximate hourly rate |
 |---|---:|
-| Network Firewall endpoint | $0.395 |
-| DNS Firewall advanced association | $0.160 |
-| NAT Gateway | $0.045 |
-| Public IPv4 address | $0.005 |
-| EC2 `t4g.medium` worker | $0.034 |
-| **Baseline** | **$0.639/hour** |
+| Network Firewall standard endpoint | $0.395 |
+| NAT Gateway in the same-AZ Network Firewall path | $0.000 in AWS's bundled pricing example |
+| Public IPv4 address for the NAT Gateway EIP | $0.005 |
+| EC2 `t4g.medium` Linux On-Demand worker | $0.0368 |
+| DNS Firewall Advanced association | $0.000 — this template uses foundational domain-list rules, not Advanced rules |
+| **Baseline** | **$0.4368/hour** |
 
-Additional variable charges include Network Firewall processing (approximately $0.065/GB), NAT processing (approximately $0.045/GB), data transfer, and CloudWatch Logs ingestion/storage. Pricing must be rechecked immediately before any deployment.
+A two-hour run therefore has an indicative fixed baseline of about **$0.87**, before variable charges. Network Firewall data processing is approximately $0.065/GB. Standard DNS Firewall query inspection is $0.60 per million queries for the first billion, and customer-managed domain-list entries are $0.0005 per domain-month. AWS's Network Firewall pricing example waives NAT Gateway hourly and data-processing charges for traffic using the same-AZ Network Firewall + NAT path; confirm the actual billing line items after any approved run. This template does not enable TLS Advanced Inspection ($0.489 per endpoint-hour) or DNS Firewall Advanced rules ($0.16 per VPC association-hour).
+
+Pricing sources: AWS Network Firewall [pricing](https://aws.amazon.com/network-firewall/pricing/), Route 53 [pricing](https://aws.amazon.com/route53/pricing/), VPC [pricing](https://aws.amazon.com/vpc/pricing/), and the connected account's AWS Price List API result for Linux `t4g.medium` in EU (Ireland), effective 2026-11-01.
 
 The current estimated AWS credit balance is not a spend limit. This template does not create an AWS Budget or enforce a monetary hard stop. **Do not deploy until the owner has approved a monetary ceiling and notification recipient, the billing alert path has been verified, and the teardown procedure has been rehearsed.**
 
