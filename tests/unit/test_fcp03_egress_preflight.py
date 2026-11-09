@@ -11,9 +11,7 @@ def valid_topology() -> dict[str, object]:
             "vpc_id": "vpc-worker-a",
             "subnet_id": "subnet-worker-a",
             "vpc_cidr": "10.20.0.0/16",
-            "vpc_cidr_associations": [
-                {"cidr": "10.20.0.0/16", "state": "associated"}
-            ],
+            "vpc_cidr_associations": [{"cidr": "10.20.0.0/16", "state": "associated"}],
             "resolver_ip": "10.20.0.2",
             "subnet_cidr": "10.20.1.0/24",
             "network_acl": {
@@ -428,8 +426,6 @@ def test_rejects_secondary_or_pending_vpc_cidr_associations() -> None:
 
     assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
 
-    topology["worker"]["vpc_cidr_associations"] = [
-        {"cidr": "10.20.0.0/16", "state": "associating"}
-    ]
+    topology["worker"]["vpc_cidr_associations"] = [{"cidr": "10.20.0.0/16", "state": "associating"}]
 
     assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
