@@ -16,6 +16,32 @@ def valid_topology() -> dict[str, object]:
             "network_acl": {
                 "associated": True,
                 "subnet_ids": ["subnet-worker-a"],
+                "ingress_rules": [
+                    {
+                        "rule_number": 100,
+                        "protocol": "6",
+                        "action": "allow",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": 1024,
+                        "to_port": 65535,
+                    },
+                    {
+                        "rule_number": 110,
+                        "protocol": "17",
+                        "action": "allow",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": 1024,
+                        "to_port": 65535,
+                    },
+                    {
+                        "rule_number": 32766,
+                        "protocol": "-1",
+                        "action": "deny",
+                        "cidr": "0.0.0.0/0",
+                        "from_port": None,
+                        "to_port": None,
+                    },
+                ],
                 "egress_rules": [
                     {
                         "rule_number": 90,
@@ -369,3 +395,24 @@ def test_fails_closed_when_worker_subnet_nacl_association_is_missing_or_shared()
     topology["worker"]["subnet_id"] = "subnet-worker-a"
 
     assert "worker-nacl-association-invalid" in evaluate_fcp03_topology(topology)
+
+
+
+def test_rejects_worker_nacl_with_missing_or_unrestricted_ingress_policy() -> None:
+    topology = valid_topology()
+    topology["worker"]["network_acl"]["ingress_rules"] = []
+
+    assert "worker-nacl-ingress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+    topology["worker"]["network_acl"]["ingress_rules"] = [
+        {
+            "rule_number": 100,
+            "protocol": "-1",
+            "action": "allow",
+            "cidr": "0.0.0.0/0",
+            "from_port": None,
+            "to_port": None,
+        },
+    ]
+
+    assert "worker-nacl-ingress-policy-invalid" in evaluate_fcp03_topology(topology)
