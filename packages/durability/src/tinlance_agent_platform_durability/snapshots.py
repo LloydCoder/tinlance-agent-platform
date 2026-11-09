@@ -47,6 +47,13 @@ class SnapshotObjectStore(Protocol):
     def get(self, snapshot_id: UUID) -> bytes: ...
 
 
+class SnapshotCatalog(Protocol):
+    def record(self, reference: SnapshotReference) -> None: ...
+    def get(
+        self, tenant_id: UUID, workspace_id: UUID, snapshot_id: UUID
+    ) -> SnapshotReference | None: ...
+
+
 class RestoreLeaseAuthority(Protocol):
     def assert_active(self, tenant_id: UUID, workspace_id: UUID, fencing_token: int) -> bool: ...
 
@@ -342,7 +349,7 @@ class WorkspaceSnapshotService:
         ).encode("ascii")
         ciphertext = self._cipher.encrypt(envelope, self._aad(snapshot_id, tenant_id, workspace_id))
         self._store.put_if_absent(snapshot_id, ciphertext)
-        return SnapshotReference(
+        reference = SnapshotReference(
             snapshot_id=snapshot_id,
             tenant_id=tenant_id,
             workspace_id=workspace_id,
@@ -350,8 +357,17 @@ class WorkspaceSnapshotService:
             created_at=timestamp.astimezone(UTC),
             digest=hashlib.sha256(payload).hexdigest(),
         )
+        if self._catalog is not None:
+            self._catalog.record(reference)
+        return reference
 
     def _read_verified(self, reference: SnapshotReference) -> dict[str, object]:
+        if self._catalog is not None:
+            stored = self._catalog.get(
+                reference.tenant_id, reference.workspace_id, reference.snapshot_id
+            )
+            if stored != reference:
+                raise SnapshotIntegrityError("snapshot reference is absent or differs from its catalog")
         ciphertext = self._store.get(reference.snapshot_id)
         envelope_bytes = self._cipher.decrypt(
             ciphertext,
