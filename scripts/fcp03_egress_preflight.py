@@ -213,6 +213,10 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         if observed_nat_routes != expected_nat_routes:
             findings.add("nat-return-route-set-invalid")
 
+    worker_route_table_subnet_ids = _strings(worker.get("route_table_subnet_ids"))
+    if not isinstance(subnet_id, str) or worker_route_table_subnet_ids != {subnet_id}:
+        findings.add("worker-route-table-not-dedicated")
+
     route_entries = worker.get("route_entries")
     if (
         not isinstance(route_entries, Sequence)
