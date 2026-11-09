@@ -38,11 +38,14 @@ AWS Network Firewall creates endpoints in dedicated firewall subnets and traffic
 ### 2. Destination-bound HTTPS policy
 
 Use AWS Network Firewall stateful domain-list inspection as an independent network control:
-- Use an allowlist rule group with HTTPS `TLS_SNI` inspection and the `AWS_ROUTE_53_RESOLVED_DOMAIN` target type together, so the TLS SNI and the DNS-resolved destination identity must both match the approved domain policy.
-- Include the protocol target type in the allowlist rule group; an IP-only resolved-domain allowlist is additive and does not itself create a default drop for unmatched traffic.
+- Use an allowlist rule group with HTTPS `TLS_SNI` inspection and the `AWS_ROUTE_53_RESOLVED_DOMAIN` target type together. For an allowlist containing both target types, AWS Network Firewall requires the SNI and the Route 53-resolved destination identity to match; include the protocol target type so unmatched traffic receives the generated default drop.
+- **Required policy-level prerequisite:** configure `Route53ResolvedIPValidation` on the Network Firewall policy and reference the exact Route 53 Resolver DNS Firewall rule-group ID through `DNSFirewallRuleGroupId`. A stateful rule group using `AWS_ROUTE_53_RESOLVED_DOMAIN` is inactive without this policy-level setting; AWS reports `ROUTE53_RESOLVED_IP_VALIDATION_MISSING`. Treat any policy `Errors` entry or firewall attachment `ERROR` as a deployment failure, even if create/update APIs returned success.
+- The referenced DNS Firewall rule group must be associated with the worker VPC(s), and worker DNS must use that VPC's Route 53 Resolver. Block direct external DNS, DoT and unapproved DoH so clients cannot create an alternate resolution path.
+- Resolved-IP records are Availability-Zone scoped. Deploy a firewall endpoint in every worker AZ and preserve same-AZ routing from each worker subnet to its corresponding endpoint. Cross-AZ routing to a different endpoint can be evaluated as unresolved and dropped; test AZ affinity and endpoint failover explicitly.
+- Configure policy-level validation in `ALERT` mode for initial observation only, verify resolver coverage and false-positive behavior, then promote to `DROP` (or explicitly approved `REJECT`) before any protected workload is admitted. Set DNS-expiry exception handling to `DROP` or `REJECT`; never silently `CONTINUE` expired destination resolutions in the enforced profile. Keep bypass destination ranges empty unless a narrow, documented, independently approved exception is unavoidable.
 - Add explicit stateful rules that deny non-approved TCP ports, all browser UDP egress, private/special-use destinations, metadata/link-local ranges, and traffic that does not match an approved HTTPS destination.
 - Keep the application CONNECT proxy's exact/wildcard allowlist, DNS answer validation and IP pinning. The network firewall is defense in depth, not a replacement for the proxy.
-- Preserve TLS end-to-end. Do not install interception certificates or disable browser certificate validation as a shortcut.
+- Preserve TLS end-to-end. Do not install interception certificates or disable browser certificate validation as a shortcut. Treat absent/hidden SNI (including ECH cases where inspection cannot establish the approved name) as deny, not as a reason to fall back to IP-only allow.
 
 **Tenant-policy isolation is a release blocker.** Network Firewall domain-list rule groups and DNS Firewall associations are VPC-scoped. A shared VPC-wide allowlist must not silently union tenants' permissions. The production design must prove one of:
 1. dedicated egress-policy VPC/resolver association per tenant or policy-isolation domain; or
@@ -89,7 +92,7 @@ The FCP-03 implementation must prove all of the following in an isolated disposa
 11. Logs contain sufficient policy/evidence attribution without sensitive browsing data.
 12. All routes, firewall resources, resolver associations and test workloads are removed after the test; cleanup is verified.
 
-Artifacts must include exact infrastructure template revision, region/AZ topology, route tables, firewall policy/rule-group revisions, DNS Firewall rule-group and VPC association revisions, policy manifests, test vectors, observed packet/flow evidence, CloudWatch logs/metrics, teardown evidence and SHA-256 digests.
+Artifacts must include exact infrastructure template revision, region/AZ topology, route tables, firewall policy/rule-group revisions, the `Route53ResolvedIPValidation` configuration (DNS Firewall rule-group ID, action, expiry exception action, source ranges and bypass ranges), policy `Errors` and firewall attachment status, DNS Firewall rule-group and VPC association revisions, policy manifests, test vectors, observed packet/flow evidence (including resolved-IP validation fields and AZ), CloudWatch logs/metrics, teardown evidence and SHA-256 digests.
 
 ## Cost, deployment and safety gates
 
