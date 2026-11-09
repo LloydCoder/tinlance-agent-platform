@@ -158,6 +158,9 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         for raw_route in firewall_routes:
             route = _object(raw_route)
             destination, target = route.get("destination"), route.get("target")
+            if not isinstance(destination, str) or not destination or not isinstance(target, str) or not target:
+                findings.add("firewall-route-inventory-invalid")
+                continue
             if route.get("state") != "active":
                 findings.add("firewall-route-state-not-active")
             observed_firewall_routes.add((destination, target))
@@ -183,15 +186,18 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         for raw_route in nat_routes:
             route = _object(raw_route)
             destination, target = route.get("destination"), route.get("target")
+            if not isinstance(destination, str) or not destination or not isinstance(target, str) or not target:
+                findings.add("nat-return-route-inventory-invalid")
+                continue
             if route.get("state") != "active":
                 findings.add("nat-route-state-not-active")
-            if destination == "0.0.0.0/0" and isinstance(target, str) and target.startswith("igw-"):
+            if destination == "0.0.0.0/0" and target.startswith("igw-"):
                 normalized_target = "internet-gateway"
             else:
                 normalized_target = target
             observed_nat_routes.add((destination, normalized_target))
             if target not in {"local", endpoint} and not (
-                destination == "0.0.0.0/0" and isinstance(target, str) and target.startswith("igw-")
+                destination == "0.0.0.0/0" and target.startswith("igw-")
             ):
                 findings.add("nat-return-route-bypasses-firewall")
         if observed_nat_routes != expected_nat_routes:
@@ -207,11 +213,13 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     else:
         for raw_route in route_entries:
             route = _object(raw_route)
-            if not isinstance(route.get("destination"), str) or not route.get("destination"):
-                findings.add("worker-route-inventory-unknown")
+            destination, target = route.get("destination"), route.get("target")
+            if not isinstance(destination, str) or not destination or not isinstance(target, str) or not target:
+                findings.add("worker-route-inventory-invalid")
+                continue
             if route.get("state") != "active":
                 findings.add("worker-route-state-not-active")
-            if route.get("target") not in {"local", endpoint}:
+            if target not in {"local", endpoint}:
                 findings.add("worker-route-bypasses-firewall")
 
     network_acl = _object(worker.get("network_acl"))
