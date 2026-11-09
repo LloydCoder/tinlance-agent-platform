@@ -54,7 +54,7 @@ The current estimated AWS credit balance is not a spend limit. This template doe
 
 ## Validation and deployment boundary
 
-The template is JSON so it can be checked with standard tooling. CloudFormation `ValidateTemplate` succeeded in `eu-west-1`. In addition, the current regional CloudFormation resource-provider schemas for all 22 resource types were inspected recursively: zero unknown properties, missing required properties, or nested schema errors. These are read-only validation calls; no stack, change set, or billable resource was created.
+The template is JSON so it can be checked with standard tooling. CloudFormation `ValidateTemplate` succeeded in `eu-west-1`. In addition, the current regional CloudFormation resource-provider schemas for all 25 resource types and 42 resources were inspected recursively: zero unknown properties, missing required properties, or nested schema errors. These are read-only validation calls; no stack, change set, or billable resource was created.
 
 This schema audit is stronger than JSON syntax validation, but it still does not prove runtime dependency ordering, IAM authorization at deployment, service quota availability, route convergence, endpoint readiness, or packet-level enforcement.
 
