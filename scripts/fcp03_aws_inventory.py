@@ -254,7 +254,16 @@ def _security_group_ingress(
 
 def _firewall_for_vpc(network_firewall: Any, vpc_id: str) -> Mapping[str, Any] | None:
     firewalls = _all_pages(network_firewall, "list_firewalls", "Firewalls")
-    matches = [firewall for firewall in firewalls if firewall.get("VpcId") == vpc_id]
+    if any(
+        not isinstance(firewall, Mapping)
+        or not isinstance(firewall.get("VpcId"), str)
+        or not firewall.get("VpcId")
+        or not isinstance(firewall.get("FirewallArn"), str)
+        or not firewall.get("FirewallArn")
+        for firewall in firewalls
+    ):
+        raise ValueError("AWS Network Firewall returned incomplete firewall inventory")
+    matches = [firewall for firewall in firewalls if firewall["VpcId"] == vpc_id]
     if len(matches) > 1:
         raise ValueError(
             "multiple Network Firewalls found for the worker VPC; select a policy domain"
