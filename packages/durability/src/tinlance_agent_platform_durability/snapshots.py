@@ -350,7 +350,7 @@ class S3SnapshotStore:
         if not isinstance(value, bytes) or not value or len(value) > self.MAX_OBJECT_BYTES:
             raise ValueError("snapshot object must be non-empty bytes within the storage size limit")
         try:
-            self._s3.put_object(  # type: ignore[attr-defined]
+            response = self._s3.put_object(  # type: ignore[attr-defined]
                 Bucket=self._bucket,
                 Key=self._key(snapshot_id),
                 Body=value,
@@ -359,6 +359,11 @@ class S3SnapshotStore:
                 ServerSideEncryption="aws:kms",
                 SSEKMSKeyId=self._kms_key_id,
             )
+            if (
+                response.get("ServerSideEncryption") != "aws:kms"
+                or response.get("SSEKMSKeyId") != self._kms_key_id
+            ):
+                raise RuntimeError("S3 did not confirm the configured snapshot SSE-KMS key")
         except Exception as exc:
             response = getattr(exc, "response", {})
             error = response.get("Error", {}) if isinstance(response, dict) else {}
