@@ -84,15 +84,16 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" in dockerfile
-    assert "Acquire::Retries=5" in dockerfile
-    assert "APT::Update::Error-Mode=any" in dockerfile
-    assert dockerfile.count("Acquire::Retries=5") == 4
-    assert dockerfile.count("Acquire::http::Timeout=30") == 4
+    assert "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true" in dockerfile
+    assert "Acquire::https::CaInfo=/tmp/host-ca-bundle.crt" in dockerfile
+    assert dockerfile.count("Acquire::https::CaInfo=/tmp/host-ca-bundle.crt") == 2
+    assert dockerfile.count("Acquire::Retries=5") == 2
     assert dockerfile.count("Acquire::https::Timeout=30") == 2
-    assert dockerfile.count("APT::Update::Error-Mode=any") == 2
+    assert dockerfile.count("APT::Update::Error-Mode=any") == 1
     assert dockerfile.count("--snapshot=") == 2
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
-    assert "http://archive.ubuntu.com/ubuntu" in dockerfile
+    assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
+    assert "https://archive.ubuntu.com/ubuntu" in dockerfile
     assert "RUN --network=none" in dockerfile
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
@@ -119,6 +120,9 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "byte_identical" in firecracker
     assert "firecracker-w2-${{ github.run_id }}" in firecracker
     assert "path: artifacts/" in firecracker
+    assert firecracker.count("--secret id=ca_bundle,src=/etc/ssl/certs/ca-certificates.crt") == 2
+    assert "ca_bundle_sha256" in firecracker
+    assert "curl --fail --silent --show-error --location --retry 5 --retry-all-errors" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
     assert firecracker.count("needs: guest-boot") == 3
     assert (
@@ -144,6 +148,8 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
+    kata_workflow = (workflow_root / "persistent-computer-kata-benchmark.yml").read_text(encoding="utf-8")
+    assert "curl --fail --silent --show-error --location --retry 5 --retry-all-errors" in kata_workflow
     for name in (
         "persistent-computer-gvisor-benchmark.yml",
         "persistent-computer-kata-benchmark.yml",
