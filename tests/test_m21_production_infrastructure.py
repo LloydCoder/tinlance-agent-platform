@@ -47,7 +47,6 @@ def test_verified_dependency_requires_evidence() -> None:
         ProductionDependency(DependencyKind.DATABASE, "postgres", True)
 
 
-
 def test_production_readiness_rejects_duplicate_dependency_kinds() -> None:
     dependencies = _verified_dependencies() + (_verified_dependencies()[0],)
     with pytest.raises(ValueError, match="duplicate"):
