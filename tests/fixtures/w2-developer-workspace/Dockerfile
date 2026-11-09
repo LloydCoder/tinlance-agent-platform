@@ -15,12 +15,12 @@ RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=tru
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
-        update \
+        --snapshot="${APT_SNAPSHOT}" update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
         -o Acquire::https::Timeout=30 \
-        install --yes --no-install-recommends \
+        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
         ca-certificates=20260816ubuntu0.24.04.2 \
         openssl=3.0.13-0ubuntu3.16 \
         libssl3t64=3.0.13-0ubuntu3.16 \
