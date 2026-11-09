@@ -128,7 +128,6 @@ def test_production_readiness_rejects_naive_evidence_timestamps() -> None:
         )
 
 
-
 def test_verified_dependency_rejects_credential_bearing_evidence_uri() -> None:
     with pytest.raises(ValueError, match="credentials"):
         ProductionDependency(
@@ -157,16 +156,12 @@ def test_production_readiness_rejects_future_dated_evidence() -> None:
         for dependency in _verified_dependencies()
     )
     with pytest.raises(RuntimeError, match="future-dated"):
-        ProductionReadiness("1.1.0", dependencies).verify(
-            now=datetime(2026, 11, 9, tzinfo=UTC)
-        )
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 9, tzinfo=UTC))
 
 
 def test_production_readiness_rejects_naive_verification_clock() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
-        ProductionReadiness("1.1.0", _verified_dependencies()).verify(
-            now=datetime(2026, 11, 9)
-        )
+        ProductionReadiness("1.1.0", _verified_dependencies()).verify(now=datetime(2026, 11, 9))
 
 
 def test_dependency_expiry_must_follow_verification_time() -> None:
