@@ -87,7 +87,10 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" in dockerfile
-    assert "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true" in dockerfile
+    assert (
+        "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,"
+        "required=true,mode=0444"
+    ) in dockerfile
     assert "Acquire::https::CaInfo=/tmp/host-ca-bundle.crt" in dockerfile
     assert dockerfile.count("Acquire::https::CaInfo=/tmp/host-ca-bundle.crt") == 2
     assert dockerfile.count("Acquire::Retries=5") == 4
