@@ -36,9 +36,7 @@ def _has_unrestricted_egress(rules: object) -> bool:
             network = ipaddress.ip_network(cidr, strict=False)
         except ValueError:
             return True
-        if network.prefixlen == 0 and (
-            network.version == 6 or protocol != "tcp" or port != 443
-        ):
+        if network.prefixlen == 0 and (network.version == 6 or protocol != "tcp" or port != 443):
             return True
     return False
 
