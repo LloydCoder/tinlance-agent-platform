@@ -614,7 +614,11 @@ def collect_fcp03_snapshot(
         # traffic to NAT, and the NAT subnet must return worker-subnet traffic
         # through the same-AZ firewall endpoint.
         sync_states = firewall_status.get("SyncStates", {})
-        az_state = sync_states.get(availability_zone, {}) if isinstance(sync_states, Mapping) else {}
+        az_state = (
+            sync_states.get(availability_zone, {})
+            if isinstance(sync_states, Mapping)
+            else {}
+        )
         attachment = az_state.get("Attachment", {}) if isinstance(az_state, Mapping) else {}
         firewall_subnet_id = attachment.get("SubnetId")
         if not isinstance(firewall_subnet_id, str):
@@ -667,7 +671,9 @@ def collect_fcp03_snapshot(
                     ),
                     None,
                 )
-                candidate_nat_id = nat_route.get("target") if isinstance(nat_route, Mapping) else None
+                candidate_nat_id = (
+                    nat_route.get("target") if isinstance(nat_route, Mapping) else None
+                )
                 if isinstance(candidate_nat_id, str) and candidate_nat_id.startswith("nat-"):
                     nat_gateway_id = candidate_nat_id
                     nat_gateways = _all_pages(
