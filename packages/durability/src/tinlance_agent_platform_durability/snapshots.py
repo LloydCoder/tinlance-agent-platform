@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import stat
+from contextlib import suppress
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -249,6 +250,8 @@ class WorkspaceSnapshotService:
         if not isinstance(files, Mapping) or not files or len(files) > self.MAX_FILES:
             raise SnapshotError("snapshot must contain between 1 and 10000 files")
         modes = file_modes or {}
+        if not isinstance(modes, Mapping) or not set(modes).issubset(files):
+            raise SnapshotError("file modes may only refer to included snapshot files")
         entries: list[dict[str, object]] = []
         total = 0
         seen: set[str] = set()
@@ -321,6 +324,8 @@ class WorkspaceSnapshotService:
             decoded = json.loads(payload)
         except (KeyError, TypeError, ValueError, UnicodeDecodeError) as exc:
             raise SnapshotIntegrityError("snapshot envelope is malformed") from exc
+        if not isinstance(decoded, dict):
+            raise SnapshotIntegrityError("snapshot payload must be an object")
         if not self._signer.verify(payload, signature):
             raise SnapshotIntegrityError("snapshot signature is invalid")
         if not hmac.compare_digest(hashlib.sha256(payload).hexdigest(), reference.digest):
@@ -360,16 +365,19 @@ class WorkspaceSnapshotService:
             raise SnapshotConflictError("restore operation was already claimed")
         target = Path(destination)
         if target.exists() or target.is_symlink():
-            ledger.fail(restore_id, "destination_not_clean")
             raise SnapshotConflictError("restore destination must not exist on the clean host")
         parent = target.parent.resolve(strict=True)
         target = parent / target.name
         staging = parent / f".{target.name}.restore-{restore_id.hex}"
         if staging.exists() or staging.is_symlink():
-            ledger.fail(restore_id, "staging_path_exists")
             raise SnapshotConflictError("restore staging path already exists")
-        staging.mkdir(mode=0o700)
+        if not ledger.begin(
+            tenant_id, workspace_id, restore_id, reference.snapshot_id, fencing_token
+        ):
+            raise SnapshotConflictError("restore operation was already claimed")
+        published = False
         try:
+            staging.mkdir(mode=0o700)
             total = 0
             seen: set[str] = set()
             for entry in entries:
@@ -399,17 +407,22 @@ class WorkspaceSnapshotService:
                 os.chmod(output, mode)
             credentials = credential_refresher.refresh(tenant_id, workspace_id, fencing_token)
             if not isinstance(credentials, Mapping) or any(
-                not isinstance(k, str) or not isinstance(v, str) or not k or not v
+                not isinstance(k, str)
+                or not isinstance(v, str)
+                or not k
+                or not (v.startswith("secret-ref://") or v.startswith("arn:aws:secretsmanager:"))
                 for k, v in credentials.items()
             ):
                 raise SnapshotError(
-                    "credential refresher must return non-empty credential references"
+                    "credential refresher must return opaque secret references, never secret values"
                 )
             if not lease_authority.assert_active(tenant_id, workspace_id, fencing_token):
                 raise SnapshotError("restore lease was revoked before publication")
-            if target.exists() or target.is_symlink():
-                raise SnapshotConflictError("restore destination appeared before publication")
+            # Reserve the final path exclusively, then atomically replace the empty
+            # reservation with the fully materialized tree.
+            target.mkdir(mode=0o700)
             os.replace(staging, target)
+            published = True
             ledger.complete(restore_id, reference.digest)
             return RestoreResult(
                 restore_id=restore_id, snapshot_id=reference.snapshot_id,
@@ -419,5 +432,10 @@ class WorkspaceSnapshotService:
         except BaseException as exc:
             if staging.exists():
                 shutil.rmtree(staging)
-            ledger.fail(restore_id, type(exc).__name__)
+            if published and target.exists():
+                shutil.rmtree(target)
+            elif target.exists() and not any(target.iterdir()):
+                target.rmdir()
+            with suppress(Exception):
+                ledger.fail(restore_id, type(exc).__name__)
             raise
