@@ -156,15 +156,9 @@ def firewall_client() -> FakeClient:
 def resolver_client() -> FakeClient:
     return FakeClient(
         {
-            "describe_firewall_rule_group": [
-                {"FirewallRuleGroup": {"Status": "COMPLETE"}}
-            ],
+            "describe_firewall_rule_group": [{"FirewallRuleGroup": {"Status": "COMPLETE"}}],
             "list_firewall_rule_group_associations": [
-                {
-                    "FirewallRuleGroupAssociations": [
-                        {"VpcId": "vpc-worker", "Status": "COMPLETE"}
-                    ]
-                }
+                {"FirewallRuleGroupAssociations": [{"VpcId": "vpc-worker", "Status": "COMPLETE"}]}
             ],
             "list_firewall_rules": [
                 {
@@ -192,9 +186,7 @@ def resolver_client() -> FakeClient:
                 {"Domains": ["approved.example"]},
                 {"Domains": ["*"]},
             ],
-            "get_firewall_config": [
-                {"FirewallConfig": {"FirewallFailOpen": "DISABLED"}}
-            ],
+            "get_firewall_config": [{"FirewallConfig": {"FirewallFailOpen": "DISABLED"}}],
         }
     )
 
@@ -274,9 +266,7 @@ def test_rejects_dns_wildcard_block_that_precedes_allow_rules() -> None:
 def test_collector_surfaces_ipv6_addresses_and_default_routes() -> None:
     ec2 = ec2_client()
     instance = ec2.responses["describe_instances"][0]["Reservations"][0]["Instances"][0]
-    instance["NetworkInterfaces"] = [
-        {"Ipv6Addresses": [{"Ipv6Address": "2001:db8::10"}]}
-    ]
+    instance["NetworkInterfaces"] = [{"Ipv6Addresses": [{"Ipv6Address": "2001:db8::10"}]}]
     ec2.responses["describe_subnets"][0]["Subnets"][0]["Ipv6CidrBlockAssociationSet"] = [
         {"Ipv6CidrBlock": "2001:db8:1::/64"}
     ]
