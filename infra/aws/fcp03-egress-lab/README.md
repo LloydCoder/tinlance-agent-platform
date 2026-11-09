@@ -1,0 +1,71 @@
+# FCP-03 single-AZ disposable egress lab
+
+This template is a **deployment candidate only**. It has not been deployed. It is intentionally separate from Tinlyt, FusionOps, ThreatFade, and the existing W5 runtime VPC.
+
+## Why this is separate from the existing test host
+
+The existing `tinlyt-test-runtime` is suitable as a controller and software-test runner, but its current subnet has a direct Internet Gateway default route and its security group allows unrestricted outbound IPv4. Changing those routes or rules would alter the W5 test host's network behavior. This lab therefore uses a dedicated VPC and keeps the existing host unchanged.
+
+The existing host can remain the controller and invoke the new worker through Systems Manager. The worker reuses the existing `TinlytTestRuntimeSSMProfile` instance profile; this template does not add permissions to that role. Supply the region-specific SSM control-plane FQDNs in `ApprovedDomains` so the worker can register with Systems Manager.
+
+## Topology
+
+- One VPC and one Availability Zone, with separate public-NAT, Network Firewall, and private-worker subnets.
+- The worker has no public IPv4 address, no IPv6 address or route, no inbound security-group rules, and IMDSv2 is required.
+- The worker's IPv4 default route targets the Network Firewall endpoint in the same AZ.
+- The firewall subnet's default route targets the NAT Gateway; the NAT subnet alone routes to the Internet Gateway.
+- The worker security group permits TCP/443 egress for inspection and TCP/UDP 53 only to the VPC Resolver address. It does not permit UDP/443 (QUIC), TCP/853 (DoT), direct external DNS, or IPv6.
+- Route 53 DNS Firewall allows the supplied domain list and then blocks the wildcard catch-all. DNS Firewall is configured fail-closed.
+- Network Firewall uses strict stateful rule order, an allowlist over TLS SNI, HTTP Host, and `AWS_ROUTE_53_RESOLVED_DOMAIN`, policy-level Route 53 resolved-IP validation, and a strict drop default.
+- Flow and alert logs are sent to a seven-day CloudWatch Logs group.
+
+This is a single-AZ provider-level test topology. It does not, by itself, prove cross-AZ behavior, multi-tenant non-interference, failure injection, or production certification.
+
+## Automatic teardown
+
+`TeardownAtUtc` is required. Before deployment, validate it immediately before stack creation:
+
+```bash
+python scripts/validate_fcp03_teardown_at.py --teardown-at 2026-11-09T11:00:00
+```
+
+The validator requires a UTC timestamp 15 minutes to 2 hours in the future. EventBridge Scheduler then invokes CloudFormation `DeleteStack` on this stack only. The Scheduler role is scoped to this stack ARN and trusts only the exact schedule ARN and account.
+
+Automatic teardown is a guardrail, **not a hard spend cap**. A failed scheduler delivery or failed resource deletion can leave billable resources behind. Verify the stack reaches `DELETE_COMPLETE` after every run.
+
+## Cost model
+
+Indicative `eu-west-1` baseline, excluding traffic, data transfer, logs, and taxes:
+
+| Component | Approximate hourly rate |
+|---|---:|
+| Network Firewall endpoint | $0.395 |
+| DNS Firewall advanced association | $0.160 |
+| NAT Gateway | $0.045 |
+| Public IPv4 address | $0.005 |
+| EC2 `t4g.medium` worker | $0.034 |
+| **Baseline** | **$0.639/hour** |
+
+Additional variable charges include Network Firewall processing (approximately $0.065/GB), NAT processing (approximately $0.045/GB), data transfer, and CloudWatch Logs ingestion/storage. Pricing must be rechecked immediately before any deployment.
+
+The current estimated AWS credit balance is not a spend limit. This template does not create an AWS Budget or enforce a monetary hard stop. **Do not deploy until the owner has approved a monetary ceiling and notification recipient, the billing alert path has been verified, and the teardown procedure has been rehearsed.**
+
+## Validation and deployment boundary
+
+The template is JSON so it can be checked with standard tooling. Syntax validation performed with CloudFormation `ValidateTemplate` succeeded; that operation creates no stack or billable resources and does not replace a resource-provider deployment review.
+
+Example command after the cost gate is accepted:
+
+```bash
+aws cloudformation create-stack \
+  --region eu-west-1 \
+  --stack-name tinlance-fcp03-egress-lab \
+  --template-body file://infra/aws/fcp03-egress-lab/template.json \
+  --capabilities CAPABILITY_IAM \
+  --parameters \
+    ParameterKey=AvailabilityZone,ParameterValue=eu-west-1a \
+    ParameterKey=ApprovedDomains,ParameterValue='example.com,ssm.eu-west-1.amazonaws.com,ssmmessages.eu-west-1.amazonaws.com,ec2messages.eu-west-1.amazonaws.com' \
+    ParameterKey=TeardownAtUtc,ParameterValue=2026-11-09T11:00:00
+```
+
+Do not run the example with its illustrative domain list or timestamp without validating the actual test plan. No create-stack, change-set execution, or infrastructure mutation is authorized by this repository change.
