@@ -176,3 +176,53 @@ def test_dependency_expiry_must_follow_verification_time() -> None:
             expires_at=datetime(2026, 11, 8, tzinfo=UTC),
             evidence_sha256="a" * 64,
         )
+
+
+
+@pytest.mark.parametrize(
+    "evidence_ref",
+    (
+        "file:///tmp/report",
+        "https:///report",
+        "https://evidence.example/report?token=secret",
+        "https://evidence.example/report#section",
+        "s3://evidence-bucket",
+    ),
+)
+def test_verified_dependency_rejects_non_durable_or_ambiguous_evidence_uris(
+    evidence_ref: str,
+) -> None:
+    with pytest.raises(ValueError):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            evidence_ref,
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            evidence_sha256="a" * 64,
+        )
+
+
+def test_dependency_environment_must_be_normalized() -> None:
+    with pytest.raises(ValueError, match="normalized identifier"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            False,
+            environment="Production",
+        )
+
+
+def test_dependency_expiry_timestamp_must_be_timezone_aware() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ProductionDependency(
+            DependencyKind.DATABASE,
+            "postgres",
+            True,
+            "https://evidence.example/report",
+            verified_by="operator",
+            verified_at=datetime(2026, 11, 9, tzinfo=UTC),
+            expires_at=datetime(2026, 11, 10),
+            evidence_sha256="a" * 64,
+        )
