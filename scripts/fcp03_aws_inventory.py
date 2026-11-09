@@ -725,14 +725,32 @@ def collect_fcp03_snapshot(
         ),
         None,
     )
-    ipv6_addresses = sorted(
-        {
-            address["Ipv6Address"]
-            for interface in instance.get("NetworkInterfaces", [])
-            for address in interface.get("Ipv6Addresses", [])
-            if isinstance(address.get("Ipv6Address"), str)
-        }
-    )
+    raw_interfaces = instance.get("NetworkInterfaces")
+    ipv6_address_values: list[str] = []
+    invalid_ipv6_inventory = not isinstance(raw_interfaces, list) or not raw_interfaces
+    if isinstance(raw_interfaces, list):
+        for interface in raw_interfaces:
+            if not isinstance(interface, Mapping):
+                invalid_ipv6_inventory = True
+                continue
+            raw_ipv6_addresses = interface.get("Ipv6Addresses", [])
+            if not isinstance(raw_ipv6_addresses, list):
+                invalid_ipv6_inventory = True
+                continue
+            for address in raw_ipv6_addresses:
+                if not isinstance(address, Mapping):
+                    invalid_ipv6_inventory = True
+                    continue
+                ipv6_address = address.get("Ipv6Address")
+                if not isinstance(ipv6_address, str) or not ipv6_address:
+                    invalid_ipv6_inventory = True
+                    continue
+                ipv6_address_values.append(ipv6_address)
+    ipv6_addresses: list[object] = sorted(set(ipv6_address_values))
+    if invalid_ipv6_inventory:
+        # A truthy sentinel makes the existing topology policy reject an
+        # incomplete ENI/IPv6 inventory rather than infer "no IPv6" from it.
+        ipv6_addresses.append(None)
 
     raw_security_groups = instance.get("SecurityGroups", [])
     security_group_inventory_valid = isinstance(raw_security_groups, list) and all(
@@ -828,16 +846,27 @@ def collect_fcp03_snapshot(
         attachment = az_state.get("Attachment", {}) if isinstance(az_state, Mapping) else {}
         firewall_subnet_id = attachment.get("SubnetId")
         if not isinstance(firewall_subnet_id, str):
-            mappings = firewall.get("SubnetMappings", [])
-            matching_mappings = [
-                mapping
-                for mapping in mappings
-                if isinstance(mapping, Mapping)
-                and mapping.get("SubnetId")
-                and mapping.get("AvailabilityZone") == availability_zone
-            ]
+            mappings = firewall.get("SubnetMappings")
+            mappings_are_complete = (
+                isinstance(mappings, list)
+                and all(
+                    isinstance(mapping, Mapping)
+                    and isinstance(mapping.get("SubnetId"), str)
+                    and bool(mapping.get("SubnetId"))
+                    for mapping in mappings
+                )
+            )
+            matching_mappings = (
+                [
+                    mapping
+                    for mapping in mappings
+                    if mapping.get("AvailabilityZone") == availability_zone
+                ]
+                if mappings_are_complete
+                else []
+            )
             if len(matching_mappings) == 1:
-                firewall_subnet_id = matching_mappings[0].get("SubnetId")
+                firewall_subnet_id = matching_mappings[0]["SubnetId"]
 
         firewall_subnet = None
         firewall_route_entries: list[dict[str, object]] = []
