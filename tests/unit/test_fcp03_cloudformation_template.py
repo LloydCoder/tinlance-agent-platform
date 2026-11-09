@@ -172,6 +172,16 @@ def test_worker_nacl_allows_only_resolver_dns_and_inspected_https_egress() -> No
         "SubnetId": {"Ref": "WorkerSubnet"},
         "NetworkAclId": {"Ref": "WorkerNetworkAcl"},
     }
+    assert set(resources["WorkerNetworkAclAssociation"]["DependsOn"]) == {
+        "WorkerNaclEgressDnsUdp",
+        "WorkerNaclEgressDnsTcp",
+        "WorkerNaclEgressDenyVpc",
+        "WorkerNaclEgressHttps",
+        "WorkerNaclEgressDenyRest",
+        "WorkerNaclIngressTcpEphemeral",
+        "WorkerNaclIngressUdpEphemeral",
+        "WorkerNaclIngressDenyRest",
+    }
 
     entries = [
         resource["Properties"]
