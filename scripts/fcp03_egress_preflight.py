@@ -21,6 +21,26 @@ def _strings(value: object) -> set[str]:
     return set()
 
 
+def _has_unrestricted_egress(rules: object) -> bool:
+    if not isinstance(rules, Sequence) or isinstance(rules, (str, bytes)):
+        return True
+
+    for raw_rule in rules:
+        rule = _object(raw_rule)
+        cidr = rule.get("cidr")
+        protocol = rule.get("protocol")
+        port = rule.get("port")
+        if not isinstance(cidr, str):
+            return True
+        try:
+            network = ipaddress.ip_network(cidr, strict=False)
+        except ValueError:
+            return True
+        if network.prefixlen == 0 and (network.version == 6 or protocol != "tcp" or port != 443):
+            return True
+    return False
+
+
 def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     """Return stable finding codes for an unsafe or incomplete worker egress topology.
 
@@ -329,6 +349,9 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     ):
         findings.add("worker-nacl-ingress-policy-invalid")
 
+    if _has_unrestricted_egress(worker.get("security_group_egress")):
+        findings.add("unrestricted-security-group-egress")
+
     resolver_ip = worker.get("resolver_ip")
     expected_security_group_egress = {
         ("tcp", 443, "0.0.0.0/0"),
@@ -344,9 +367,19 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     else:
         for rule in raw_security_group_egress:
             entry = _object(rule)
-            observed_security_group_egress.add(
-                (entry.get("protocol"), entry.get("port"), entry.get("cidr"))
+            protocol, port, cidr = (
+                entry.get("protocol"),
+                entry.get("port"),
+                entry.get("cidr"),
             )
+            if (
+                not isinstance(protocol, str)
+                or (port is not None and not isinstance(port, int))
+                or not isinstance(cidr, str)
+            ):
+                findings.add("worker-security-group-egress-policy-invalid")
+                continue
+            observed_security_group_egress.add((protocol, port, cidr))
         if (
             len(observed_security_group_egress) != len(raw_security_group_egress)
             or observed_security_group_egress != expected_security_group_egress
