@@ -225,8 +225,6 @@ def _dns_firewall_snapshot(
         "domain_list_statuses": sorted(domain_list_statuses),
     }
 
-
-
 def _stateful_rule_group_snapshots(
     network_firewall: Any, policy: Mapping[str, Any]
 ) -> list[dict[str, object]]:
