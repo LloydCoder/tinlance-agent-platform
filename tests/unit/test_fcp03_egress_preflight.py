@@ -591,3 +591,21 @@ def test_fails_closed_when_worker_route_table_association_is_unknown() -> None:
     topology["worker"].pop("route_table_subnet_ids")
 
     assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_duplicate_firewall_subnet_route_entries() -> None:
+    topology = valid_topology()
+    topology["firewall"]["route_entries"].append(
+        {"destination": "0.0.0.0/0", "target": "nat-123", "state": "active"}
+    )
+
+    assert "firewall-subnet-route-set-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_duplicate_nat_return_route_entries() -> None:
+    topology = valid_topology()
+    topology["firewall"]["nat_route_entries"].append(
+        {"destination": "10.20.1.0/24", "target": "vpce-fw-a", "state": "active"}
+    )
+
+    assert "nat-return-route-set-invalid" in evaluate_fcp03_topology(topology)
