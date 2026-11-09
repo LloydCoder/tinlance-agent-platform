@@ -62,6 +62,82 @@ def ec2_client() -> FakeClient:
                     ]
                 }
             ],
+            "describe_vpcs": [
+                {"Vpcs": [{"VpcId": "vpc-worker", "CidrBlock": "10.20.0.0/16"}]}
+            ],
+            "describe_network_acls": [
+                {
+                    "NetworkAcls": [
+                        {
+                            "NetworkAclId": "acl-worker",
+                            "Associations": [{"SubnetId": "subnet-worker"}],
+                            "Entries": [
+                                {
+                                    "RuleNumber": 100,
+                                    "Protocol": "6",
+                                    "RuleAction": "allow",
+                                    "Egress": False,
+                                    "CidrBlock": "0.0.0.0/0",
+                                    "PortRange": {"From": 1024, "To": 65535},
+                                },
+                                {
+                                    "RuleNumber": 110,
+                                    "Protocol": "17",
+                                    "RuleAction": "allow",
+                                    "Egress": False,
+                                    "CidrBlock": "0.0.0.0/0",
+                                    "PortRange": {"From": 1024, "To": 65535},
+                                },
+                                {
+                                    "RuleNumber": 32766,
+                                    "Protocol": "-1",
+                                    "RuleAction": "deny",
+                                    "Egress": False,
+                                    "CidrBlock": "0.0.0.0/0",
+                                },
+                                {
+                                    "RuleNumber": 90,
+                                    "Protocol": "17",
+                                    "RuleAction": "allow",
+                                    "Egress": True,
+                                    "CidrBlock": "10.20.0.2/32",
+                                    "PortRange": {"From": 53, "To": 53},
+                                },
+                                {
+                                    "RuleNumber": 91,
+                                    "Protocol": "6",
+                                    "RuleAction": "allow",
+                                    "Egress": True,
+                                    "CidrBlock": "10.20.0.2/32",
+                                    "PortRange": {"From": 53, "To": 53},
+                                },
+                                {
+                                    "RuleNumber": 100,
+                                    "Protocol": "-1",
+                                    "RuleAction": "deny",
+                                    "Egress": True,
+                                    "CidrBlock": "10.20.0.0/16",
+                                },
+                                {
+                                    "RuleNumber": 110,
+                                    "Protocol": "6",
+                                    "RuleAction": "allow",
+                                    "Egress": True,
+                                    "CidrBlock": "0.0.0.0/0",
+                                    "PortRange": {"From": 443, "To": 443},
+                                },
+                                {
+                                    "RuleNumber": 32766,
+                                    "Protocol": "-1",
+                                    "RuleAction": "deny",
+                                    "Egress": True,
+                                    "CidrBlock": "0.0.0.0/0",
+                                },
+                            ],
+                        }
+                    ]
+                }
+            ],
             "describe_route_tables": [
                 {
                     "RouteTables": [
@@ -257,6 +333,9 @@ def test_collects_live_aws_shapes_into_a_preflight_snapshot() -> None:
     assert snapshot["worker"]["metadata_endpoint_enabled"] is False
     assert snapshot["worker"]["metadata_tokens_required"] is True
     assert snapshot["worker"]["metadata_hop_limit"] == 1
+    assert snapshot["worker"]["network_acl"]["subnet_ids"] == ["subnet-worker"]
+    assert len(snapshot["worker"]["network_acl"]["ingress_rules"]) == 3
+    assert len(snapshot["worker"]["network_acl"]["egress_rules"]) == 5
     assert snapshot["worker"]["route_entries"] == [
         {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"}
     ]
