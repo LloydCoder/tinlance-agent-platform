@@ -24,9 +24,9 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 suffix="$$"
-namespace="fcp03-\${suffix}"
-host_if="f3h\${suffix}"
-peer_if="f3n\${suffix}"
+namespace="fcp03-${suffix}"
+host_if="f3h${suffix}"
+peer_if="f3n${suffix}"
 server_file="$(mktemp /tmp/fcp03-probe-server.XXXXXX.py)"
 server_pid=""
 
@@ -80,7 +80,7 @@ ip link add "$host_if" type veth peer name "$peer_if"
 ip link set "$peer_if" netns "$namespace"
 ip addr add 198.18.0.1/30 dev "$host_if"
 ip link set "$host_if" up
-sysctl -q -w "net.ipv4.conf.\${host_if}.forwarding=0" >/dev/null
+sysctl -q -w "net.ipv4.conf.${host_if}.forwarding=0" >/dev/null
 ip netns exec "$namespace" ip link set lo up
 ip netns exec "$namespace" ip addr add 198.18.0.2/30 dev "$peer_if"
 ip netns exec "$namespace" ip link set "$peer_if" up
