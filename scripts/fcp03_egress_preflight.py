@@ -158,7 +158,12 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         for raw_route in firewall_routes:
             route = _object(raw_route)
             destination, target = route.get("destination"), route.get("target")
-            if not isinstance(destination, str) or not destination or not isinstance(target, str) or not target:
+            if (
+                not isinstance(destination, str)
+                or not destination
+                or not isinstance(target, str)
+                or not target
+            ):
                 findings.add("firewall-route-inventory-invalid")
                 continue
             if route.get("state") != "active":
@@ -186,7 +191,12 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         for raw_route in nat_routes:
             route = _object(raw_route)
             destination, target = route.get("destination"), route.get("target")
-            if not isinstance(destination, str) or not destination or not isinstance(target, str) or not target:
+            if (
+                not isinstance(destination, str)
+                or not destination
+                or not isinstance(target, str)
+                or not target
+            ):
                 findings.add("nat-return-route-inventory-invalid")
                 continue
             if route.get("state") != "active":
@@ -214,7 +224,12 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         for raw_route in route_entries:
             route = _object(raw_route)
             destination, target = route.get("destination"), route.get("target")
-            if not isinstance(destination, str) or not destination or not isinstance(target, str) or not target:
+            if (
+                not isinstance(destination, str)
+                or not destination
+                or not isinstance(target, str)
+                or not target
+            ):
                 findings.add("worker-route-inventory-invalid")
                 continue
             if route.get("state") != "active":
