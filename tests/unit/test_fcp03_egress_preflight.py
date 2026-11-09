@@ -98,7 +98,7 @@ def valid_topology() -> dict[str, object]:
                 {"destination": "0.0.0.0/0", "target": "vpce-fw-a", "state": "active"},
             ],
             "security_group_egress": [
-                {"protocol": "tcp", "port": 443, "cidr": "10.20.10.0/24"},
+                {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
                 {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
                 {"protocol": "tcp", "port": 53, "cidr": "10.20.0.2/32"},
             ],
