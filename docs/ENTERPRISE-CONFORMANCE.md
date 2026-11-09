@@ -17,7 +17,7 @@ M14 closes the canonical roadmap. M15-M29 are complete repository-level enterpri
 - **M19:** evidence-backed production acceptance and GA certification contract.
 - **M20:** risk classification, runtime control hooks, tenant-bound resource registry, attestation claims, cryptographic metadata and compliance traceability.
 - **M21:** evidence-backed readiness contract for the external production dependency boundary.
-- **M22:** token validation, sender-constraint metadata, key lifecycle and attestation revocation contracts.
+- **M22:** exact issuer/audience and time-window validation, transaction nonce checks, request-bound sender-key metadata, canonical thumbprints, explicit key rotation/retirement/revocation lifecycle and time-bounded attestation trust. Cryptographic proof verification, provider key custody and durable revocation propagation remain external adapter responsibilities.
 - **M23:** registry lifecycle, compatibility, provenance, digest and revocation controls.
 - **M24:** executable adversarial security regression corpus and fail-closed release gate.
 - **M25:** recovery objectives, failure-mode drills and RTO/RPO release gate.
