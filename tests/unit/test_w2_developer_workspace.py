@@ -69,7 +69,7 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert base_image in dockerfile
     assert "https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}" in dockerfile
     assert 'grep -c "^URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}$"' in dockerfile
-    assert dockerfile.count("update \\\\") == 2
+    assert dockerfile.count("update " + chr(92)) == 2
     assert dockerfile.count("install --yes --no-install-recommends") == 2
     assert "--snapshot=" not in dockerfile
     assert "dpkg-query -W" in dockerfile
