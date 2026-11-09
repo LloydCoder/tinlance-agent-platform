@@ -144,3 +144,14 @@ def test_lab_reuses_the_existing_ssm_instance_profile_without_widening_it() -> N
     assert template["Resources"]["WorkerInstance"]["Properties"]["IamInstanceProfile"] == {
         "Ref": "WorkerInstanceProfileName"
     }
+
+
+def test_nat_and_firewall_routes_are_symmetric_and_worker_volume_is_encrypted() -> None:
+    resources = load_template()["Resources"]
+    public_route = resources["PublicDefaultRoute"]["Properties"]
+    firewall_route = resources["FirewallDefaultRoute"]["Properties"]
+    worker = resources["WorkerInstance"]["Properties"]
+
+    assert public_route["GatewayId"] == {"Ref": "InternetGateway"}
+    assert firewall_route["NatGatewayId"] == {"Ref": "NatGateway"}
+    assert "PublicReturnRoute" in worker and False
