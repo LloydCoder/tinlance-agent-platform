@@ -726,3 +726,88 @@ def test_collector_fails_closed_when_any_worker_egress_group_inventory_is_missin
     assert snapshot["worker"]["security_group_egress"] is None
     findings = evaluate_fcp03_topology(snapshot)
     assert "worker-security-group-egress-policy-invalid" in findings
+
+
+def test_collector_rejects_malformed_route53_validation_ranges() -> None:
+    firewall = firewall_client()
+    validation = firewall.responses["describe_firewall_policy"][0]["FirewallPolicy"][
+        "Route53ResolvedIPValidation"
+    ]
+    validation["BypassDestinationValidationIPRanges"].append({"AddressDefinition": None})
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver_client(),
+    )
+
+    assert "resolved-ip-bypass-range-present" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_preserves_malformed_stateful_rule_target_types() -> None:
+    firewall = firewall_client()
+    firewall.responses["describe_rule_group"][0]["RuleGroup"]["RulesSource"][
+        "RulesSourceList"
+    ]["TargetTypes"].append(None)
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver_client(),
+    )
+
+    assert "stateful-domain-target-types-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_preserves_malformed_dns_domain_list_entries() -> None:
+    resolver = resolver_client()
+    resolver.responses["list_firewall_domains"][0]["Domains"].append(None)
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall_client(),
+        resolver=resolver,
+    )
+
+    assert "dns-allowlist-incomplete" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_rejects_malformed_worker_route_table_associations() -> None:
+    ec2 = ec2_client()
+    ec2.responses["describe_route_tables"][0]["RouteTables"][0]["Associations"].append({})
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert "worker-route-table-not-dedicated" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_rejects_network_acl_entries_with_unknown_direction() -> None:
+    ec2 = ec2_client()
+    ec2.responses["describe_network_acls"][0]["NetworkAcls"][0]["Entries"].append(
+        {
+            "RuleNumber": 120,
+            "Protocol": "-1",
+            "RuleAction": "allow",
+            "CidrBlock": "0.0.0.0/0",
+            "Egress": None,
+        }
+    )
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    findings = evaluate_fcp03_topology(snapshot)
+    assert "worker-nacl-egress-policy-invalid" in findings
+    assert "worker-nacl-ingress-policy-invalid" in findings
