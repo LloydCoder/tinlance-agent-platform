@@ -98,9 +98,17 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
     assert dockerfile.count("--snapshot=") == 4
     bootstrap_update = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
+    bootstrap_installs = [
+        index
+        for index in range(len(dockerfile))
+        if dockerfile.startswith('--snapshot="${APT_SNAPSHOT}" install', index)
+    ]
     bootstrap_ca = dockerfile.index("ca-certificates=20260816ubuntu0.24.04.2")
-    bootstrap_install = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert bootstrap_update < bootstrap_ca < bootstrap_install
+    workspace_update = dockerfile.index(
+        '--snapshot="${APT_SNAPSHOT}" update', bootstrap_update + 1
+    )
+    assert len(bootstrap_installs) == 2
+    assert bootstrap_update < bootstrap_installs[0] < bootstrap_ca < workspace_update < bootstrap_installs[1]
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
     assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
     assert "sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources" in dockerfile
@@ -170,7 +178,7 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
         workflow_root / "persistent-computer-kata-benchmark.yml"
     ).read_text(encoding="utf-8")
     assert (
-        "curl --fail --silent --show-error --location --retry 5 --retry-all-errors"
+        "--retry 12 --retry-all-errors --retry-delay 10"
         in kata_workflow
     )
     for name in (
