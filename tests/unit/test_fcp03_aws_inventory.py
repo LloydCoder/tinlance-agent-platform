@@ -896,3 +896,39 @@ def test_collector_rejects_incomplete_firewall_list_metadata() -> None:
             network_firewall=firewall,
             resolver=resolver_client(),
         )
+
+
+def test_collector_rejects_extra_dns_allow_rule_reusing_approved_domain_list() -> None:
+    resolver = resolver_client()
+    resolver.responses["list_firewall_rules"][0]["FirewallRules"].append(
+        {
+            "Action": "ALLOW",
+            "FirewallDomainListId": "domain-allow",
+            "Priority": 150,
+            "Status": "COMPLETE",
+        }
+    )
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall_client(),
+        resolver=resolver,
+    )
+
+    assert "dns-firewall-rule-set-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+@pytest.mark.parametrize("priority", [True, 0, 10001])
+def test_collector_rejects_invalid_dns_firewall_rule_priority(priority: object) -> None:
+    resolver = resolver_client()
+    resolver.responses["list_firewall_rules"][0]["FirewallRules"][0]["Priority"] = priority
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall_client(),
+        resolver=resolver,
+    )
+
+    assert "dns-firewall-rule-priority-invalid" in evaluate_fcp03_topology(snapshot)
