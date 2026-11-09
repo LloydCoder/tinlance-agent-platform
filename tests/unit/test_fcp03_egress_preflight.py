@@ -544,3 +544,14 @@ def test_rejects_noncanonical_or_additional_worker_security_group_egress() -> No
     ]
 
     assert "worker-security-group-egress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_fails_closed_on_malformed_security_group_egress_entries() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_egress"] = [
+        {"protocol": "tcp", "port": 443, "cidr": "0.0.0.0/0"},
+        {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
+        {"protocol": "tcp", "port": 53, "cidr": ["10.20.0.2/32"]},
+    ]
+
+    assert "worker-security-group-egress-policy-invalid" in evaluate_fcp03_topology(topology)
