@@ -51,9 +51,7 @@ def test_verified_dependency_requires_evidence() -> None:
 def test_production_readiness_rejects_duplicate_dependency_kinds() -> None:
     dependencies = _verified_dependencies() + (_verified_dependencies()[0],)
     with pytest.raises(ValueError, match="duplicate"):
-        ProductionReadiness("1.1.0", dependencies).verify(
-            now=datetime(2026, 11, 9, tzinfo=UTC)
-        )
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 9, tzinfo=UTC))
 
 
 def test_production_readiness_rejects_evidence_from_another_environment() -> None:
@@ -117,9 +115,7 @@ def test_production_readiness_rejects_expired_dependency_evidence() -> None:
         for dependency in _verified_dependencies()
     )
     with pytest.raises(RuntimeError, match="expired"):
-        ProductionReadiness("1.1.0", dependencies).verify(
-            now=datetime(2026, 11, 10, tzinfo=UTC)
-        )
+        ProductionReadiness("1.1.0", dependencies).verify(now=datetime(2026, 11, 10, tzinfo=UTC))
 
 
 def test_production_readiness_rejects_naive_evidence_timestamps() -> None:
