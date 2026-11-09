@@ -121,7 +121,12 @@ def test_lab_has_an_automatic_stack_teardown_target_scoped_to_this_stack() -> No
 
     assert schedule["State"] == "ENABLED"
     assert schedule["ScheduleExpression"]["Fn::Sub"] == "at(${TeardownAtUtc})"
+    assert schedule["Name"] == "tinlance-fcp03-auto-teardown"
     assert schedule["FlexibleTimeWindow"]["Mode"] == "OFF"
+    trust = resources["TeardownRole"]["Properties"]["AssumeRolePolicyDocument"]
+    assert trust["Statement"][0]["Condition"]["ArnEquals"]["aws:SourceArn"] == {
+        "Fn::Sub": "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/tinlance-fcp03-auto-teardown"
+    }
     assert target["Arn"] == "arn:aws:scheduler:::aws-sdk:cloudformation:deleteStack"
     assert target["Input"]["Fn::Sub"] == "{\"StackName\":\"${AWS::StackName}\"}"
     statement = role_policy["Statement"][0]
