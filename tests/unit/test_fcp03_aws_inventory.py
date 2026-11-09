@@ -45,6 +45,7 @@ def ec2_client() -> FakeClient:
                                         "HttpPutResponseHopLimit": 1,
                                     },
                                     "SecurityGroups": [{"GroupId": "sg-worker"}],
+                                    "NetworkInterfaces": [{"Ipv6Addresses": []}],
                                 }
                             ]
                         }
@@ -844,3 +845,36 @@ def test_collector_rejects_missing_network_acl_entries_field() -> None:
     findings = evaluate_fcp03_topology(snapshot)
     assert "worker-nacl-egress-policy-invalid" in findings
     assert "worker-nacl-ingress-policy-invalid" in findings
+
+
+def test_collector_rejects_malformed_ipv6_interface_address_record() -> None:
+    ec2 = ec2_client()
+    instance = ec2.responses["describe_instances"][0]["Reservations"][0]["Instances"][0]
+    instance["NetworkInterfaces"] = [{"Ipv6Addresses": [{"Ipv6Address": None}]}]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
+
+
+def test_collector_rejects_malformed_firewall_subnet_mapping() -> None:
+    firewall = firewall_client()
+    described = firewall.responses["describe_firewall"][0]
+    del described["FirewallStatus"]["SyncStates"]["eu-west-1a"]["Attachment"]["SubnetId"]
+    described["Firewall"]["SubnetMappings"][0]["AvailabilityZone"] = "eu-west-1a"
+    described["Firewall"]["SubnetMappings"].append(None)
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall,
+        resolver=resolver_client(),
+    )
+
+    findings = evaluate_fcp03_topology(snapshot)
+    assert "firewall-return-path-identity-unknown" in findings
