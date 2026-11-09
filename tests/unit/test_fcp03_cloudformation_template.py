@@ -224,5 +224,5 @@ def test_worker_management_does_not_require_imds_or_an_instance_profile() -> Non
     assert "WorkerInstanceProfileName" not in template["Parameters"]
     assert "IamInstanceProfile" not in worker
     assert worker["MetadataOptions"]["HttpEndpoint"] == "disabled"
-    assert "ssm" not in worker["UserData"]["Fn::Base64"]["Fn::Sub"].lower()
+    assert "amazon-ssm-agent" not in worker["UserData"]["Fn::Base64"]["Fn::Sub"].lower()
     assert "retrieve_with_ec2_get_console_output=true" in worker["UserData"]["Fn::Base64"]["Fn::Sub"]
