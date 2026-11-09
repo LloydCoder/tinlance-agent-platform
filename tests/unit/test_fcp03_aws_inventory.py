@@ -811,3 +811,37 @@ def test_collector_rejects_network_acl_entries_with_unknown_direction() -> None:
     findings = evaluate_fcp03_topology(snapshot)
     assert "worker-nacl-egress-policy-invalid" in findings
     assert "worker-nacl-ingress-policy-invalid" in findings
+
+
+
+def test_collector_rejects_malformed_network_acl_record_even_with_valid_match() -> None:
+    ec2 = ec2_client()
+    ec2.responses["describe_network_acls"][0]["NetworkAcls"].append(None)
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    findings = evaluate_fcp03_topology(snapshot)
+    assert "worker-nacl-association-invalid" in findings
+    assert "worker-nacl-egress-policy-invalid" in findings
+    assert "worker-nacl-ingress-policy-invalid" in findings
+
+
+def test_collector_rejects_missing_network_acl_entries_field() -> None:
+    ec2 = ec2_client()
+    del ec2.responses["describe_network_acls"][0]["NetworkAcls"][0]["Entries"]
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    findings = evaluate_fcp03_topology(snapshot)
+    assert "worker-nacl-egress-policy-invalid" in findings
+    assert "worker-nacl-ingress-policy-invalid" in findings
