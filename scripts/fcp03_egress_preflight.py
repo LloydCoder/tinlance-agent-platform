@@ -142,6 +142,13 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("worker-nacl-association-invalid")
 
     vpc_cidr = worker.get("vpc_cidr")
+    cidr_associations = worker.get("vpc_cidr_associations")
+    if (
+        not isinstance(cidr_associations, Sequence)
+        or isinstance(cidr_associations, (str, bytes))
+        or list(cidr_associations) != [{"cidr": vpc_cidr, "state": "associated"}]
+    ):
+        findings.add("worker-vpc-cidr-associations-invalid")
     resolver_ip = worker.get("resolver_ip")
     expected_nacl_rules: list[dict[str, object]] = []
     try:
