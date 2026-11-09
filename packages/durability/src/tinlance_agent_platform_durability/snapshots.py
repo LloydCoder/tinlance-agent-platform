@@ -498,7 +498,12 @@ class WorkspaceSnapshotService:
             os.replace(staging, target)
             target_reserved = False
             published = True
-            ledger.complete(tenant_id, workspace_id, restore_id, reference.digest)
+            try:
+                ledger.complete(tenant_id, workspace_id, restore_id, reference.digest)
+            except Exception:
+                # The commit result may be ambiguous after a network failure. The SQL
+                # transition is idempotent, so retry once before reporting uncertainty.
+                ledger.complete(tenant_id, workspace_id, restore_id, reference.digest)
             return RestoreResult(
                 restore_id=restore_id,
                 snapshot_id=reference.snapshot_id,
@@ -509,10 +514,11 @@ class WorkspaceSnapshotService:
         except BaseException as exc:
             if staging_created and staging is not None and staging.exists():
                 shutil.rmtree(staging)
-            if published and target.exists():
-                shutil.rmtree(target)
-            elif target_reserved and target.exists() and not any(target.iterdir()):
-                target.rmdir()
-            with suppress(Exception):
-                ledger.fail(tenant_id, workspace_id, restore_id, type(exc).__name__)
+            if not published:
+                if target_reserved and target.exists() and not any(target.iterdir()):
+                    target.rmdir()
+                with suppress(Exception):
+                    ledger.fail(tenant_id, workspace_id, restore_id, type(exc).__name__)
+            # Once the destination has been atomically published, never delete it
+            # because a database acknowledgement was lost. Keep it for reconciliation.
             raise
