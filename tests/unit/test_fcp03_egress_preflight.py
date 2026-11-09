@@ -633,3 +633,43 @@ def test_fails_closed_when_worker_security_group_ingress_inventory_is_malformed(
     topology["worker"]["security_group_ingress"] = "unknown"
 
     assert "worker-security-group-ingress-inventory-invalid" in evaluate_fcp03_topology(topology)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "finding"),
+    [
+        (
+            lambda topology: topology["worker"]["route_table_subnet_ids"].append(None),
+            "worker-route-table-not-dedicated",
+        ),
+        (
+            lambda topology: topology["firewall"]["policy"]["stateful_rule_groups"][0][
+                "target_types"
+            ].append(None),
+            "stateful-domain-target-types-invalid",
+        ),
+        (
+            lambda topology: topology["dns_firewall"]["allowlist_domains"].append(None),
+            "dns-allowlist-incomplete",
+        ),
+        (
+            lambda topology: topology["firewall"]["route_table_subnet_ids"].append(
+                {"subnet_id": "subnet-other"}
+            ),
+            "firewall-route-table-not-dedicated",
+        ),
+        (
+            lambda topology: topology["firewall"]["policy"][
+                "route53_resolved_ip_validation"
+            ]["source_ip_ranges"].append(None),
+            "resolved-ip-source-range-incomplete",
+        ),
+    ],
+)
+def test_rejects_malformed_members_in_security_inventory_collections(
+    mutate: object, finding: str
+) -> None:
+    topology = valid_topology()
+    mutate(topology)  # type: ignore[operator]
+
+    assert finding in evaluate_fcp03_topology(topology)
