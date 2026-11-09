@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+from copy import deepcopy
+
+from scripts.fcp03_egress_preflight import evaluate_fcp03_topology
+
+
+def valid_topology() -> dict[str, object]:
+    return {
+        "worker": {
+            "vpc_id": "vpc-worker-a",
+            "subnet_cidr": "10.20.1.0/24",
+            "public_ip": None,
+            "map_public_ip_on_launch": False,
+            "availability_zone": "eu-west-1a",
+            "default_route_target": "vpce-fw-a",
+            "security_group_egress": [
+                {"protocol": "tcp", "port": 443, "cidr": "10.20.10.0/24"},
+                {"protocol": "udp", "port": 53, "cidr": "10.20.0.2/32"},
+                {"protocol": "tcp", "port": 53, "cidr": "10.20.0.2/32"},
+            ],
+        },
+        "firewall": {
+            "endpoints_by_az": {"eu-west-1a": "vpce-fw-a"},
+            "policy": {
+                "route53_resolved_ip_validation": {
+                    "dns_firewall_rule_group_id": "rslvr-frg-123",
+                    "action": "DROP",
+                    "dns_expiry_exception_action": "DROP",
+                    "source_ip_ranges": ["10.20.1.0/24"],
+                    "bypass_destination_validation_ip_ranges": [],
+                }
+            },
+        },
+        "dns_firewall": {
+            "rule_group_id": "rslvr-frg-123",
+            "associated_vpc_ids": ["vpc-worker-a"],
+            "allowlist_domains": ["approved.example"],
+            "terminal_block": True,
+            "failure_mode": "CLOSED",
+        },
+    }
+
+
+def test_accepts_a_private_worker_with_same_az_firewall_route_and_scoped_dns_policy() -> None:
+    assert evaluate_fcp03_topology(valid_topology()) == ()
+
+
+def test_rejects_public_worker_address_or_public_subnet_mapping() -> None:
+    topology = valid_topology()
+    topology["worker"]["public_ip"] = "203.0.113.10"
+    topology["worker"]["map_public_ip_on_launch"] = True
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "worker-public-address" in findings
+    assert "worker-public-subnet" in findings
+
+
+def test_rejects_default_route_that_bypasses_the_same_az_firewall_endpoint() -> None:
+    topology = valid_topology()
+    topology["worker"]["default_route_target"] = "igw-123"
+
+    assert "worker-firewall-route-missing" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_unrestricted_ipv4_and_ipv6_security_group_egress() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_egress"].extend(
+        [
+            {"protocol": "-1", "port": None, "cidr": "0.0.0.0/0"},
+            {"protocol": "-1", "port": None, "cidr": "::/0"},
+        ]
+    )
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "unrestricted-security-group-egress" in findings
+
+
+def test_requires_policy_level_resolved_ip_validation_and_exact_dns_group_binding() -> None:
+    topology = valid_topology()
+    topology["firewall"]["policy"]["route53_resolved_ip_validation"] = None
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "resolved-ip-validation-missing" in findings
+
+
+def test_rejects_shared_dns_resolution_pool_and_non_fail_closed_dns_policy() -> None:
+    topology = valid_topology()
+    topology["dns_firewall"]["associated_vpc_ids"] = ["vpc-worker-a", "vpc-tenant-b"]
+    topology["dns_firewall"]["failure_mode"] = "OPEN"
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "dns-resolution-pool-cross-vpc" in findings
+    assert "dns-firewall-not-fail-closed" in findings
+
+
+def test_rejects_dns_policy_without_allowlist_terminal_block_or_expiry_drop() -> None:
+    topology = valid_topology()
+    topology["dns_firewall"]["allowlist_domains"] = []
+    topology["dns_firewall"]["terminal_block"] = False
+    topology["firewall"]["policy"]["route53_resolved_ip_validation"][
+        "dns_expiry_exception_action"
+    ] = "CONTINUE"
+
+    findings = evaluate_fcp03_topology(topology)
+
+    assert "dns-allowlist-incomplete" in findings
+    assert "dns-expiry-not-fail-closed" in findings
+
+
+def test_does_not_mutate_the_supplied_inventory_snapshot() -> None:
+    topology = valid_topology()
+    original = deepcopy(topology)
+
+    evaluate_fcp03_topology(topology)
+
+    assert topology == original
+
+
+def test_rejects_world_http_and_ipv6_https_egress() -> None:
+    topology = valid_topology()
+    topology["worker"]["security_group_egress"].extend(
+        [
+            {"protocol": "tcp", "port": 80, "cidr": "0.0.0.0/0"},
+            {"protocol": "tcp", "port": 443, "cidr": "::/0"},
+        ]
+    )
+
+    assert "unrestricted-security-group-egress" in evaluate_fcp03_topology(topology)
+
+
+def test_cli_returns_zero_and_machine_readable_pass_for_valid_snapshot(tmp_path, capsys) -> None:
+    import json
+
+    from scripts.fcp03_egress_preflight import main
+
+    snapshot_path = tmp_path / "topology.json"
+    snapshot_path.write_text(json.dumps(valid_topology()), encoding="utf-8")
+
+    assert main(["--snapshot", str(snapshot_path)]) == 0
+    assert capsys.readouterr().out == '{"findings": [], "status": "pass"}\n'
+
+
+def test_cli_returns_nonzero_and_findings_for_invalid_snapshot(tmp_path, capsys) -> None:
+    import json
+
+    from scripts.fcp03_egress_preflight import main
+
+    topology = valid_topology()
+    topology["worker"]["public_ip"] = "198.51.100.20"
+    snapshot_path = tmp_path / "topology.json"
+    snapshot_path.write_text(json.dumps(topology), encoding="utf-8")
+
+    assert main(["--snapshot", str(snapshot_path)]) == 1
+    output = capsys.readouterr().out
+    assert '"status": "fail"' in output
+    assert '"worker-public-address"' in output
