@@ -1,6 +1,14 @@
 -- W6 acceptance: durable restore claims, one-way transitions, RLS and append-only evidence.
 BEGIN;
 
+CREATE ROLE w6_restore_runtime NOLOGIN;
+GRANT USAGE ON SCHEMA platform TO w6_restore_runtime;
+GRANT SELECT ON platform.workspace_restore_operations,
+    platform.workspace_restore_events,
+    platform.workspace_snapshots,
+    platform.workspace_snapshot_events
+TO w6_restore_runtime;
+
 INSERT INTO platform.tenants (tenant_id, name)
 VALUES
     ('00000000-0000-0000-0000-000000000093', 'w6-restore-tenant-a'),
@@ -126,6 +134,8 @@ BEGIN
         NULL;
     END;
 
+    SET LOCAL ROLE w6_restore_runtime;
+    PERFORM set_config('platform.tenant_id', tenant::text, true);
     SELECT count(*) INTO visible_count FROM platform.workspace_restore_operations
      WHERE tenant_id = tenant;
     IF visible_count <> 2 THEN
