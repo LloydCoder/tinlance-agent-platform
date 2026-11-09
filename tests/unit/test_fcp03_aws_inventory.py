@@ -711,7 +711,6 @@ def test_collector_fails_closed_when_worker_ingress_inventory_is_malformed() -> 
     assert "worker-security-group-ingress-inventory-invalid" in findings
 
 
-
 def test_collector_fails_closed_when_any_worker_egress_group_inventory_is_missing() -> None:
     ec2 = ec2_client()
     groups = ec2.responses["describe_security_groups"][0]["SecurityGroups"]
