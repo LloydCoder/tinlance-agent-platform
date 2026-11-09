@@ -185,19 +185,13 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
             destination, target = route.get("destination"), route.get("target")
             if route.get("state") != "active":
                 findings.add("nat-route-state-not-active")
-            if (
-                destination == "0.0.0.0/0"
-                and isinstance(target, str)
-                and target.startswith("igw-")
-            ):
+            if destination == "0.0.0.0/0" and isinstance(target, str) and target.startswith("igw-"):
                 normalized_target = "internet-gateway"
             else:
                 normalized_target = target
             observed_nat_routes.add((destination, normalized_target))
             if target not in {"local", endpoint} and not (
-                destination == "0.0.0.0/0"
-                and isinstance(target, str)
-                and target.startswith("igw-")
+                destination == "0.0.0.0/0" and isinstance(target, str) and target.startswith("igw-")
             ):
                 findings.add("nat-return-route-bypasses-firewall")
         if observed_nat_routes != expected_nat_routes:
