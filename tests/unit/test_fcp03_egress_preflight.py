@@ -11,6 +11,9 @@ def valid_topology() -> dict[str, object]:
             "vpc_id": "vpc-worker-a",
             "subnet_id": "subnet-worker-a",
             "vpc_cidr": "10.20.0.0/16",
+            "vpc_cidr_associations": [
+                {"cidr": "10.20.0.0/16", "state": "associated"}
+            ],
             "resolver_ip": "10.20.0.2",
             "subnet_cidr": "10.20.1.0/24",
             "network_acl": {
@@ -415,3 +418,18 @@ def test_rejects_worker_nacl_with_missing_or_unrestricted_ingress_policy() -> No
     ]
 
     assert "worker-nacl-ingress-policy-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_secondary_or_pending_vpc_cidr_associations() -> None:
+    topology = valid_topology()
+    topology["worker"]["vpc_cidr_associations"].append(
+        {"cidr": "10.30.0.0/16", "state": "associated"}
+    )
+
+    assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
+
+    topology["worker"]["vpc_cidr_associations"] = [
+        {"cidr": "10.20.0.0/16", "state": "associating"}
+    ]
+
+    assert "worker-vpc-cidr-associations-invalid" in evaluate_fcp03_topology(topology)
