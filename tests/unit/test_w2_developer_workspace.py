@@ -67,32 +67,34 @@ def test_w2_image_build_uses_an_immutable_ubuntu_snapshot_and_package_manifest()
         "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
     )
     assert base_image in dockerfile
-    assert '--snapshot="${APT_SNAPSHOT}" update' in dockerfile
-    assert '--snapshot="${APT_SNAPSHOT}" install' in dockerfile
+    assert "https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}" in dockerfile
+    assert 'grep -c "^URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}$"' in dockerfile
+    assert dockerfile.count("update " + chr(92)) == 2
+    assert dockerfile.count("install --yes --no-install-recommends") == 2
+    assert "--snapshot=" not in dockerfile
     assert "dpkg-query -W" in dockerfile
     assert (
         "npm install --package-lock-only --offline --ignore-scripts --no-audit --no-fund"
         in dockerfile
     )
-    assert "dpkg-query -W -f='${binary:Package}=${Version}\\n'" in dockerfile
     assert "w2-package-manifest.lock" in dockerfile
-    bootstrap_update_index = dockerfile.index("apt-get \\\n        -o Acquire::Retries=5")
-    update_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" update')
-    install_index = dockerfile.index('--snapshot="${APT_SNAPSHOT}" install')
-    assert bootstrap_update_index < update_index < install_index
+    secret_mount = (
+        "RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,"
+        "required=true,mode=0444"
+    )
+    assert secret_mount in dockerfile
     assert "ca-certificates=20260816ubuntu0.24.04.2" in dockerfile
     assert "git python3 nodejs npm util-linux" in dockerfile
     assert "openssl=3.0.13-0ubuntu3.16" in dockerfile
     assert "libssl3t64=3.0.13-0ubuntu3.16" in dockerfile
-    assert "Acquire::Retries=5" in dockerfile
-    assert "APT::Update::Error-Mode=any" in dockerfile
+    assert "Acquire::https::CaInfo=/tmp/host-ca-bundle.crt" in dockerfile
+    assert dockerfile.count("Acquire::https::CaInfo=/tmp/host-ca-bundle.crt") == 2
     assert dockerfile.count("Acquire::Retries=5") == 4
-    assert dockerfile.count("Acquire::http::Timeout=30") == 4
-    assert dockerfile.count("Acquire::https::Timeout=30") == 2
+    assert dockerfile.count("Acquire::https::Timeout=30") == 4
     assert dockerfile.count("APT::Update::Error-Mode=any") == 2
-    assert dockerfile.count("--snapshot=") == 2
+    assert "Invalid Ubuntu snapshot identifier" in dockerfile
     assert "Acquire::https::Verify-Peer=false" not in dockerfile
-    assert "http://archive.ubuntu.com/ubuntu" in dockerfile
+    assert "http://archive.ubuntu.com/ubuntu" not in dockerfile
     assert "RUN --network=none" in dockerfile
     assert "find / -xdev ! -type l -perm /6000" in dockerfile
 
@@ -119,6 +121,14 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "byte_identical" in firecracker
     assert "firecracker-w2-${{ github.run_id }}" in firecracker
     assert "path: artifacts/" in firecracker
+    assert firecracker.count("--secret id=ca_bundle,src=/tmp/tinlance-ca-bundle.crt") == 2
+    assert "ca_bundle_sha256" in firecracker
+    assert (
+        "install -m 0600 /etc/ssl/certs/ca-certificates.crt /tmp/tinlance-ca-bundle.crt"
+        in firecracker
+    )
+    assert "test ! -L /tmp/tinlance-ca-bundle.crt" in firecracker
+    assert "curl --fail --silent --show-error --location" in firecracker
     assert "trap 'rm -f \"$W2_ROOTFS_TAR\"' EXIT" not in firecracker
     assert firecracker.count("needs: guest-boot") == 3
     assert (
@@ -144,6 +154,10 @@ def test_w2_cross_runtime_jobs_consume_one_normalized_rootfs_artifact() -> None:
     assert "--runs 3" in firecracker
     assert "docker import" in firecracker
     assert firecracker.count("--runs 30") >= 3
+    kata_workflow = (workflow_root / "persistent-computer-kata-benchmark.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "--retry 12 --retry-all-errors --retry-delay 10" in kata_workflow
     for name in (
         "persistent-computer-gvisor-benchmark.yml",
         "persistent-computer-kata-benchmark.yml",
@@ -192,3 +206,20 @@ def test_firecracker_w2_workspace_collects_thirty_samples_for_percentiles() -> N
     assert "--runs 30 --profile W2" in workflow
     assert 'report.get("sample_count") != 30' in workflow
     assert "len(markers) != 30" in workflow
+
+
+def test_release_download_workflows_use_pinned_api_fallbacks_and_bounded_retries() -> None:
+    workflow_root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+    firecracker = (workflow_root / "persistent-computer-firecracker-w2.yml").read_text(
+        encoding="utf-8"
+    )
+    kata = (workflow_root / "persistent-computer-kata-benchmark.yml").read_text(encoding="utf-8")
+    for workflow in (firecracker, kata):
+        assert "api.github.com/repos/" in workflow
+        assert "--retry 12 --retry-all-errors --retry-delay 10" in workflow
+        assert "--connect-timeout 30 --max-time" in workflow
+        assert 'test "$downloaded" -eq 1' in workflow
+    assert "releases/assets/555159508" in firecracker
+    assert "releases/assets/663864062" in kata
+    assert "no guest acceptance is claimed" in firecracker
+    assert "no benchmark acceptance is claimed" in kata

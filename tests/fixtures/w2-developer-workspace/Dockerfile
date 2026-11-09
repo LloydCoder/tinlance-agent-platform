@@ -1,42 +1,48 @@
+# syntax=docker/dockerfile:1.7
 ARG BASE_IMAGE=ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
 ARG APT_SNAPSHOT=20261106T000000Z
 FROM ${BASE_IMAGE}
 ARG APT_SNAPSHOT
 
-# Resolve every package from one immutable Ubuntu archive snapshot. Updating the
-# indexes and installing from that same snapshot avoids mixed-time package sets.
-# The package manifest emitted below is retained as guest-build provenance.
-# The minimal base has no CA bundle. Bootstrap the exact CA package over the
-# Ubuntu archive's HTTP transport, while retaining APT's signed InRelease and
-# package-hash verification. Then use the immutable Ubuntu snapshot over HTTPS
-# with normal certificate-peer verification for all workspace dependencies.
-RUN sed -i 's|https://archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources \
+# The minimal Ubuntu base has no CA bundle. Bootstrap trust from the ephemeral
+# build runner through a BuildKit secret (never an image layer). Route every
+# architecture through Canonical's snapshot-enabled primary archive endpoint:
+# the ports mirror does not honor the dated snapshot URL. All packages remain
+# architecture-filtered by APT and resolve from one immutable snapshot.
+RUN --mount=type=secret,id=ca_bundle,target=/tmp/host-ca-bundle.crt,required=true,mode=0444 \
+    case "${APT_SNAPSHOT}" in \
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;; \
+        *) echo "Invalid Ubuntu snapshot identifier"; exit 1 ;; \
+    esac \
+    && sed -i -E "s|^URIs: .*|URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}|" \
+        /etc/apt/sources.list.d/ubuntu.sources \
+    && test "$(grep -c "^URIs: https://snapshot.ubuntu.com/ubuntu/${APT_SNAPSHOT}$" /etc/apt/sources.list.d/ubuntu.sources)" -eq 2 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
         update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Acquire::https::CaInfo=/tmp/host-ca-bundle.crt \
         -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
         install --yes --no-install-recommends \
         ca-certificates=20260816ubuntu0.24.04.2 \
         openssl=3.0.13-0ubuntu3.16 \
         libssl3t64=3.0.13-0ubuntu3.16 \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
         -o APT::Update::Error-Mode=any \
-        --snapshot="${APT_SNAPSHOT}" update \
+        update \
     && DEBIAN_FRONTEND=noninteractive apt-get \
         -o Acquire::Retries=5 \
-        -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
-        --snapshot="${APT_SNAPSHOT}" install --yes --no-install-recommends \
+        install --yes --no-install-recommends \
         git python3 nodejs npm util-linux \
     && install -d /usr/share/tinlance \
-    && dpkg-query -W -f='${binary:Package}=${Version}\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
+    && dpkg-query -W -f='${binary:Package}=${Version}\\n' | sort > /usr/share/tinlance/w2-package-manifest.lock \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
