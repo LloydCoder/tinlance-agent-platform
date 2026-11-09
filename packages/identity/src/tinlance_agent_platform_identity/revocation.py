@@ -255,8 +255,7 @@ class DynamoDBTokenRevocationStore:
                     "Put": {
                         "TableName": self.table_name,
                         "Item": {
-                            name: self._serialize_attribute(value)
-                            for name, value in item.items()
+                            name: self._serialize_attribute(value) for name, value in item.items()
                         },
                     }
                 }
