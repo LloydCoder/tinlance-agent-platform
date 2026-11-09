@@ -50,6 +50,10 @@ Agent frameworks can produce an action; a governed execution substrate determine
 | Evidence | Attributable, integrity-protected execution evidence and audit records |
 | Enterprise assurance | Conformance, adversarial, reliability, supply-chain and release gates |
 
+## Identity, cryptography and trust
+
+The identity boundary exposes provider-neutral token-context checks for exact issuer/audience, validity windows, nonce and request-bound sender-key metadata. The crypto and attestation packages model explicit key lifecycle and time-bounded revocation. These contracts do not verify signatures or DPoP proofs, store private keys, or provide a production revocation feed; those responsibilities remain with configured, independently audited provider adapters. See [M22 Identity, Cryptography & Attestation](docs/M22-IDENTITY-CRYPTO-ATTESTATION.md).
+
 ## Quick Start
 
 Prerequisites: Python 3.12, 3.13, or 3.14.
