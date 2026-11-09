@@ -118,7 +118,9 @@ def firewall_client() -> FakeClient:
             "describe_firewall": [
                 {
                     "Firewall": {
-                        "FirewallPolicyArn": "arn:aws:network-firewall:eu-west-1:123:firewall-policy/test"
+                        "FirewallPolicyArn": (
+                            "arn:aws:network-firewall:eu-west-1:123:firewall-policy/test"
+                        )
                     },
                     "FirewallStatus": {
                         "Status": "READY",
@@ -245,7 +247,10 @@ def test_collector_is_read_only_and_uses_the_requested_instance_id() -> None:
     )
 
     assert ec2.calls[0] == ("describe_instances", {"InstanceIds": ["i-test"]})
-    assert all(not operation.startswith(("create_", "delete_", "update_", "associate_")) for operation, _ in ec2.calls)
+    assert all(
+        not operation.startswith(("create_", "delete_", "update_", "associate_"))
+        for operation, _ in ec2.calls
+    )
 
 
 def test_rejects_dns_wildcard_block_that_precedes_allow_rules() -> None:
