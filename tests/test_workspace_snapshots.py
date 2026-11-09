@@ -565,7 +565,7 @@ def test_s3_snapshot_store_rejects_invalid_prefix_and_oversized_objects():
     store = S3SnapshotStore(
         s3_client=FakeS3(),
         bucket="tinlance-snapshots",
-        sse_kms_key_id="kms-key",
+        sse_kms_key_id="arn:aws:kms:eu-west-1:123456789012:key/example",
     )
     with pytest.raises(ValueError, match="size limit"):
         store.put_if_absent(uuid4(), b"x" * (store.MAX_OBJECT_BYTES + 1))
