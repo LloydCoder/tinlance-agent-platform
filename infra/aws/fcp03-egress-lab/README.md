@@ -21,6 +21,8 @@ The existing host remains an out-of-band controller. The disposable worker delib
 
 This is a single-AZ provider-level test topology. It does not, by itself, prove cross-AZ behavior, multi-tenant non-interference, failure injection, or production certification.
 
+The read-only FCP-03 inventory/preflight also verifies the full symmetric service chain: the firewall subnet's default route must target the expected available NAT Gateway; the NAT subnet must have a worker-subnet return route through the same-AZ firewall endpoint and its internet default route through the IGW; both route tables must be dedicated to their respective subnets; and the firewall endpoint, NAT Gateway and worker must share an AZ. Missing or ambiguous route inventories fail closed. These checks validate static configuration only and do not replace packet/flow evidence.
+
 ## Automatic teardown
 
 `TeardownAtUtc` is required. Before deployment, validate it immediately before stack creation:
