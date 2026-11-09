@@ -377,3 +377,33 @@ def test_cognito_profile_rejects_unprefixed_or_foreign_resource_scopes() -> None
         verifier.verify(make_cognito_token(private_key, scope="openid web.search"))
     with pytest.raises(PermissionError, match="scope"):
         verifier.verify(make_cognito_token(private_key, scope="openid other-api/web.search"))
+
+
+def test_jwks_client_is_reused_across_token_verifications(monkeypatch: pytest.MonkeyPatch) -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    provider = StaticKeyProvider(private_key.public_key())
+    constructed: list[tuple[str, dict[str, object]]] = []
+
+    def build_provider(url: str, **kwargs: object) -> StaticKeyProvider:
+        constructed.append((url, dict(kwargs)))
+        return provider
+
+    monkeypatch.setattr(
+        "tinlance_agent_platform_identity.jwt_verifier.PyJWKClient",
+        build_provider,
+    )
+    service = JWKSIdentityVerifier(
+        issuer=ISSUER,
+        audience=AUDIENCE,
+        jwks_url="https://issuer.example.test/.well-known/jwks.json",
+    )
+    token = make_token(private_key)
+
+    assert service.verify(token).token_id == "token-123"
+    assert service.verify(token).token_id == "token-123"
+    assert constructed == [
+        (
+            "https://issuer.example.test/.well-known/jwks.json",
+            {"cache_jwk_set": True, "lifespan": 300, "timeout": 5.0},
+        )
+    ]

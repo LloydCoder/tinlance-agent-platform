@@ -8,7 +8,7 @@ the Platform authorization and policy layers remain authoritative.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from urllib.parse import urlsplit
@@ -46,6 +46,7 @@ class JWKSIdentityVerifier:
     resource_scope_prefix: str | None = None
     jwks_timeout_seconds: float = 5.0
     key_provider: SigningKeyProvider | None = None
+    _signing_key_provider: SigningKeyProvider = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         issuer = urlsplit(self.issuer)
@@ -138,15 +139,18 @@ class JWKSIdentityVerifier:
         ):
             raise ValueError("principal type claim and allowlist must be configured")
 
+        provider = self.key_provider
+        if provider is None:
+            provider = PyJWKClient(
+                self.jwks_url,
+                cache_jwk_set=True,
+                lifespan=300,
+                timeout=self.jwks_timeout_seconds,
+            )
+        object.__setattr__(self, "_signing_key_provider", provider)
+
     def _provider(self) -> SigningKeyProvider:
-        if self.key_provider is not None:
-            return self.key_provider
-        return PyJWKClient(
-            self.jwks_url,
-            cache_jwk_set=True,
-            lifespan=300,
-            timeout=self.jwks_timeout_seconds,
-        )
+        return self._signing_key_provider
 
     def verify(self, assertion: str, *, expected_nonce: str | None = None) -> VerifiedAgentIdentity:
         if (
