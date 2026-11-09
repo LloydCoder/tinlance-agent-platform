@@ -208,7 +208,15 @@ class WorkspaceSnapshotService:
         path = PurePosixPath(value)
         if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
             raise SnapshotError("snapshot paths must be normalized relative paths")
-        if any(part.casefold() in cls._SENSITIVE_SEGMENTS for part in path.parts):
+        sensitive = any(
+            part.casefold() in cls._SENSITIVE_SEGMENTS
+            or part.casefold().startswith(".env")
+            or "private_key" in part.casefold()
+            or part.casefold() in {"id_rsa", "id_ed25519", "authorized_keys"}
+            or part.casefold().endswith((".pem", ".p12", ".pfx", ".key"))
+            for part in path.parts
+        )
+        if sensitive:
             raise SnapshotError("snapshot path contains excluded credential or identity material")
         normalized = path.as_posix()
         if normalized != value or len(normalized) > 1024:
