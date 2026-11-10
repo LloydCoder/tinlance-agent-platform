@@ -5,7 +5,7 @@
     "WorkloadRoleArn": {
       "Type": "String",
       "Description": "Exact IAM role ARN used by the production Agent Platform workload; no wildcard principals.",
-      "AllowedPattern": "^arn:(aws|aws-us-gov|aws-cn):iam::[0-9]{12}:role/.+$"
+      "AllowedPattern": "^arn:aws(-[a-z0-9-]+)?:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$"
     },
     "SnapshotRetentionDays": {
       "Type": "Number",
@@ -551,6 +551,26 @@
                     ]
                   }
                 }
+              }
+            },
+            {
+              "Sid": "DenySnapshotObjectDeletion",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:DeleteObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "SnapshotBucket",
+                        "Arn"
+                      ]
+                    },
+                    "/tinlance/workspace-snapshots/v1/*"
+                  ]
+                ]
               }
             },
             {
