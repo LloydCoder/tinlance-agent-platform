@@ -5,7 +5,6 @@ import pathlib
 import re
 import typing
 
-
 TEMPLATE_PATH = (
     pathlib.Path(__file__).parents[2]
     / "infra"
@@ -118,7 +117,7 @@ def test_workload_policy_is_scoped_to_the_identity_tables_snapshot_prefix_and_ke
     }
 
 
-def test_snapshot_bucket_policy_denies_insecure_transport_wrong_encryption_and_version_delete() -> None:
+def test_snapshot_bucket_policy_enforces_transport_encryption_and_deletion_controls() -> None:
     statements = load_template()["Resources"]["SnapshotBucketPolicy"]["Properties"][
         "PolicyDocument"
     ]["Statement"]
