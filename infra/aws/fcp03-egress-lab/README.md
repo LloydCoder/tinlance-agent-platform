@@ -31,9 +31,9 @@ The read-only FCP-03 inventory/preflight also verifies the full symmetric servic
 python scripts/validate_fcp03_teardown_at.py --teardown-at 2026-11-09T11:00:00
 ```
 
-The validator requires a UTC timestamp 15 minutes to 2 hours in the future. EventBridge Scheduler then invokes CloudFormation `DeleteStack` on this stack only. The Scheduler role is scoped to this stack ARN and trusts only the exact schedule ARN and account. The schedule name is deliberately fixed, so only one lab stack may be active in the account at a time.
+The validator requires a UTC timestamp 15 minutes to 24 hours in the future. EventBridge Scheduler then invokes CloudFormation `DeleteStack` on this stack only. The Scheduler role is scoped to this stack ARN and trusts only the exact schedule ARN and account. The schedule name is deliberately fixed, so only one lab stack may be active in the account at a time.
 
-Automatic teardown is a guardrail, **not a hard spend cap**. A failed scheduler delivery or failed resource deletion can leave billable resources behind. Verify the stack reaches `DELETE_COMPLETE` after every run.
+The supported deadline window is 15 minutes to 24 hours. Automatic teardown is a guardrail, **not a hard spend cap**. A failed scheduler delivery or failed resource deletion can leave billable resources behind. Verify the stack reaches `DELETE_COMPLETE` after every run.
 
 ## Cost model
 
@@ -48,7 +48,7 @@ Indicative `eu-west-1` baseline, excluding variable query volume, data transfer,
 | DNS Firewall Advanced association | $0.000 — this template uses foundational domain-list rules, not Advanced rules |
 | **Baseline** | **$0.4368/hour** |
 
-A two-hour run therefore has an indicative fixed baseline of about **$0.87**, before variable charges. Network Firewall data processing is approximately $0.065/GB. Standard DNS Firewall query inspection is $0.60 per million queries for the first billion, and customer-managed domain-list entries are $0.0005 per domain-month. AWS's Network Firewall pricing example waives NAT Gateway hourly and data-processing charges for traffic using the same-AZ Network Firewall + NAT path; confirm the actual billing line items after any approved run. This template does not enable TLS Advanced Inspection ($0.489 per endpoint-hour) or DNS Firewall Advanced rules ($0.16 per VPC association-hour).
+A two-hour run therefore has an indicative fixed baseline of about **$0.87**, and a 24-hour run about **$10.48**, before variable charges. Network Firewall data processing is approximately $0.065/GB. Standard DNS Firewall query inspection is $0.60 per million queries for the first billion, and customer-managed domain-list entries are $0.0005 per domain-month. AWS's Network Firewall pricing example waives NAT Gateway hourly and data-processing charges for traffic using the same-AZ Network Firewall + NAT path; confirm the actual billing line items after any approved run. This template does not enable TLS Advanced Inspection ($0.489 per endpoint-hour) or DNS Firewall Advanced rules ($0.16 per VPC association-hour).
 
 Pricing sources: AWS Network Firewall [pricing](https://aws.amazon.com/network-firewall/pricing/), Route 53 [pricing](https://aws.amazon.com/route53/pricing/), VPC [pricing](https://aws.amazon.com/vpc/pricing/), and the connected account's AWS Price List API result for Linux `t4g.medium` in EU (Ireland), effective 2026-11-01.
 
