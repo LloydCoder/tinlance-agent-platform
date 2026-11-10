@@ -175,9 +175,7 @@ def test_snapshot_bucket_has_a_separate_hardened_access_log_destination() -> Non
     )
     assert delivery["Principal"] == {"Service": "logging.s3.amazonaws.com"}
     assert delivery["Action"] == "s3:PutObject"
-    assert delivery["Condition"]["StringEquals"]["aws:SourceAccount"] == {
-        "Ref": "AWS::AccountId"
-    }
+    assert delivery["Condition"]["StringEquals"]["aws:SourceAccount"] == {"Ref": "AWS::AccountId"}
     assert delivery["Condition"]["ArnLike"]["aws:SourceArn"] == {
         "Fn::GetAtt": ["SnapshotBucket", "Arn"]
     }
