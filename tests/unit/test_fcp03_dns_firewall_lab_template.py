@@ -216,15 +216,9 @@ def test_dns_firewall_lab_enables_resolver_query_log_correlation() -> None:
 
     log_group = resources["DNSQueryLogGroup"]["Properties"]
     assert log_group["RetentionInDays"] == 1
-    assert log_group["LogGroupName"] == {
-        "Fn::Sub": "/aws/route53resolver/${AWS::StackName}"
-    }
+    assert log_group["LogGroupName"] == {"Fn::Sub": "/aws/route53resolver/${AWS::StackName}"}
     config = resources["DNSQueryLoggingConfig"]
-    assert config["Properties"]["DestinationArn"] == {
-        "Fn::GetAtt": ["DNSQueryLogGroup", "Arn"]
-    }
+    assert config["Properties"]["DestinationArn"] == {"Fn::GetAtt": ["DNSQueryLogGroup", "Arn"]}
     association = resources["DNSQueryLoggingAssociation"]
     assert association["Properties"]["ResourceId"] == {"Ref": "Vpc"}
-    assert association["Properties"]["ResolverQueryLogConfigId"] == {
-        "Ref": "DNSQueryLoggingConfig"
-    }
+    assert association["Properties"]["ResolverQueryLogConfigId"] == {"Ref": "DNSQueryLoggingConfig"}
