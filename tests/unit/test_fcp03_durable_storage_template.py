@@ -123,9 +123,7 @@ def test_snapshot_bucket_policy_enforces_transport_encryption_and_deletion_contr
     ]["Statement"]
     by_sid = {statement["Sid"]: statement for statement in statements}
 
-    assert by_sid["DenyInsecureTransport"]["Condition"]["Bool"] == {
-        "aws:SecureTransport": "false"
-    }
+    assert by_sid["DenyInsecureTransport"]["Condition"]["Bool"] == {"aws:SecureTransport": "false"}
     assert by_sid["DenyUnencryptedSnapshotUploads"]["Condition"]["StringNotEquals"] == {
         "s3:x-amz-server-side-encryption": "aws:kms"
     }
