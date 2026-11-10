@@ -1,0 +1,115 @@
+name: FCP-03 OpenBao Secret Provider Integration
+
+on:
+  pull_request:
+    paths:
+      - "packages/secrets/**"
+      - "tests/test_openbao_secret_provider*.py"
+      - ".github/workflows/fcp03-openbao-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcp03-openbao-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  openbao-kv-v2:
+    name: OpenBao KV v2 tenant-scoped integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Start disposable OpenBao development server
+        env:
+          OPENBAO_ROOT_TOKEN: ci-only-root-token
+        run: |
+          set -euo pipefail
+          docker run --detach --rm --name fcp03-openbao \
+            --cap-add=IPC_LOCK \
+            --publish 127.0.0.1:8200:8200 \
+            openbao/openbao:2.7.2 \
+            server -dev -dev-listen-address=0.0.0.0:8200 \
+            -dev-root-token-id="$OPENBAO_ROOT_TOKEN"
+
+          ready=0
+          for _ in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:8200/v1/sys/health >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+      - name: Seed versioned tenant secret and issue a least-privilege token
+        env:
+          OPENBAO_ROOT_TOKEN: ci-only-root-token
+        run: |
+          set -euo pipefail
+          api="http://127.0.0.1:8200/v1"
+          curl --fail --silent --show-error --request POST \
+            --header "X-Vault-Token: $OPENBAO_ROOT_TOKEN" \
+            --header "X-Vault-Request: true" \
+            --header "Content-Type: application/json" \
+            --data '{"data":{"value":"version-one"}}' \
+            "$api/secret/data/tenants/tenant-a/fcp03/integration" >/dev/null
+          curl --fail --silent --show-error --request POST \
+            --header "X-Vault-Token: $OPENBAO_ROOT_TOKEN" \
+            --header "X-Vault-Request: true" \
+            --header "Content-Type: application/json" \
+            --data '{"data":{"value":"version-two"}}' \
+            "$api/secret/data/tenants/tenant-a/fcp03/integration" >/dev/null
+
+          policy='path "secret/data/tenants/tenant-a/*" { capabilities = ["read"] }'
+          curl --fail --silent --show-error --request PUT \
+            --header "X-Vault-Token: $OPENBAO_ROOT_TOKEN" \
+            --header "X-Vault-Request: true" \
+            --header "Content-Type: application/json" \
+            --data "$(python -c 'import json,os; print(json.dumps({"policy": os.environ["POLICY"]}))')" \
+            "$api/sys/policies/acl/fcp03-tenant-a-reader" >/dev/null
+          curl --fail --silent --show-error --request POST \
+            --header "X-Vault-Token: $OPENBAO_ROOT_TOKEN" \
+            --header "X-Vault-Request: true" \
+            --header "Content-Type: application/json" \
+            --data '{"policies":["fcp03-tenant-a-reader"],"ttl":"5m","renewable":false}' \
+            "$api/auth/token/create" > /tmp/fcp03-openbao-token.json
+
+          token="$(python -c 'import json; print(json.load(open("/tmp/fcp03-openbao-token.json"))["auth"]["client_token"])')"
+          echo "::add-mask::$token"
+          {
+            echo "OPENBAO_TEST_ADDR=http://127.0.0.1:8200"
+            echo "OPENBAO_TEST_TOKEN=$token"
+          } >> "$GITHUB_ENV"
+        env:
+          OPENBAO_ROOT_TOKEN: ci-only-root-token
+          POLICY: path "secret/data/tenants/tenant-a/*" { capabilities = ["read"] }
+
+      - name: Install project test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Run OpenBao provider unit and live integration tests
+        run: |
+          set -euo pipefail
+          pytest -q tests/test_openbao_secret_provider.py tests/test_openbao_secret_provider_integration.py
+
+      - name: Print OpenBao diagnostics on failure
+        if: failure()
+        run: docker logs fcp03-openbao
+
+      - name: Stop disposable OpenBao server
+        if: always()
+        run: docker rm --force fcp03-openbao >/dev/null 2>&1 || true
