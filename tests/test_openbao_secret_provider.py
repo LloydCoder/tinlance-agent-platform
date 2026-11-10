@@ -285,7 +285,9 @@ def test_openbao_rejects_version_mismatch_and_malformed_payload(
     monkeypatch.setattr(
         openbao_module,
         "urlopen",
-        lambda request, *, timeout, context: _Response(\n            {"data": {"data": []}}, url=request.full_url\n        ),
+        lambda request, *, timeout, context: _Response(
+            {"data": {"data": []}}, url=request.full_url
+        ),
     )
     with pytest.raises(SecretResolutionError):
         provider.resolve(_handle())
