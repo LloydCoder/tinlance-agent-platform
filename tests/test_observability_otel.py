@@ -42,9 +42,7 @@ class FakeHistogram:
     def __init__(self) -> None:
         self.records: list[tuple[float, dict[str, object] | None]] = []
 
-    def record(
-        self, amount: float, attributes: dict[str, object] | None = None
-    ) -> None:
+    def record(self, amount: float, attributes: dict[str, object] | None = None) -> None:
         self.records.append((amount, attributes))
 
 
