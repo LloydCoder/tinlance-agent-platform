@@ -18,12 +18,12 @@ def _test_configuration() -> tuple[str, str]:
     return address, token
 
 
-def _handle(version: str) -> ScopedSecretHandle:
+def _handle(version: str, tenant_id: str = "tenant-a") -> ScopedSecretHandle:
     now = datetime.now(UTC)
     return ScopedSecretHandle(
         name="fcp03/integration",
         version=version,
-        tenant_id="tenant-a",
+        tenant_id=tenant_id,
         principal_id="ci-principal",
         agent_id=uuid4(),
         execution_id=uuid4(),
@@ -60,6 +60,21 @@ def test_openbao_kv_v2_reads_pinned_versions_through_scoped_broker() -> None:
 
     assert _resolve(broker, _handle("1")) == "version-one"
     assert _resolve(broker, _handle("2")) == "version-two"
+
+
+
+def test_openbao_token_policy_denies_another_tenant() -> None:
+    address, token = _test_configuration()
+    provider = OpenBaoSecretProvider(
+        base_url=address,
+        token_provider=lambda: token,
+        allow_insecure_loopback=True,
+    )
+    broker = ScopedSecretBroker(provider)
+    handle = _handle("1", tenant_id="tenant-b")
+
+    with pytest.raises(PermissionError):
+        _resolve(broker, handle)
 
 
 def test_openbao_scoped_broker_rejects_cross_tenant_context() -> None:
