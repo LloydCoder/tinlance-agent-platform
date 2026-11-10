@@ -173,7 +173,6 @@ def test_openbao_rejects_credentials_in_base_url() -> None:
         )
 
 
-
 def test_openbao_rejects_tenant_path_injection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -291,7 +290,6 @@ def test_openbao_rejects_version_mismatch_and_malformed_payload(
     )
     with pytest.raises(SecretResolutionError):
         provider.resolve(_handle())
-
 
 
 def test_openbao_rejects_redirected_response(
