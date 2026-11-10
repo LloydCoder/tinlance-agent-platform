@@ -1,3 +1,4 @@
+from .openbao import OpenBaoSecretProvider
 from .broker import SecretBroker, SecretHandle
 from .model_provider import ModelCredentialRequest, ScopedModelCredentialProvider
 from .scoped import (
@@ -8,6 +9,7 @@ from .scoped import (
 )
 
 __all__ = [
+    "OpenBaoSecretProvider",
     "ScopedSecretBroker",
     "ScopedModelCredentialProvider",
     "ModelCredentialRequest",
