@@ -207,7 +207,9 @@ echo "FCP03_RESOLVER_READY=PASS"
 # Positive DNS and HTTPS controls.
 allowed_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short)"
 test "$allowed_answer" = "10.203.0.10"
-echo "FCP03_ALLOWED_DNS_ANSWER=PASS"
+allowed_tcp_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +tcp +time=1 +tries=1 +short)"
+test "$allowed_tcp_answer" = "10.203.0.10"
+echo "FCP03_ALLOWED_DNS_UDP_TCP=PASS"
 https_marker="$(FCP03_CA_CERT="$ca_cert" ip netns exec "$worker_ns" python3 - <<'PY'
 import os
 import socket
