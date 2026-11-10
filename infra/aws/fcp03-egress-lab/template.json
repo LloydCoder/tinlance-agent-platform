@@ -1126,5 +1126,28 @@
     "SafetyNote": {
       "Value": "One AZ only. Worker has no public IP or IPv6. Stack self-deletes at the required UTC time. Deployment still requires a separate cost and test approval."
     }
+  },
+  "Rules": {
+    "BlockedProbeMustNotBeApproved": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  {
+                    "Ref": "ApprovedDomains"
+                  },
+                  {
+                    "Ref": "BlockedProbeDomain"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "BlockedProbeDomain must not appear in ApprovedDomains."
+        }
+      ]
+    }
   }
 }
