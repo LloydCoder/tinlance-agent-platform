@@ -11,8 +11,8 @@ import json
 import math
 import re
 import ssl
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
