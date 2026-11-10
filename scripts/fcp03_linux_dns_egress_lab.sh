@@ -242,7 +242,7 @@ with socket.create_connection(("10.203.0.10", 443), timeout=1) as raw:
 PY
 )"
 test "$https_marker" = "FCP03-HTTPS-CERTIFICATE-AND-SNI-VERIFIED"
-echo "FCP03_APPROVED_HTTPS_TLS_SNI=PASS"
+echo "FCP03_APPROVED_HTTPS_TLS_HOSTNAME_VALIDATION=PASS"
 
 # DNS query policy is evaluated separately from packet-path policy.
 blocked_dns="$(ip netns exec "$worker_ns" dig @10.203.0.1 blocked.test A +time=1 +tries=1 +noall +comments)"
@@ -365,9 +365,9 @@ printf 'FCP03_LOCAL_DNS_ALLOW=PASS\n'
 printf 'FCP03_LOCAL_DNS_BLOCK_NXDOMAIN=PASS\n'
 printf 'FCP03_DNS_REBINDING_RESOLUTION=OBSERVED\n'
 printf 'FCP03_DNS_QUERY_LOG_CORRELATION=PASS\n'
-printf 'FCP03_APPROVED_HTTPS_TLS_SNI=PASS\n'
+printf 'FCP03_APPROVED_HTTPS_TLS_HOSTNAME_VALIDATION=PASS\n'
 printf 'FCP03_DIRECT_DNS_UDP_TCP_BYPASS=BLOCKED\n'
-printf 'FCP03_DOH_DIRECT_IP_BYPASS=BLOCKED_BY_EGRESS_POLICY\n'
+printf 'FCP03_DOH_ENDPOINT_IP_TCP443=BLOCKED\n'
 printf 'FCP03_DOT_853=BLOCKED\n'
 printf 'FCP03_QUIC_UDP443=BLOCKED\n'
 printf 'FCP03_METADATA_DESTINATION=BLOCKED\n'
