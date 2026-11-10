@@ -77,9 +77,7 @@ class JWKSPrincipalResolver:
         method: str,
         uri: str,
     ) -> Principal:
-        return self._resolve(
-            bearer_token, dpop_proof=dpop_proof, method=method, uri=uri
-        )
+        return self._resolve(bearer_token, dpop_proof=dpop_proof, method=method, uri=uri)
 
     def _resolve(
         self,
@@ -142,12 +140,7 @@ class JWKSPrincipalResolver:
                     "DPoP proof cannot be used with an unbound bearer token"
                 )
             return
-        if (
-            self.dpop_verifier is None
-            or dpop_proof is None
-            or method is None
-            or uri is None
-        ):
+        if self.dpop_verifier is None or dpop_proof is None or method is None or uri is None:
             raise IdentityAuthenticationError(
                 "sender-constrained access token requires a DPoP proof"
             )
