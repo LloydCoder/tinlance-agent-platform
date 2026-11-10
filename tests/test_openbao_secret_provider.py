@@ -90,7 +90,7 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
     request = seen["request"]
     assert isinstance(request, Request)
     assert request.full_url == (
-        "https://bao.example:8200/v1/secret/data/team/model-provider?version=3"
+        "https://bao.example:8200/v1/secret/data/tenants/tenant-a/team/model-provider?version=3"
     )
     assert request.get_method() == "GET"
     assert request.unredirected_hdrs.get("X-Vault-Token") == "test-token"
@@ -171,6 +171,48 @@ def test_openbao_rejects_credentials_in_base_url() -> None:
             base_url="https://user:password@bao.example:8200",
             token_provider=lambda: "test-token",
         )
+
+
+
+def test_openbao_rejects_tenant_path_injection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    def forbidden_urlopen(
+        request: Request,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+    ) -> _Response:
+        nonlocal called
+        called = True
+        raise AssertionError("network request must not be attempted")
+
+    monkeypatch.setattr(openbao_module, "urlopen", forbidden_urlopen)
+    provider = OpenBaoSecretProvider(
+        base_url="https://bao.example:8200",
+        token_provider=lambda: "test-token",
+    )
+    with pytest.raises(SecretResolutionError):
+        provider.resolve(_handle())
+    with pytest.raises(SecretResolutionError):
+        provider.resolve(
+            ScopedSecretHandle(
+                name="secret",
+                version="1",
+                tenant_id="../tenant-b",
+                principal_id="principal-a",
+                agent_id=uuid4(),
+                execution_id=uuid4(),
+                capability_id="model:invoke",
+                purpose="model:invoke",
+                audience="https://api.example",
+                issued_at=datetime.now(UTC) - timedelta(seconds=1),
+                expires_at=datetime.now(UTC) + timedelta(minutes=5),
+            )
+        )
+    assert called is False
 
 
 def test_openbao_rejects_token_header_injection(
