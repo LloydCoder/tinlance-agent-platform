@@ -124,7 +124,9 @@ class DPoPProofVerifier:
         try:
             issued_at = datetime.fromtimestamp(issued_at_value, UTC)
         except (OverflowError, OSError, ValueError) as exc:
-            raise PermissionError(\n                "DPoP proof issued-at claim is outside the supported range"\n            ) from exc
+            raise PermissionError(
+                "DPoP proof issued-at claim is outside the supported range"
+            ) from exc
         if (
             issued_at > current + timedelta(seconds=self.clock_skew_seconds)
             or issued_at < current - timedelta(seconds=self.max_age_seconds)
