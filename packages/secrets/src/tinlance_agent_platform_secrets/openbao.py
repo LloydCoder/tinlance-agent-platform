@@ -13,7 +13,7 @@ import re
 import ssl
 from dataclasses import dataclass, field
 from typing import Callable
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
@@ -132,7 +132,7 @@ class OpenBaoSecretProvider:
             if exc.code == 404:
                 raise SecretResolutionError("OpenBao secret version was not found") from None
             raise SecretResolutionError("OpenBao secret request failed") from None
-        except (URLError, TimeoutError, OSError, ssl.SSLError):
+        except OSError:
             raise SecretResolutionError("OpenBao secret transport failed") from None
 
         if len(body) > self.max_response_bytes:
