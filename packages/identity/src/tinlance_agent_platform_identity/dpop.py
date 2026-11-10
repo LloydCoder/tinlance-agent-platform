@@ -14,7 +14,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from urllib.parse import urlsplit
 
-import jwt
 
 
 _ALLOWED_DPOP_ALGORITHMS = frozenset({"ES256", "RS256", "PS256", "EdDSA"})
@@ -80,6 +79,8 @@ class DPoPProofVerifier:
             raise PermissionError("DPoP request context is malformed")
 
         try:
+            import jwt
+
             header = jwt.get_unverified_header(proof)
             if header.get("typ") != "dpop+jwt":
                 raise PermissionError("DPoP proof type is not trusted")
@@ -197,6 +198,8 @@ class DPoPProofVerifier:
         if kty == "OKP" and (jwk.get("crv") != "Ed25519" or algorithm != "EdDSA"):
             raise PermissionError("DPoP OKP keys must use Ed25519 with EdDSA")
         try:
+            import jwt
+
             key = jwt.PyJWK.from_dict(jwk, algorithm=algorithm).key
         except Exception as exc:
             raise PermissionError("DPoP public JWK cannot be imported") from exc
