@@ -161,6 +161,10 @@ class JWKSIdentityVerifier:
             raise PermissionError("identity assertion is malformed")
         try:
             header = jwt.get_unverified_header(assertion)
+            if "crit" in header or "b64" in header:
+                raise PermissionError("identity token uses an unsupported JOSE critical header")
+            if {"jku", "x5u", "jwk", "x5c"}.intersection(header):
+                raise PermissionError("identity token contains an untrusted key-source header")
             if self.expected_typ is not None:
                 actual_typ = header.get("typ")
                 if (
