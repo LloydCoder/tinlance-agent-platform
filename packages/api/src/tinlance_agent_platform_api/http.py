@@ -247,13 +247,16 @@ def serve(
                             raise AuthenticationError("DPoP public request target is unavailable")
                         dpop_uri = f"{normalized_public_origin}{self.path}"
                     try:
-                        session_revoker.revoke_session(
-                            token,
-                            request_id=request_id,
-                            dpop_proof=dpop_proof,
-                            method="POST" if dpop_proof is not None else None,
-                            uri=dpop_uri,
-                        )
+                        if dpop_proof is None:
+                            session_revoker.revoke_session(token, request_id=request_id)
+                        else:
+                            session_revoker.revoke_session(
+                                token,
+                                request_id=request_id,
+                                dpop_proof=dpop_proof,
+                                method="POST",
+                                uri=dpop_uri,
+                            )
                     except PermissionError as exc:
                         raise AuthenticationError(
                             "bearer identity could not be authenticated"
