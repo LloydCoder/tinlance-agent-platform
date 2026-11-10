@@ -31,6 +31,7 @@ worker_if="f3w${suffix}"
 resolver_if="f3d${suffix}"
 config_file="$(mktemp /tmp/fcp03-unbound.XXXXXX.conf)"
 log_file="$(mktemp /tmp/fcp03-unbound.XXXXXX.log)"
+stderr_file="$(mktemp /tmp/fcp03-unbound-stderr.XXXXXX.log)"
 server_file="$(mktemp /tmp/fcp03-https.XXXXXX.py)"
 resolver_pid=""
 server_pid=""
@@ -52,6 +53,11 @@ cleanup() {
       tail -n 80 "$log_file" >&2
       echo "FCP03_UNBOUND_LOG_END" >&2
     fi
+    if [[ -f "$stderr_file" ]]; then
+      echo "FCP03_UNBOUND_STDERR_BEGIN" >&2
+      tail -n 80 "$stderr_file" >&2
+      echo "FCP03_UNBOUND_STDERR_END" >&2
+    fi
     if ip netns list | grep -Fq "$worker_ns"; then
       echo "FCP03_WORKER_NFT_DIAGNOSTICS" >&2
       ip netns exec "$worker_ns" nft list ruleset >&2
@@ -69,7 +75,7 @@ cleanup() {
   ip netns del "$worker_ns" >/dev/null 2>&1
   ip netns del "$resolver_ns" >/dev/null 2>&1
   ip link del "$worker_if" >/dev/null 2>&1
-  rm -f "$config_file" "$log_file" "$server_file"
+  rm -f "$config_file" "$log_file" "$stderr_file" "$server_file"
 }
 trap cleanup EXIT
 
@@ -90,10 +96,12 @@ ip netns exec "$worker_ns" ip link set eth0 up
 ip netns exec "$resolver_ns" ip link set eth0 up
 ip netns exec "$worker_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
 ip netns exec "$resolver_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
+ip netns exec "$worker_ns" ip route add default via 10.203.0.1 dev eth0
 
-# There must be no default route in either namespace. The only connected path
-# is the private veth; host forwarding is untouched and remains outside the lab.
-test -z "$(ip netns exec "$worker_ns" ip route show default)"
+# The worker default route terminates at the isolated resolver namespace.
+# That namespace has forwarding disabled and no default route, so no packet
+# can leave the two-namespace lab or reach the host/external network.
+test "$(ip netns exec "$worker_ns" ip route show default)" = "default via 10.203.0.1 dev eth0"
 test -z "$(ip netns exec "$resolver_ns" ip route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 addr show scope global)"
@@ -112,7 +120,7 @@ server:
   directory: "/tmp"
   logfile: "/tmp/fcp03-unbound-runtime.log"
   pidfile: "/tmp/fcp03-unbound-runtime.pid"
-  verbosity: 1
+  verbosity: 2
   log-queries: yes
   log-replies: yes
   hide-identity: yes
@@ -131,7 +139,7 @@ UNBOUND
 # Use a namespace-specific runtime logfile to avoid touching host /tmp state.
 sed -i "s|/tmp/fcp03-unbound-runtime.log|$log_file|; s|/tmp/fcp03-unbound-runtime.pid|/tmp/fcp03-unbound-${suffix}.pid|" "$config_file"
 unbound-checkconf "$config_file"
-ip netns exec "$resolver_ns" unbound -d -c "$config_file" >/dev/null 2>&1 &
+ip netns exec "$resolver_ns" unbound -d -vv -c "$config_file" >"$stderr_file" 2>&1 &
 resolver_pid="$!"
 
 cat >"$server_file" <<'PY'
