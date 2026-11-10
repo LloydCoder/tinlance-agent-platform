@@ -2,9 +2,9 @@
 # FCP-03 provider-neutral Linux DNS + egress policy integration lab.
 #
 # Runs two disposable network namespaces joined by a private veth:
-#   worker -> dedicated Unbound policy resolver + local HTTPS test endpoint
-# No namespace has a default route, no forwarding is enabled, and no host
-# firewall, route, Docker network, or existing service is modified.
+#   worker -> dedicated dnsmasq policy resolver + local TCP/443 test endpoint
+# The resolver namespace has no default route or forwarding. The worker's default route
+# terminates at that sink. No host firewall, route, Docker network, or existing service is modified.
 #
 # This proves local Linux kernel/DNS policy behavior only. It is NOT evidence
 # of AWS Network Firewall, AWS Route 53 DNS Firewall, production deployment,
@@ -30,7 +30,6 @@ resolver_ns="fcp03-d-${suffix}"
 worker_if="f3w${suffix}"
 resolver_if="f3d${suffix}"
 log_file="/tmp/fcp03-dnsmasq-${suffix}.log"
-stderr_file="$(mktemp /tmp/fcp03-unbound-stderr.XXXXXX.log)"
 server_file="$(mktemp /tmp/fcp03-https.XXXXXX.py)"
 resolver_pid=""
 server_pid=""
@@ -48,14 +47,9 @@ cleanup() {
   if [[ "$status" -ne 0 ]]; then
     echo "FCP03_LAB_FAILURE_STATUS=$status" >&2
     if [[ -f "$log_file" ]]; then
-      echo "FCP03_UNBOUND_LOG_BEGIN" >&2
+      echo "FCP03_DNSMASQ_LOG_BEGIN" >&2
       tail -n 80 "$log_file" >&2
-      echo "FCP03_UNBOUND_LOG_END" >&2
-    fi
-    if [[ -f "$stderr_file" ]]; then
-      echo "FCP03_UNBOUND_STDERR_BEGIN" >&2
-      tail -n 80 "$stderr_file" >&2
-      echo "FCP03_UNBOUND_STDERR_END" >&2
+      echo "FCP03_DNSMASQ_LOG_END" >&2
     fi
     if ip netns list | grep -Fq "$worker_ns"; then
       echo "FCP03_WORKER_NFT_DIAGNOSTICS" >&2
@@ -75,7 +69,7 @@ cleanup() {
   ip netns del "$worker_ns" >/dev/null 2>&1
   ip netns del "$resolver_ns" >/dev/null 2>&1
   ip link del "$worker_if" >/dev/null 2>&1
-  rm -f "$log_file" "$stderr_file" "$server_file"
+  rm -f "$log_file" "$server_file"
 }
 trap cleanup EXIT
 
@@ -118,11 +112,11 @@ ip netns exec "$resolver_ns" dnsmasq \
   --port=5353 \
   --user=unbound \
   --log-queries \
-  --log-facility="$log_file" \
+  --log-facility=- \
   --address=/allowed.test/10.203.0.10 \
   --address=/blocked.test/ \
   --address=/rebind.test/203.0.113.10 \
-  --address=/metadata.test/169.254.169.254 >"$stderr_file" 2>&1 &
+  --address=/metadata.test/169.254.169.254 >"$log_file" 2>&1 &
 resolver_pid="$!"
 
 cat >"$server_file" <<'PY'
