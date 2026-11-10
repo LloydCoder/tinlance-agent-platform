@@ -164,21 +164,11 @@
                         ".amazonaws.com"
                       ]
                     ]
-                  }
-                },
-                "StringLike": {
+                  },
                   "kms:EncryptionContext:aws:s3:arn": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        {
-                          "Fn::GetAtt": [
-                            "SnapshotBucket",
-                            "Arn"
-                          ]
-                        },
-                        "/tinlance/workspace-snapshots/v1/*"
-                      ]
+                    "Fn::GetAtt": [
+                      "SnapshotBucket",
+                      "Arn"
                     ]
                   }
                 }
