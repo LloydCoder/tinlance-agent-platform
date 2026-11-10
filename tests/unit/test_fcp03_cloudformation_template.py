@@ -311,7 +311,7 @@ def test_known_doh_resolvers_are_denied_before_the_approved_domain_allowlist() -
         "doh.opendns.com",
         "dns.nextdns.io",
     } <= set(rules_source["Targets"])
-    assert [reference["Priority"] for reference in ordered] == [0, 1]
+    assert [reference["Priority"] for reference in ordered] == [1, 2]
     assert ordered[0]["ResourceArn"] == {
         "Fn::GetAtt": ["DoHResolverBlockRuleGroup", "RuleGroupArn"]
     }
