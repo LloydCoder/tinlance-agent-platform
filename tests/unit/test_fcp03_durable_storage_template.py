@@ -97,9 +97,9 @@ def test_kms_policy_separates_service_data_use_from_grant_creation() -> None:
 
     s3_data = by_sid["WorkloadS3SnapshotDataEncryption"]
     assert "kms:CreateGrant" not in s3_data["Action"]
-    assert s3_data["Condition"]["StringLike"]["kms:EncryptionContext:aws:s3:arn"][
-        "Fn::Join"
-    ]
+    assert s3_data["Condition"]["StringEquals"]["kms:EncryptionContext:aws:s3:arn"] == {
+        "Fn::GetAtt": ["SnapshotBucket", "Arn"]
+    }
     s3_grant = by_sid["WorkloadS3SnapshotGrant"]
     assert s3_grant["Action"] == "kms:CreateGrant"
     assert s3_grant["Condition"]["Bool"]["kms:GrantIsForAWSResource"] == "true"
