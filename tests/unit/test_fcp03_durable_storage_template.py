@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import typing
 
 
@@ -133,6 +134,7 @@ def test_snapshot_bucket_policy_denies_insecure_transport_wrong_encryption_and_v
         "s3:x-amz-server-side-encryption-aws-kms-key-id"
     ] == {"Fn::GetAtt": ["DataKey", "Arn"]}
     assert by_sid["DenyVersionDeletion"]["Action"] == "s3:DeleteObjectVersion"
+    assert by_sid["DenySnapshotObjectDeletion"]["Action"] == "s3:DeleteObject"
 
 
 def test_data_key_policy_does_not_create_resource_dependency_cycles() -> None:
@@ -142,3 +144,13 @@ def test_data_key_policy_does_not_create_resource_dependency_cycles() -> None:
     assert "TokenRevocationTable" not in encoded
     assert "DPoPReplayTable" not in encoded
     assert "SnapshotBucket" not in encoded
+
+
+def test_workload_role_arn_rejects_wildcard_principals() -> None:
+    pattern = load_template()["Parameters"]["WorkloadRoleArn"]["AllowedPattern"]
+
+    assert re.fullmatch(
+        pattern,
+        "arn:aws:iam::123456789012:role/agent-platform-production",
+    )
+    assert not re.fullmatch(pattern, "arn:aws:iam::123456789012:role/*")
