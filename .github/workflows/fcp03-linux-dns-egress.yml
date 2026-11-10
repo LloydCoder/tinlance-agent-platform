@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   isolated-linux-policy:
-    name: Unbound RPZ-equivalent DNS policy and nftables egress lab
+    name: Unbound local-zone DNS policy and nftables egress lab
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
