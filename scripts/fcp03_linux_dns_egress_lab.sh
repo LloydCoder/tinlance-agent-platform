@@ -12,7 +12,7 @@
 
 set -Eeuo pipefail
 
-for command in ip nft sysctl unbound unbound-checkconf dig python3 sha256sum awk grep runuser; do
+for command in ip nft sysctl dnsmasq dig python3 sha256sum awk grep; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'missing required command: %s\n' "$command" >&2
     exit 2
@@ -29,8 +29,7 @@ worker_ns="fcp03-w-${suffix}"
 resolver_ns="fcp03-d-${suffix}"
 worker_if="f3w${suffix}"
 resolver_if="f3d${suffix}"
-config_file="$(mktemp /tmp/fcp03-unbound.XXXXXX.conf)"
-log_file="/tmp/fcp03-unbound-${suffix}.log"
+log_file="/tmp/fcp03-dnsmasq-${suffix}.log"
 stderr_file="$(mktemp /tmp/fcp03-unbound-stderr.XXXXXX.log)"
 server_file="$(mktemp /tmp/fcp03-https.XXXXXX.py)"
 resolver_pid=""
@@ -76,7 +75,7 @@ cleanup() {
   ip netns del "$worker_ns" >/dev/null 2>&1
   ip netns del "$resolver_ns" >/dev/null 2>&1
   ip link del "$worker_if" >/dev/null 2>&1
-  rm -f "$config_file" "$log_file" "$stderr_file" "$server_file"
+  rm -f "$log_file" "$stderr_file" "$server_file"
 }
 trap cleanup EXIT
 
@@ -108,44 +107,22 @@ test -z "$(ip netns exec "$resolver_ns" ip route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 addr show scope global)"
 
-cat >"$config_file" <<'UNBOUND'
-server:
-  interface: 10.203.0.1
-  port: 5353
-  do-ip4: yes
-  do-ip6: no
-  do-udp: yes
-  do-tcp: yes
-  access-control: 10.203.0.2/32 allow
-  username: "unbound"
-  chroot: "/"
-  directory: "/tmp"
-  logfile: "/tmp/fcp03-unbound-runtime.log"
-  pidfile: "/tmp/fcp03-unbound-runtime.pid"
-  verbosity: 2
-  log-queries: yes
-  log-replies: yes
-  hide-identity: yes
-  hide-version: yes
-  harden-glue: yes
-  harden-dnssec-stripped: yes
-  local-zone: "allowed.test." redirect
-  local-data: "allowed.test. 60 IN A 10.203.0.10"
-  local-zone: "blocked.test." always_nxdomain
-  local-zone: "rebind.test." redirect
-  local-data: "rebind.test. 60 IN A 203.0.113.10"
-  local-zone: "metadata.test." redirect
-  local-data: "metadata.test. 60 IN A 169.254.169.254"
-UNBOUND
-
-# Use a namespace-specific runtime logfile to avoid touching host /tmp state.
-sed -i "s|/tmp/fcp03-unbound-runtime.log|$log_file|; s|/tmp/fcp03-unbound-runtime.pid|/tmp/fcp03-unbound-${suffix}.pid|" "$config_file"
-chown unbound:unbound "$config_file"
-chmod 640 "$config_file"  # Test-only resolver config contains no credentials.
-runuser -u unbound -- test -r "$config_file"
-ip netns exec "$resolver_ns" runuser -u unbound -- test -r "$config_file"
-unbound-checkconf "$config_file"
-ip netns exec "$resolver_ns" runuser -u unbound -- unbound -d -vv -c "$config_file" >"$stderr_file" 2>&1 &
+ip netns exec "$resolver_ns" dnsmasq \
+  --no-daemon \
+  --no-pid \
+  --no-resolv \
+  --no-hosts \
+  --no-poll \
+  --bind-interfaces \
+  --listen-address=10.203.0.1 \
+  --port=5353 \
+  --user=unbound \
+  --log-queries \
+  --log-facility="$log_file" \
+  --address=/allowed.test/10.203.0.10 \
+  --address=/blocked.test/ \
+  --address=/rebind.test/203.0.113.10 \
+  --address=/metadata.test/169.254.169.254 >"$stderr_file" 2>&1 &
 resolver_pid="$!"
 
 cat >"$server_file" <<'PY'
