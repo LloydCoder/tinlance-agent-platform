@@ -1004,3 +1004,18 @@ def test_collector_rejects_multiple_route_target_fields(extra_target: object) ->
 
     assert snapshot["worker"]["route_entries"][1]["target"] is None
     assert "worker-route-inventory-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+def test_all_pages_rejects_a_missing_result_collection() -> None:
+    client = FakeClient({"describe_instances": [{}]})
+
+    with pytest.raises(ValueError, match="omitted Reservations collection"):
+        _all_pages(client, "describe_instances", "Reservations")
+
+
+@pytest.mark.parametrize("value", [None, {}, "not-a-list"])
+def test_all_pages_rejects_a_malformed_result_collection(value: object) -> None:
+    client = FakeClient({"describe_instances": [{"Reservations": value}]})
+
+    with pytest.raises(ValueError, match="invalid Reservations collection"):
+        _all_pages(client, "describe_instances", "Reservations")
