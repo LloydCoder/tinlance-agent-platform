@@ -29,3 +29,15 @@ flowchart LR
 - SLO/error-budget measurement remains operational governance and never grants execution authority.
 
 The controls directly address OWASP MCP Top 10 MCP08 (lack of audit/telemetry) and NIST's agent-security emphasis on attributable auditing.
+
+## Production OpenTelemetry adapter
+
+`OpenTelemetryObservabilitySink` accepts the application's configured OpenTelemetry tracer, meter and logger objects. The application remains responsible for configuring SDK providers, OTLP exporters, resource identity, sampling, collector endpoints, TLS/authentication, retention and alert routing.
+
+- Completed spans are exported with start/end timestamps and tenant/run correlation attributes.
+- When a W3C trace ID is supplied, a context factory is mandatory. The application must build the proper OpenTelemetry parent/root context; the adapter does not fabricate or silently drop parent context.
+- Metrics use histograms, cache instruments by name, reject unit changes for an existing name, cap instrument creation at 64 by default (hard maximum 256), and deliberately omit tenant IDs as metric dimensions to limit cardinality.
+- Security events are emitted as structured OTel log records with tenant, actor, trace, run, execution, incident, severity and outcome correlation. Secret payloads are not accepted or copied.
+- The in-memory sink remains useful for tests; it is not a production telemetry backend.
+
+This adapter provides the instrumentation bridge, not production observability acceptance. FCP-03 still requires configured exporters/collectors, durable retention, redaction review, dashboards, security-event correlation, SLOs, alerts, incident response, operational ownership and failure-mode testing.
