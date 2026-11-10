@@ -505,6 +505,15 @@
             {
               "ResourceArn": {
                 "Fn::GetAtt": [
+                  "DoHResolverBlockRuleGroup",
+                  "RuleGroupArn"
+                ]
+              },
+              "Priority": 0
+            },
+            {
+              "ResourceArn": {
+                "Fn::GetAtt": [
                   "ResolvedDomainRuleGroup",
                   "RuleGroupArn"
                 ]
@@ -727,7 +736,7 @@
         "UserData": {
           "Fn::Base64": {
             "Fn::Sub": [
-              "#!/bin/bash\nset -u\nexec > >(tee /dev/console | logger -t fcp03-bootstrap -s 2>/dev/console) 2>&1\nprintf '%s\\n' 'FCP03_BOOTSTRAP_START metadata_endpoint=disabled instance_profile=none'\nprintf '%s\\n' 'FCP03_TEST_DNS_BEGIN'\nif getent ahostsv4 '${ApprovedProbeDomain}' >/dev/null 2>&1; then printf '%s\\n' 'FCP03_TEST_DNS_APPROVED=PASS'; else printf '%s\\n' 'FCP03_TEST_DNS_APPROVED=FAIL'; fi\nprintf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED_BEGIN'\nif timeout 12 curl --fail --silent --show-error --connect-timeout 5 --max-time 10 'https://${ApprovedProbeDomain}/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED=PASS'; else printf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED=FAIL'; fi\nprintf '%s\\n' 'FCP03_TEST_DIRECT_IP_BEGIN'\nif timeout 8 curl --insecure --silent --show-error --connect-timeout 3 --max-time 6 'https://1.1.1.1/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_DIRECT_IP=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_DIRECT_IP=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_BOOTSTRAP_COMPLETE retrieve_with_ec2_get_console_output=true'",
+              "#!/bin/bash\nset -u\nexec > >(tee /dev/console | logger -t fcp03-bootstrap -s 2>/dev/console) 2>&1\nprintf '%s\\n' 'FCP03_BOOTSTRAP_START metadata_endpoint=disabled instance_profile=none'\nprintf '%s\\n' 'FCP03_TEST_DNS_BEGIN'\nif getent ahostsv4 '${ApprovedProbeDomain}' >/dev/null 2>&1; then printf '%s\\n' 'FCP03_TEST_DNS_APPROVED=PASS'; else printf '%s\\n' 'FCP03_TEST_DNS_APPROVED=FAIL'; fi\nprintf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED_BEGIN'\nif timeout 12 curl --fail --silent --show-error --connect-timeout 5 --max-time 10 'https://${ApprovedProbeDomain}/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED=PASS'; else printf '%s\\n' 'FCP03_TEST_HTTPS_APPROVED=FAIL'; fi\nprintf '%s\\n' 'FCP03_TEST_DIRECT_IP_BEGIN'\nif timeout 8 curl --insecure --silent --show-error --connect-timeout 3 --max-time 6 'https://1.1.1.1/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_DIRECT_IP=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_DIRECT_IP=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_TEST_DOH_BEGIN'\nif timeout 8 curl --silent --show-error --connect-timeout 3 --max-time 6 -H 'accept: application/dns-message' 'https://cloudflare-dns.com/dns-query?name=example.com&type=A' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_DOH=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_DOH=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_TEST_DOT_BEGIN'\nif timeout 5 bash -c 'echo > /dev/tcp/1.1.1.1/853' 2>/dev/null; then printf '%s\\n' 'FCP03_TEST_DOT=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_DOT=BLOCKED_OR_UNAVAILABLE_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_TEST_QUIC_BEGIN'\nif curl --version | grep -q HTTP3; then if timeout 8 curl --http3-only --silent --show-error --connect-timeout 3 --max-time 6 'https://cloudflare-dns.com/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_QUIC=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_QUIC=BLOCKED_OR_UNAVAILABLE_REQUIRES_FLOW_EVIDENCE'; fi; else printf '%s\\n' 'FCP03_TEST_QUIC=UNSUPPORTED_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_TEST_IPV6_BEGIN'\nif timeout 8 curl -6 --silent --show-error --connect-timeout 3 --max-time 6 'https://example.com/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_IPV6=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_IPV6=NO_ROUTE_OR_UNAVAILABLE_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_TEST_IMDS_BEGIN'\nif timeout 4 curl --silent --show-error --connect-timeout 2 --max-time 3 'http://169.254.169.254/latest/meta-data/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_IMDS=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_IMDS=BLOCKED'; fi\nprintf '%s\\n' 'FCP03_TEST_DNS_REBIND_BEGIN'\nif timeout 8 curl --insecure --silent --show-error --connect-timeout 3 --max-time 6 --resolve '${ApprovedProbeDomain}:443:1.1.1.1' 'https://${ApprovedProbeDomain}/' -o /dev/null; then printf '%s\\n' 'FCP03_TEST_DNS_REBIND=UNEXPECTED_PASS'; else printf '%s\\n' 'FCP03_TEST_DNS_REBIND=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE'; fi\nprintf '%s\\n' 'FCP03_BOOTSTRAP_COMPLETE retrieve_with_ec2_get_console_output=true'",
               {
                 "ApprovedProbeDomain": {
                   "Fn::Select": [
@@ -1020,6 +1029,61 @@
         "RuleAction": "deny",
         "Egress": false,
         "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "DoHResolverBlockRuleGroup": {
+      "Type": "AWS::NetworkFirewall::RuleGroup",
+      "Properties": {
+        "RuleGroupName": {
+          "Fn::Sub": "${AWS::StackName}-doh-resolver-blocklist"
+        },
+        "Capacity": 100,
+        "Description": "Deny known public DNS-over-HTTPS resolver hostnames before the approved HTTPS destination allowlist.",
+        "RuleGroup": {
+          "RulesSource": {
+            "RulesSourceList": {
+              "Targets": [
+                "cloudflare-dns.com",
+                "*.cloudflare-dns.com",
+                "dns.google",
+                "dns.quad9.net",
+                "*.quad9.net",
+                "doh.opendns.com",
+                "doh.cleanbrowsing.org",
+                "dns.adguard.com",
+                "dns.adguard-dns.com",
+                "dns.nextdns.io",
+                "*.dns.nextdns.io",
+                "doh.dns.sb",
+                "doh.ffmuc.net",
+                "dns0.eu",
+                "dns.alidns.com",
+                "doh.pub",
+                "doh.twnic.tw",
+                "doh.privacydns.org"
+              ],
+              "TargetTypes": [
+                "TLS_SNI",
+                "HTTP_HOST"
+              ],
+              "GeneratedRulesType": "DENYLIST"
+            }
+          },
+          "StatefulRuleOptions": {
+            "RuleOrder": "STRICT_ORDER"
+          }
+        },
+        "Type": "STATEFUL",
+        "Tags": [
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Environment",
+            "Value": "disposable-test"
+          }
+        ]
       }
     }
   },
