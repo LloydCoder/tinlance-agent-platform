@@ -140,7 +140,9 @@ UNBOUND
 
 # Use a namespace-specific runtime logfile to avoid touching host /tmp state.
 sed -i "s|/tmp/fcp03-unbound-runtime.log|$log_file|; s|/tmp/fcp03-unbound-runtime.pid|/tmp/fcp03-unbound-${suffix}.pid|" "$config_file"
-chmod 644 "$config_file"  # No credentials are stored in this test-only resolver config.
+chown unbound:unbound "$config_file"
+chmod 640 "$config_file"  # Test-only resolver config contains no credentials.
+runuser -u unbound -- test -r "$config_file"
 unbound-checkconf "$config_file"
 ip netns exec "$resolver_ns" unbound -d -vv -c "$config_file" >"$stderr_file" 2>&1 &
 resolver_pid="$!"
