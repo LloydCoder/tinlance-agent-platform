@@ -7,11 +7,7 @@ import typing
 
 
 TEMPLATE_PATH = (
-    pathlib.Path(__file__).parents[2]
-    / "infra"
-    / "aws"
-    / "fcp03-dns-firewall-lab"
-    / "template.json"
+    pathlib.Path(__file__).parents[2] / "infra" / "aws" / "fcp03-dns-firewall-lab" / "template.json"
 )
 
 
