@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from .service import (
     API_VERSION,
@@ -41,7 +42,15 @@ class JWKSProvider(Protocol):
 
 
 class SessionRevoker(Protocol):
-    def revoke_session(self, bearer_token: str, *, request_id: str) -> None: ...
+    def revoke_session(
+        self,
+        bearer_token: str,
+        *,
+        request_id: str,
+        dpop_proof: str | None = None,
+        method: str | None = None,
+        uri: str | None = None,
+    ) -> None: ...
 
 
 MAX_REQUEST_BYTES = 1 * 1024 * 1024
@@ -69,6 +78,27 @@ def _traceparent(value: str | None) -> str | None:
     return value
 
 
+def _public_origin(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme.lower() != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError
+        _ = parsed.port
+        return f"https://{parsed.netloc.lower()}"
+    except (TypeError, ValueError) as exc:
+        raise ValueError("DPoP public origin must be a normalized HTTPS origin") from exc
+
+
 def _request_id(value: str | None) -> str:
     if value is None or not value or value != value.strip() or len(value) > 256:
         raise ValueError("X-Request-ID is required and must be normalized")
@@ -87,12 +117,16 @@ def serve(
     a2a_service: A2AHTTPService | None = None,
     jwks_provider: JWKSProvider | None = None,
     session_revoker: SessionRevoker | None = None,
+    public_origin: str | None = None,
 ) -> ThreadingHTTPServer:
     """Start a local/reference HTTP server.
 
     Production deployments should place a hardened TLS/reverse-proxy boundary
     in front of this handler and inject a standards-based token verifier.
+    DPoP requires a configured canonical HTTPS public origin; Host headers are
+    never trusted as the proof target authority.
     """
+    normalized_public_origin = _public_origin(public_origin)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "TinlanceAgentPlatform/1.1"
@@ -169,6 +203,7 @@ def serve(
                         "Authorization",
                         "X-Tinlance-API-Version",
                         "X-Request-ID",
+                        "DPoP",
                     )
                 ):
                     return
@@ -201,8 +236,24 @@ def serve(
                     if not isinstance(body, dict) or body:
                         raise ValueError("session revocation body must be an empty JSON object")
                     token = _bearer(self.headers.get("Authorization"))
+                    dpop_proof = self.headers.get("DPoP")
+                    dpop_uri = None
+                    if dpop_proof is not None:
+                        if (
+                            normalized_public_origin is None
+                            or not self.path.startswith("/")
+                            or self.path.startswith("//")
+                        ):
+                            raise AuthenticationError("DPoP public request target is unavailable")
+                        dpop_uri = f"{normalized_public_origin}{self.path}"
                     try:
-                        session_revoker.revoke_session(token, request_id=request_id)
+                        session_revoker.revoke_session(
+                            token,
+                            request_id=request_id,
+                            dpop_proof=dpop_proof,
+                            method="POST" if dpop_proof is not None else None,
+                            uri=dpop_uri,
+                        )
                     except PermissionError as exc:
                         raise AuthenticationError(
                             "bearer identity could not be authenticated"
@@ -308,6 +359,19 @@ def serve(
             if self.path != "/v1/agent-platform":
                 self._respond(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
+            if self._reject_ambiguous_headers(
+                (
+                    "Content-Length",
+                    "Content-Type",
+                    "Authorization",
+                    "X-Tinlance-API-Version",
+                    "X-Request-ID",
+                    "Idempotency-Key",
+                    "traceparent",
+                    "DPoP",
+                )
+            ):
+                return
             try:
                 length = int(self.headers.get("Content-Length", ""))
             except ValueError:
@@ -334,8 +398,25 @@ def serve(
                     self._respond(HTTPStatus.UPGRADE_REQUIRED, {"error": "api_version_required"})
                     return
                 token = _bearer(self.headers.get("Authorization"))
+                dpop_proof = self.headers.get("DPoP")
                 try:
-                    principal = resolver.resolve(token)
+                    if dpop_proof is None:
+                        principal = resolver.resolve(token)
+                    else:
+                        resolve_with_dpop = getattr(resolver, "resolve_with_dpop", None)
+                        if (
+                            not callable(resolve_with_dpop)
+                            or normalized_public_origin is None
+                            or not self.path.startswith("/")
+                            or self.path.startswith("//")
+                        ):
+                            raise AuthenticationError("DPoP request verification is unavailable")
+                        principal = resolve_with_dpop(
+                            token,
+                            dpop_proof,
+                            method="POST",
+                            uri=f"{normalized_public_origin}{self.path}",
+                        )
                 except PermissionError as exc:
                     raise AuthenticationError("bearer identity could not be authenticated") from exc
                 tenant_id = body.get("tenant_id", principal.tenant_id)
