@@ -126,7 +126,7 @@ def make_dpop_proof(
     )
 
 
-def make_resolver(public_key: Any) -> JWKSPrincipalResolver:
+def make_resolver(public_key: Any, database_path: Any) -> JWKSPrincipalResolver:
     verifier = JWKSIdentityVerifier(
         issuer=ISSUER,
         audience=AUDIENCE,
@@ -135,7 +135,7 @@ def make_resolver(public_key: Any) -> JWKSPrincipalResolver:
     )
     return JWKSPrincipalResolver(
         verifier,
-        SQLiteTokenRevocationStore(":memory:"),
+        SQLiteTokenRevocationStore(database_path),
         dpop_verifier=DPoPProofVerifier(replay_cache=ReplayCache()),
     )
 
@@ -178,12 +178,12 @@ def with_server(resolver: JWKSPrincipalResolver):
     return server, thread, endpoint
 
 
-def test_sender_bound_access_token_requires_a_matching_dpop_proof_over_http() -> None:
+def test_sender_bound_access_token_requires_a_matching_dpop_proof_over_http(tmp_path: Any) -> None:
     token_key, proof_key, jwk, thumbprint = make_binding_material()
     token = make_access_token(token_key, thumbprint)
     proof = make_dpop_proof(proof_key, jwk, token)
     _, public_key = token_key, token_key.public_key()
-    resolver = make_resolver(public_key)
+    resolver = make_resolver(public_key, tmp_path / "revocations.db")
     server, thread, endpoint = with_server(resolver)
     try:
         status, body = send_request(endpoint, token, proof)
@@ -195,10 +195,10 @@ def test_sender_bound_access_token_requires_a_matching_dpop_proof_over_http() ->
         thread.join(timeout=2)
 
 
-def test_sender_bound_access_token_rejects_missing_dpop_proof_over_http() -> None:
+def test_sender_bound_access_token_rejects_missing_dpop_proof_over_http(tmp_path: Any) -> None:
     token_key, _, _, thumbprint = make_binding_material()
     token = make_access_token(token_key, thumbprint)
-    resolver = make_resolver(token_key.public_key())
+    resolver = make_resolver(token_key.public_key(), tmp_path / "revocations.db")
     server, thread, endpoint = with_server(resolver)
     try:
         status, body = send_request(endpoint, token, None)
@@ -210,12 +210,12 @@ def test_sender_bound_access_token_rejects_missing_dpop_proof_over_http() -> Non
         thread.join(timeout=2)
 
 
-def test_sender_bound_access_token_rejects_wrong_dpop_key_over_http() -> None:
+def test_sender_bound_access_token_rejects_wrong_dpop_key_over_http(tmp_path: Any) -> None:
     token_key, _, _, thumbprint = make_binding_material()
     _, wrong_proof_key, wrong_jwk, _ = make_binding_material()
     token = make_access_token(token_key, thumbprint)
     proof = make_dpop_proof(wrong_proof_key, wrong_jwk, token)
-    resolver = make_resolver(token_key.public_key())
+    resolver = make_resolver(token_key.public_key(), tmp_path / "revocations.db")
     server, thread, endpoint = with_server(resolver)
     try:
         status, body = send_request(endpoint, token, proof)
@@ -227,7 +227,7 @@ def test_sender_bound_access_token_rejects_wrong_dpop_key_over_http() -> None:
         thread.join(timeout=2)
 
 
-def test_sender_bound_access_token_rejects_dpop_uri_mismatch_over_http() -> None:
+def test_sender_bound_access_token_rejects_dpop_uri_mismatch_over_http(tmp_path: Any) -> None:
     token_key, proof_key, jwk, thumbprint = make_binding_material()
     token = make_access_token(token_key, thumbprint)
     proof = make_dpop_proof(
@@ -236,7 +236,7 @@ def test_sender_bound_access_token_rejects_dpop_uri_mismatch_over_http() -> None
         token,
         uri=f"{PUBLIC_ORIGIN}/v1/other",
     )
-    resolver = make_resolver(token_key.public_key())
+    resolver = make_resolver(token_key.public_key(), tmp_path / "revocations.db")
     server, thread, endpoint = with_server(resolver)
     try:
         status, body = send_request(endpoint, token, proof)
@@ -248,11 +248,11 @@ def test_sender_bound_access_token_rejects_dpop_uri_mismatch_over_http() -> None
         thread.join(timeout=2)
 
 
-def test_bearer_token_rejects_unbound_dpop_proof_over_http() -> None:
+def test_bearer_token_rejects_unbound_dpop_proof_over_http(tmp_path: Any) -> None:
     token_key, proof_key, jwk, _ = make_binding_material()
     token = make_access_token(token_key, None)
     proof = make_dpop_proof(proof_key, jwk, token)
-    resolver = make_resolver(token_key.public_key())
+    resolver = make_resolver(token_key.public_key(), tmp_path / "revocations.db")
     server, thread, endpoint = with_server(resolver)
     try:
         status, body = send_request(endpoint, token, proof)
