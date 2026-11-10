@@ -94,7 +94,7 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
     )
     assert request.get_method() == "GET"
     assert request.unredirected_hdrs.get("X-vault-token") == "test-token"
-    assert request.get_header("X-vault-token") is None
+    assert "X-vault-token" not in request.headers
     assert request.get_header("Cache-control") == "no-store"
     assert request.get_header("X-vault-request") == "true"
     assert seen["timeout"] == 3.0
