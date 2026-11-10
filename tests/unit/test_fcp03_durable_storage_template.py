@@ -169,7 +169,9 @@ def test_snapshot_bucket_has_a_separate_hardened_access_log_destination() -> Non
     statements = resources["SnapshotAccessLogsBucketPolicy"]["Properties"]["PolicyDocument"][
         "Statement"
     ]
-    delivery = next(statement for statement in statements if statement["Sid"] == "AllowS3ServerAccessLogs")
+    delivery = next(
+        statement for statement in statements if statement["Sid"] == "AllowS3ServerAccessLogs"
+    )
     assert delivery["Principal"] == {"Service": "logging.s3.amazonaws.com"}
     assert delivery["Action"] == "s3:PutObject"
     assert delivery["Condition"]["StringEquals"]["aws:SourceAccount"] == {"Ref": "AWS::AccountId"}
