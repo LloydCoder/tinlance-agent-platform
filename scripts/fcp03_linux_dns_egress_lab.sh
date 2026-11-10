@@ -115,7 +115,7 @@ ip netns exec "$resolver_ns" dnsmasq \
   --no-poll \
   --bind-interfaces \
   --listen-address=10.203.0.1 \
-  --port=5353 \
+  --port=53 \
   --user=nobody \
   --log-queries \
   --log-facility=- \
@@ -145,6 +145,7 @@ import ssl
 import threading
 
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.minimum_version = ssl.TLSVersion.TLSv1_2
 context.load_cert_chain(os.environ["FCP03_SERVER_CERT"], os.environ["FCP03_SERVER_KEY"])
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -183,8 +184,8 @@ table inet fcp03 {
   chain output {
     type filter hook output priority 0; policy drop;
     oifname "lo" accept
-    ip daddr 10.203.0.1 udp dport 5353 counter accept
-    ip daddr 10.203.0.1 tcp dport 5353 counter accept
+    ip daddr 10.203.0.1 udp dport 53 counter accept
+    ip daddr 10.203.0.1 tcp dport 53 counter accept
     ip daddr 10.203.0.10 tcp dport 443 counter accept
     counter drop
   }
@@ -194,7 +195,7 @@ NFT
 # Wait for the local resolver and test endpoint without relying on outside DNS.
 ready=0
 for _ in $(seq 1 30); do
-  if ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 allowed.test A +time=1 +tries=1 +short 2>/dev/null | grep -Fxq "10.203.0.10"; then
+  if ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short 2>/dev/null | grep -Fxq "10.203.0.10"; then
     ready=1
     break
   fi
@@ -218,7 +219,13 @@ with socket.create_connection(("10.203.0.10", 443), timeout=1) as raw:
         conn.sendall(
             b"GET / HTTP/1.1\r\nHost: allowed.test\r\nConnection: close\r\n\r\n"
         )
-        response = conn.recv(1024)
+        chunks = []
+        while True:
+            chunk = conn.recv(4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        response = b"".join(chunks)
         if b"FCP03-LOCAL-HTTPS-OK" not in response:
             raise SystemExit("local HTTPS response marker missing")
         print("FCP03-HTTPS-CERTIFICATE-AND-SNI-VERIFIED")
