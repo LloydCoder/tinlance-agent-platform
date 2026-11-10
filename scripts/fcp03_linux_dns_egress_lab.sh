@@ -30,7 +30,7 @@ resolver_ns="fcp03-d-${suffix}"
 worker_if="f3w${suffix}"
 resolver_if="f3d${suffix}"
 config_file="$(mktemp /tmp/fcp03-unbound.XXXXXX.conf)"
-log_file="$(mktemp /tmp/fcp03-unbound.XXXXXX.log)"
+log_file="/tmp/fcp03-unbound-${suffix}.log"
 stderr_file="$(mktemp /tmp/fcp03-unbound-stderr.XXXXXX.log)"
 server_file="$(mktemp /tmp/fcp03-https.XXXXXX.py)"
 resolver_pid=""
@@ -111,13 +111,13 @@ test -z "$(ip netns exec "$worker_ns" ip -6 addr show scope global)"
 cat >"$config_file" <<'UNBOUND'
 server:
   interface: 10.203.0.1
-  port: 53
+  port: 5353
   do-ip4: yes
   do-ip6: no
   do-udp: yes
   do-tcp: yes
   access-control: 10.203.0.2/32 allow
-  username: ""
+  username: "unbound"
   chroot: ""
   directory: "/tmp"
   logfile: "/tmp/fcp03-unbound-runtime.log"
@@ -172,8 +172,8 @@ table inet fcp03 {
   chain output {
     type filter hook output priority 0; policy drop;
     oifname "lo" accept
-    ip daddr 10.203.0.1 udp dport 53 counter accept
-    ip daddr 10.203.0.1 tcp dport 53 counter accept
+    ip daddr 10.203.0.1 udp dport 5353 counter accept
+    ip daddr 10.203.0.1 tcp dport 5353 counter accept
     ip daddr 10.203.0.10 tcp dport 443 counter accept
     counter drop
   }
@@ -183,7 +183,7 @@ NFT
 # Wait for the local resolver and test endpoint without relying on outside DNS.
 ready=0
 for _ in $(seq 1 30); do
-  if ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short 2>/dev/null | grep -Fxq "10.203.0.10"; then
+  if ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 allowed.test A +time=1 +tries=1 +short 2>/dev/null | grep -Fxq "10.203.0.10"; then
     ready=1
     break
   fi
@@ -206,12 +206,12 @@ test "$https_marker" = "FCP03-LOCAL-HTTPS-OK"
 echo "FCP03_APPROVED_HTTPS_PROBE=PASS"
 
 # DNS query policy is evaluated separately from packet-path policy.
-blocked_dns="$(ip netns exec "$worker_ns" dig @10.203.0.1 blocked.test A +time=1 +tries=1 +noall +comments)"
+blocked_dns="$(ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 blocked.test A +time=1 +tries=1 +noall +comments)"
 grep -q "status: NXDOMAIN" <<<"$blocked_dns"
 echo "FCP03_BLOCKED_DNS_NXDOMAIN=PASS"
-rebind_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 rebind.test A +time=1 +tries=1 +short)"
+rebind_answer="$(ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 rebind.test A +time=1 +tries=1 +short)"
 test "$rebind_answer" = "203.0.113.10"
-metadata_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 metadata.test A +time=1 +tries=1 +short)"
+metadata_answer="$(ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 metadata.test A +time=1 +tries=1 +short)"
 test "$metadata_answer" = "169.254.169.254"
 
 # Packet-path negatives: a failed request is not enough by itself; the nftables
