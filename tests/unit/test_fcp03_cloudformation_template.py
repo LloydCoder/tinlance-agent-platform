@@ -326,6 +326,10 @@ def test_worker_bootstrap_probes_known_network_egress_bypass_classes() -> None:
     worker = load_template()["Resources"]["WorkerInstance"]["Properties"]
     bootstrap = worker["UserData"]["Fn::Base64"]["Fn::Sub"][0]
 
+    assert "--resolve 'cloudflare-dns.com:443:1.1.1.1'" in bootstrap
+    assert "--resolve '${ApprovedProbeDomain}:443:[2001:db8::1]'" in bootstrap
+    assert "--resolve '${ApprovedProbeDomain}:443:203.0.113.1'" in bootstrap
+
     for marker in (
         "FCP03_TEST_DNS_UNAPPROVED=UNEXPECTED_PASS",
         "FCP03_TEST_DOH=UNEXPECTED_PASS",
