@@ -7,6 +7,7 @@ kernel; caller-supplied tenant and subject identifiers are never credentials.
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -27,6 +28,7 @@ class VerifiedAgentIdentity:
     principal_type: str = "federated"
     roles: frozenset[str] = frozenset()
     revocation_ids: frozenset[str] = frozenset()
+    sender_key_thumbprint: str | None = None
 
     def validate(
         self,
@@ -115,6 +117,19 @@ class VerifiedAgentIdentity:
             raise PermissionError("identity revocation identifiers must be normalized")
         if expected_nonce is not None and self.nonce != expected_nonce:
             raise PermissionError("identity nonce does not match")
+        if self.sender_key_thumbprint is not None:
+            value = self.sender_key_thumbprint
+            if not isinstance(value, str) or len(value) != 43:
+                raise PermissionError("identity sender-key thumbprint is malformed")
+            try:
+                decoded = base64.urlsafe_b64decode(value + "=")
+            except Exception as exc:
+                raise PermissionError("identity sender-key thumbprint is malformed") from exc
+            if (
+                len(decoded) != 32
+                or base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=") != value
+            ):
+                raise PermissionError("identity sender-key thumbprint is malformed")
 
 
 class IdentityVerifier(Protocol):
