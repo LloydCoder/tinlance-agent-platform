@@ -607,7 +607,13 @@
         "LogGroupName": {
           "Fn::Sub": "/aws/network-firewall/${AWS::StackName}"
         },
-        "RetentionInDays": 7
+        "RetentionInDays": 7,
+        "KmsKeyId": {
+          "Fn::GetAtt": [
+            "FirewallLogKey",
+            "Arn"
+          ]
+        }
       }
     },
     "NetworkFirewallLogging": {
@@ -1091,6 +1097,70 @@
           {
             "Key": "Environment",
             "Value": "disposable-test"
+          }
+        ]
+      }
+    },
+    "FirewallLogKey": {
+      "Type": "AWS::KMS::Key",
+      "Properties": {
+        "Description": "FCP-03 Network Firewall CloudWatch log encryption",
+        "KeySpec": "SYMMETRIC_DEFAULT",
+        "KeyUsage": "ENCRYPT_DECRYPT",
+        "EnableKeyRotation": true,
+        "PendingWindowInDays": 7,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AccountKeyAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "CloudWatchLogsEncryption",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": {
+                  "Fn::Sub": "logs.${AWS::Region}.amazonaws.com"
+                }
+              },
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "ArnEquals": {
+                  "kms:EncryptionContext:aws:logs:arn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/network-firewall/${AWS::StackName}"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "network-firewall-log-encryption"
           }
         ]
       }
