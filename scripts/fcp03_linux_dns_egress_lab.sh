@@ -110,7 +110,7 @@ ip netns exec "$resolver_ns" dnsmasq \
   --bind-interfaces \
   --listen-address=10.203.0.1 \
   --port=5353 \
-  --user=unbound \
+  --user=nobody \
   --log-queries \
   --log-facility=- \
   --address=/allowed.test/10.203.0.10 \
