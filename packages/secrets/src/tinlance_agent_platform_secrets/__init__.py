@@ -1,6 +1,6 @@
-from .openbao import OpenBaoSecretProvider
 from .broker import SecretBroker, SecretHandle
 from .model_provider import ModelCredentialRequest, ScopedModelCredentialProvider
+from .openbao import OpenBaoSecretProvider
 from .scoped import (
     ScopedSecretBroker,
     ScopedSecretHandle,
