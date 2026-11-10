@@ -283,6 +283,7 @@ def test_approved_domains_parameter_rejects_wildcards_and_non_fqdns() -> None:
     assert not re.fullmatch(pattern, "bad..example")
     assert not re.fullmatch(pattern, "bad_domain.example")
 
+
 def test_teardown_parameter_documents_the_validator_24_hour_maximum() -> None:
     description = load_template()["Parameters"]["TeardownAtUtc"]["Description"].lower()
 
