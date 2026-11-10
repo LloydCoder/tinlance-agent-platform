@@ -509,7 +509,7 @@
                   "RuleGroupArn"
                 ]
               },
-              "Priority": 0
+              "Priority": 1
             },
             {
               "ResourceArn": {
@@ -518,7 +518,7 @@
                   "RuleGroupArn"
                 ]
               },
-              "Priority": 1
+              "Priority": 2
             }
           ],
           "StatefulEngineOptions": {
