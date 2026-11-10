@@ -5,7 +5,7 @@ import pathlib
 import re
 import typing
 
-TEMPLATE_PATH = pathlib.Path(__file__).parents[2] / "infra" / "aws" / "fcp03-durable-storage" / "template.json"
+TEMPLATE_PATH = pathlib.Path(__file__).parents[2] / "infra/aws/fcp03-durable-storage/template.json"
 
 
 def load_template() -> dict[str, typing.Any]:
