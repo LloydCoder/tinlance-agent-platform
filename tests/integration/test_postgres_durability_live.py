@@ -4,9 +4,8 @@ import os
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import psycopg
 import pytest
-
-psycopg = pytest.importorskip("psycopg")
 
 from tinlance_agent_platform_durability.postgres_restore_ledger import PostgresRestoreLedger
 from tinlance_agent_platform_durability.postgres_snapshot_catalog import PostgresSnapshotCatalog
