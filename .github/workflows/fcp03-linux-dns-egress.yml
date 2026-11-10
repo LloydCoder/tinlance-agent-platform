@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   isolated-linux-policy:
-    name: Unbound local-zone DNS policy and nftables egress lab
+    name: dnsmasq DNS policy and nftables egress lab
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -30,14 +30,14 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            iproute2 nftables unbound dnsutils shellcheck
+            iproute2 nftables dnsmasq-base dnsutils shellcheck
 
       - name: Validate shell syntax and static analysis
         run: |
           set -euo pipefail
           bash -n scripts/fcp03_linux_dns_egress_lab.sh
           shellcheck --severity=style scripts/fcp03_linux_dns_egress_lab.sh
-          unbound -V
+          dnsmasq --version
           nft --version
           ip -Version
 
