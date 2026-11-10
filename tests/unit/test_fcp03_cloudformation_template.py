@@ -70,7 +70,10 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
     assert "FCP03_TEST_DNS_APPROVED=PASS" in bootstrap
     bootstrap = worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
     assert isinstance(bootstrap, list)
-    assert bootstrap[1] == {"ApprovedProbeDomain": {"Fn::Select": [0, {"Ref": "ApprovedDomains"}]}}
+    assert bootstrap[1] == {
+        "ApprovedProbeDomain": {"Fn::Select": [0, {"Ref": "ApprovedDomains"}]},
+        "BlockedProbeDomain": {"Ref": "BlockedProbeDomain"},
+    }
     assert "FCP03_TEST_HTTPS_APPROVED=PASS" in bootstrap[0]
     assert "FCP03_TEST_DIRECT_IP=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE" in bootstrap[0]
     assert "FCP03_TEST_DIRECT_IP=EXPECTED_BLOCK_OR_UNAVAILABLE" not in bootstrap[0]
@@ -290,3 +293,66 @@ def test_teardown_parameter_documents_the_validator_24_hour_maximum() -> None:
     assert "15 minutes" in description
     assert "24 hours" in description
     assert "2 hours" not in description
+
+
+def test_known_doh_resolvers_are_denied_before_the_approved_domain_allowlist() -> None:
+    resources = load_template()["Resources"]
+    rule_group = resources["DoHResolverBlockRuleGroup"]["Properties"]
+    rules_source = rule_group["RuleGroup"]["RulesSource"]["RulesSourceList"]
+    references = resources["FirewallPolicy"]["Properties"]["FirewallPolicy"][
+        "StatefulRuleGroupReferences"
+    ]
+    ordered = sorted(references, key=lambda reference: reference["Priority"])
+
+    assert rule_group["Type"] == "STATEFUL"
+    assert rules_source["GeneratedRulesType"] == "DENYLIST"
+    assert set(rules_source["TargetTypes"]) == {"TLS_SNI", "HTTP_HOST"}
+    assert {
+        "cloudflare-dns.com",
+        ".cloudflare-dns.com",
+        "dns.google",
+        "dns.quad9.net",
+        "doh.opendns.com",
+        "dns.nextdns.io",
+    } <= set(rules_source["Targets"])
+    assert [reference["Priority"] for reference in ordered] == [1, 2]
+    assert ordered[0]["ResourceArn"] == {
+        "Fn::GetAtt": ["DoHResolverBlockRuleGroup", "RuleGroupArn"]
+    }
+    assert ordered[1]["ResourceArn"] == {"Fn::GetAtt": ["ResolvedDomainRuleGroup", "RuleGroupArn"]}
+
+
+def test_worker_bootstrap_probes_known_network_egress_bypass_classes() -> None:
+    worker = load_template()["Resources"]["WorkerInstance"]["Properties"]
+    bootstrap = worker["UserData"]["Fn::Base64"]["Fn::Sub"][0]
+
+    assert "--resolve 'cloudflare-dns.com:443:1.1.1.1'" in bootstrap
+    assert "--resolve '${ApprovedProbeDomain}:443:[2001:db8::1]'" in bootstrap
+    assert "--resolve '${ApprovedProbeDomain}:443:203.0.113.1'" in bootstrap
+
+    for marker in (
+        "FCP03_TEST_DNS_UNAPPROVED=UNEXPECTED_PASS",
+        "FCP03_TEST_DOH=UNEXPECTED_PASS",
+        "FCP03_TEST_DOT=UNEXPECTED_PASS",
+        "FCP03_TEST_QUIC=UNEXPECTED_PASS",
+        "FCP03_TEST_IPV6=UNEXPECTED_PASS",
+        "FCP03_TEST_IMDS=UNEXPECTED_PASS",
+        "FCP03_TEST_DNS_REBIND=UNEXPECTED_PASS",
+    ):
+        assert marker in bootstrap
+
+
+def test_blocked_dns_probe_domain_must_not_be_in_the_approved_list() -> None:
+    rule = load_template()["Rules"]["BlockedProbeMustNotBeApproved"]
+    assertion = rule["Assertions"][0]
+
+    assert assertion["Assert"] == {
+        "Fn::Not": [
+            {
+                "Fn::Contains": [
+                    {"Ref": "ApprovedDomains"},
+                    {"Ref": "BlockedProbeDomain"},
+                ]
+            }
+        ]
+    }
