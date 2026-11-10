@@ -205,7 +205,6 @@ def test_userdata_shell_defaults_do_not_collide_with_cloudformation_substitution
     assert "${BLOCKED_STATUS}" not in script
 
 
-
 def test_dns_firewall_lab_enables_resolver_query_log_correlation() -> None:
     resources = load_template()["Resources"]
     types = {resource["Type"] for resource in resources.values()}
