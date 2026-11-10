@@ -126,7 +126,9 @@ ip netns exec "$resolver_ns" dnsmasq \
 resolver_pid="$!"
 
 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
-  -keyout "$ca_key" -out "$ca_cert" -subj "/CN=FCP03 Disposable Test CA" >/dev/null 2>&1
+  -keyout "$ca_key" -out "$ca_cert" -subj "/CN=FCP03 Disposable Test CA" \\
+  -addext "basicConstraints=critical,CA:TRUE" \\
+  -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
 openssl req -newkey rsa:2048 -nodes -keyout "$server_key" -out "$server_csr" \
   -subj "/CN=allowed.test" >/dev/null 2>&1
 cat >"$ext_file" <<'CERT'
@@ -164,9 +166,9 @@ def serve():
             conn.recv(1024)
             body = b"FCP03-LOCAL-HTTPS-OK"
             conn.sendall(
-                b"HTTP/1.1 200 OK\\r\\n"
-                + (b"Content-Length: %d\\r\\n" % len(body))
-                + b"Connection: close\\r\\n\\r\\n"
+                b"HTTP/1.1 200 OK\r\n"
+                + (b"Content-Length: %d\r\n" % len(body))
+                + b"Connection: close\r\n\r\n"
                 + body
             )
 
@@ -217,7 +219,7 @@ context = ssl.create_default_context(cafile=os.environ["FCP03_CA_CERT"])
 with socket.create_connection(("10.203.0.10", 443), timeout=1) as raw:
     with context.wrap_socket(raw, server_hostname="allowed.test") as conn:
         conn.sendall(
-            b"GET / HTTP/1.1\\r\\nHost: allowed.test\\r\\nConnection: close\\r\\n\\r\\n"
+            b"GET / HTTP/1.1\r\nHost: allowed.test\r\nConnection: close\r\n\r\n"
         )
         response = conn.recv(1024)
         if b"FCP03-LOCAL-HTTPS-OK" not in response:
@@ -226,7 +228,7 @@ with socket.create_connection(("10.203.0.10", 443), timeout=1) as raw:
 PY
 )"
 test "$https_marker" = "FCP03-HTTPS-CERTIFICATE-AND-SNI-VERIFIED"
-echo "FCP03_APPROVED_HTTPS_PROBE=PASS"
+echo "FCP03_APPROVED_HTTPS_TLS_SNI=PASS"
 
 # DNS query policy is evaluated separately from packet-path policy.
 blocked_dns="$(ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 blocked.test A +time=1 +tries=1 +noall +comments)"
