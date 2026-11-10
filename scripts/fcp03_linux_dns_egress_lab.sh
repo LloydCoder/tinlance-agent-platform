@@ -328,7 +328,7 @@ trap - EXIT
 after_host_rules="$(nft list ruleset | sed -E 's/counter packets [0-9]+ bytes [0-9]+/counter packets <n> bytes <n>/g' | sha256sum | awk '{print $1}')"
 after_default_routes="$(ip route show default)"
 after_ipv6_default_routes="$(ip -6 route show default)"
-ipv6_drop_packets="$(grep -E 'ip6 daddr ::/0 counter packets [0-9]+ bytes [0-9]+ drop' <<<"$rules" | sed -E 's/.*counter packets ([0-9]+) bytes.*/\\1/' | tail -n 1)"
+ipv6_drop_packets="$(grep -E 'ip6 daddr ::/0 counter packets [0-9]+ bytes [0-9]+ drop' <<<"$rules" | awk '{for (i = 1; i <= NF; i++) if ($i == "packets") print $(i + 1)}' | tail -n 1)"
 if [[ -z "$ipv6_drop_packets" || "$ipv6_drop_packets" -lt 1 ]]; then
   echo "IPv6 egress drop counter did not record a blocked packet" >&2
   exit 1
