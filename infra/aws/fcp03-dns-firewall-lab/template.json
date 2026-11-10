@@ -746,7 +746,6 @@
     },
     "DNSQueryLoggingAssociation": {
       "Type": "AWS::Route53Resolver::ResolverQueryLoggingConfigAssociation",
-      "DependsOn": "DNSQueryLoggingConfig",
       "Properties": {
         "ResolverQueryLogConfigId": {
           "Ref": "DNSQueryLoggingConfig"
