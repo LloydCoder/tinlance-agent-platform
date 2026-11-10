@@ -36,6 +36,7 @@ jobs:
           OPENBAO_ROOT_TOKEN: ci-only-root-token
         run: |
           set -euo pipefail
+          echo "::add-mask::$OPENBAO_ROOT_TOKEN"
           docker run --detach --rm --name fcp03-openbao \
             --cap-add=IPC_LOCK \
             --publish 127.0.0.1:8200:8200 \
@@ -102,10 +103,6 @@ jobs:
         run: |
           set -euo pipefail
           pytest -q tests/test_openbao_secret_provider.py tests/test_openbao_secret_provider_integration.py
-
-      - name: Print OpenBao diagnostics on failure
-        if: failure()
-        run: docker logs fcp03-openbao || true
 
       - name: Stop disposable OpenBao server
         if: always()
