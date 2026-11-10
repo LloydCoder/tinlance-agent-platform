@@ -14,14 +14,13 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from tinlance_agent_platform_api.http import serve
-from tinlance_agent_platform_api.service import APIResponse, AgentPlatformAPI
+from tinlance_agent_platform_api.service import AgentPlatformAPI, APIResponse
 from tinlance_agent_platform_identity import (
     DPoPProofVerifier,
     JWKSIdentityVerifier,
     JWKSPrincipalResolver,
     SQLiteTokenRevocationStore,
 )
-
 
 ISSUER = "https://issuer.example.test/"
 AUDIENCE = "tinlance-platform"
