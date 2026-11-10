@@ -7,6 +7,7 @@ the Platform authorization and policy layers remain authoritative.
 
 from __future__ import annotations
 
+import base64
 import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -236,6 +237,7 @@ class JWKSIdentityVerifier:
             raise PermissionError("identity token nonce does not match")
         scopes = frozenset(self._normalized_scopes(claims))
         roles = frozenset(self._roles(claims))
+        sender_key_thumbprint = self._sender_key_thumbprint(claims)
         identity = VerifiedAgentIdentity(
             subject_id=subject,
             tenant_id=tenant_id,
@@ -250,6 +252,7 @@ class JWKSIdentityVerifier:
             principal_type=principal_type,
             roles=roles,
             revocation_ids=revocation_ids,
+            sender_key_thumbprint=sender_key_thumbprint,
         )
         identity.validate(
             expected_issuer=self.issuer,
@@ -259,6 +262,27 @@ class JWKSIdentityVerifier:
             leeway_seconds=self.leeway_seconds,
         )
         return identity
+
+    @staticmethod
+    def _sender_key_thumbprint(claims: dict[str, Any]) -> str | None:
+        confirmation = claims.get("cnf")
+        if confirmation is None:
+            return None
+        if not isinstance(confirmation, dict) or set(confirmation) != {"jkt"}:
+            raise PermissionError("identity confirmation claim is malformed or unsupported")
+        thumbprint = confirmation.get("jkt")
+        if not isinstance(thumbprint, str) or len(thumbprint) != 43:
+            raise PermissionError("identity confirmation thumbprint is malformed")
+        try:
+            decoded = base64.urlsafe_b64decode(thumbprint + "=")
+        except Exception as exc:
+            raise PermissionError("identity confirmation thumbprint is malformed") from exc
+        if (
+            len(decoded) != 32
+            or base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=") != thumbprint
+        ):
+            raise PermissionError("identity confirmation thumbprint is malformed")
+        return thumbprint
 
     @staticmethod
     def _required_string(claims: dict[str, Any], name: str) -> str:
