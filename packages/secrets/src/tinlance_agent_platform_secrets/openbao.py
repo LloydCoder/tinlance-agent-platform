@@ -108,17 +108,23 @@ class OpenBaoSecretProvider:
             url,
             headers={
                 "Accept": "application/json",
+                "Cache-Control": "no-store",
+                "Pragma": "no-cache",
                 "X-Vault-Request": "true",
-                "X-Vault-Token": token,
             },
             method="GET",
         )
+        # Unredirected headers prevent urllib from forwarding the bearer token
+        # if the configured endpoint unexpectedly responds with a redirect.
+        request.add_unredirected_header("X-Vault-Token", token)
         context = ssl.create_default_context(cafile=self.ca_bundle)
 
         try:
             with urlopen(request, timeout=self.timeout_seconds, context=context) as response:
                 if response.status != 200:
                     raise SecretResolutionError("OpenBao returned an unexpected status")
+                if response.geturl() != url:
+                    raise SecretResolutionError("OpenBao redirects are not accepted")
                 body = response.read(self.max_response_bytes + 1)
         except HTTPError as exc:
             if exc.code in {401, 403}:
