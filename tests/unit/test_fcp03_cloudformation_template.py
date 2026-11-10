@@ -294,6 +294,7 @@ def test_teardown_parameter_documents_the_validator_24_hour_maximum() -> None:
     assert "24 hours" in description
     assert "2 hours" not in description
 
+
 def test_known_doh_resolvers_are_denied_before_the_approved_domain_allowlist() -> None:
     resources = load_template()["Resources"]
     rule_group = resources["DoHResolverBlockRuleGroup"]["Properties"]
@@ -318,9 +319,7 @@ def test_known_doh_resolvers_are_denied_before_the_approved_domain_allowlist() -
     assert ordered[0]["ResourceArn"] == {
         "Fn::GetAtt": ["DoHResolverBlockRuleGroup", "RuleGroupArn"]
     }
-    assert ordered[1]["ResourceArn"] == {
-        "Fn::GetAtt": ["ResolvedDomainRuleGroup", "RuleGroupArn"]
-    }
+    assert ordered[1]["ResourceArn"] == {"Fn::GetAtt": ["ResolvedDomainRuleGroup", "RuleGroupArn"]}
 
 
 def test_worker_bootstrap_probes_known_network_egress_bypass_classes() -> None:
@@ -337,6 +336,7 @@ def test_worker_bootstrap_probes_known_network_egress_bypass_classes() -> None:
         "FCP03_TEST_DNS_REBIND=UNEXPECTED_PASS",
     ):
         assert marker in bootstrap
+
 
 def test_blocked_dns_probe_domain_must_not_be_in_the_approved_list() -> None:
     rule = load_template()["Rules"]["BlockedProbeMustNotBeApproved"]
