@@ -789,9 +789,10 @@ def test_rejects_duplicate_worker_nacl_subnet_associations() -> None:
 
 def test_rejects_extra_resolved_ip_validation_source_ranges() -> None:
     topology = valid_topology()
-    topology["firewall"]["policy"]["route53_resolved_ip_validation"][
-        "source_ip_ranges"
-    ] = ["10.20.1.0/24", "10.20.2.0/24"]
+    topology["firewall"]["policy"]["route53_resolved_ip_validation"]["source_ip_ranges"] = [
+        "10.20.1.0/24",
+        "10.20.2.0/24",
+    ]
 
     assert "resolved-ip-source-range-incomplete" in evaluate_fcp03_topology(topology)
 
