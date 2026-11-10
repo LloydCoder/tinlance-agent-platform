@@ -950,3 +950,18 @@ def test_collector_rejects_wildcard_dns_allowlist_even_when_targets_match() -> N
     )
 
     assert "dns-allowlist-wildcard-present" in evaluate_fcp03_topology(snapshot)
+
+
+@pytest.mark.parametrize("action", [[], {"unexpected": "mapping"}])
+def test_collector_rejects_malformed_dns_firewall_rule_action(action: object) -> None:
+    resolver = resolver_client()
+    resolver.responses["list_firewall_rules"][0]["FirewallRules"][0]["Action"] = action
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2_client(),
+        network_firewall=firewall_client(),
+        resolver=resolver,
+    )
+
+    assert "dns-firewall-rule-set-invalid" in evaluate_fcp03_topology(snapshot)
