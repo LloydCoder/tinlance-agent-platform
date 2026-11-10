@@ -768,11 +768,39 @@ def test_rejects_duplicate_or_extra_firewall_inventory_members(
     assert finding in evaluate_fcp03_topology(topology)
 
 
+@pytest.mark.parametrize("value", ["", {}, False])
 def test_rejects_any_non_null_public_ip_value(value: object) -> None:
     topology = valid_topology()
     topology["worker"]["public_ip"] = value
 
     assert "worker-public-address" in evaluate_fcp03_topology(topology)
+
+
+
+def test_rejects_duplicate_worker_nacl_subnet_associations() -> None:
+    topology = valid_topology()
+    topology["worker"]["network_acl"]["subnet_ids"] = [
+        "subnet-worker-a",
+        "subnet-worker-a",
+    ]
+
+    assert "worker-nacl-association-invalid" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_extra_resolved_ip_validation_source_ranges() -> None:
+    topology = valid_topology()
+    topology["firewall"]["policy"]["route53_resolved_ip_validation"][
+        "source_ip_ranges"
+    ] = ["10.20.1.0/24", "10.20.2.0/24"]
+
+    assert "resolved-ip-source-range-incomplete" in evaluate_fcp03_topology(topology)
+
+
+def test_rejects_missing_ipv6_default_route_inventory_key() -> None:
+    topology = valid_topology()
+    topology["worker"].pop("ipv6_default_route_target")
+
+    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(topology)
 
 
 @pytest.mark.parametrize("field", ["action", "dns_expiry_exception_action"])
