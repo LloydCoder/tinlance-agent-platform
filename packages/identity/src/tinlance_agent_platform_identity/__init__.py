@@ -7,7 +7,7 @@ from .cognito_pretoken import (
     DynamoDBTenantMembershipResolver,
     build_cognito_pretoken_handler,
 )
-from .dpop import DPoPProofVerifier, DPoPReplayCache, VerifiedDPoPProof
+from .dpop import DPoPProofVerifier, DPoPReplayCache, DynamoDBDPoPReplayCache, VerifiedDPoPProof
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
 from .resolver import (
@@ -28,6 +28,7 @@ __all__ = [
     "IdentityVerifier",
     "DPoPProofVerifier",
     "DPoPReplayCache",
+    "DynamoDBDPoPReplayCache",
     "VerifiedDPoPProof",
     "VerifiedAgentIdentity",
     "require_verified_identity",

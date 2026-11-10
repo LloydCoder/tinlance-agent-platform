@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -10,7 +11,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from tinlance_agent_platform_identity.dpop import DPoPProofVerifier
+from tinlance_agent_platform_identity.dpop import DPoPProofVerifier, DynamoDBDPoPReplayCache
 
 
 class ReplayCache:
@@ -193,6 +194,87 @@ def test_dpop_proof_rejects_non_ascii_access_token_hash_suffix(
     )
 
     with pytest.raises(PermissionError, match="hash"):
+        verifier.verify(
+            proof,
+            method="POST",
+            uri="https://api.example.test/v1/agents?debug=1",
+            access_token="access-token",
+        )
+
+
+class ConditionalWriteError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}}
+
+
+class FakeDynamoDBReplayClient:
+    def __init__(self) -> None:
+        self.items: dict[str, dict[str, dict[str, str]]] = {}
+        self.requests: list[dict[str, object]] = []
+        self.error: Exception | None = None
+
+    def put_item(self, **kwargs: object) -> dict[str, object]:
+        self.requests.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        item = kwargs["Item"]
+        assert isinstance(item, dict)
+        replay_key = item["replay_key"]["S"]
+        if replay_key in self.items:
+            raise ConditionalWriteError("ConditionalCheckFailedException")
+        self.items[replay_key] = item
+        return {}
+
+
+def test_dynamodb_dpop_replay_cache_atomically_consumes_replay_ids() -> None:
+    client = FakeDynamoDBReplayClient()
+    cache = DynamoDBDPoPReplayCache(client=client, table_name="agent-dpop-replay")
+    expiry = datetime.now(UTC) + timedelta(minutes=5)
+
+    assert cache.consume("thumbprint-123:proof-123", expiry) is True
+    assert cache.consume("thumbprint-123:proof-123", expiry) is False
+
+    request = client.requests[0]
+    assert request["TableName"] == "agent-dpop-replay"
+    assert request["ConditionExpression"] == "attribute_not_exists(replay_key)"
+    item = request["Item"]
+    assert item["expires_at"]["N"] == str(math.ceil(expiry.timestamp()))
+
+
+def test_dynamodb_dpop_replay_cache_fails_closed_on_service_errors() -> None:
+    client = FakeDynamoDBReplayClient()
+    client.error = RuntimeError("DynamoDB unavailable")
+    cache = DynamoDBDPoPReplayCache(client=client, table_name="agent-dpop-replay")
+
+    with pytest.raises(RuntimeError, match="unavailable"):
+        cache.consume(
+            "thumbprint-123:proof-123",
+            datetime.now(UTC) + timedelta(minutes=5),
+        )
+
+
+def test_dynamodb_dpop_replay_cache_rejects_invalid_configuration() -> None:
+    client = FakeDynamoDBReplayClient()
+    with pytest.raises(ValueError, match="table"):
+        DynamoDBDPoPReplayCache(client=client, table_name=" agent-dpop-replay ")
+    cache = DynamoDBDPoPReplayCache(client=client, table_name="agent-dpop-replay")
+    with pytest.raises(ValueError, match="timezone-aware"):
+        cache.consume("thumbprint-123:proof-123", datetime.now())
+
+
+def test_dpop_verifier_fails_closed_when_replay_cache_is_unavailable(
+    proof_context: tuple[DPoPProofVerifier, Any, ReplayCache],
+) -> None:
+    _, (private_key, public_jwk), _ = proof_context
+
+    class UnavailableReplayCache:
+        def consume(self, jti: str, expires_at: datetime) -> bool:
+            raise RuntimeError("replay store unavailable")
+
+    verifier = DPoPProofVerifier(replay_cache=UnavailableReplayCache())
+    proof = make_proof(private_key, public_jwk)
+    with pytest.raises(PermissionError, match="replay protection"):
         verifier.verify(
             proof,
             method="POST",
