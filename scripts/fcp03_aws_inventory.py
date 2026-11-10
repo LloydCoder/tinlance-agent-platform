@@ -101,19 +101,27 @@ def _route_entries_for_subnet(
 
 
 def _route_target(route: Mapping[str, Any]) -> str | None:
-    for key in (
-        "VpcEndpointId",
-        "NatGatewayId",
-        "GatewayId",
-        "TransitGatewayId",
-        "NetworkInterfaceId",
+    """Return a route target only when the AWS response has exactly one valid target."""
+    target_keys = (
+        "CarrierGatewayId",
+        "CoreNetworkArn",
         "EgressOnlyInternetGatewayId",
+        "GatewayId",
+        "InstanceId",
+        "IpAddress",
         "LocalGatewayId",
-    ):
-        value = route.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
+        "NatGatewayId",
+        "NetworkInterfaceId",
+        "OdbNetworkArn",
+        "TransitGatewayId",
+        "VpcEndpointId",
+        "VpcPeeringConnectionId",
+    )
+    values = [route[key] for key in target_keys if key in route and route[key] is not None]
+    if len(values) != 1:
+        return None
+    target = values[0]
+    return target if isinstance(target, str) and target else None
 
 
 def _security_group_egress(
