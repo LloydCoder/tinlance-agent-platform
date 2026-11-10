@@ -181,3 +181,26 @@ def test_no_broad_sg_or_nacl_internet_egress() -> None:
         if props.get("Egress") and props.get("CidrBlock") == "0.0.0.0/0":
             assert props["RuleAction"] == "deny"
             assert name == "WorkerNaclEgressDenyRest"
+
+
+
+def test_cloudformation_rules_reject_overlap_without_constant_false_assertions() -> None:
+    rule = load_template()["Rules"]["BlockedProbeMustNotBeApproved"]
+    assert "RuleCondition" not in rule
+    assert rule["Assertions"][0]["Assert"] == {
+        "Fn::Not": [
+            {
+                "Fn::Contains": [
+                    {"Ref": "ApprovedDomains"},
+                    {"Ref": "BlockedProbeDomain"},
+                ]
+            }
+        ]
+    }
+
+
+def test_userdata_shell_defaults_do_not_collide_with_cloudformation_substitution() -> None:
+    script = _userdata_script()
+    assert "${APPROVED_ANS:-0}" not in script
+    assert "${APPROVED_STATUS:-UNKNOWN}" not in script
+    assert "${BLOCKED_STATUS}" not in script
