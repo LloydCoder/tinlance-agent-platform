@@ -12,7 +12,7 @@
 
 set -Eeuo pipefail
 
-for command in ip nft sysctl dnsmasq dig python3 sha256sum awk grep; do
+for command in ip nft sysctl dnsmasq dig python3 sha256sum awk grep openssl; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'missing required command: %s\n' "$command" >&2
     exit 2
@@ -31,6 +31,12 @@ worker_if="f3w${suffix}"
 resolver_if="f3d${suffix}"
 log_file="/tmp/fcp03-dnsmasq-${suffix}.log"
 server_file="$(mktemp /tmp/fcp03-https.XXXXXX.py)"
+ca_cert="$(mktemp /tmp/fcp03-ca.XXXXXX.crt)"
+ca_key="$(mktemp /tmp/fcp03-ca.XXXXXX.key)"
+server_key="$(mktemp /tmp/fcp03-server.XXXXXX.key)"
+server_csr="$(mktemp /tmp/fcp03-server.XXXXXX.csr)"
+server_cert="$(mktemp /tmp/fcp03-server.XXXXXX.crt)"
+ext_file="$(mktemp /tmp/fcp03-server.XXXXXX.ext)"
 resolver_pid=""
 server_pid=""
 
@@ -69,7 +75,7 @@ cleanup() {
   ip netns del "$worker_ns" >/dev/null 2>&1
   ip netns del "$resolver_ns" >/dev/null 2>&1
   ip link del "$worker_if" >/dev/null 2>&1
-  rm -f "$log_file" "$server_file"
+  rm -f "$log_file" "$server_file" "$ca_cert" "$ca_key" "$server_key" "$server_csr" "$server_cert" "$ext_file" "${ca_cert}.srl"
 }
 trap cleanup EXIT
 
@@ -119,25 +125,56 @@ ip netns exec "$resolver_ns" dnsmasq \
   --address=/metadata.test/169.254.169.254 >"$log_file" 2>&1 &
 resolver_pid="$!"
 
+openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+  -keyout "$ca_key" -out "$ca_cert" -subj "/CN=FCP03 Disposable Test CA" >/dev/null 2>&1
+openssl req -newkey rsa:2048 -nodes -keyout "$server_key" -out "$server_csr" \
+  -subj "/CN=allowed.test" >/dev/null 2>&1
+cat >"$ext_file" <<'CERT'
+subjectAltName=DNS:allowed.test
+extendedKeyUsage=serverAuth
+keyUsage=digitalSignature,keyEncipherment
+basicConstraints=CA:FALSE
+CERT
+openssl x509 -req -sha256 -days 1 -in "$server_csr" -CA "$ca_cert" -CAkey "$ca_key" \
+  -CAcreateserial -out "$server_cert" -extfile "$ext_file" >/dev/null 2>&1
+
 cat >"$server_file" <<'PY'
+import os
+import pwd
 import socket
+import ssl
 import threading
 
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain(os.environ["FCP03_SERVER_CERT"], os.environ["FCP03_SERVER_KEY"])
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 listener.bind(("10.203.0.10", 443))
 listener.listen(8)
 
+nobody = pwd.getpwnam("nobody")
+os.setgroups([])
+os.setgid(nobody.pw_gid)
+os.setuid(nobody.pw_uid)
+
 def serve():
     while True:
-        conn, _ = listener.accept()
-        with conn:
-            conn.sendall(b"FCP03-LOCAL-HTTPS-OK")
+        raw, _ = listener.accept()
+        with context.wrap_socket(raw, server_side=True) as conn:
+            conn.recv(1024)
+            body = b"FCP03-LOCAL-HTTPS-OK"
+            conn.sendall(
+                b"HTTP/1.1 200 OK\\r\\n"
+                + (b"Content-Length: %d\\r\\n" % len(body))
+                + b"Connection: close\\r\\n\\r\\n"
+                + body
+            )
 
 threading.Thread(target=serve, daemon=True).start()
 threading.Event().wait()
 PY
-ip netns exec "$resolver_ns" python3 "$server_file" >/dev/null 2>&1 &
+FCP03_SERVER_CERT="$server_cert" FCP03_SERVER_KEY="$server_key" \
+  ip netns exec "$resolver_ns" python3 "$server_file" >/dev/null 2>&1 &
 server_pid="$!"
 
 # Only the approved resolver and one resolved HTTPS destination are reachable.
@@ -171,13 +208,24 @@ echo "FCP03_RESOLVER_READY=PASS"
 allowed_answer="$(ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 allowed.test A +time=1 +tries=1 +short)"
 test "$allowed_answer" = "10.203.0.10"
 echo "FCP03_ALLOWED_DNS_ANSWER=PASS"
-https_marker="$(ip netns exec "$worker_ns" python3 - <<'PY'
+https_marker="$(FCP03_CA_CERT="$ca_cert" ip netns exec "$worker_ns" python3 - <<'PY'
+import os
 import socket
-with socket.create_connection(("10.203.0.10", 443), timeout=1) as conn:
-    print(conn.recv(128).decode("ascii"))
+import ssl
+
+context = ssl.create_default_context(cafile=os.environ["FCP03_CA_CERT"])
+with socket.create_connection(("10.203.0.10", 443), timeout=1) as raw:
+    with context.wrap_socket(raw, server_hostname="allowed.test") as conn:
+        conn.sendall(
+            b"GET / HTTP/1.1\\r\\nHost: allowed.test\\r\\nConnection: close\\r\\n\\r\\n"
+        )
+        response = conn.recv(1024)
+        if b"FCP03-LOCAL-HTTPS-OK" not in response:
+            raise SystemExit("local HTTPS response marker missing")
+        print("FCP03-HTTPS-CERTIFICATE-AND-SNI-VERIFIED")
 PY
 )"
-test "$https_marker" = "FCP03-LOCAL-HTTPS-OK"
+test "$https_marker" = "FCP03-HTTPS-CERTIFICATE-AND-SNI-VERIFIED"
 echo "FCP03_APPROVED_HTTPS_PROBE=PASS"
 
 # DNS query policy is evaluated separately from packet-path policy.
@@ -280,7 +328,7 @@ printf 'FCP03_LOCAL_DNS_ALLOW=PASS\n'
 printf 'FCP03_LOCAL_DNS_BLOCK_NXDOMAIN=PASS\n'
 printf 'FCP03_DNS_REBINDING_RESOLUTION=OBSERVED\n'
 printf 'FCP03_DNS_QUERY_LOG_CORRELATION=PASS\n'
-printf 'FCP03_APPROVED_HTTPS_DESTINATION=PASS\n'
+printf 'FCP03_APPROVED_HTTPS_TLS_SNI=PASS\n'
 printf 'FCP03_DIRECT_DNS_UDP_TCP_BYPASS=BLOCKED\n'
 printf 'FCP03_DOH_DIRECT_IP_BYPASS=BLOCKED_BY_EGRESS_POLICY\n'
 printf 'FCP03_DOT_853=BLOCKED\n'
