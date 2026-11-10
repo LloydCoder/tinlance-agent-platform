@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import hmac
 import json
 import re
 from dataclasses import dataclass
@@ -215,4 +214,6 @@ class DPoPProofVerifier:
 
 def hmac_compare(left: str, right: str) -> bool:
     """Compare proof bindings without data-dependent early exit."""
+    import hmac
+
     return hmac.compare_digest(left.encode("ascii", errors="ignore"), right.encode("ascii"))
