@@ -172,3 +172,18 @@ def test_otel_sink_emits_tenant_bound_security_log_without_secret_payloads() -> 
     assert record["attributes"]["platform.tenant_id"] == "tenant-a"
     assert record["attributes"]["platform.outcome"] == "deny"
     assert "token" not in record["attributes"]
+
+
+def test_otel_sink_bounds_metric_instruments_and_rejects_unit_reuse() -> None:
+    sink = OpenTelemetryObservabilitySink(
+        tracer=FakeTracer(),
+        meter=FakeMeter(),
+        logger=FakeLogger(),
+        max_histograms=1,
+    )
+    sink.emit_metric(MetricPoint("tenant-a", "agent.execution.duration", 1.0, "ms"))
+
+    with pytest.raises(ValueError, match="another unit"):
+        sink.emit_metric(MetricPoint("tenant-a", "agent.execution.duration", 1.0, "s"))
+    with pytest.raises(ValueError, match="instrument limit"):
+        sink.emit_metric(MetricPoint("tenant-a", "unbounded.metric.name", 1.0, "ms"))
