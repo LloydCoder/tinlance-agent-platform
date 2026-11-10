@@ -141,7 +141,6 @@ class InMemoryObservabilitySink:
             self._security.append(event)
 
 
-
 class OpenTelemetrySpan(Protocol):
     def set_attribute(self, key: str, value: object) -> None: ...
     def end(self, *, end_time: int | None = None) -> None: ...
