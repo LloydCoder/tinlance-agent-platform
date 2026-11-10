@@ -19,7 +19,11 @@ def _all_pages(client: Any, operation: str, result_key: str, **params: Any) -> l
     seen_tokens: set[str] = set()
     while True:
         response = getattr(client, operation)(**request)
-        page = response.get(result_key, [])
+        if not isinstance(response, Mapping):
+            raise ValueError(f"AWS {operation} returned an invalid response object")
+        if result_key not in response:
+            raise ValueError(f"AWS {operation} omitted {result_key} collection")
+        page = response[result_key]
         if not isinstance(page, list):
             raise ValueError(f"AWS {operation} returned an invalid {result_key} collection")
         items.extend(page)
