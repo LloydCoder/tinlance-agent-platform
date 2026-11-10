@@ -305,7 +305,7 @@ def test_known_doh_resolvers_are_denied_before_the_approved_domain_allowlist() -
     assert set(rules_source["TargetTypes"]) == {"TLS_SNI", "HTTP_HOST"}
     assert {
         "cloudflare-dns.com",
-        "*.cloudflare-dns.com",
+        ".cloudflare-dns.com",
         "dns.google",
         "dns.quad9.net",
         "doh.opendns.com",
