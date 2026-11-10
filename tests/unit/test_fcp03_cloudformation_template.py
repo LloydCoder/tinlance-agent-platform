@@ -356,3 +356,24 @@ def test_blocked_dns_probe_domain_must_not_be_in_the_approved_list() -> None:
             }
         ]
     }
+
+
+def test_firewall_cloudwatch_logs_use_a_scoped_customer_managed_kms_key() -> None:
+    resources = load_template()["Resources"]
+    log_group = resources["FirewallLogGroup"]["Properties"]
+    key = resources["FirewallLogKey"]["Properties"]
+
+    assert log_group["KmsKeyId"] == {"Fn::GetAtt": ["FirewallLogKey", "Arn"]}
+    assert key["KeySpec"] == "SYMMETRIC_DEFAULT"
+    assert key["KeyUsage"] == "ENCRYPT_DECRYPT"
+    assert key["EnableKeyRotation"] is True
+
+    statements = key["KeyPolicy"]["Statement"]
+    log_service = next(
+        statement for statement in statements if statement["Sid"] == "CloudWatchLogsEncryption"
+    )
+    assert log_service["Principal"]["Service"] == {"Fn::Sub": "logs.${AWS::Region}.amazonaws.com"}
+    assert log_service["Condition"]["ArnEquals"]["kms:EncryptionContext:aws:logs:arn"] == {
+        "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:"
+        "log-group:/aws/network-firewall/${AWS::StackName}"
+    }

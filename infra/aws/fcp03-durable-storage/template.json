@@ -276,6 +276,16 @@
             "Value": "snapshot-hmac-signing"
           }
         ]
+      },
+      "Metadata": {
+        "checkov": {
+          "skip": [
+            {
+              "id": "CKV_AWS_7",
+              "comment": "KMS automatic rotation is not supported for HMAC_256 keys. Rotate signing keys through an application-managed key-version migration with dual verification."
+            }
+          ]
+        }
       }
     },
     "TokenRevocationTable": {
@@ -453,7 +463,13 @@
             "Key": "Purpose",
             "Value": "immutable-workspace-snapshots"
           }
-        ]
+        ],
+        "LoggingConfiguration": {
+          "DestinationBucketName": {
+            "Ref": "SnapshotAccessLogsBucket"
+          },
+          "LogFilePrefix": "snapshot-access/"
+        }
       }
     },
     "SnapshotBucketPolicy": {
@@ -707,6 +723,138 @@
                   "SigningKey",
                   "Arn"
                 ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "SnapshotAccessLogsBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerPreferred"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireCurrentAccessLogs",
+              "Status": "Enabled",
+              "ExpirationInDays": 365,
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 30
+              },
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "snapshot-access-logs"
+          }
+        ]
+      },
+      "Metadata": {
+        "checkov": {
+          "skip": [
+            {
+              "id": "CKV_AWS_18",
+              "comment": "This is the dedicated S3 server-access-log destination. Logging it to another bucket would create recursive access-log delivery; protect it with CloudTrail data events at deployment."
+            }
+          ]
+        }
+      }
+    },
+    "SnapshotAccessLogsBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "SnapshotAccessLogsBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowS3ServerAccessLogs",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "logging.s3.amazonaws.com"
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${SnapshotAccessLogsBucket.Arn}/snapshot-access/*"
+              },
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "SnapshotBucket",
+                      "Arn"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "SnapshotAccessLogsBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${SnapshotAccessLogsBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
               }
             }
           ]
