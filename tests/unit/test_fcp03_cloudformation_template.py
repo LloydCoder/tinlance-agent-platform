@@ -337,3 +337,18 @@ def test_worker_bootstrap_probes_known_network_egress_bypass_classes() -> None:
         "FCP03_TEST_DNS_REBIND=UNEXPECTED_PASS",
     ):
         assert marker in bootstrap
+
+def test_blocked_dns_probe_domain_must_not_be_in_the_approved_list() -> None:
+    rule = load_template()["Rules"]["BlockedProbeMustNotBeApproved"]
+    assertion = rule["Assertions"][0]
+
+    assert assertion["Assert"] == {
+        "Fn::Not": [
+            {
+                "Fn::Contains": [
+                    {"Ref": "ApprovedDomains"},
+                    {"Ref": "BlockedProbeDomain"},
+                ]
+            }
+        ]
+    }
