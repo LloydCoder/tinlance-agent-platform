@@ -16,8 +16,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from urllib.parse import urlsplit
 
-
-
 _ALLOWED_DPOP_ALGORITHMS = frozenset({"ES256", "RS256", "PS256", "EdDSA"})
 _JTI_PATTERN = re.compile(r"^[A-Za-z0-9._~-]{1,256}$")
 
@@ -129,10 +127,9 @@ class DPoPProofVerifier:
             raise PermissionError(
                 "DPoP proof issued-at claim is outside the supported range"
             ) from exc
-        if (
-            issued_at > current + timedelta(seconds=self.clock_skew_seconds)
-            or issued_at < current - timedelta(seconds=self.max_age_seconds)
-        ):
+        if issued_at > current + timedelta(
+            seconds=self.clock_skew_seconds
+        ) or issued_at < current - timedelta(seconds=self.max_age_seconds):
             raise PermissionError("DPoP proof freshness window has elapsed or is not yet valid")
 
         jti = claims.get("jti")
@@ -177,9 +174,7 @@ class DPoPProofVerifier:
             raise PermissionError("DPoP request URI must be a valid HTTPS URI") from exc
 
     @staticmethod
-    def _public_key_and_thumbprint(
-        jwk: dict[str, object], algorithm: str
-    ) -> tuple[object, str]:
+    def _public_key_and_thumbprint(jwk: dict[str, object], algorithm: str) -> tuple[object, str]:
         kty = jwk.get("kty")
         required_members = {
             "EC": ("crv", "kty", "x", "y"),
