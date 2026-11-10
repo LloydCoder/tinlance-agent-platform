@@ -12,10 +12,10 @@ import math
 import re
 import ssl
 from dataclasses import dataclass, field
+from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
-from typing import Callable
 
 from .scoped import ScopedSecretHandle, SecretResolutionError
 
@@ -148,7 +148,9 @@ class OpenBaoSecretProvider:
         except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
             raise SecretResolutionError("OpenBao returned an invalid KV v2 response") from None
 
-        if type(actual_version) is not int or actual_version != int(version):
+        if isinstance(actual_version, bool) or not isinstance(actual_version, int):
+            raise SecretResolutionError("OpenBao returned an invalid secret version")
+        if actual_version != int(version):
             raise SecretResolutionError("OpenBao returned a different secret version")
         if not isinstance(value, str) or not value:
             raise SecretResolutionError("OpenBao secret value is missing or invalid")
