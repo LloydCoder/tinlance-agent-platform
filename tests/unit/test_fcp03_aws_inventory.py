@@ -60,6 +60,8 @@ def ec2_client() -> FakeClient:
                             "VpcId": "vpc-worker",
                             "CidrBlock": "10.20.1.0/24",
                             "MapPublicIpOnLaunch": False,
+                            "AssignIpv6AddressOnCreation": False,
+                            "Ipv6CidrBlockAssociationSet": [],
                         }
                     ]
                 },
@@ -965,3 +967,23 @@ def test_collector_rejects_malformed_dns_firewall_rule_action(action: object) ->
     )
 
     assert "dns-firewall-rule-set-invalid" in evaluate_fcp03_topology(snapshot)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["AssignIpv6AddressOnCreation", "Ipv6CidrBlockAssociationSet"],
+)
+def test_collector_preserves_unknown_subnet_ipv6_inventory(field: str) -> None:
+    ec2 = ec2_client()
+    subnet = ec2.responses["describe_subnets"][0]["Subnets"][0]
+    subnet.pop(field)
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["ipv6_enabled"] is None
+    assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
