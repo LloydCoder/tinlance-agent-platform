@@ -987,3 +987,20 @@ def test_collector_preserves_unknown_subnet_ipv6_inventory(field: str) -> None:
 
     assert snapshot["worker"]["ipv6_enabled"] is None
     assert "worker-ipv6-egress-enabled" in evaluate_fcp03_topology(snapshot)
+
+
+@pytest.mark.parametrize("extra_target", ["local", {"unexpected": "mapping"}, ""])
+def test_collector_rejects_multiple_route_target_fields(extra_target: object) -> None:
+    ec2 = ec2_client()
+    worker_default_route = ec2.responses["describe_route_tables"][0]["RouteTables"][0]["Routes"][1]
+    worker_default_route["GatewayId"] = extra_target
+
+    snapshot = collect_fcp03_snapshot(
+        instance_id="i-test",
+        ec2=ec2,
+        network_firewall=firewall_client(),
+        resolver=resolver_client(),
+    )
+
+    assert snapshot["worker"]["route_entries"][1]["target"] is None
+    assert "worker-route-inventory-invalid" in evaluate_fcp03_topology(snapshot)
