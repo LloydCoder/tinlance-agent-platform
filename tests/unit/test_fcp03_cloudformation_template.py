@@ -70,7 +70,10 @@ def test_worker_has_no_public_or_ipv6_path_and_uses_firewall_default_route() -> 
     assert "FCP03_TEST_DNS_APPROVED=PASS" in bootstrap
     bootstrap = worker_instance["UserData"]["Fn::Base64"]["Fn::Sub"]
     assert isinstance(bootstrap, list)
-    assert bootstrap[1] == {"ApprovedProbeDomain": {"Fn::Select": [0, {"Ref": "ApprovedDomains"}]}}
+    assert bootstrap[1] == {
+        "ApprovedProbeDomain": {"Fn::Select": [0, {"Ref": "ApprovedDomains"}]},
+        "BlockedProbeDomain": {"Ref": "BlockedProbeDomain"},
+    }
     assert "FCP03_TEST_HTTPS_APPROVED=PASS" in bootstrap[0]
     assert "FCP03_TEST_DIRECT_IP=INCONCLUSIVE_REQUIRES_FLOW_EVIDENCE" in bootstrap[0]
     assert "FCP03_TEST_DIRECT_IP=EXPECTED_BLOCK_OR_UNAVAILABLE" not in bootstrap[0]
@@ -325,6 +328,7 @@ def test_worker_bootstrap_probes_known_network_egress_bypass_classes() -> None:
     bootstrap = worker["UserData"]["Fn::Base64"]["Fn::Sub"][0]
 
     for marker in (
+        "FCP03_TEST_DNS_UNAPPROVED=UNEXPECTED_PASS",
         "FCP03_TEST_DOH=UNEXPECTED_PASS",
         "FCP03_TEST_DOT=UNEXPECTED_PASS",
         "FCP03_TEST_QUIC=UNEXPECTED_PASS",
