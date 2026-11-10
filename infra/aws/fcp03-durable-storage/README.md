@@ -8,6 +8,7 @@ This CloudFormation template is a **deployment candidate**, not a deployed produ
 - A separate KMS HMAC-256 key for workspace snapshot signing.
 - On-demand DynamoDB tables for token revocation and DPoP replay records. Both have TTL on `expires_at`, point-in-time recovery, and customer-managed KMS encryption.
 - A versioned S3 snapshot bucket with S3 Object Lock in COMPLIANCE mode, configurable default retention, SSE-KMS, bucket-owner-enforced ownership, public-access blocking, TLS-only access, exact snapshot-prefix write policy and version-deletion denial.
+- A separate S3 server-access-log destination with bucket-owner-preferred ownership (ACLs enabled for log delivery), SSE-S3, public-access blocking, source-account/source-bucket-scoped delivery policy, one-year current-log expiry and 30-day noncurrent-version expiry. The log destination is retained with the stack's other durable resources.
 - A detached IAM managed policy scoped to the two DynamoDB tables, the snapshot prefix and the two KMS keys.
 
 The table partition keys match the low-level adapters:
