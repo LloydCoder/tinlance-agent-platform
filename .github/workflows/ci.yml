@@ -25,6 +25,10 @@ jobs:
       - run: python -m pip install --upgrade pip && pip install -e ".[test,security]"
       - run: python -m pip check
       - run: python -m compileall -q packages tests
+      - name: Diagnose Ruff import normalization
+        run: |
+          ruff check --fix packages/secrets/src/tinlance_agent_platform_secrets/openbao.py || true
+          git diff -- packages/secrets/src/tinlance_agent_platform_secrets/openbao.py
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy packages
