@@ -1,0 +1,47 @@
+name: FCP-03 Linux DNS and Egress Qualification
+
+on:
+  pull_request:
+    paths:
+      - "scripts/fcp03_linux_dns_egress_lab.sh"
+      - ".github/workflows/fcp03-linux-dns-egress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcp03-linux-dns-egress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-linux-policy:
+    name: dnsmasq DNS policy and nftables egress lab
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned distro lab prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            iproute2 nftables dnsmasq-base dnsutils openssl shellcheck
+
+      - name: Validate shell syntax and static analysis
+        run: |
+          set -euo pipefail
+          bash -n scripts/fcp03_linux_dns_egress_lab.sh
+          shellcheck --severity=style scripts/fcp03_linux_dns_egress_lab.sh
+          dnsmasq --version
+          nft --version
+          ip -Version
+
+      - name: Run isolated DNS and packet-policy integration tests
+        run: |
+          set -euo pipefail
+          sudo bash scripts/fcp03_linux_dns_egress_lab.sh
