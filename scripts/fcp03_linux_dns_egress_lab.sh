@@ -118,7 +118,7 @@ server:
   do-tcp: yes
   access-control: 10.203.0.2/32 allow
   username: "unbound"
-  chroot: ""
+  chroot: "/"
   directory: "/tmp"
   logfile: "/tmp/fcp03-unbound-runtime.log"
   pidfile: "/tmp/fcp03-unbound-runtime.pid"
