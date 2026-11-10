@@ -16,11 +16,17 @@ def test_accepts_a_teardown_deadline_inside_the_bounded_window() -> None:
     assert result == NOW + datetime.timedelta(minutes=90)
 
 
+def test_accepts_the_maximum_24_hour_teardown_window() -> None:
+    result = teardown.validate_teardown_at("2026-11-10T09:00:00", now=NOW)
+
+    assert result == NOW + datetime.timedelta(hours=24)
+
+
 @pytest.mark.parametrize(
     "value",
     [
         "2026-11-09T09:14:59",
-        "2026-11-09T11:00:01",
+        "2026-11-10T09:00:01",
         "2026-11-09T10:30:00Z",
         "2026-11-09T10:30:00+01:00",
         "not-a-time",
