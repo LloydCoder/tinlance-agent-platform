@@ -19,8 +19,9 @@ from tinlance_agent_platform_secrets.scoped import (
 
 
 class _Response:
-    def __init__(self, payload: object, status: int = 200) -> None:
+    def __init__(self, payload: object, status: int = 200, url: str = "") -> None:
         self.status = status
+        self.url = url
         self._body = json.dumps(payload).encode("utf-8")
 
     def __enter__(self) -> _Response:
@@ -28,6 +29,9 @@ class _Response:
 
     def __exit__(self, *args: object) -> None:
         return None
+
+    def geturl(self) -> str:
+        return self.url
 
     def read(self, limit: int = -1) -> bytes:
         return self._body if limit < 0 else self._body[:limit]
@@ -73,7 +77,7 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
         seen["request"] = request
         seen["timeout"] = timeout
         seen["context"] = context
-        return _Response(_payload())
+        return _Response(_payload(), url=request.full_url)
 
     monkeypatch.setattr(openbao_module, "urlopen", fake_urlopen)
     provider = OpenBaoSecretProvider(
@@ -89,7 +93,9 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
         "https://bao.example:8200/v1/secret/data/team/model-provider?version=3"
     )
     assert request.get_method() == "GET"
-    assert request.get_header("X-vault-token") == "test-token"
+    assert request.unredirected_hdrs.get("X-Vault-Token") == "test-token"
+    assert request.get_header("X-vault-token") is None
+    assert request.get_header("Cache-control") == "no-store"
     assert request.get_header("X-vault-request") == "true"
     assert seen["timeout"] == 3.0
     assert isinstance(seen["context"], ssl.SSLContext)
@@ -227,7 +233,7 @@ def test_openbao_rejects_version_mismatch_and_malformed_payload(
     monkeypatch.setattr(
         openbao_module,
         "urlopen",
-        lambda request, *, timeout, context: _Response(_payload(version=2)),
+        lambda request, *, timeout, context: _Response(_payload(version=2), url=request.full_url),
     )
     provider = OpenBaoSecretProvider(
         base_url="https://bao.example:8200",
@@ -239,9 +245,28 @@ def test_openbao_rejects_version_mismatch_and_malformed_payload(
     monkeypatch.setattr(
         openbao_module,
         "urlopen",
-        lambda request, *, timeout, context: _Response({"data": {"data": []}}),
+        lambda request, *, timeout, context: _Response({"data": {"data": []}}, url=request.full_url),
     )
     with pytest.raises(SecretResolutionError):
+        provider.resolve(_handle())
+
+
+
+def test_openbao_rejects_redirected_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        openbao_module,
+        "urlopen",
+        lambda request, *, timeout, context: _Response(
+            _payload(), url="https://attacker.example/steal"
+        ),
+    )
+    provider = OpenBaoSecretProvider(
+        base_url="https://bao.example:8200",
+        token_provider=lambda: "test-token",
+    )
+    with pytest.raises(SecretResolutionError, match="redirects"):
         provider.resolve(_handle())
 
 
@@ -251,7 +276,7 @@ def test_openbao_rejects_oversized_response(
     monkeypatch.setattr(
         openbao_module,
         "urlopen",
-        lambda request, *, timeout, context: _Response(_payload("x" * 2048)),
+        lambda request, *, timeout, context: _Response(_payload("x" * 2048), url=request.full_url),
     )
     provider = OpenBaoSecretProvider(
         base_url="https://bao.example:8200",
