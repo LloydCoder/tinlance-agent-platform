@@ -183,7 +183,6 @@ def test_no_broad_sg_or_nacl_internet_egress() -> None:
             assert name == "WorkerNaclEgressDenyRest"
 
 
-
 def test_cloudformation_rules_reject_overlap_without_constant_false_assertions() -> None:
     rule = load_template()["Rules"]["BlockedProbeMustNotBeApproved"]
     assert "RuleCondition" not in rule
