@@ -28,7 +28,7 @@ Advance FCP-03 Workstream B under the $0 Network Firewall expenditure constraint
 
 Because both probes talk to the same reachable Resolver address, a differential outcome (`NOERROR` vs `NXDOMAIN`) is evidence of **name-policy** behaviour on that path, not merely “DNS works” vs “DNS fails.” Timeout/empty status is `INCONCLUSIVE_*`, never PASS.
 
-**Post-deploy acceptance** still requires archiving console markers **and** correlating with Resolver/DNS Firewall query logs (or equivalent) for the blocked name. Template-only review does not equal live qualification.
+**Post-deploy acceptance** requires archiving console markers **and** correlating the blocked name, RCODE, source address, and timestamp with Route 53 Resolver query logs. This template provisions a CloudWatch Logs destination with one-day retention and a service-scoped resource policy. CloudWatch Logs ingestion and storage are billable; include expected query volume in the separate deployment ceiling. Template-only review does not equal live qualification.
 
 ### Path isolation vs DNS Firewall (external resolver)
 
@@ -50,6 +50,7 @@ Treat `EXTERNAL_RESOLVER=PASS` as **network-isolation** evidence only. Do not ci
 | EBS gp3 8 GiB (encrypted, DeleteOnTermination) | **Yes** | ~$0.08/month ≈ $0.00011/hour storage |
 | DNS Firewall domain lists | **Yes** | ~$0.0005 per domain-month |
 | DNS Firewall query inspection | **Yes** | ~$0.60 per million queries |
+| Resolver query logs | **Yes** | CloudWatch Logs ingestion/storage; one-day retention configured |
 | EventBridge Scheduler one-shot | **Usually free** | Confirm free-tier headroom |
 
 **Maximum exposure example (before independent DELETE_COMPLETE):**
