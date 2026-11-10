@@ -222,7 +222,15 @@ class FakeDynamoDBReplayClient:
         assert isinstance(item, dict)
         replay_key = item["replay_key"]["S"]
         if replay_key in self.items:
-            raise ConditionalWriteError("ConditionalCheckFailedException")
+            condition = kwargs["ConditionExpression"]
+            if condition == "attribute_not_exists(replay_key) OR expires_at < :now":
+                values = kwargs["ExpressionAttributeValues"]
+                now = int(values[":now"]["N"])
+                previous_expiry = int(self.items[replay_key]["expires_at"]["N"])
+                if previous_expiry >= now:
+                    raise ConditionalWriteError("ConditionalCheckFailedException")
+            else:
+                raise ConditionalWriteError("ConditionalCheckFailedException")
         self.items[replay_key] = item
         return {}
 
@@ -237,7 +245,10 @@ def test_dynamodb_dpop_replay_cache_atomically_consumes_replay_ids() -> None:
 
     request = client.requests[0]
     assert request["TableName"] == "agent-dpop-replay"
-    assert request["ConditionExpression"] == "attribute_not_exists(replay_key)"
+    assert request["ConditionExpression"] == (
+        "attribute_not_exists(replay_key) OR expires_at < :now"
+    )
+    assert int(request["ExpressionAttributeValues"][":now"]["N"]) > 0
     item = request["Item"]
     assert item["expires_at"]["N"] == str(math.ceil(expiry.timestamp()))
 
@@ -281,3 +292,18 @@ def test_dpop_verifier_fails_closed_when_replay_cache_is_unavailable(
             uri="https://api.example.test/v1/agents?debug=1",
             access_token="access-token",
         )
+
+
+def test_dynamodb_dpop_replay_cache_reclaims_entries_after_expiry() -> None:
+    client = FakeDynamoDBReplayClient()
+    cache = DynamoDBDPoPReplayCache(client=client, table_name="agent-dpop-replay")
+    replay_key = hashlib.sha256(b"thumbprint-123:proof-expired").hexdigest()
+    client.items[replay_key] = {
+        "replay_key": {"S": replay_key},
+        "expires_at": {"N": "1"},
+    }
+
+    assert cache.consume(
+        "thumbprint-123:proof-expired",
+        datetime.now(UTC) + timedelta(minutes=5),
+    ) is True
