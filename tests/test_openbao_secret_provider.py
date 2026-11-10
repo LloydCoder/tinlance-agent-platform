@@ -81,7 +81,7 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
 
     monkeypatch.setattr(openbao_module, "urlopen", fake_urlopen)
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
         mount="secret",
     )
@@ -90,7 +90,7 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
     request = seen["request"]
     assert isinstance(request, Request)
     assert request.full_url == (
-        "https://bao.example:8200/v1/secret/data/tenants/tenant-a/team/model-provider?version=3"
+        "https://127.0.0.1:8200/v1/secret/data/tenants/tenant-a/team/model-provider?version=3"
     )
     assert request.get_method() == "GET"
     assert request.unredirected_hdrs.get("X-vault-token") == "test-token"
@@ -124,7 +124,7 @@ def test_openbao_rejects_path_traversal_and_url_injection(
 
     monkeypatch.setattr(openbao_module, "urlopen", forbidden_urlopen)
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
     )
 
@@ -136,7 +136,7 @@ def test_openbao_rejects_path_traversal_and_url_injection(
 @pytest.mark.parametrize("version", ["", "0", "-1", "1/2", "01", "9999999999"])
 def test_openbao_rejects_invalid_secret_versions(version: str) -> None:
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
     )
     with pytest.raises(SecretResolutionError):
@@ -146,7 +146,7 @@ def test_openbao_rejects_invalid_secret_versions(version: str) -> None:
 def test_openbao_requires_tls_except_explicit_loopback_test_mode() -> None:
     with pytest.raises(ValueError):
         OpenBaoSecretProvider(
-            base_url="http://bao.example:8200",
+            base_url="http://127.0.0.1:8200",
             token_provider=lambda: "test-token",
         )
 
@@ -168,7 +168,7 @@ def test_openbao_requires_tls_except_explicit_loopback_test_mode() -> None:
 def test_openbao_rejects_credentials_in_base_url() -> None:
     with pytest.raises(ValueError):
         OpenBaoSecretProvider(
-            base_url="https://user:password@bao.example:8200",
+            base_url="https://user:password@127.0.0.1:8200",
             token_provider=lambda: "test-token",
         )
 
@@ -191,7 +191,7 @@ def test_openbao_rejects_tenant_path_injection(
 
     monkeypatch.setattr(openbao_module, "urlopen", forbidden_urlopen)
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
     )
     with pytest.raises(SecretResolutionError):
@@ -230,7 +230,7 @@ def test_openbao_rejects_token_header_injection(
 
     monkeypatch.setattr(openbao_module, "urlopen", forbidden_urlopen)
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "token\r\nX-Evil: true",
     )
 
@@ -258,7 +258,7 @@ def test_openbao_maps_forbidden_response_without_leaking_body(
 
     monkeypatch.setattr(openbao_module, "urlopen", forbidden_urlopen)
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
     )
 
@@ -276,7 +276,7 @@ def test_openbao_rejects_version_mismatch_and_malformed_payload(
         lambda request, *, timeout, context: _Response(_payload(version=2), url=request.full_url),
     )
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
     )
     with pytest.raises(SecretResolutionError):
@@ -303,7 +303,7 @@ def test_openbao_rejects_redirected_response(
         ),
     )
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
     )
     with pytest.raises(SecretResolutionError, match="redirects"):
@@ -319,7 +319,7 @@ def test_openbao_rejects_oversized_response(
         lambda request, *, timeout, context: _Response(_payload("x" * 2048), url=request.full_url),
     )
     provider = OpenBaoSecretProvider(
-        base_url="https://bao.example:8200",
+        base_url="https://127.0.0.1:8200",
         token_provider=lambda: "test-token",
         max_response_bytes=1024,
     )
