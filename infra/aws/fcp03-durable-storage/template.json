@@ -595,7 +595,9 @@
             }
           ]
         }
-      }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
     },
     "WorkloadAccessPolicy": {
       "Type": "AWS::IAM::ManagedPolicy",
