@@ -222,3 +222,24 @@ def test_cpu_security_attestation_rejects_sentinel_microcode_revision(
 
     assert result.cpu_security_mitigations_ready is False
     assert "CPU microcode revision is unavailable, zero or sentinel" in result.cpu_security_warnings
+
+
+def test_arm_cpuinfo_processor_index_is_not_reported_as_cpu_model_name(tmp_path: Path) -> None:
+    write_probe_fixture(tmp_path, kvm=True)
+    (tmp_path / "proc/cpuinfo").write_text(
+        "processor: 0\nCPU implementer: 0x41\nCPU architecture: 8\n"
+        "CPU part: 0xd0c\nCPU revision: 1\n",
+        encoding="utf-8",
+    )
+
+    result = probe_host_capabilities(
+        root=tmp_path,
+        architecture="aarch64",
+        kernel_release="test-kernel",
+        binary_lookup=lambda _: None,
+        access_check=lambda *_: True,
+    )
+
+    assert result.cpu_model_name == ""
+    assert "CPU model is unavailable" in result.cpu_security_warnings
+    assert result.cpu_model == "0xd0c"

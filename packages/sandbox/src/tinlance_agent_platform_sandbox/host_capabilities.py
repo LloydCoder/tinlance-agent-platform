@@ -101,10 +101,11 @@ def probe_host_capabilities(
     cpu_vendor = _cpuinfo_value(cpuinfo_text, "vendor_id") or _cpuinfo_value(
         cpuinfo_text, "CPU implementer"
     )
-    cpu_model_name = (
-        _cpuinfo_value(cpuinfo_text, "model name")
-        or _cpuinfo_value(cpuinfo_text, "Hardware")
-        or _cpuinfo_value(cpuinfo_text, "Processor")
+    # Linux ARM exposes `processor: 0` as a logical CPU index, not a model name.
+    # Keep it out of the human-readable model field; CPU implementer/part/revision
+    # are captured independently below for ARM host identity evidence.
+    cpu_model_name = _cpuinfo_value(cpuinfo_text, "model name") or _cpuinfo_value(
+        cpuinfo_text, "Hardware"
     )
     cpu_family = _cpuinfo_value(cpuinfo_text, "cpu family") or _cpuinfo_value(
         cpuinfo_text, "CPU architecture"
