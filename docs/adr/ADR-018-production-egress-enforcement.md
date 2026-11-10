@@ -1,6 +1,6 @@
 # ADR-018 — Independent production egress and DNS enforcement
 
-- **Status:** Proposed for FCP-03 implementation; not deployed or production-approved
+- **Status:** Provider-neutral Linux DNS/egress lab CI-verified; AWS production enforcement remains proposed, not deployed or production-approved
 - **Date:** 2026-11-09
 - **Scope:** Tinlance Agent Platform production persistent-computer/browser egress
 - **Supersedes:** No prior ADR; extends ADR-015
