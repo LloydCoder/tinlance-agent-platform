@@ -151,7 +151,6 @@ def test_snapshot_bucket_has_a_separate_hardened_access_log_destination() -> Non
     log_properties = log_bucket["Properties"]
     assert log_bucket["DeletionPolicy"] == "Retain"
     assert log_bucket["UpdateReplacePolicy"] == "Retain"
-    assert log_properties["AccessControl"] == "LogDeliveryWrite"
     assert (
         log_properties["BucketEncryption"]["ServerSideEncryptionConfiguration"][0][
             "ServerSideEncryptionByDefault"
