@@ -54,8 +54,6 @@ jobs:
           test "$ready" -eq 1
 
       - name: Seed versioned tenant secret and issue a least-privilege token
-        env:
-          OPENBAO_ROOT_TOKEN: ci-only-root-token
         run: |
           set -euo pipefail
           api="http://127.0.0.1:8200/v1"
@@ -72,7 +70,6 @@ jobs:
             --data '{"data":{"value":"version-two"}}' \
             "$api/secret/data/tenants/tenant-a/fcp03/integration" >/dev/null
 
-          policy='path "secret/data/tenants/tenant-a/*" { capabilities = ["read"] }'
           curl --fail --silent --show-error --request PUT \
             --header "X-Vault-Token: $OPENBAO_ROOT_TOKEN" \
             --header "X-Vault-Request: true" \
@@ -108,7 +105,7 @@ jobs:
 
       - name: Print OpenBao diagnostics on failure
         if: failure()
-        run: docker logs fcp03-openbao
+        run: docker logs fcp03-openbao || true
 
       - name: Stop disposable OpenBao server
         if: always()
