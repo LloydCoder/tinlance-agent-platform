@@ -6,18 +6,17 @@ accepted only for an explicitly enabled loopback development/test endpoint.
 
 from __future__ import annotations
 
+import ipaddress
+import json
+import math
+import re
+import ssl
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
-
-import ipaddress
-import json
-import math
-import re
-import ssl
 
 from .scoped import ScopedSecretHandle, SecretResolutionError
 
