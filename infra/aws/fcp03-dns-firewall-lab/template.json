@@ -549,7 +549,8 @@
       "DependsOn": [
         "DNSFirewallConfig",
         "S3GatewayEndpoint",
-        "DynamoDBGatewayEndpoint"
+        "DynamoDBGatewayEndpoint",
+        "DNSQueryLoggingAssociation"
       ],
       "Properties": {
         "ImageId": {
@@ -695,6 +696,63 @@
           "Input": {
             "Fn::Sub": "{\"StackName\":\"${AWS::StackName}\"}"
           }
+        }
+      }
+    },
+    "DNSQueryLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/route53resolver/${AWS::StackName}"
+        },
+        "RetentionInDays": 1
+      },
+      "Metadata": {
+        "checkov": {
+          "skip": [
+            {
+              "id": "CKV_AWS_158",
+              "comment": "The disposable DNS lab uses CloudWatch Logs default AWS-owned encryption to avoid a separate billable CMK; one-day retention bounds stored evidence. Production logging must use a customer-managed key."
+            }
+          ]
+        }
+      }
+    },
+    "DNSQueryLogResourcePolicy": {
+      "Type": "AWS::Logs::ResourcePolicy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Sub": "${AWS::StackName}-resolver-query-logs"
+        },
+        "PolicyDocument": {
+          "Fn::Sub": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"route53resolver.amazonaws.com\"},\"Action\":[\"logs:CreateLogStream\",\"logs:PutLogEvents\"],\"Resource\":\"${DNSQueryLogGroup.Arn}:*\",\"Condition\":{\"StringEquals\":{\"aws:SourceAccount\":\"${AWS::AccountId}\"}}}]}"
+        }
+      }
+    },
+    "DNSQueryLoggingConfig": {
+      "Type": "AWS::Route53Resolver::ResolverQueryLoggingConfig",
+      "DependsOn": "DNSQueryLogResourcePolicy",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-resolver-query-logs"
+        },
+        "DestinationArn": {
+          "Fn::GetAtt": [
+            "DNSQueryLogGroup",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "DNSQueryLoggingAssociation": {
+      "Type": "AWS::Route53Resolver::ResolverQueryLoggingConfigAssociation",
+      "DependsOn": "DNSQueryLoggingConfig",
+      "Properties": {
+        "ResolverQueryLogConfigId": {
+          "Ref": "DNSQueryLoggingConfig"
+        },
+        "ResourceId": {
+          "Ref": "Vpc"
         }
       }
     }
