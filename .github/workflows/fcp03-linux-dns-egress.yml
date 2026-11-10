@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            iproute2 nftables dnsmasq-base dnsutils shellcheck
+            iproute2 nftables dnsmasq-base dnsutils openssl shellcheck
 
       - name: Validate shell syntax and static analysis
         run: |
