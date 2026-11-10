@@ -445,11 +445,11 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     associated_vpcs = _strings(dns_firewall.get("associated_vpc_ids"))
     if not isinstance(worker_vpc, str) or associated_vpcs != {worker_vpc}:
         findings.add("dns-resolution-pool-cross-vpc")
-    if (
-        not _strings(dns_firewall.get("allowlist_domains"))
-        or dns_firewall.get("terminal_block") is not True
-    ):
+    allowlist_domains = _strings(dns_firewall.get("allowlist_domains"))
+    if not allowlist_domains or dns_firewall.get("terminal_block") is not True:
         findings.add("dns-allowlist-incomplete")
+    if any("*" in domain for domain in allowlist_domains):
+        findings.add("dns-allowlist-wildcard-present")
     if dns_firewall.get("failure_mode") != "CLOSED":
         findings.add("dns-firewall-not-fail-closed")
     if dns_firewall.get("rule_group_status") != "COMPLETE":
@@ -460,6 +460,25 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     rule_statuses = _strings(dns_firewall.get("rule_statuses"))
     if not rule_statuses or rule_statuses != {"COMPLETE"}:
         findings.add("dns-firewall-rule-not-ready")
+    rule_actions = dns_firewall.get("rule_actions")
+    if (
+        not isinstance(rule_actions, Sequence)
+        or isinstance(rule_actions, (str, bytes))
+        or len(rule_actions) != 2
+        or _strings(rule_actions) != {"ALLOW", "BLOCK"}
+    ):
+        findings.add("dns-firewall-rule-set-invalid")
+    rule_priorities = dns_firewall.get("rule_priorities")
+    if (
+        not isinstance(rule_priorities, Sequence)
+        or isinstance(rule_priorities, (str, bytes))
+        or len(rule_priorities) != 2
+        or any(
+            type(priority) is not int or not 1 <= priority <= 10000 for priority in rule_priorities
+        )
+        or len(set(rule_priorities)) != len(rule_priorities)
+    ):
+        findings.add("dns-firewall-rule-priority-invalid")
     domain_list_statuses = _strings(dns_firewall.get("domain_list_statuses"))
     if not domain_list_statuses or domain_list_statuses != {"COMPLETE"}:
         findings.add("dns-firewall-domain-list-not-ready")
