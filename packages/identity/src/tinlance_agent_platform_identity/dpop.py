@@ -76,9 +76,7 @@ class DynamoDBDPoPReplayCache:
                     "expires_at": {"N": str(expiry_epoch)},
                 },
                 ConditionExpression="attribute_not_exists(replay_key) OR expires_at < :now",
-                ExpressionAttributeValues={
-                    ":now": {"N": str(int(datetime.now(UTC).timestamp()))}
-                },
+                ExpressionAttributeValues={":now": {"N": str(int(datetime.now(UTC).timestamp()))}},
             )
         except Exception as exc:
             response = getattr(exc, "response", None)
