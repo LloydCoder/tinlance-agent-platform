@@ -85,7 +85,7 @@ aws cloudformation create-stack \
   --parameters \
     ParameterKey=AvailabilityZone,ParameterValue=eu-west-1a \
     ParameterKey=ApprovedDomains,ParameterValue='example.com' \
-    ParameterKey=BlockedProbeDomain,ParameterValue='known-resolving-domain.example' \
+    ParameterKey=BlockedProbeDomain,ParameterValue='example.org' \
     ParameterKey=TeardownAtUtc,ParameterValue='<validated-future-UTC-time>'
 ```
 
