@@ -13,7 +13,10 @@ from tinlance_agent_platform_durability.snapshots import SnapshotConflictError, 
 from tinlance_agent_platform_events.publisher import PostgresOutboxPublisher
 
 DATABASE_URL = os.getenv("FCP03_DATABASE_URL")
-pytestmark = pytest.mark.skipif(not DATABASE_URL, reason="FCP03 live PostgreSQL URL is not configured")
+pytestmark = pytest.mark.skipif(
+    not DATABASE_URL,
+    reason="FCP03 live PostgreSQL URL is not configured",
+)
 _APP_ROLE = "fcp03_adapter_runtime"
 
 
@@ -58,7 +61,9 @@ def _configure_runtime_role() -> None:
             GRANT EXECUTE ON FUNCTION platform.claim_outbox_batch(integer, integer),
                 platform.ack_outbox(uuid, uuid),
                 platform.release_outbox(uuid, uuid, text, integer),
-                platform.record_workspace_snapshot(uuid, uuid, uuid, bigint, timestamptz, text, text),
+                platform.record_workspace_snapshot(
+                    uuid, uuid, uuid, bigint, timestamptz, text, text
+                ),
                 platform.get_workspace_snapshot(uuid, uuid, uuid),
                 platform.begin_workspace_restore(uuid, uuid, uuid, uuid, bigint),
                 platform.complete_workspace_restore(uuid, uuid, uuid, text),
@@ -100,12 +105,18 @@ def _seed_tenant(*, label: str) -> tuple[object, object, object, object]:
             INSERT INTO platform.tasks (
                 task_id, tenant_id, agent_id, agent_version, requester_subject_id,
                 status, objective
-            ) VALUES (%s, %s, %s, '1.0.0', 'fcp03-owner', 'queued', 'FCP-03 live adapter qualification')
+            ) VALUES (
+                %s, %s, %s, '1.0.0', 'fcp03-owner', 'queued',
+                'FCP-03 live adapter qualification'
+            )
             """,
             (task_id, tenant_id, agent_id),
         )
         connection.execute(
-            "INSERT INTO platform.runs (run_id, tenant_id, task_id, status) VALUES (%s, %s, %s, 'created')",
+            """
+            INSERT INTO platform.runs (run_id, tenant_id, task_id, status)
+            VALUES (%s, %s, %s, 'created')
+            """,
             (run_id, tenant_id, task_id),
         )
     return tenant_id, agent_id, task_id, run_id
