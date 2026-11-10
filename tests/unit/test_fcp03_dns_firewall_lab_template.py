@@ -203,3 +203,29 @@ def test_userdata_shell_defaults_do_not_collide_with_cloudformation_substitution
     assert "${APPROVED_ANS:-0}" not in script
     assert "${APPROVED_STATUS:-UNKNOWN}" not in script
     assert "${BLOCKED_STATUS}" not in script
+
+
+
+def test_dns_firewall_lab_enables_resolver_query_log_correlation() -> None:
+    resources = load_template()["Resources"]
+    types = {resource["Type"] for resource in resources.values()}
+
+    assert "AWS::Logs::LogGroup" in types
+    assert "AWS::Logs::ResourcePolicy" in types
+    assert "AWS::Route53Resolver::ResolverQueryLoggingConfig" in types
+    assert "AWS::Route53Resolver::ResolverQueryLoggingConfigAssociation" in types
+
+    log_group = resources["DNSQueryLogGroup"]["Properties"]
+    assert log_group["RetentionInDays"] == 1
+    assert log_group["LogGroupName"] == {
+        "Fn::Sub": "/aws/route53resolver/${AWS::StackName}"
+    }
+    config = resources["DNSQueryLoggingConfig"]
+    assert config["Properties"]["DestinationArn"] == {
+        "Fn::GetAtt": ["DNSQueryLogGroup", "Arn"]
+    }
+    association = resources["DNSQueryLoggingAssociation"]
+    assert association["Properties"]["ResourceId"] == {"Ref": "Vpc"}
+    assert association["Properties"]["ResolverQueryLogConfigId"] == {
+        "Ref": "DNSQueryLoggingConfig"
+    }
