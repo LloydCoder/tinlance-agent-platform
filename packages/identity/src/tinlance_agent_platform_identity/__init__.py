@@ -8,6 +8,7 @@ from .cognito_pretoken import (
     build_cognito_pretoken_handler,
 )
 from .federation import IdentityVerifier, VerifiedAgentIdentity, require_verified_identity
+from .dpop import DPoPProofVerifier, DPoPReplayCache, VerifiedDPoPProof
 from .jwt_verifier import JWKSIdentityVerifier, SigningKeyProvider
 from .resolver import (
     IdentityAuthenticationError,
@@ -25,6 +26,9 @@ from .token_security import TokenSecurityContext
 
 __all__ = [
     "IdentityVerifier",
+    "DPoPProofVerifier",
+    "DPoPReplayCache",
+    "VerifiedDPoPProof",
     "VerifiedAgentIdentity",
     "require_verified_identity",
     "validate_principal",
