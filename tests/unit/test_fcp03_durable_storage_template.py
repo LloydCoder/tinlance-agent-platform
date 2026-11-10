@@ -5,13 +5,7 @@ import pathlib
 import re
 import typing
 
-TEMPLATE_PATH = (
-    pathlib.Path(__file__).parents[2]
-    / "infra"
-    / "aws"
-    / "fcp03-durable-storage"
-    / "template.json"
-)
+TEMPLATE_PATH = pathlib.Path(__file__).parents[2] / "infra" / "aws" / "fcp03-durable-storage" / "template.json"
 
 
 def load_template() -> dict[str, typing.Any]:
@@ -70,15 +64,11 @@ def test_snapshot_bucket_enforces_immutable_retained_storage() -> None:
         "BlockPublicPolicy": True,
         "RestrictPublicBuckets": True,
     }
-    assert properties["OwnershipControls"]["Rules"] == [
-        {"ObjectOwnership": "BucketOwnerEnforced"}
-    ]
+    assert properties["OwnershipControls"]["Rules"] == [{"ObjectOwnership": "BucketOwnerEnforced"}]
 
 
 def test_kms_policy_separates_service_data_use_from_grant_creation() -> None:
-    statements = load_template()["Resources"]["DataKey"]["Properties"]["KeyPolicy"][
-        "Statement"
-    ]
+    statements = load_template()["Resources"]["DataKey"]["Properties"]["KeyPolicy"]["Statement"]
     by_sid = {statement["Sid"]: statement for statement in statements}
 
     assert by_sid["AccountKeyAdministration"]["Principal"]["AWS"]["Fn::Join"]
@@ -107,14 +97,10 @@ def test_workload_policy_is_scoped_to_the_identity_tables_snapshot_prefix_and_ke
     assert by_sid["TokenRevocationOperations"]["Resource"] == {
         "Fn::GetAtt": ["TokenRevocationTable", "Arn"]
     }
-    assert by_sid["DPoPReplayOperations"]["Resource"] == {
-        "Fn::GetAtt": ["DPoPReplayTable", "Arn"]
-    }
+    assert by_sid["DPoPReplayOperations"]["Resource"] == {"Fn::GetAtt": ["DPoPReplayTable", "Arn"]}
     assert by_sid["SnapshotObjectOperations"]["Resource"]["Fn::Join"]
     assert "s3:DeleteObject" not in by_sid["SnapshotObjectOperations"]["Action"]
-    assert by_sid["SnapshotHMACOperations"]["Resource"] == {
-        "Fn::GetAtt": ["SigningKey", "Arn"]
-    }
+    assert by_sid["SnapshotHMACOperations"]["Resource"] == {"Fn::GetAtt": ["SigningKey", "Arn"]}
 
 
 def test_snapshot_bucket_policy_enforces_transport_encryption_and_deletion_controls() -> None:
