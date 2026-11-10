@@ -265,9 +265,9 @@ class JWKSIdentityVerifier:
 
     @staticmethod
     def _sender_key_thumbprint(claims: dict[str, Any]) -> str | None:
-        confirmation = claims.get("cnf")
-        if confirmation is None:
+        if "cnf" not in claims:
             return None
+        confirmation = claims["cnf"]
         if not isinstance(confirmation, dict) or set(confirmation) != {"jkt"}:
             raise PermissionError("identity confirmation claim is malformed or unsupported")
         thumbprint = confirmation.get("jkt")
