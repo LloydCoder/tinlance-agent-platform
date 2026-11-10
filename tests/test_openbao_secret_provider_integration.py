@@ -62,7 +62,6 @@ def test_openbao_kv_v2_reads_pinned_versions_through_scoped_broker() -> None:
     assert _resolve(broker, _handle("2")) == "version-two"
 
 
-
 def test_openbao_token_policy_denies_another_tenant() -> None:
     address, token = _test_configuration()
     provider = OpenBaoSecretProvider(
