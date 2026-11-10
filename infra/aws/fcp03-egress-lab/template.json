@@ -14,7 +14,7 @@
     },
     "TeardownAtUtc": {
       "Type": "String",
-      "Description": "Required UTC timestamp YYYY-MM-DDTHH:MM:SS. Validate with scripts/validate_fcp03_teardown_at.py; must be 15 minutes to 2 hours after deployment."
+      "Description": "Required UTC timestamp YYYY-MM-DDTHH:MM:SS. Validate with scripts/validate_fcp03_teardown_at.py; must be 15 minutes to 24 hours after deployment."
     },
     "WorkerInstanceType": {
       "Type": "String",
