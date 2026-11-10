@@ -12,7 +12,7 @@
 
 set -Eeuo pipefail
 
-for command in ip nft sysctl unbound unbound-checkconf dig python3 sha256sum awk grep; do
+for command in ip nft sysctl unbound unbound-checkconf dig python3 sha256sum awk grep runuser; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'missing required command: %s\n' "$command" >&2
     exit 2
@@ -143,8 +143,9 @@ sed -i "s|/tmp/fcp03-unbound-runtime.log|$log_file|; s|/tmp/fcp03-unbound-runtim
 chown unbound:unbound "$config_file"
 chmod 640 "$config_file"  # Test-only resolver config contains no credentials.
 runuser -u unbound -- test -r "$config_file"
+ip netns exec "$resolver_ns" runuser -u unbound -- test -r "$config_file"
 unbound-checkconf "$config_file"
-ip netns exec "$resolver_ns" unbound -d -vv -c "$config_file" >"$stderr_file" 2>&1 &
+ip netns exec "$resolver_ns" runuser -u unbound -- unbound -d -vv -c "$config_file" >"$stderr_file" 2>&1 &
 resolver_pid="$!"
 
 cat >"$server_file" <<'PY'
