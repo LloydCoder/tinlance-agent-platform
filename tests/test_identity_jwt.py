@@ -426,3 +426,39 @@ def test_identity_claims_with_control_characters_are_rejected(
 
     with pytest.raises(PermissionError):
         service.verify(make_token(private_key, **overrides))
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"crit": ["b64"], "b64": False},
+        {"crit": ["unknown-security-extension"], "unknown-security-extension": True},
+        {"jku": "https://attacker.example.test/keys.json"},
+        {"x5u": "https://attacker.example.test/cert.pem"},
+        {"jwk": {"kty": "RSA", "n": "attacker", "e": "AQAB"}},
+        {"x5c": ["ZmFrZS1jZXJ0aWZpY2F0ZQ=="]},
+    ],
+)
+def test_jwks_verifier_rejects_unsupported_or_token_supplied_key_headers(
+    verifier: tuple[JWKSIdentityVerifier, Any], headers: dict[str, object]
+) -> None:
+    service, private_key = verifier
+    token = jwt.encode(
+        {
+            "iss": ISSUER,
+            "sub": "user-123",
+            "aud": AUDIENCE,
+            "jti": "token-123",
+            "iat": int(datetime.now(UTC).timestamp()),
+            "exp": int((datetime.now(UTC) + timedelta(minutes=5)).timestamp()),
+            "tenant_id": "tenant-123",
+            "client_id": "tinlance-test-client",
+            "principal_type": "user",
+        },
+        private_key,
+        algorithm="RS256",
+        headers={"typ": "at+jwt", "kid": "key-1", **headers},
+    )
+
+    with pytest.raises(PermissionError, match="header"):
+        service.verify(token)
