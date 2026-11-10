@@ -168,17 +168,18 @@ def test_live_postgres_outbox_publisher_claims_acknowledges_and_releases_by_tena
                     "4bf92f3577b34da6a3ce929d0e0e4736",
                 ),
             )
-        connection.executemany(
-            """
-            INSERT INTO platform.outbox (outbox_id, tenant_id, event_id, max_attempts)
-            VALUES (%s, %s, %s, 5)
-            """,
-            (
-                (outbox_a_ok, tenant_a, event_a_ok),
-                (outbox_a_fail, tenant_a, event_a_fail),
-                (outbox_b, tenant_b, event_b),
-            ),
-        )
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO platform.outbox (outbox_id, tenant_id, event_id, max_attempts)
+                VALUES (%s, %s, %s, 5)
+                """,
+                (
+                    (outbox_a_ok, tenant_a, event_a_ok),
+                    (outbox_a_fail, tenant_a, event_a_fail),
+                    (outbox_b, tenant_b, event_b),
+                ),
+            )
 
     published: list[str] = []
 
