@@ -219,4 +219,9 @@ def hmac_compare(left: str, right: str) -> bool:
     """Compare proof bindings without data-dependent early exit."""
     import hmac
 
-    return hmac.compare_digest(left.encode("ascii", errors="ignore"), right.encode("ascii"))
+    try:
+        left_bytes = left.encode("ascii")
+        right_bytes = right.encode("ascii")
+    except UnicodeEncodeError:
+        return False
+    return hmac.compare_digest(left_bytes, right_bytes)
