@@ -20,7 +20,6 @@ from urllib.request import Request, urlopen
 
 from .scoped import ScopedSecretHandle, SecretResolutionError
 
-
 _PATH_SEGMENT = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 _VERSION = re.compile(r"^[1-9][0-9]{0,8}$")
 _SIMPLE_KEY = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
