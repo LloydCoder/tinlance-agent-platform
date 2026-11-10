@@ -181,9 +181,11 @@ def test_dpop_proof_rejects_non_ascii_access_token_hash_suffix(
     proof_context: tuple[DPoPProofVerifier, Any, ReplayCache],
 ) -> None:
     verifier, (private_key, public_jwk), _ = proof_context
-    expected_ath = base64.urlsafe_b64encode(
-        hashlib.sha256(b"access-token").digest()
-    ).decode("ascii").rstrip("=")
+    expected_ath = (
+        base64.urlsafe_b64encode(hashlib.sha256(b"access-token").digest())
+        .decode("ascii")
+        .rstrip("=")
+    )
     proof = make_proof(
         private_key,
         public_jwk,
