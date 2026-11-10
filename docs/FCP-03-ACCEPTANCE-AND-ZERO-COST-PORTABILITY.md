@@ -16,6 +16,7 @@ The user constraint for this programme is **USD 0 new AWS spend**. Promotional c
 | `CI_VERIFIED` | Exact commit has successful applicable CI checks. |
 | `LOCAL_INTEGRATION_VERIFIED` | Reproducible integration test ran on an isolated local Linux environment. |
 | `HOSTED_LINUX_INTEGRATION_VERIFIED` | Actual Linux network namespaces, DNS policy and nftables enforcement ran on an ephemeral hosted CI runner with captured counters/logs and cleanup assertions. |
+| `HOSTED_SERVICE_INTEGRATION_VERIFIED` | A disposable real service/container ran on a hosted CI runner and its protocol/authorization behavior was exercised; this is not a production deployment. |
 | `DEPLOYED_VERIFIED` | Deployed target infrastructure and runtime evidence are archived. |
 | `INDEPENDENTLY_ASSURED` | A named independent assessor completed the defined scope and closed or accepted all findings. |
 | `BLOCKED` | Required evidence cannot be obtained under the current constraints. |
@@ -31,7 +32,7 @@ Never promote one state to another by inference. A template, unit test, failed c
 | Provider-neutral Linux DNS/egress lab | dnsmasq policy, isolated worker/resolver namespaces, nftables default-deny, DNS UDP/TCP, NXDOMAIN, rebinding, metadata, DoT, QUIC, direct TCP/443, IPv4/IPv6 drop counters and TLS certificate/hostname validation | `IMPLEMENTED` / `CI_VERIFIED` / `HOSTED_LINUX_INTEGRATION_VERIFIED` (PR #288 merge `37fae92`; IPv6 evidence PR #289 merge `eb06de`) | No AWS Network Firewall/Route 53 Resolver or production-host acceptance; DoH endpoint test is TCP/443 reachability, not a full HTTP/2 DoH exchange |
 | Durable identity/snapshots | KMS/DynamoDB/S3/Object Lock candidate and adapter contracts | `IMPLEMENTED` / `CI_VERIFIED` | No live IAM effective-permission, revocation propagation, replay-race, snapshot-integrity or restore evidence; deployment is billable and retention is irreversible |
 | Sender-constrained identity | DPoP verification, `cnf.jkt` request binding and replay-cache implementation | `IMPLEMENTED` / `CI_VERIFIED` | Production issuer/JWKS, key custody, revocation feed, durable cache and end-to-end deployed tests |
-| External secret provider | Tenant-scoped OpenBao KV v2 adapter; exact secret-version selection; token-header auth; redirect rejection; bounded responses; redacted failures; disposable OpenBao policy test proving cross-tenant denial | `IMPLEMENTED` / `CI_VERIFIED` / `LOCAL_INTEGRATION_VERIFIED` (PR #291 merge `d5993cfd`) | No production OpenBao endpoint, identity integration, TLS trust provisioning, token rotation/lease renewal, HA/seal recovery or operational alert evidence |
+| External secret provider | Tenant-scoped OpenBao KV v2 adapter; exact secret-version selection; token-header auth; redirect rejection; bounded responses; redacted failures; disposable OpenBao policy test proving cross-tenant denial | `IMPLEMENTED` / `CI_VERIFIED` / `HOSTED_SERVICE_INTEGRATION_VERIFIED` (PR #291 merge `d5993cfd`) | No production OpenBao endpoint, identity integration, TLS trust provisioning, token rotation/lease renewal, HA/seal recovery or operational alert evidence |
 | Host/runtime isolation | Existing sandbox/runtime code and phase-2 evidence | Partial repository evidence | Production host hardening, persistent-computer end-to-end qualification, resource limits, escape tests and operational isolation evidence |
 | Persistence and DR | Durable adapter contracts and AWS storage candidate | Partial repository evidence | Production PostgreSQL/outbox/queue, backups, restore drills, measured RTO/RPO and operator-owned recovery |
 | Telemetry and operations | Observability contracts and OpenTelemetry adapter tests | Partial repository evidence | Live collector/exporter, alert routing, verified recipients, SLO/error-budget measurements, incident runbook and on-call ownership |
@@ -40,7 +41,7 @@ Never promote one state to another by inference. A template, unit test, failed c
 
 The initial FCP-03 infrastructure merge `dd4b53f057cc20eb4ad0d77b42980d028b31937f` had 14 successful reported mainline check-runs. The provider-neutral Linux lab was merged as PR #288 (`37fae92ad3743c8dd97bac466f162961c012e1b2`) with 20/20 check-runs successful, including its dedicated live Linux namespace/nftables/DNS/TLS workflow. IPv6 egress counter and evidence-boundary qualification was merged as PR #289 (`eb06debed84aa8d32c8315691e01f6e51e1ed1fc`).
 
-The tenant-scoped OpenBao KV v2 adapter was merged as PR #291 (`d5993cfd6f03ac96058507c7cf7bc2f1e0014913`). Exact-head validation passed all seven workflows: CI (Python 3.12/3.13/3.14, SQL and TSIC conformance), CodeQL, Secret Scan, R10 Certification, Reference Agents and the disposable OpenBao integration. All six post-merge mainline workflows also passed: CI, CodeQL, Secret Scan, R10 Certification, Reference Agents and Supply Chain Attestation. This is local integration evidence only; no production OpenBao service or AWS resources were deployed.
+The tenant-scoped OpenBao KV v2 adapter was merged as PR #291 (`d5993cfd6f03ac96058507c7cf7bc2f1e0014913`). Exact-head validation passed all seven workflow runs across six distinct workflows: CI on both push and pull-request events (Python 3.12/3.13/3.14, SQL and TSIC conformance), CodeQL, Secret Scan, R10 Certification, Reference Agents and the disposable OpenBao integration. All six post-merge mainline workflows also passed: CI, CodeQL, Secret Scan, R10 Certification, Reference Agents and Supply Chain Attestation. This is local integration evidence only; no production OpenBao service or AWS resources were deployed.
 
 This CI evidence does not substitute for the separate AWS CloudFormation cfn-lint/Checkov gate or a deployed provider environment.
 
@@ -103,7 +104,7 @@ FCP-03 can be accepted only when all of the following are true:
 - [ ] AWS adapter templates pass cfn-lint, Checkov and schema validation, without claiming live AWS acceptance.
 - [ ] Production identity/JWKS/DPoP/revocation/key lifecycle are verified against real configured adapters.
 - [ ] Production host/runtime isolation and persistent-computer controls pass adversarial tests.
-- [x] Tenant-scoped OpenBao KV v2 adapter passes disposable local integration for version pinning and cross-tenant denial (PR #291); this does not establish production OpenBao deployment.
+- [x] Tenant-scoped OpenBao KV v2 adapter passes disposable hosted-service integration for version pinning and cross-tenant denial (PR #291); this does not establish production OpenBao deployment.
 - [ ] Durable persistence, outbox, production secret-manager operations, backup/restore and measured RTO/RPO are verified.
 - [ ] OTel pipeline, alert routing, SLOs, incident runbooks and operational ownership are verified.
 - [ ] Cost controls, contacts and escalation are verifiably configured; no spend is incurred under the current zero-AWS-spend constraint.
