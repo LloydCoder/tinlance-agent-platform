@@ -97,7 +97,7 @@ class OpenBaoSecretProvider:
 
     def resolve(self, handle: ScopedSecretHandle) -> str:
         """Resolve one exact KV v2 version without disclosing backend details."""
-        secret_path = self._validated_secret_path(handle.name)
+        secret_path = self._validated_secret_path(handle.tenant_id, handle.name)
         version = self._validated_version(handle.version)
         token = self._get_token()
         url = (
@@ -169,7 +169,9 @@ class OpenBaoSecretProvider:
         return token
 
     @staticmethod
-    def _validated_secret_path(name: str) -> str:
+    def _validated_secret_path(tenant_id: str, name: str) -> str:
+        if not isinstance(tenant_id, str) or not _PATH_SEGMENT.fullmatch(tenant_id):
+            raise SecretResolutionError("OpenBao tenant scope is invalid")
         if not isinstance(name, str) or not name or name.startswith("/") or name.endswith("/"):
             raise SecretResolutionError("OpenBao secret path is invalid")
         segments = name.split("/")
@@ -178,7 +180,8 @@ class OpenBaoSecretProvider:
             for segment in segments
         ):
             raise SecretResolutionError("OpenBao secret path is invalid")
-        return "/".join(quote(segment, safe="._-") for segment in segments)
+        scoped_segments = ["tenants", tenant_id, *segments]
+        return "/".join(quote(segment, safe="._-") for segment in scoped_segments)
 
     @staticmethod
     def _validated_version(version: str) -> str:
