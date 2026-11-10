@@ -125,10 +125,7 @@ ip netns exec "$resolver_ns" dnsmasq \
   --address=/metadata.test/169.254.169.254 >"$log_file" 2>&1 &
 resolver_pid="$!"
 
-openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
-  -keyout "$ca_key" -out "$ca_cert" -subj "/CN=FCP03 Disposable Test CA" \\
-  -addext "basicConstraints=critical,CA:TRUE" \\
-  -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
+openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 -keyout "$ca_key" -out "$ca_cert" -subj "/CN=FCP03 Disposable Test CA" -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
 openssl req -newkey rsa:2048 -nodes -keyout "$server_key" -out "$server_csr" \
   -subj "/CN=allowed.test" >/dev/null 2>&1
 cat >"$ext_file" <<'CERT'
