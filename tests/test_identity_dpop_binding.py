@@ -61,9 +61,7 @@ def make_binding_material() -> tuple[Any, Any, dict[str, str], str]:
         thumbprint_members, sort_keys=True, separators=(",", ":"), ensure_ascii=True
     ).encode("ascii")
     thumbprint = (
-        base64.urlsafe_b64encode(hashlib.sha256(canonical).digest())
-        .decode("ascii")
-        .rstrip("=")
+        base64.urlsafe_b64encode(hashlib.sha256(canonical).digest()).decode("ascii").rstrip("=")
     )
     return token_key, proof_key, jwk, thumbprint
 
@@ -108,9 +106,11 @@ def make_dpop_proof(
     jti: str = "proof-jti-a",
 ) -> str:
     now = datetime.now(UTC)
-    ath = base64.urlsafe_b64encode(hashlib.sha256(access_token.encode()).digest()).decode(
-        "ascii"
-    ).rstrip("=")
+    ath = (
+        base64.urlsafe_b64encode(hashlib.sha256(access_token.encode()).digest())
+        .decode("ascii")
+        .rstrip("=")
+    )
     return jwt.encode(
         {
             "htm": "POST",
