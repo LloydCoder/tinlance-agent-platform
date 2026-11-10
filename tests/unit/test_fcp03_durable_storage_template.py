@@ -85,11 +85,7 @@ def test_kms_policy_separates_service_data_use_from_grant_creation() -> None:
     ddb_data = by_sid["WorkloadDynamoDBDataEncryption"]
     assert "kms:CreateGrant" not in ddb_data["Action"]
     assert ddb_data["Condition"]["StringEquals"]["kms:ViaService"]["Fn::Join"]
-    assert set(
-        ddb_data["Condition"]["ForAnyValue:StringEquals"][
-            "kms:EncryptionContext:aws:dynamodb:tableName"
-        ]
-    ) == [{"Ref": "TokenRevocationTable"}, {"Ref": "DPoPReplayTable"}]
+    assert "kms:ViaService" in ddb_data["Condition"]["StringEquals"]
 
     ddb_grant = by_sid["WorkloadDynamoDBGrant"]
     assert ddb_grant["Action"] == "kms:CreateGrant"
@@ -97,9 +93,7 @@ def test_kms_policy_separates_service_data_use_from_grant_creation() -> None:
 
     s3_data = by_sid["WorkloadS3SnapshotDataEncryption"]
     assert "kms:CreateGrant" not in s3_data["Action"]
-    assert s3_data["Condition"]["StringEquals"]["kms:EncryptionContext:aws:s3:arn"] == {
-        "Fn::GetAtt": ["SnapshotBucket", "Arn"]
-    }
+    assert "kms:ViaService" in s3_data["Condition"]["StringEquals"]
     s3_grant = by_sid["WorkloadS3SnapshotGrant"]
     assert s3_grant["Action"] == "kms:CreateGrant"
     assert s3_grant["Condition"]["Bool"]["kms:GrantIsForAWSResource"] == "true"
@@ -139,3 +133,12 @@ def test_snapshot_bucket_policy_denies_insecure_transport_wrong_encryption_and_v
         "s3:x-amz-server-side-encryption-aws-kms-key-id"
     ] == {"Fn::GetAtt": ["DataKey", "Arn"]}
     assert by_sid["DenyVersionDeletion"]["Action"] == "s3:DeleteObjectVersion"
+
+
+def test_data_key_policy_does_not_create_resource_dependency_cycles() -> None:
+    policy = load_template()["Resources"]["DataKey"]["Properties"]["KeyPolicy"]
+    encoded = json.dumps(policy)
+
+    assert "TokenRevocationTable" not in encoded
+    assert "DPoPReplayTable" not in encoded
+    assert "SnapshotBucket" not in encoded
