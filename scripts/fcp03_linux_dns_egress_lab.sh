@@ -71,7 +71,7 @@ ip netns exec "$worker_ns" ip link set lo up
 ip netns exec "$resolver_ns" ip link set lo up
 ip netns exec "$worker_ns" ip addr add 10.203.0.2/24 dev eth0
 ip netns exec "$resolver_ns" ip addr add 10.203.0.1/24 dev eth0
-ip netns exec "$resolver_ns" ip addr add 10.203.0.10/32 dev lo
+ip netns exec "$resolver_ns" ip addr add 10.203.0.10/32 dev eth0
 ip netns exec "$worker_ns" ip link set eth0 up
 ip netns exec "$resolver_ns" ip link set eth0 up
 ip netns exec "$worker_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
