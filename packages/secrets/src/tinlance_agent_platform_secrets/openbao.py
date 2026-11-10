@@ -6,13 +6,13 @@ accepted only for an explicitly enabled loopback development/test endpoint.
 
 from __future__ import annotations
 
-import contextlib
 import ipaddress
 import json
 import math
 import re
 import ssl
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urlsplit
@@ -70,7 +70,7 @@ class OpenBaoSecretProvider:
 
         if parsed.scheme == "http":
             is_loopback = hostname.lower() == "localhost"
-            with contextlib.suppress(ValueError):
+            with suppress(ValueError):
                 is_loopback = is_loopback or ipaddress.ip_address(hostname).is_loopback
             if not self.allow_insecure_loopback or not is_loopback:
                 raise ValueError("OpenBao requires HTTPS outside explicit loopback test mode")
