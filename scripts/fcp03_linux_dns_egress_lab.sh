@@ -62,6 +62,7 @@ cleanup() {
       echo "FCP03_WORKER_NFT_DIAGNOSTICS" >&2
       ip netns exec "$worker_ns" nft list ruleset >&2
       ip netns exec "$worker_ns" ip addr show >&2
+      ip netns exec "$worker_ns" ip route show >&2
     fi
   fi
   if [[ -n "$resolver_pid" ]]; then
@@ -96,12 +97,13 @@ ip netns exec "$worker_ns" ip link set eth0 up
 ip netns exec "$resolver_ns" ip link set eth0 up
 ip netns exec "$worker_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
 ip netns exec "$resolver_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
-ip netns exec "$worker_ns" ip route add default via 10.203.0.1 dev eth0
+ip netns exec "$worker_ns" ip route add default via 10.203.0.1 dev eth0 onlink
+echo "FCP03_ISOLATED_DEFAULT_ROUTE=CONFIGURED"
 
 # The worker default route terminates at the isolated resolver namespace.
 # That namespace has forwarding disabled and no default route, so no packet
 # can leave the two-namespace lab or reach the host/external network.
-test "$(ip netns exec "$worker_ns" ip route show default)" = "default via 10.203.0.1 dev eth0"
+ip netns exec "$worker_ns" ip route show default | grep -Eq "^default via 10\\.203\\.0\\.1 dev eth0( |$)"
 test -z "$(ip netns exec "$resolver_ns" ip route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 addr show scope global)"
