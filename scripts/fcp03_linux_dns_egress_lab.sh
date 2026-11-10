@@ -194,6 +194,7 @@ table inet fcp03 {
     ip daddr 10.203.0.1 udp dport 53 counter accept
     ip daddr 10.203.0.1 tcp dport 53 counter accept
     ip daddr 10.203.0.10 tcp dport 443 counter accept
+    ip6 daddr ::/0 counter drop
     counter drop
   }
 }
@@ -327,12 +328,21 @@ trap - EXIT
 after_host_rules="$(nft list ruleset | sed -E 's/counter packets [0-9]+ bytes [0-9]+/counter packets <n> bytes <n>/g' | sha256sum | awk '{print $1}')"
 after_default_routes="$(ip route show default)"
 after_ipv6_default_routes="$(ip -6 route show default)"
+ipv6_drop_packets="$(grep -E 'ip6 daddr ::/0 counter packets [0-9]+ bytes [0-9]+ drop' <<<"$rules" | sed -E 's/.*counter packets ([0-9]+) bytes.*/\\1/' | tail -n 1)"
+if [[ -z "$ipv6_drop_packets" || "$ipv6_drop_packets" -lt 1 ]]; then
+  echo "IPv6 egress drop counter did not record a blocked packet" >&2
+  exit 1
+fi
 if [[ "$baseline_host_rules" != "$after_host_rules" ]]; then
   echo "host nftables ruleset changed unexpectedly" >&2
   exit 1
 fi
 if [[ "$baseline_default_routes" != "$after_default_routes" ]]; then
   echo "host default routes changed unexpectedly" >&2
+  exit 1
+fi
+if [[ "$baseline_ipv6_default_routes" != "$after_ipv6_default_routes" ]]; then
+  echo "host IPv6 default routes changed unexpectedly" >&2
   exit 1
 fi
 if [[ -n "$baseline_docker" ]] && command -v docker >/dev/null 2>&1; then
@@ -362,7 +372,8 @@ printf 'FCP03_DOT_853=BLOCKED\n'
 printf 'FCP03_QUIC_UDP443=BLOCKED\n'
 printf 'FCP03_METADATA_DESTINATION=BLOCKED\n'
 printf 'FCP03_DNS_REBINDING_DESTINATION=BLOCKED\n'
-printf 'FCP03_IPV6_DEFAULT_ROUTE=ABSENT\n'
+printf 'FCP03_IPV6_EGRESS=BLOCKED_BY_NFTABLES\n'
+printf 'FCP03_IPV6_NFT_DROP_PACKETS=%s\n' "$ipv6_drop_packets"
 printf 'FCP03_NFT_DROP_COUNTER_PACKETS=%s\n' "$drop_packets"
 printf 'FCP03_HOST_FIREWALL_AND_ROUTES_UNCHANGED=PASS\n'
 printf 'FCP03_EXISTING_DOCKER_STATE_UNCHANGED=PASS\n'
