@@ -189,12 +189,16 @@ class OpenTelemetryObservabilitySink:
         meter: OpenTelemetryMeter,
         logger: OpenTelemetryLogger,
         context_factory: Callable[[str, str | None], object] | None = None,
+        max_histograms: int = 64,
     ) -> None:
+        if isinstance(max_histograms, bool) or not 1 <= max_histograms <= 256:
+            raise ValueError("OpenTelemetry histogram limit must be between 1 and 256")
         self._tracer = tracer
         self._meter = meter
         self._logger = logger
         self._context_factory = context_factory
-        self._histograms: dict[tuple[str, str], OpenTelemetryHistogram] = {}
+        self._max_histograms = max_histograms
+        self._histograms: dict[str, tuple[str, OpenTelemetryHistogram]] = {}
         self._lock = RLock()
 
     @staticmethod
@@ -227,16 +231,21 @@ class OpenTelemetryObservabilitySink:
         otel_span.end(end_time=self._epoch_ns(span.ended_at))
 
     def emit_metric(self, metric: MetricPoint) -> None:
-        key = (metric.name, metric.unit)
         with self._lock:
-            histogram = self._histograms.get(key)
-            if histogram is None:
+            existing = self._histograms.get(metric.name)
+            if existing is not None:
+                if existing[0] != metric.unit:
+                    raise ValueError("OpenTelemetry metric name cannot be reused with another unit")
+                histogram = existing[1]
+            else:
+                if len(self._histograms) >= self._max_histograms:
+                    raise ValueError("OpenTelemetry metric instrument limit exceeded")
                 histogram = self._meter.create_histogram(
                     metric.name,
                     unit=metric.unit,
                     description="Tinlance Agent Platform metric observations",
                 )
-                self._histograms[key] = histogram
+                self._histograms[metric.name] = (metric.unit, histogram)
         histogram.record(float(metric.value))
 
     def emit_security(self, event: SecurityEvent) -> None:
