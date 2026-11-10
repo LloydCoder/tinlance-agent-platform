@@ -193,7 +193,7 @@ test "$ready" -eq 1
 echo "FCP03_RESOLVER_READY=PASS"
 
 # Positive DNS and HTTPS controls.
-allowed_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short)"
+allowed_answer="$(ip netns exec "$worker_ns" dig -p 5353 @10.203.0.1 allowed.test A +time=1 +tries=1 +short)"
 test "$allowed_answer" = "10.203.0.10"
 echo "FCP03_ALLOWED_DNS_ANSWER=PASS"
 https_marker="$(ip netns exec "$worker_ns" python3 - <<'PY'
