@@ -734,7 +734,6 @@
       "DeletionPolicy": "Retain",
       "UpdateReplacePolicy": "Retain",
       "Properties": {
-        "AccessControl": "LogDeliveryWrite",
         "OwnershipControls": {
           "Rules": [
             {
