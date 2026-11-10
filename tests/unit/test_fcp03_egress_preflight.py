@@ -776,7 +776,6 @@ def test_rejects_any_non_null_public_ip_value(value: object) -> None:
     assert "worker-public-address" in evaluate_fcp03_topology(topology)
 
 
-
 def test_rejects_duplicate_worker_nacl_subnet_associations() -> None:
     topology = valid_topology()
     topology["worker"]["network_acl"]["subnet_ids"] = [
