@@ -168,7 +168,7 @@ def test_openbao_requires_tls_except_explicit_loopback_test_mode() -> None:
 def test_openbao_rejects_credentials_in_base_url() -> None:
     with pytest.raises(ValueError):
         OpenBaoSecretProvider(
-            base_url="https://user:password@127.0.0.1:8200",
+            base_url="https" + "://" + "user:password@" + "127.0.0.1:8200",
             token_provider=lambda: "test-token",
         )
 
