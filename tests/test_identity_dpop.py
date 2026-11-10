@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -238,7 +239,7 @@ def test_dynamodb_dpop_replay_cache_atomically_consumes_replay_ids() -> None:
     assert request["TableName"] == "agent-dpop-replay"
     assert request["ConditionExpression"] == "attribute_not_exists(replay_key)"
     item = request["Item"]
-    assert item["expires_at"]["N"] == str(int(expiry.timestamp()))
+    assert item["expires_at"]["N"] == str(math.ceil(expiry.timestamp()))
 
 
 def test_dynamodb_dpop_replay_cache_fails_closed_on_service_errors() -> None:
