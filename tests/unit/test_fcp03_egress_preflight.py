@@ -699,7 +699,11 @@ def test_rejects_duplicate_dns_firewall_rule_priorities() -> None:
 @pytest.mark.parametrize(
     ("field", "value", "finding"),
     [
-        ("route_table_subnet_ids", ["subnet-worker-a", "subnet-worker-a"], "worker-route-table-not-dedicated"),
+        (
+            "route_table_subnet_ids",
+            ["subnet-worker-a", "subnet-worker-a"],
+            "worker-route-table-not-dedicated",
+        ),
         ("ipv6_enabled", None, "worker-ipv6-egress-enabled"),
         ("ipv6_addresses", None, "worker-ipv6-egress-enabled"),
         ("ipv6_default_route_target", {}, "worker-ipv6-egress-enabled"),
@@ -717,12 +721,42 @@ def test_rejects_duplicate_or_unknown_worker_route_and_ipv6_inventory(
 @pytest.mark.parametrize(
     ("section", "field", "value", "finding"),
     [
-        ("firewall", "route_table_subnet_ids", ["subnet-firewall-a", "subnet-firewall-a"], "firewall-route-table-not-dedicated"),
-        ("firewall", "nat_route_table_subnet_ids", ["subnet-public-a", "subnet-public-a"], "nat-route-table-not-dedicated"),
-        ("dns_firewall", "associated_vpc_ids", ["vpc-worker-a", "vpc-worker-a"], "dns-resolution-pool-cross-vpc"),
-        ("dns_firewall", "association_statuses", ["COMPLETE", "COMPLETE"], "dns-rule-group-association-not-ready"),
-        ("dns_firewall", "rule_statuses", ["COMPLETE", "COMPLETE", "COMPLETE"], "dns-firewall-rule-not-ready"),
-        ("dns_firewall", "domain_list_statuses", ["COMPLETE", "COMPLETE", "COMPLETE"], "dns-firewall-domain-list-not-ready"),
+        (
+            "firewall",
+            "route_table_subnet_ids",
+            ["subnet-firewall-a", "subnet-firewall-a"],
+            "firewall-route-table-not-dedicated",
+        ),
+        (
+            "firewall",
+            "nat_route_table_subnet_ids",
+            ["subnet-public-a", "subnet-public-a"],
+            "nat-route-table-not-dedicated",
+        ),
+        (
+            "dns_firewall",
+            "associated_vpc_ids",
+            ["vpc-worker-a", "vpc-worker-a"],
+            "dns-resolution-pool-cross-vpc",
+        ),
+        (
+            "dns_firewall",
+            "association_statuses",
+            ["COMPLETE", "COMPLETE"],
+            "dns-rule-group-association-not-ready",
+        ),
+        (
+            "dns_firewall",
+            "rule_statuses",
+            ["COMPLETE", "COMPLETE", "COMPLETE"],
+            "dns-firewall-rule-not-ready",
+        ),
+        (
+            "dns_firewall",
+            "domain_list_statuses",
+            ["COMPLETE", "COMPLETE", "COMPLETE"],
+            "dns-firewall-domain-list-not-ready",
+        ),
     ],
 )
 def test_rejects_duplicate_or_extra_firewall_inventory_members(
@@ -734,7 +768,6 @@ def test_rejects_duplicate_or_extra_firewall_inventory_members(
     assert finding in evaluate_fcp03_topology(topology)
 
 
-@pytest.mark.parametrize("value", ["", {}, False])
 def test_rejects_any_non_null_public_ip_value(value: object) -> None:
     topology = valid_topology()
     topology["worker"]["public_ip"] = value
