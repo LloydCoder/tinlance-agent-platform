@@ -295,9 +295,8 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
 
     network_acl = _object(worker.get("network_acl"))
     subnet_id = worker.get("subnet_id")
-    if (
-        network_acl.get("associated") is not True
-        or not _exactly_one_string(network_acl.get("subnet_ids"), subnet_id)
+    if network_acl.get("associated") is not True or not _exactly_one_string(
+        network_acl.get("subnet_ids"), subnet_id
     ):
         findings.add("worker-nacl-association-invalid")
 
