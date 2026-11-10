@@ -1,0 +1,685 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "FCP-03 durable identity and workspace snapshot storage primitives. Deployment requires a reviewed least-privilege workload role and explicit cost approval.",
+  "Parameters": {
+    "WorkloadRoleArn": {
+      "Type": "String",
+      "Description": "Exact IAM role ARN used by the production Agent Platform workload; no wildcard principals.",
+      "AllowedPattern": "^arn:(aws|aws-us-gov|aws-cn):iam::[0-9]{12}:role/.+$"
+    },
+    "SnapshotRetentionDays": {
+      "Type": "Number",
+      "Default": 365,
+      "MinValue": 30,
+      "MaxValue": 3650,
+      "Description": "S3 Object Lock compliance retention for immutable workspace snapshots."
+    }
+  },
+  "Resources": {
+    "DataKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Tinlance FCP-03 envelope and storage encryption",
+        "KeySpec": "SYMMETRIC_DEFAULT",
+        "KeyUsage": "ENCRYPT_DECRYPT",
+        "EnableKeyRotation": true,
+        "PendingWindowInDays": 30,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AccountKeyAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "WorkloadDynamoDBEncryption",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "WorkloadRoleArn"
+                }
+              },
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey",
+                "kms:CreateGrant"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "StringEquals": {
+                  "kms:CallerAccount": {
+                    "Ref": "AWS::AccountId"
+                  },
+                  "kms:ViaService": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "dynamodb.",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        ".amazonaws.com"
+                      ]
+                    ]
+                  }
+                },
+                "ForAnyValue:StringEquals": {
+                  "kms:EncryptionContext:aws:dynamodb:tableName": [
+                    {
+                      "Ref": "TokenRevocationTable"
+                    },
+                    {
+                      "Ref": "DPoPReplayTable"
+                    }
+                  ]
+                },
+                "Bool": {
+                  "kms:GrantIsForAWSResource": "true"
+                }
+              }
+            },
+            {
+              "Sid": "WorkloadS3Encryption",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "WorkloadRoleArn"
+                }
+              },
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey",
+                "kms:CreateGrant"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "StringEquals": {
+                  "kms:CallerAccount": {
+                    "Ref": "AWS::AccountId"
+                  },
+                  "kms:ViaService": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "s3.",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        ".amazonaws.com"
+                      ]
+                    ]
+                  }
+                },
+                "Bool": {
+                  "kms:GrantIsForAWSResource": "true"
+                }
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "storage-encryption"
+          }
+        ]
+      }
+    },
+    "SigningKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Tinlance FCP-03 workspace snapshot HMAC signing key",
+        "KeySpec": "HMAC_256",
+        "KeyUsage": "GENERATE_VERIFY_MAC",
+        "PendingWindowInDays": 30,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AccountKeyAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "WorkloadSnapshotSigning",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "WorkloadRoleArn"
+                }
+              },
+              "Action": [
+                "kms:GenerateMac",
+                "kms:VerifyMac",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*"
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "snapshot-hmac-signing"
+          }
+        ]
+      }
+    },
+    "TokenRevocationTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "revocation_key",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "revocation_key",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+          "KMSMasterKeyId": {
+            "Fn::GetAtt": [
+              "DataKey",
+              "Arn"
+            ]
+          }
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "TimeToLiveSpecification": {
+          "AttributeName": "expires_at",
+          "Enabled": true
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "token-revocation"
+          }
+        ]
+      }
+    },
+    "DPoPReplayTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "replay_key",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "replay_key",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+          "KMSMasterKeyId": {
+            "Fn::GetAtt": [
+              "DataKey",
+              "Arn"
+            ]
+          }
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "TimeToLiveSpecification": {
+          "AttributeName": "expires_at",
+          "Enabled": true
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "dpop-replay-protection"
+          }
+        ]
+      }
+    },
+    "SnapshotBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ObjectLockEnabled": true,
+        "ObjectLockConfiguration": {
+          "ObjectLockEnabled": "Enabled",
+          "Rule": {
+            "DefaultRetention": {
+              "Mode": "COMPLIANCE",
+              "Days": {
+                "Ref": "SnapshotRetentionDays"
+              }
+            }
+          }
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "aws:kms",
+                "KMSMasterKeyID": {
+                  "Fn::GetAtt": [
+                    "DataKey",
+                    "Arn"
+                  ]
+                }
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "AbortIncompleteSnapshotUploads",
+              "Status": "Enabled",
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Tinlance"
+          },
+          {
+            "Key": "FCPPhase",
+            "Value": "FCP-03"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "immutable-workspace-snapshots"
+          }
+        ]
+      }
+    },
+    "SnapshotBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "SnapshotBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "SnapshotBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "SnapshotBucket",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnencryptedSnapshotUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "SnapshotBucket",
+                        "Arn"
+                      ]
+                    },
+                    "/tinlance/workspace-snapshots/v1/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "aws:kms"
+                }
+              }
+            },
+            {
+              "Sid": "DenyWrongSnapshotKMSKey",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "SnapshotBucket",
+                        "Arn"
+                      ]
+                    },
+                    "/tinlance/workspace-snapshots/v1/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption-aws-kms-key-id": {
+                    "Fn::GetAtt": [
+                      "DataKey",
+                      "Arn"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "Sid": "DenyVersionDeletion",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:DeleteObjectVersion",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "SnapshotBucket",
+                        "Arn"
+                      ]
+                    },
+                    "/tinlance/workspace-snapshots/v1/*"
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "WorkloadAccessPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Least-privilege FCP-03 access for identity revocation, DPoP replay and immutable workspace snapshots.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "TokenRevocationOperations",
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:DescribeTable",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:TransactWriteItems"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TokenRevocationTable",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Sid": "DPoPReplayOperations",
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:DescribeTable",
+                "dynamodb:PutItem"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DPoPReplayTable",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Sid": "SnapshotObjectOperations",
+              "Effect": "Allow",
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+                "s3:PutObject"
+              ],
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "SnapshotBucket",
+                        "Arn"
+                      ]
+                    },
+                    "/tinlance/workspace-snapshots/v1/*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Sid": "SnapshotBucketPrefixListing",
+              "Effect": "Allow",
+              "Action": "s3:ListBucket",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SnapshotBucket",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": [
+                    "tinlance/workspace-snapshots/v1/*"
+                  ]
+                }
+              }
+            },
+            {
+              "Sid": "DataKeyUse",
+              "Effect": "Allow",
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DataKey",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Sid": "SnapshotHMACOperations",
+              "Effect": "Allow",
+              "Action": [
+                "kms:GenerateMac",
+                "kms:VerifyMac",
+                "kms:DescribeKey"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SigningKey",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "DataKeyArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "DataKey",
+          "Arn"
+        ]
+      }
+    },
+    "SnapshotSigningKeyArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "SigningKey",
+          "Arn"
+        ]
+      }
+    },
+    "TokenRevocationTableName": {
+      "Value": {
+        "Ref": "TokenRevocationTable"
+      }
+    },
+    "DPoPReplayTableName": {
+      "Value": {
+        "Ref": "DPoPReplayTable"
+      }
+    },
+    "SnapshotBucketName": {
+      "Value": {
+        "Ref": "SnapshotBucket"
+      }
+    },
+    "WorkloadAccessPolicyArn": {
+      "Value": {
+        "Ref": "WorkloadAccessPolicy"
+      }
+    }
+  }
+}
