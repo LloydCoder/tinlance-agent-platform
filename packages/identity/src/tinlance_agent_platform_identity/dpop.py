@@ -13,7 +13,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 _ALLOWED_DPOP_ALGORITHMS = frozenset({"ES256", "RS256", "PS256", "EdDSA"})
@@ -174,7 +174,7 @@ class DPoPProofVerifier:
             raise PermissionError("DPoP request URI must be a valid HTTPS URI") from exc
 
     @staticmethod
-    def _public_key_and_thumbprint(jwk: dict[str, object], algorithm: str) -> tuple[object, str]:
+    def _public_key_and_thumbprint(jwk: dict[str, object], algorithm: str) -> tuple[Any, str]:
         kty = jwk.get("kty")
         required_members = {
             "EC": ("crv", "kty", "x", "y"),
