@@ -137,3 +137,42 @@ def test_workload_role_arn_rejects_wildcard_principals() -> None:
         "arn:aws:iam::123456789012:role/agent-platform-production",
     )
     assert not re.fullmatch(pattern, "arn:aws:iam::123456789012:role/*")
+
+
+
+def test_snapshot_bucket_has_a_separate_hardened_access_log_destination() -> None:
+    resources = load_template()["Resources"]
+    snapshot_bucket = resources["SnapshotBucket"]["Properties"]
+    logging = snapshot_bucket["LoggingConfiguration"]
+
+    assert logging["DestinationBucketName"] == {"Ref": "SnapshotAccessLogsBucket"}
+    assert logging["LogFilePrefix"] == "snapshot-access/"
+
+    log_bucket = resources["SnapshotAccessLogsBucket"]
+    log_properties = log_bucket["Properties"]
+    assert log_bucket["DeletionPolicy"] == "Retain"
+    assert log_bucket["UpdateReplacePolicy"] == "Retain"
+    assert log_properties["AccessControl"] == "LogDeliveryWrite"
+    assert log_properties["BucketEncryption"]["ServerSideEncryptionConfiguration"][0][
+        "ServerSideEncryptionByDefault"
+    ]["SSEAlgorithm"] == "AES256"
+    assert log_properties["PublicAccessBlockConfiguration"] == {
+        "BlockPublicAcls": True,
+        "IgnorePublicAcls": True,
+        "BlockPublicPolicy": True,
+        "RestrictPublicBuckets": True,
+    }
+    assert log_properties["OwnershipControls"]["Rules"] == [
+        {"ObjectOwnership": "BucketOwnerPreferred"}
+    ]
+
+    statements = resources["SnapshotAccessLogsBucketPolicy"]["Properties"]["PolicyDocument"][
+        "Statement"
+    ]
+    delivery = next(statement for statement in statements if statement["Sid"] == "AllowS3ServerAccessLogs")
+    assert delivery["Principal"] == {"Service": "logging.s3.amazonaws.com"}
+    assert delivery["Action"] == "s3:PutObject"
+    assert delivery["Condition"]["StringEquals"]["aws:SourceAccount"] == {"Ref": "AWS::AccountId"}
+    assert delivery["Condition"]["ArnLike"]["aws:SourceArn"] == {
+        "Fn::GetAtt": ["SnapshotBucket", "Arn"]
+    }
