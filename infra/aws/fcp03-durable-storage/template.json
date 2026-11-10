@@ -86,16 +86,6 @@
                       ]
                     ]
                   }
-                },
-                "ForAnyValue:StringEquals": {
-                  "kms:EncryptionContext:aws:dynamodb:tableName": [
-                    {
-                      "Ref": "TokenRevocationTable"
-                    },
-                    {
-                      "Ref": "DPoPReplayTable"
-                    }
-                  ]
                 }
               }
             },
@@ -163,12 +153,6 @@
                         },
                         ".amazonaws.com"
                       ]
-                    ]
-                  },
-                  "kms:EncryptionContext:aws:s3:arn": {
-                    "Fn::GetAtt": [
-                      "SnapshotBucket",
-                      "Arn"
                     ]
                   }
                 }
