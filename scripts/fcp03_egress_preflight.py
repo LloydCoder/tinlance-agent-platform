@@ -28,6 +28,30 @@ def _strings(value: object) -> set[str]:
     return set(value)
 
 
+def _unique_strings(value: object) -> set[str] | None:
+    """Return unique string members, preserving invalid/duplicate inventory as unknown."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return None
+    if any(not isinstance(item, str) or not item for item in value):
+        return None
+    if len(set(value)) != len(value):
+        return None
+    return set(value)
+
+
+def _exactly_one_string(value: object, expected: object) -> bool:
+    """Require one and only one string association to the expected resource."""
+    return (
+        isinstance(expected, str)
+        and bool(expected)
+        and isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes))
+        and len(value) == 1
+        and isinstance(value[0], str)
+        and value[0] == expected
+    )
+
+
 def _has_unrestricted_egress(rules: object) -> bool:
     if not isinstance(rules, Sequence) or isinstance(rules, (str, bytes)):
         return True
@@ -90,14 +114,14 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
             "HTTP_HOST",
             "AWS_ROUTE_53_RESOLVED_DOMAIN",
         }
-        if _strings(stateful_group.get("target_types")) != required_target_types:
+        if _unique_strings(stateful_group.get("target_types")) != required_target_types:
             findings.add("stateful-domain-target-types-invalid")
-        if _strings(stateful_group.get("targets")) != _strings(
+        if _unique_strings(stateful_group.get("targets")) != _unique_strings(
             dns_firewall.get("allowlist_domains")
         ):
             findings.add("stateful-domain-targets-mismatch")
 
-    if worker.get("public_ip"):
+    if worker.get("public_ip") is not None:
         findings.add("worker-public-address")
     if worker.get("map_public_ip_on_launch") is not False:
         findings.add("worker-public-subnet")
@@ -105,10 +129,13 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         findings.add("worker-metadata-endpoint-enabled")
     if worker.get("metadata_tokens_required") is not True or worker.get("metadata_hop_limit") != 1:
         findings.add("worker-metadata-protection-invalid")
+    ipv6_addresses = worker.get("ipv6_addresses")
     if (
-        worker.get("ipv6_enabled")
-        or worker.get("ipv6_addresses")
-        or worker.get("ipv6_default_route_target")
+        worker.get("ipv6_enabled") is not False
+        or not isinstance(ipv6_addresses, list)
+        or ipv6_addresses
+        or "ipv6_default_route_target" not in worker
+        or worker.get("ipv6_default_route_target") is not None
     ):
         findings.add("worker-ipv6-egress-enabled")
 
@@ -144,9 +171,9 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
     if firewall.get("nat_gateway_state") != "available":
         findings.add("nat-gateway-not-available")
 
-    if _strings(firewall.get("route_table_subnet_ids")) != {firewall_subnet_id}:
+    if not _exactly_one_string(firewall.get("route_table_subnet_ids"), firewall_subnet_id):
         findings.add("firewall-route-table-not-dedicated")
-    if _strings(firewall.get("nat_route_table_subnet_ids")) != {nat_subnet_id}:
+    if not _exactly_one_string(firewall.get("nat_route_table_subnet_ids"), nat_subnet_id):
         findings.add("nat-route-table-not-dedicated")
 
     firewall_routes = firewall.get("route_entries")
@@ -227,8 +254,7 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
             findings.add("nat-return-route-set-invalid")
 
     worker_subnet_id = worker.get("subnet_id")
-    worker_route_table_subnet_ids = _strings(worker.get("route_table_subnet_ids"))
-    if not isinstance(worker_subnet_id, str) or worker_route_table_subnet_ids != {worker_subnet_id}:
+    if not _exactly_one_string(worker.get("route_table_subnet_ids"), worker_subnet_id):
         findings.add("worker-route-table-not-dedicated")
 
     route_entries = worker.get("route_entries")
@@ -269,10 +295,8 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
 
     network_acl = _object(worker.get("network_acl"))
     subnet_id = worker.get("subnet_id")
-    if (
-        network_acl.get("associated") is not True
-        or not isinstance(subnet_id, str)
-        or _strings(network_acl.get("subnet_ids")) != {subnet_id}
+    if network_acl.get("associated") is not True or not _exactly_one_string(
+        network_acl.get("subnet_ids"), subnet_id
     ):
         findings.add("worker-nacl-association-invalid")
 
@@ -430,35 +454,45 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         group_id = validation.get("dns_firewall_rule_group_id")
         if not isinstance(group_id, str) or group_id != dns_firewall.get("rule_group_id"):
             findings.add("resolved-ip-validation-group-mismatch")
-        if validation.get("action") not in {"ALERT", "DROP"}:
+        validation_action = validation.get("action")
+        if not isinstance(validation_action, str) or validation_action not in {"ALERT", "DROP"}:
             findings.add("resolved-ip-validation-action-invalid")
-        if validation.get("dns_expiry_exception_action") not in {"DROP", "REJECT"}:
+        expiry_action = validation.get("dns_expiry_exception_action")
+        if not isinstance(expiry_action, str) or expiry_action not in {"DROP", "REJECT"}:
             findings.add("dns-expiry-not-fail-closed")
         if validation.get("bypass_destination_validation_ip_ranges") != []:
             findings.add("resolved-ip-bypass-range-present")
-        source_ranges = _strings(validation.get("source_ip_ranges"))
         subnet_cidr = worker.get("subnet_cidr")
-        if not isinstance(subnet_cidr, str) or subnet_cidr not in source_ranges:
+        if not _exactly_one_string(validation.get("source_ip_ranges"), subnet_cidr):
             findings.add("resolved-ip-source-range-incomplete")
 
     worker_vpc = worker.get("vpc_id")
-    associated_vpcs = _strings(dns_firewall.get("associated_vpc_ids"))
-    if not isinstance(worker_vpc, str) or associated_vpcs != {worker_vpc}:
+    if not _exactly_one_string(dns_firewall.get("associated_vpc_ids"), worker_vpc):
         findings.add("dns-resolution-pool-cross-vpc")
-    allowlist_domains = _strings(dns_firewall.get("allowlist_domains"))
+    allowlist_domains = _unique_strings(dns_firewall.get("allowlist_domains"))
     if not allowlist_domains or dns_firewall.get("terminal_block") is not True:
         findings.add("dns-allowlist-incomplete")
-    if any("*" in domain for domain in allowlist_domains):
+    if allowlist_domains is not None and any("*" in domain for domain in allowlist_domains):
         findings.add("dns-allowlist-wildcard-present")
     if dns_firewall.get("failure_mode") != "CLOSED":
         findings.add("dns-firewall-not-fail-closed")
     if dns_firewall.get("rule_group_status") != "COMPLETE":
         findings.add("dns-rule-group-not-ready")
-    association_statuses = _strings(dns_firewall.get("association_statuses"))
-    if not association_statuses or association_statuses != {"COMPLETE"}:
+    association_statuses = dns_firewall.get("association_statuses")
+    if (
+        not isinstance(association_statuses, Sequence)
+        or isinstance(association_statuses, (str, bytes))
+        or len(association_statuses) != 1
+        or association_statuses[0] != "COMPLETE"
+    ):
         findings.add("dns-rule-group-association-not-ready")
-    rule_statuses = _strings(dns_firewall.get("rule_statuses"))
-    if not rule_statuses or rule_statuses != {"COMPLETE"}:
+    rule_statuses = dns_firewall.get("rule_statuses")
+    if (
+        not isinstance(rule_statuses, Sequence)
+        or isinstance(rule_statuses, (str, bytes))
+        or len(rule_statuses) != 2
+        or any(status != "COMPLETE" for status in rule_statuses)
+    ):
         findings.add("dns-firewall-rule-not-ready")
     rule_actions = dns_firewall.get("rule_actions")
     if (
@@ -479,8 +513,13 @@ def evaluate_fcp03_topology(snapshot: Mapping[str, object]) -> tuple[str, ...]:
         or len(set(rule_priorities)) != len(rule_priorities)
     ):
         findings.add("dns-firewall-rule-priority-invalid")
-    domain_list_statuses = _strings(dns_firewall.get("domain_list_statuses"))
-    if not domain_list_statuses or domain_list_statuses != {"COMPLETE"}:
+    domain_list_statuses = dns_firewall.get("domain_list_statuses")
+    if (
+        not isinstance(domain_list_statuses, Sequence)
+        or isinstance(domain_list_statuses, (str, bytes))
+        or len(domain_list_statuses) != 2
+        or any(status != "COMPLETE" for status in domain_list_statuses)
+    ):
         findings.add("dns-firewall-domain-list-not-ready")
 
     return tuple(sorted(findings))

@@ -793,6 +793,16 @@ def collect_fcp03_snapshot(
 
     metadata_options = instance.get("MetadataOptions")
     metadata_options = metadata_options if isinstance(metadata_options, Mapping) else {}
+    raw_ipv6_auto_assign = subnet.get("AssignIpv6AddressOnCreation")
+    raw_ipv6_cidr_associations = subnet.get("Ipv6CidrBlockAssociationSet")
+    ipv6_subnet_inventory_valid = isinstance(raw_ipv6_auto_assign, bool) and isinstance(
+        raw_ipv6_cidr_associations, list
+    )
+    ipv6_enabled = (
+        raw_ipv6_auto_assign or bool(raw_ipv6_cidr_associations)
+        if ipv6_subnet_inventory_valid
+        else None
+    )
 
     worker = {
         "vpc_id": vpc_id,
@@ -815,9 +825,7 @@ def collect_fcp03_snapshot(
             else None
         ),
         "metadata_hop_limit": metadata_options.get("HttpPutResponseHopLimit"),
-        "ipv6_enabled": bool(
-            subnet.get("AssignIpv6AddressOnCreation") or subnet.get("Ipv6CidrBlockAssociationSet")
-        ),
+        "ipv6_enabled": ipv6_enabled,
         "availability_zone": availability_zone,
         "default_route_target": _route_target(default_route) if default_route else None,
         "route_table_subnet_ids": route_table_subnet_ids,
