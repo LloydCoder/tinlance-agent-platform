@@ -43,7 +43,21 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 cleanup() {
+  local status=$?
   set +e
+  if [[ "$status" -ne 0 ]]; then
+    echo "FCP03_LAB_FAILURE_STATUS=$status" >&2
+    if [[ -f "$log_file" ]]; then
+      echo "FCP03_UNBOUND_LOG_BEGIN" >&2
+      tail -n 80 "$log_file" >&2
+      echo "FCP03_UNBOUND_LOG_END" >&2
+    fi
+    if ip netns list | grep -Fq "$worker_ns"; then
+      echo "FCP03_WORKER_NFT_DIAGNOSTICS" >&2
+      ip netns exec "$worker_ns" nft list ruleset >&2
+      ip netns exec "$worker_ns" ip addr show >&2
+    fi
+  fi
   if [[ -n "$resolver_pid" ]]; then
     kill "$resolver_pid" >/dev/null 2>&1
     wait "$resolver_pid" >/dev/null 2>&1
@@ -166,10 +180,12 @@ for _ in $(seq 1 30); do
   sleep 0.2
 done
 test "$ready" -eq 1
+echo "FCP03_RESOLVER_READY=PASS"
 
 # Positive DNS and HTTPS controls.
 allowed_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short)"
 test "$allowed_answer" = "10.203.0.10"
+echo "FCP03_ALLOWED_DNS_ANSWER=PASS"
 https_marker="$(ip netns exec "$worker_ns" python3 - <<'PY'
 import socket
 with socket.create_connection(("10.203.0.10", 443), timeout=1) as conn:
@@ -177,10 +193,12 @@ with socket.create_connection(("10.203.0.10", 443), timeout=1) as conn:
 PY
 )"
 test "$https_marker" = "FCP03-LOCAL-HTTPS-OK"
+echo "FCP03_APPROVED_HTTPS_PROBE=PASS"
 
 # DNS query policy is evaluated separately from packet-path policy.
 blocked_dns="$(ip netns exec "$worker_ns" dig @10.203.0.1 blocked.test A +time=1 +tries=1 +noall +comments)"
 grep -q "status: NXDOMAIN" <<<"$blocked_dns"
+echo "FCP03_BLOCKED_DNS_NXDOMAIN=PASS"
 rebind_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 rebind.test A +time=1 +tries=1 +short)"
 test "$rebind_answer" = "203.0.113.10"
 metadata_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 metadata.test A +time=1 +tries=1 +short)"
