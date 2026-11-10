@@ -182,7 +182,7 @@ def test_sender_bound_access_token_requires_a_matching_dpop_proof_over_http(tmp_
     token_key, proof_key, jwk, thumbprint = make_binding_material()
     token = make_access_token(token_key, thumbprint)
     proof = make_dpop_proof(proof_key, jwk, token)
-    _, public_key = token_key, token_key.public_key()
+    public_key = token_key.public_key()
     resolver = make_resolver(public_key, tmp_path / "revocations.db")
     server, thread, endpoint = with_server(resolver)
     try:
