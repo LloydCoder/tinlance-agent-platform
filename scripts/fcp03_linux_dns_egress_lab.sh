@@ -43,6 +43,7 @@ server_pid=""
 
 baseline_host_rules="$(nft list ruleset | sed -E 's/counter packets [0-9]+ bytes [0-9]+/counter packets <n> bytes <n>/g' | sha256sum | awk '{print $1}')"
 baseline_default_routes="$(ip route show default)"
+baseline_ipv6_default_routes="$(ip -6 route show default)"
 baseline_docker=""
 if command -v docker >/dev/null 2>&1; then
   baseline_docker="$(docker ps --no-trunc --format '{{.ID}} {{.Names}} {{.Status}}' | sort)"
@@ -93,11 +94,15 @@ ip netns exec "$resolver_ns" ip link set lo up
 ip netns exec "$worker_ns" ip addr add 10.203.0.2/24 dev eth0
 ip netns exec "$resolver_ns" ip addr add 10.203.0.1/24 dev eth0
 ip netns exec "$resolver_ns" ip addr add 10.203.0.10/32 dev eth0
+ip netns exec "$worker_ns" ip -6 addr add 2001:db8:203::2/64 dev eth0
+ip netns exec "$resolver_ns" ip -6 addr add 2001:db8:203::1/64 dev eth0
 ip netns exec "$worker_ns" ip link set eth0 up
 ip netns exec "$resolver_ns" ip link set eth0 up
 ip netns exec "$worker_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
 ip netns exec "$resolver_ns" sysctl -q -w net.ipv4.ip_forward=0 >/dev/null
+ip netns exec "$resolver_ns" sysctl -q -w net.ipv6.conf.all.forwarding=0 >/dev/null
 ip netns exec "$worker_ns" ip route add default via 10.203.0.1 dev eth0 onlink
+ip netns exec "$worker_ns" ip -6 route add default via 2001:db8:203::1 dev eth0
 echo "FCP03_ISOLATED_DEFAULT_ROUTE=CONFIGURED"
 
 # The worker default route terminates at the isolated resolver namespace.
@@ -105,8 +110,9 @@ echo "FCP03_ISOLATED_DEFAULT_ROUTE=CONFIGURED"
 # can leave the two-namespace lab or reach the host/external network.
 ip netns exec "$worker_ns" ip route show default | grep -Eq "^default via 10\\.203\\.0\\.1 dev eth0( |$)"
 test -z "$(ip netns exec "$resolver_ns" ip route show default)"
-test -z "$(ip netns exec "$worker_ns" ip -6 route show default)"
-test -z "$(ip netns exec "$worker_ns" ip -6 addr show scope global)"
+ip netns exec "$worker_ns" ip -6 route show default | grep -Eq "^default via 2001:db8:203::1 dev eth0( |$)"
+ip netns exec "$worker_ns" ip -6 addr show dev eth0 | grep -Fq "2001:db8:203::2/64"
+test -z "$(ip netns exec "$resolver_ns" ip -6 route show default)"
 
 ip netns exec "$resolver_ns" dnsmasq \
   --keep-in-foreground \
@@ -188,6 +194,7 @@ table inet fcp03 {
     ip daddr 10.203.0.1 udp dport 53 counter accept
     ip daddr 10.203.0.1 tcp dport 53 counter accept
     ip daddr 10.203.0.10 tcp dport 443 counter accept
+    ip6 daddr ::/0 counter drop
     counter drop
   }
 }
@@ -235,7 +242,7 @@ with socket.create_connection(("10.203.0.10", 443), timeout=1) as raw:
 PY
 )"
 test "$https_marker" = "FCP03-HTTPS-CERTIFICATE-AND-SNI-VERIFIED"
-echo "FCP03_APPROVED_HTTPS_TLS_SNI=PASS"
+echo "FCP03_APPROVED_HTTPS_TLS_HOSTNAME_VALIDATION=PASS"
 
 # DNS query policy is evaluated separately from packet-path policy.
 blocked_dns="$(ip netns exec "$worker_ns" dig @10.203.0.1 blocked.test A +time=1 +tries=1 +noall +comments)"
@@ -281,6 +288,17 @@ blocked_tcp("1.1.1.1", 853)            # DNS-over-TLS
 blocked_tcp("10.203.0.1", 443)         # resolver is DNS-only, not a proxy
 blocked_udp("8.8.8.8", 53)             # alternate external DNS
 blocked_udp("1.1.1.1", 443)            # QUIC / HTTP3
+
+sock6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+sock6.settimeout(0.35)
+try:
+    sock6.connect(("2606:4700:4700::1111", 443, 0, 0))
+except OSError:
+    pass
+else:
+    raise SystemExit("unexpected IPv6 egress to a public destination")
+finally:
+    sock6.close()
 PY
 
 # Direct DNS-over-TCP bypass must also fail; approved TCP/53 is resolver-only.
@@ -309,12 +327,22 @@ trap - EXIT
 
 after_host_rules="$(nft list ruleset | sed -E 's/counter packets [0-9]+ bytes [0-9]+/counter packets <n> bytes <n>/g' | sha256sum | awk '{print $1}')"
 after_default_routes="$(ip route show default)"
+after_ipv6_default_routes="$(ip -6 route show default)"
+ipv6_drop_packets="$(grep -E 'ip6 daddr ::/0 counter packets [0-9]+ bytes [0-9]+ drop' <<<"$rules" | awk '{for (i = 1; i <= NF; i++) if ($i == "packets") print $(i + 1)}' | tail -n 1)"
+if [[ -z "$ipv6_drop_packets" || "$ipv6_drop_packets" -lt 1 ]]; then
+  echo "IPv6 egress drop counter did not record a blocked packet" >&2
+  exit 1
+fi
 if [[ "$baseline_host_rules" != "$after_host_rules" ]]; then
   echo "host nftables ruleset changed unexpectedly" >&2
   exit 1
 fi
 if [[ "$baseline_default_routes" != "$after_default_routes" ]]; then
   echo "host default routes changed unexpectedly" >&2
+  exit 1
+fi
+if [[ "$baseline_ipv6_default_routes" != "$after_ipv6_default_routes" ]]; then
+  echo "host IPv6 default routes changed unexpectedly" >&2
   exit 1
 fi
 if [[ -n "$baseline_docker" ]] && command -v docker >/dev/null 2>&1; then
@@ -337,14 +365,15 @@ printf 'FCP03_LOCAL_DNS_ALLOW=PASS\n'
 printf 'FCP03_LOCAL_DNS_BLOCK_NXDOMAIN=PASS\n'
 printf 'FCP03_DNS_REBINDING_RESOLUTION=OBSERVED\n'
 printf 'FCP03_DNS_QUERY_LOG_CORRELATION=PASS\n'
-printf 'FCP03_APPROVED_HTTPS_TLS_SNI=PASS\n'
+printf 'FCP03_APPROVED_HTTPS_TLS_HOSTNAME_VALIDATION=PASS\n'
 printf 'FCP03_DIRECT_DNS_UDP_TCP_BYPASS=BLOCKED\n'
-printf 'FCP03_DOH_DIRECT_IP_BYPASS=BLOCKED_BY_EGRESS_POLICY\n'
+printf 'FCP03_DOH_ENDPOINT_IP_TCP443=BLOCKED\n'
 printf 'FCP03_DOT_853=BLOCKED\n'
 printf 'FCP03_QUIC_UDP443=BLOCKED\n'
 printf 'FCP03_METADATA_DESTINATION=BLOCKED\n'
 printf 'FCP03_DNS_REBINDING_DESTINATION=BLOCKED\n'
-printf 'FCP03_IPV6_DEFAULT_ROUTE=ABSENT\n'
+printf 'FCP03_IPV6_EGRESS=BLOCKED_BY_NFTABLES\n'
+printf 'FCP03_IPV6_NFT_DROP_PACKETS=%s\n' "$ipv6_drop_packets"
 printf 'FCP03_NFT_DROP_COUNTER_PACKETS=%s\n' "$drop_packets"
 printf 'FCP03_HOST_FIREWALL_AND_ROUTES_UNCHANGED=PASS\n'
 printf 'FCP03_EXISTING_DOCKER_STATE_UNCHANGED=PASS\n'

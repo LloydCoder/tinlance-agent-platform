@@ -15,6 +15,7 @@ The user constraint for this programme is **USD 0 new AWS spend**. Promotional c
 | `IMPLEMENTED` | Code/configuration exists in the repository. |
 | `CI_VERIFIED` | Exact commit has successful applicable CI checks. |
 | `LOCAL_INTEGRATION_VERIFIED` | Reproducible integration test ran on an isolated local Linux environment. |
+| `HOSTED_LINUX_INTEGRATION_VERIFIED` | Actual Linux network namespaces, DNS policy and nftables enforcement ran on an ephemeral hosted CI runner with captured counters/logs and cleanup assertions. |
 | `DEPLOYED_VERIFIED` | Deployed target infrastructure and runtime evidence are archived. |
 | `INDEPENDENTLY_ASSURED` | A named independent assessor completed the defined scope and closed or accepted all findings. |
 | `BLOCKED` | Required evidence cannot be obtained under the current constraints. |
@@ -27,6 +28,7 @@ Never promote one state to another by inference. A template, unit test, failed c
 |---|---|---|---|
 | AWS DNS Firewall | DNS-only CloudFormation template, allow-then-NXDOMAIN policy, resolver query logging, fail-closed setting, probe tests | `IMPLEMENTED` / `CI_VERIFIED` | No live DNS Firewall association, resolver RCODE transcript or correlated Resolver query logs |
 | AWS network egress | Isolated single-AZ Network Firewall/NAT topology, symmetric routes, NACL/SG constraints, DoH denylist, resolved-domain policy, flow/alert logs | `IMPLEMENTED` / `CI_VERIFIED` | No deployed path, packet/flow evidence, live bypass probes or production qualification |
+| Provider-neutral Linux DNS/egress lab | dnsmasq policy, isolated worker/resolver namespaces, nftables default-deny, DNS UDP/TCP, NXDOMAIN, rebinding, metadata, DoT, QUIC, direct TCP/443 and TLS certificate/hostname validation | `IMPLEMENTED` / `CI_VERIFIED` / `HOSTED_LINUX_INTEGRATION_VERIFIED` (PR #288, merge `37fae92`) | IPv6 firewall counter extension is in PR #289; no AWS Network Firewall/Route 53 Resolver or production-host acceptance; DoH endpoint test is TCP/443 reachability, not a full HTTP/2 DoH exchange |
 | Durable identity/snapshots | KMS/DynamoDB/S3/Object Lock candidate and adapter contracts | `IMPLEMENTED` / `CI_VERIFIED` | No live IAM effective-permission, revocation propagation, replay-race, snapshot-integrity or restore evidence; deployment is billable and retention is irreversible |
 | Sender-constrained identity | DPoP verification, `cnf.jkt` request binding and replay-cache implementation | `IMPLEMENTED` / `CI_VERIFIED` | Production issuer/JWKS, key custody, revocation feed, durable cache and end-to-end deployed tests |
 | Host/runtime isolation | Existing sandbox/runtime code and phase-2 evidence | Partial repository evidence | Production host hardening, persistent-computer end-to-end qualification, resource limits, escape tests and operational isolation evidence |
@@ -35,7 +37,7 @@ Never promote one state to another by inference. A template, unit test, failed c
 | Cost and governance | Teardown validator and documented estimates | Partial repository evidence | Enforceable spend ceiling, verified Billing/Operations/Security contacts and evidence of an operational budget control |
 | Independent assurance | M29 report contract | Contract only | Actual named independent assessor, scope, findings, evidence and disposition |
 
-The latest repository main commit inspected for this audit is `dd4b53f057cc20eb4ad0d77b42980d028b31937f`. Its 14 reported GitHub check-runs were successful. The repository's FCP-03 infrastructure-validation workflow (cfn-lint/Checkov) was not present in that exact main-commit check-run list; do not infer it ran from the other green checks. Verify its PR-head run separately before claiming that gate green.
+The initial FCP-03 infrastructure merge `dd4b53f057cc20eb4ad0d77b42980d028b31937f` had 14 successful reported mainline check-runs. The provider-neutral Linux lab was subsequently merged as PR #288 (`37fae92ad3743c8dd97bac466f162961c012e1b2`) with 20/20 check-runs successful, including its dedicated live Linux namespace/nftables/DNS/TLS workflow. This CI evidence does not substitute for the separate AWS CloudFormation cfn-lint/Checkov gate or a deployed provider environment.
 
 The repository's main branch is currently reported as unprotected, with no required status checks. Issue [#275](https://github.com/LloydCoder/tinlance-agent-platform/issues/275) records this governance gap. The connected GitHub actions do not expose the repository-administration operation required to enable a ruleset, so the issue remains open until an administrator configures and verifies it.
 
@@ -88,7 +90,9 @@ Useful upstream references:
 FCP-03 can be accepted only when all of the following are true:
 
 - [ ] Provider-neutral DNS and network policy contracts are executable and tested.
-- [ ] Local Linux egress lab passes every protocol/bypass case with correlated evidence.
+- [x] The declared local Linux lab cases pass on a hosted Linux runner with DNS query logs, nftables drop counters, TLS certificate/hostname validation and host-state cleanup evidence (PR #288).
+- [ ] Extend and retain IPv6 firewall drop-counter evidence (PR #289 pending).
+- [ ] Add a full HTTP/2 DoH protocol test if DoH protocol behavior, rather than default-deny destination reachability, is part of the acceptance scope.
 - [ ] AWS adapter templates pass cfn-lint, Checkov and schema validation, without claiming live AWS acceptance.
 - [ ] Production identity/JWKS/DPoP/revocation/key lifecycle are verified against real configured adapters.
 - [ ] Production host/runtime isolation and persistent-computer controls pass adversarial tests.
