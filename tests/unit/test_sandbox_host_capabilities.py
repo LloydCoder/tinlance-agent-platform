@@ -223,6 +223,7 @@ def test_cpu_security_attestation_rejects_sentinel_microcode_revision(
     assert result.cpu_security_mitigations_ready is False
     assert "CPU microcode revision is unavailable, zero or sentinel" in result.cpu_security_warnings
 
+
 def test_arm_cpuinfo_processor_index_is_not_reported_as_cpu_model_name(tmp_path: Path) -> None:
     write_probe_fixture(tmp_path, kvm=True)
     (tmp_path / "proc/cpuinfo").write_text(
