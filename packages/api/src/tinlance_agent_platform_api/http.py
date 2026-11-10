@@ -93,8 +93,14 @@ def _public_origin(value: str | None) -> str | None:
             or parsed.fragment
         ):
             raise ValueError
-        _ = parsed.port
-        return f"https://{parsed.netloc.lower()}"
+        port = parsed.port
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError
+        host = parsed.hostname.lower()
+        if ":" in host:
+            host = f"[{host}]"
+        authority = host if port in (None, 443) else f"{host}:{port}"
+        return f"https://{authority}"
     except (TypeError, ValueError) as exc:
         raise ValueError("DPoP public origin must be a normalized HTTPS origin") from exc
 
