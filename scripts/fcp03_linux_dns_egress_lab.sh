@@ -109,8 +109,8 @@ test -z "$(ip netns exec "$worker_ns" ip -6 route show default)"
 test -z "$(ip netns exec "$worker_ns" ip -6 addr show scope global)"
 
 ip netns exec "$resolver_ns" dnsmasq \
-  --no-daemon \
-  --no-pid \
+  --keep-in-foreground \
+  --pid-file="$pid_file" \
   --no-resolv \
   --no-hosts \
   --no-poll \
