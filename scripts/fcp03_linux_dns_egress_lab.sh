@@ -30,6 +30,7 @@ resolver_ns="fcp03-d-${suffix}"
 worker_if="f3w${suffix}"
 resolver_if="f3d${suffix}"
 log_file="/tmp/fcp03-dnsmasq-${suffix}.log"
+pid_file="/tmp/fcp03-dnsmasq-${suffix}.pid"
 server_file="$(mktemp /tmp/fcp03-https.XXXXXX.py)"
 ca_cert="$(mktemp /tmp/fcp03-ca.XXXXXX.crt)"
 ca_key="$(mktemp /tmp/fcp03-ca.XXXXXX.key)"
@@ -75,7 +76,7 @@ cleanup() {
   ip netns del "$worker_ns" >/dev/null 2>&1
   ip netns del "$resolver_ns" >/dev/null 2>&1
   ip link del "$worker_if" >/dev/null 2>&1
-  rm -f "$log_file" "$server_file" "$ca_cert" "$ca_key" "$server_key" "$server_csr" "$server_cert" "$ext_file" "${ca_cert}.srl"
+  rm -f "$log_file" "$pid_file" "$server_file" "$ca_cert" "$ca_key" "$server_key" "$server_csr" "$server_cert" "$ext_file" "${ca_cert}.srl"
 }
 trap cleanup EXIT
 
