@@ -1,0 +1,403 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "FCP-03 Workstream B near-zero-cost DNS Firewall lab. No Network Firewall, no NAT Gateway, no public worker IP. Route 53 DNS Firewall allowlist + fail-closed config, strict Security Group/NACL, free S3/DynamoDB Gateway Endpoints. Disposable single-AZ. Not production. Do not deploy without cost-gate approval.",
+  "Parameters": {
+    "AvailabilityZone": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Description": "Single AZ for the disposable DNS-Firewall lab."
+    },
+    "ApprovedDomains": {
+      "Type": "CommaDelimitedList",
+      "Description": "FQDN allowlist for DNS resolution (no protocol prefixes). First entry is the approved probe domain. Must not include BlockedProbeDomain."
+    },
+    "BlockedProbeDomain": {
+      "Type": "String",
+      "Description": "Known-resolvable FQDN omitted from ApprovedDomains; DNS Firewall must return NXDOMAIN for it.",
+      "MinLength": 3,
+      "MaxLength": 253,
+      "AllowedPattern": "^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\\.[a-zA-Z]{2,}$"
+    },
+    "TeardownAtUtc": {
+      "Type": "String",
+      "Description": "UTC timestamp (YYYY-MM-DDTHH:MM:SS) when EventBridge Scheduler deletes this stack. Required; no default. Validate with scripts/validate_fcp03_teardown_at.py before create-stack.",
+      "AllowedPattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    },
+    "WorkerInstanceType": {
+      "Type": "String",
+      "Default": "t4g.nano",
+      "AllowedValues": ["t4g.nano", "t3.nano", "t4g.micro"],
+      "Description": "Minimal instance for DNS probe bootstrap only."
+    },
+    "WorkerAmiId": {
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+      "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64",
+      "Description": "Amazon Linux 2023 AMI (ARM preferred for t4g)."
+    },
+    "VpcCidr": {
+      "Type": "String",
+      "Default": "10.43.0.0/16",
+      "AllowedValues": ["10.43.0.0/16"],
+      "Description": "Isolated CIDR distinct from the full Network Firewall lab (10.42.0.0/16)."
+    },
+    "WorkerSubnetCidr": {
+      "Type": "String",
+      "Default": "10.43.1.0/24",
+      "AllowedValues": ["10.43.1.0/24"]
+    }
+  },
+  "Rules": {
+    "BlockedProbeMustNotBeApproved": {
+      "RuleCondition": {
+        "Fn::Contains": [
+          { "Ref": "ApprovedDomains" },
+          { "Ref": "BlockedProbeDomain" }
+        ]
+      },
+      "Assertions": [
+        {
+          "Assert": { "Fn::Equals": [true, false] },
+          "AssertDescription": "BlockedProbeDomain must not appear in ApprovedDomains."
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": { "Ref": "VpcCidr" },
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          { "Key": "Name", "Value": { "Fn::Sub": "${AWS::StackName}-vpc" } },
+          { "Key": "FCPPhase", "Value": "FCP-03" },
+          { "Key": "FCPWorkstream", "Value": "B-dns-firewall-lab" }
+        ]
+      }
+    },
+    "WorkerSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "CidrBlock": { "Ref": "WorkerSubnetCidr" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone" },
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          { "Key": "Name", "Value": { "Fn::Sub": "${AWS::StackName}-worker" } },
+          { "Key": "FCPPhase", "Value": "FCP-03" }
+        ]
+      }
+    },
+    "WorkerRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "Tags": [
+          { "Key": "Name", "Value": { "Fn::Sub": "${AWS::StackName}-worker-rt" } },
+          { "Key": "FCPPhase", "Value": "FCP-03" }
+        ]
+      }
+    },
+    "WorkerRouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "WorkerSubnet" },
+        "RouteTableId": { "Ref": "WorkerRouteTable" }
+      }
+    },
+    "S3GatewayEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "ServiceName": { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" },
+        "VpcEndpointType": "Gateway",
+        "RouteTableIds": [{ "Ref": "WorkerRouteTable" }],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": ["s3:GetObject", "s3:ListBucket"],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "DynamoDBGatewayEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "ServiceName": { "Fn::Sub": "com.amazonaws.${AWS::Region}.dynamodb" },
+        "VpcEndpointType": "Gateway",
+        "RouteTableIds": [{ "Ref": "WorkerRouteTable" }]
+      }
+    },
+    "WorkerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "FCP-03 DNS lab worker: no ingress, DNS only to VPC resolver, no general internet egress",
+        "VpcId": { "Ref": "Vpc" },
+        "SecurityGroupIngress": [],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "udp",
+            "FromPort": 53,
+            "ToPort": 53,
+            "CidrIp": { "Fn::Sub": "${VpcCidr}" },
+            "Description": "DNS UDP only to VPC CIDR (Route 53 Resolver)"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 53,
+            "ToPort": 53,
+            "CidrIp": { "Fn::Sub": "${VpcCidr}" },
+            "Description": "DNS TCP only to VPC CIDR (Route 53 Resolver)"
+          }
+        ],
+        "Tags": [
+          { "Key": "Name", "Value": { "Fn::Sub": "${AWS::StackName}-worker-sg" } },
+          { "Key": "FCPPhase", "Value": "FCP-03" }
+        ]
+      }
+    },
+    "WorkerNetworkAcl": {
+      "Type": "AWS::EC2::NetworkAcl",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "Tags": [
+          { "Key": "Name", "Value": { "Fn::Sub": "${AWS::StackName}-worker-nacl" } },
+          { "Key": "FCPPhase", "Value": "FCP-03" }
+        ]
+      }
+    },
+    "WorkerNetworkAclAssociation": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "WorkerSubnet" },
+        "NetworkAclId": { "Ref": "WorkerNetworkAcl" }
+      }
+    },
+    "WorkerNaclEgressDnsUdp": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WorkerNetworkAcl" },
+        "RuleNumber": 100,
+        "Protocol": 17,
+        "RuleAction": "allow",
+        "Egress": true,
+        "CidrBlock": { "Ref": "VpcCidr" },
+        "PortRange": { "From": 53, "To": 53 }
+      }
+    },
+    "WorkerNaclEgressDnsTcp": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WorkerNetworkAcl" },
+        "RuleNumber": 110,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": true,
+        "CidrBlock": { "Ref": "VpcCidr" },
+        "PortRange": { "From": 53, "To": 53 }
+      }
+    },
+    "WorkerNaclEgressDenyRest": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WorkerNetworkAcl" },
+        "RuleNumber": 200,
+        "Protocol": -1,
+        "RuleAction": "deny",
+        "Egress": true,
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WorkerNaclIngressEphemeral": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WorkerNetworkAcl" },
+        "RuleNumber": 100,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": false,
+        "CidrBlock": { "Ref": "VpcCidr" },
+        "PortRange": { "From": 1024, "To": 65535 }
+      }
+    },
+    "WorkerNaclIngressDenyRest": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WorkerNetworkAcl" },
+        "RuleNumber": 200,
+        "Protocol": -1,
+        "RuleAction": "deny",
+        "Egress": false,
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ApprovedDnsDomainList": {
+      "Type": "AWS::Route53Resolver::FirewallDomainList",
+      "Properties": {
+        "Name": { "Fn::Sub": "${AWS::StackName}-approved-dns" },
+        "Domains": { "Ref": "ApprovedDomains" },
+        "Tags": [{ "Key": "FCPPhase", "Value": "FCP-03" }]
+      }
+    },
+    "WildcardDnsDomainList": {
+      "Type": "AWS::Route53Resolver::FirewallDomainList",
+      "Properties": {
+        "Name": { "Fn::Sub": "${AWS::StackName}-all-dns" },
+        "Domains": ["*"],
+        "Tags": [{ "Key": "FCPPhase", "Value": "FCP-03" }]
+      }
+    },
+    "DNSFirewallRuleGroup": {
+      "Type": "AWS::Route53Resolver::FirewallRuleGroup",
+      "Properties": {
+        "Name": { "Fn::Sub": "${AWS::StackName}-dns-allowlist" },
+        "FirewallRules": [
+          {
+            "Action": "ALLOW",
+            "FirewallDomainListId": { "Fn::GetAtt": ["ApprovedDnsDomainList", "Id"] },
+            "Priority": 100
+          },
+          {
+            "Action": "BLOCK",
+            "BlockResponse": "NXDOMAIN",
+            "FirewallDomainListId": { "Fn::GetAtt": ["WildcardDnsDomainList", "Id"] },
+            "Priority": 200
+          }
+        ],
+        "Tags": [
+          { "Key": "FCPPhase", "Value": "FCP-03" },
+          { "Key": "Environment", "Value": "disposable-dns-lab" }
+        ]
+      }
+    },
+    "DNSFirewallAssociation": {
+      "Type": "AWS::Route53Resolver::FirewallRuleGroupAssociation",
+      "Properties": {
+        "FirewallRuleGroupId": { "Ref": "DNSFirewallRuleGroup" },
+        "VpcId": { "Ref": "Vpc" },
+        "Priority": 101,
+        "MutationProtection": "DISABLED",
+        "Name": { "Fn::Sub": "${AWS::StackName}-dns-association" },
+        "Tags": [{ "Key": "FCPPhase", "Value": "FCP-03" }]
+      }
+    },
+    "DNSFirewallConfig": {
+      "Type": "AWS::Route53Resolver::FirewallConfig",
+      "DependsOn": "DNSFirewallAssociation",
+      "Properties": {
+        "ResourceId": { "Ref": "Vpc" },
+        "FirewallFailOpen": "DISABLED"
+      }
+    },
+    "WorkerInstance": {
+      "Type": "AWS::EC2::Instance",
+      "DependsOn": ["DNSFirewallConfig", "S3GatewayEndpoint", "DynamoDBGatewayEndpoint"],
+      "Properties": {
+        "ImageId": { "Ref": "WorkerAmiId" },
+        "InstanceType": { "Ref": "WorkerInstanceType" },
+        "SubnetId": { "Ref": "WorkerSubnet" },
+        "SecurityGroupIds": [{ "Ref": "WorkerSecurityGroup" }],
+        "MetadataOptions": {
+          "HttpEndpoint": "disabled",
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": [
+              "#!/bin/bash\nset -euo pipefail\necho FCP03_DNS_LAB_BOOTSTRAP_START\nAPPROVED=\"${ApprovedProbeDomain}\"\nBLOCKED=\"${BlockedProbeDomain}\"\n# Approved domain should resolve (DNS Firewall ALLOW)\nif getent hosts \"$APPROVED\" >/dev/null 2>&1; then\n  echo FCP03_TEST_DNS_APPROVED=PASS\nelse\n  echo FCP03_TEST_DNS_APPROVED=FAIL\nfi\n# Blocked domain must not resolve (NXDOMAIN)\nif getent hosts \"$BLOCKED\" >/dev/null 2>&1; then\n  echo FCP03_TEST_DNS_BLOCKED=FAIL_UNEXPECTED_RESOLUTION\nelse\n  echo FCP03_TEST_DNS_BLOCKED=PASS\nfi\n# External resolver must be unreachable from this SG/NACL\nif timeout 3 dig @8.8.8.8 +time=1 +tries=1 example.com >/dev/null 2>&1; then\n  echo FCP03_TEST_EXTERNAL_RESOLVER=FAIL_REACHABLE\nelse\n  echo FCP03_TEST_EXTERNAL_RESOLVER=PASS\nfi\necho FCP03_DNS_LAB_BOOTSTRAP_END\n",
+              {
+                "ApprovedProbeDomain": { "Fn::Select": [0, { "Ref": "ApprovedDomains" }] },
+                "BlockedProbeDomain": { "Ref": "BlockedProbeDomain" }
+              }
+            ]
+          }
+        },
+        "Tags": [
+          { "Key": "Name", "Value": { "Fn::Sub": "${AWS::StackName}-worker" } },
+          { "Key": "FCPPhase", "Value": "FCP-03" },
+          { "Key": "FCPWorkstream", "Value": "B-dns-firewall-lab" }
+        ]
+      }
+    },
+    "TeardownRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "scheduler.amazonaws.com" },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": { "Ref": "AWS::AccountId" }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DeleteThisStackOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["cloudformation:DeleteStack", "cloudformation:DescribeStacks"],
+                  "Resource": { "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*" }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [{ "Key": "FCPPhase", "Value": "FCP-03" }]
+      }
+    },
+    "AutomaticTeardown": {
+      "Type": "AWS::Scheduler::Schedule",
+      "Properties": {
+        "Name": { "Fn::Sub": "${AWS::StackName}-teardown" },
+        "Description": "Automatic delete of this FCP-03 DNS Firewall lab stack only",
+        "FlexibleTimeWindow": { "Mode": "OFF" },
+        "ScheduleExpression": { "Fn::Sub": "at(${TeardownAtUtc})" },
+        "ScheduleExpressionTimezone": "UTC",
+        "Target": {
+          "Arn": "arn:aws:scheduler:::aws-sdk:cloudformation:deleteStack",
+          "RoleArn": { "Fn::GetAtt": ["TeardownRole", "Arn"] },
+          "Input": { "Fn::Sub": "{\"StackName\":\"${AWS::StackName}\"}" }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "WorkerInstanceId": {
+      "Description": "Disposable worker instance ID; retrieve console output with ec2:GetConsoleOutput",
+      "Value": { "Ref": "WorkerInstance" }
+    },
+    "VpcId": {
+      "Description": "Lab VPC ID",
+      "Value": { "Ref": "Vpc" }
+    },
+    "DNSFirewallRuleGroupId": {
+      "Description": "Route 53 Resolver DNS Firewall rule group",
+      "Value": { "Ref": "DNSFirewallRuleGroup" }
+    },
+    "AutomaticTeardownAtUtc": {
+      "Description": "Scheduled teardown time (UTC)",
+      "Value": { "Ref": "TeardownAtUtc" }
+    },
+    "SafetyNote": {
+      "Description": "Operational safety",
+      "Value": "Near-zero-cost DNS Firewall lab only. No Network Firewall, no NAT, no public IP. DNS query charges apply. Not production. Confirm DELETE_COMPLETE after teardown."
+    }
+  }
+}
