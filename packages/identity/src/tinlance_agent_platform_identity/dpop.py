@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
@@ -23,6 +25,66 @@ class DPoPReplayCache(Protocol):
     """Atomic replay store; consume returns False when the proof ID was seen."""
 
     def consume(self, jti: str, expires_at: datetime) -> bool: ...
+
+
+class DynamoDBReplayClient(Protocol):
+    """Low-level DynamoDB client subset used by the replay adapter."""
+
+    def put_item(self, **kwargs: Any) -> Mapping[str, object]: ...
+
+
+@dataclass(frozen=True, slots=True)
+class DynamoDBDPoPReplayCache:
+    """Atomic, shared DPoP replay cache backed by a DynamoDB table.
+
+    The table must have a string partition key named replay_key and TTL
+    enabled on the numeric expires_at attribute.
+    """
+
+    client: DynamoDBReplayClient
+    table_name: str
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.table_name, str)
+            or not self.table_name
+            or self.table_name != self.table_name.strip()
+        ):
+            raise ValueError("DynamoDB DPoP replay table name must be normalized and non-empty")
+
+    def consume(self, jti: str, expires_at: datetime) -> bool:
+        if (
+            not isinstance(jti, str)
+            or not jti
+            or len(jti) > 512
+            or jti != jti.strip()
+            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in jti)
+        ):
+            raise ValueError("DynamoDB DPoP replay identifier must be normalized ASCII")
+        if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+            raise ValueError("DynamoDB DPoP replay expiry must be timezone-aware")
+        expiry_epoch = math.ceil(expires_at.astimezone(UTC).timestamp())
+        if expiry_epoch <= int(datetime.now(UTC).timestamp()):
+            raise ValueError("DynamoDB DPoP replay expiry must be in the future")
+
+        replay_key = hashlib.sha256(jti.encode("ascii")).hexdigest()
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item={
+                    "replay_key": {"S": replay_key},
+                    "expires_at": {"N": str(expiry_epoch)},
+                },
+                ConditionExpression="attribute_not_exists(replay_key)",
+            )
+        except Exception as exc:
+            response = getattr(exc, "response", None)
+            error = response.get("Error") if isinstance(response, Mapping) else None
+            code = error.get("Code") if isinstance(error, Mapping) else None
+            if code == "ConditionalCheckFailedException":
+                return False
+            raise
+        return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +208,7 @@ class DPoPProofVerifier:
 
         expiry = issued_at + timedelta(seconds=self.max_age_seconds + self.clock_skew_seconds)
         try:
-            consumed = self.replay_cache.consume(jti, expiry)
+            consumed = self.replay_cache.consume(f"{thumbprint}:{jti}", expiry)
         except Exception as exc:
             raise PermissionError("DPoP replay protection is unavailable") from exc
         if not consumed:
