@@ -374,13 +374,14 @@ def _dns_firewall_snapshot(
         priority = rule.get("Priority")
         action = rule.get("Action")
         priority_is_valid = type(priority) is int and 1 <= priority <= 10000
-        rule_actions.append(action if action in {"ALLOW", "BLOCK"} else None)
+        action_is_valid = isinstance(action, str) and action in {"ALLOW", "BLOCK"}
+        rule_actions.append(action if action_is_valid else None)
         rule_priorities.append(priority if priority_is_valid else None)
         if (
             not isinstance(domain_list_id, str)
             or not domain_list_id
             or not priority_is_valid
-            or action not in {"ALLOW", "BLOCK"}
+            or not action_is_valid
         ):
             domain_list_statuses.append(None)
             allowlist_has_malformed_domain = True
