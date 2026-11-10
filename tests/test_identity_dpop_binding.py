@@ -17,7 +17,6 @@ from tinlance_agent_platform_api.http import serve
 from tinlance_agent_platform_api.service import APIResponse, AgentPlatformAPI
 from tinlance_agent_platform_identity import (
     DPoPProofVerifier,
-    IdentityAuthenticationError,
     JWKSIdentityVerifier,
     JWKSPrincipalResolver,
     SQLiteTokenRevocationStore,
