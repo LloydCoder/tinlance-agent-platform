@@ -93,7 +93,7 @@ def test_openbao_kv_v2_resolves_exact_version_and_sends_scoped_request(
         "https://bao.example:8200/v1/secret/data/tenants/tenant-a/team/model-provider?version=3"
     )
     assert request.get_method() == "GET"
-    assert request.unredirected_hdrs.get("X-Vault-Token") == "test-token"
+    assert request.unredirected_hdrs.get("X-vault-token") == "test-token"
     assert request.get_header("X-vault-token") is None
     assert request.get_header("Cache-control") == "no-store"
     assert request.get_header("X-vault-request") == "true"
