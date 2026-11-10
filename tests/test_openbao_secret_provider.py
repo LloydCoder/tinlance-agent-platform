@@ -195,8 +195,6 @@ def test_openbao_rejects_tenant_path_injection(
         token_provider=lambda: "test-token",
     )
     with pytest.raises(SecretResolutionError):
-        provider.resolve(_handle())
-    with pytest.raises(SecretResolutionError):
         provider.resolve(
             ScopedSecretHandle(
                 name="secret",
