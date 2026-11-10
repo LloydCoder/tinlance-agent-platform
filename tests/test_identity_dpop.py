@@ -303,7 +303,10 @@ def test_dynamodb_dpop_replay_cache_reclaims_entries_after_expiry() -> None:
         "expires_at": {"N": "1"},
     }
 
-    assert cache.consume(
-        "thumbprint-123:proof-expired",
-        datetime.now(UTC) + timedelta(minutes=5),
-    ) is True
+    assert (
+        cache.consume(
+            "thumbprint-123:proof-expired",
+            datetime.now(UTC) + timedelta(minutes=5),
+        )
+        is True
+    )
