@@ -17,6 +17,7 @@ jobs:
   adversarial-boundary:
     name: R10 adversarial boundary certification
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
