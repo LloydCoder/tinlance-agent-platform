@@ -14,7 +14,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from tinlance_agent_platform_api.http import serve
-from tinlance_agent_platform_api.service import APIResponse, AgentPlatformAPI
+from tinlance_agent_platform_api.service import AgentPlatformAPI, APIResponse
 from tinlance_agent_platform_identity import (
     DPoPProofVerifier,
     JWKSIdentityVerifier,
@@ -61,7 +61,11 @@ def make_binding_material() -> tuple[Any, Any, dict[str, str], str]:
     canonical = json.dumps(
         thumbprint_members, sort_keys=True, separators=(",", ":"), ensure_ascii=True
     ).encode("ascii")
-    thumbprint = base64.urlsafe_b64encode(hashlib.sha256(canonical).digest()).decode("ascii").rstrip("=")
+    thumbprint = (
+        base64.urlsafe_b64encode(hashlib.sha256(canonical).digest())
+        .decode("ascii")
+        .rstrip("=")
+    )
     return token_key, proof_key, jwk, thumbprint
 
 
@@ -136,7 +140,9 @@ def make_resolver(public_key: Any) -> JWKSPrincipalResolver:
     )
 
 
-def send_request(endpoint: str, token: str, dpop_proof: str | None) -> tuple[int, dict[str, object]]:
+def send_request(
+    endpoint: str, token: str, dpop_proof: str | None
+) -> tuple[int, dict[str, object]]:
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
