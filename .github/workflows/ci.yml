@@ -81,3 +81,17 @@ jobs:
         env:
           FCP03_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: pytest -q tests/integration/test_postgres_durability_live.py
+  fcp03-linux-dns-egress:
+    name: FCP-03 Linux DNS/egress namespace lab
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install isolated namespace lab dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes dnsmasq-base dnsutils iproute2 nftables openssl python3
+      - name: Run disposable DNS and egress enforcement lab
+        run: sudo bash scripts/fcp03_linux_dns_egress_lab.sh
