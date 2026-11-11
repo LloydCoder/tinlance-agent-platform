@@ -45,7 +45,7 @@ The tenant-scoped OpenBao KV v2 adapter was merged as PR #291 (`d5993cfd6f03ac96
 
 This CI evidence does not substitute for the separate AWS CloudFormation cfn-lint/Checkov gate or a deployed provider environment.
 
-All five core Agent Systems default branches are currently reported as unprotected, with no required status checks. Issue [#275](https://github.com/LloydCoder/tinlance-agent-platform/issues/275) tracks this cross-repository governance gap. The connected GitHub actions expose reads but not the repository-administration writes required to enable rulesets; no protection setting has been changed. The issue remains open until an administrator configures and reads back active rulesets on all five repositories.
+As of the 2026-11-10 and early 2026-11-11 audits, all five core Agent Systems default branches were unprotected, with no required status checks. That finding is superseded by the ruleset read-back recorded at the end of this document. Issue [#275](https://github.com/LloydCoder/tinlance-agent-platform/issues/275) remains open only for the independent approving-review residual.
 
 Cross-repository sweep (2026-11-10): no open PRs remain in Agent Platform, Agent OS, Agent Platform SDK, TADL or TSIC. SDK CodeQL action updates were consolidated and merged in PR #70 (`95cc8ef81d35392624f2070bf3a5aad4525c23a2`); superseded PRs #66–#68 were closed. Remaining open issues are Platform #275 (branch protection) and TSIC #102 (phase acceptance tracker). Latest inspected `main` SHAs: Platform `d5993cfd6f03ac96058507c7cf7bc2f1e0014913`; Agent OS `62b05001121e3c8d3d144b61700b3204aa0d4428`; SDK `95cc8ef81d35392624f2070bf3a5aad4525c23a2`; TADL `409a0bda27ba3db48e696f665bda7d4e6355e4d3`; TSIC `09533756d7bcdf7fb6de0068bc578b9c205f3b6c`. These are repository-head references, not a claim that FCP-03 is accepted.
 
@@ -131,7 +131,30 @@ The additional runtime workflows establish bounded ephemeral-runner evidence onl
 - Five core repositories were re-read: Agent Platform, Agent OS, Platform SDK, TADL/Agent Developer and TSIC. No open PRs were returned. The only open issues observed are Platform #275 (default-branch governance) and TSIC #102 (canonical FCP-03 production acceptance tracker).
 - Latest observed main commits: Platform `fd5004a0077746d11884de51d55ed40fdab077ef`; Agent OS `62b05001121e3c8d3d144b61700b3204aa0d4428`; Platform SDK `95cc8ef81d35392624f2070bf3a5aad4525c23a2`; TADL `409a0bda27ba3db48e696f665bda7d4e6355e4d3`; TSIC `09533756d7bcdf7fb6de0068bc578b9c205f3b6c`.
 - The latest SDK main check-run read included one queued `.github/dependabot.yml` check with no conclusion; all other reported checks were successful. Do not label that entire check-run set fully green until the queued check concludes or is confirmed non-blocking by the workflow owner.
-- All five default branches still report `protected: false`. Platform issue #275 remains open. The connected GitHub integration exposes branch/ruleset reads but not repository-administration writes, so this audit cannot enable or verify required branch rules.
+- The 2026-11-11 morning read found all five default branches `protected: false`. That is historical. The later ruleset read-back in the section below supersedes it. Platform issue #275 remains open because approving review count is still 0.
 - TSIC issue #102 remains the canonical programme tracker and records FCP-03 as active/incomplete. TADS remains adjacent to, not a substitute for, the five core conformance repositories.
 
-**Updated disposition: FCP-03 remains NOT ACCEPTED.** PR #293 materially improves hosted-service and runtime CI evidence, but production identity/key custody/revocation, deployed network enforcement or an approved equivalent target, production host isolation, backup/DR, operational alert ownership, branch governance and independent assessment remain open. FCP-04 through FCP-10 remain gated.
+**Updated disposition: FCP-03 remains NOT ACCEPTED.** PR #293 materially improves hosted-service and runtime CI evidence, and default-branch rulesets are now active, but production identity/key custody/revocation, deployed network enforcement or an approved equivalent target, production host isolation, backup/DR, operational alert ownership, independent approving review and independent assessment remain open. FCP-04 through FCP-10 remain gated.
+
+### 2026-11-11 ruleset read-back
+
+Owner administration created and read back ruleset `fcp03-default-branch` on the five core default branches:
+
+| Repository | Ruleset ID | Required PR checks |
+|---|---:|---:|
+| Agent Platform | 27050541 | 13 |
+| Agent OS | 27050544 | 7 |
+| Platform SDK | 27050546 | 6 |
+| TADL / Agent Developer | 27050548 | 5 |
+| TSIC | 27050549 | 32 |
+
+Enforcement is active. Bypass actors are empty. Deletion and non-fast-forward pushes are denied. Pull requests and conversation resolution are required. Status checks are strict. `GET /rules/branches/main` returned `deletion`, `non_fast_forward`, `pull_request` and `required_status_checks` on each repository, and `protected` read back `true`.
+
+Checks were limited to workflows that run on every pull request. Path-filtered FCP-03 lab, OpenBao, CloudFormation and persistent-computer workflows are not required checks, because GitHub would block unrelated pull requests waiting for checks that never start. Push-only attestation workflows are likewise not PR-required.
+
+Approving review count is 0. Each repository's only collaborator is `LloydCoder`. Raising the count without a second reviewer would be an unsatisfiable gate. That residual is not waived; it is the remaining reason issue #275 stays open.
+
+Dependabot alerts and security updates were enabled. A simultaneous read returned 0 open alerts, which is not a zero-risk claim. Secret scanning and push protection were already on. Validity checks and non-provider patterns stayed disabled after the settings write and are not claimed as enabled.
+
+No AWS credential was available and no AWS resource was created. This read-back is not FCP-03 acceptance.
+
