@@ -113,3 +113,35 @@ def test_non_network_execution_does_not_require_egress_assertion() -> None:
 
     assert result.exit_code == 0
     assert supervisor.executed is True
+
+
+def test_non_network_execution_rejects_malformed_egress_assertion() -> None:
+    with pytest.raises(TypeError, match="egress_assertion must be callable"):
+        execute_request(
+            request(network=False),
+            policy(),
+            FakeProvider(),
+            SandboxLimits(),
+            lease_assertion=lambda _: True,
+            egress_assertion=True,  # type: ignore[arg-type]
+            supervisor=FakeSupervisor(),
+        )
+
+
+def test_workspace_lease_loss_prevents_egress_authority_from_being_used() -> None:
+    supervisor = FakeSupervisor()
+    egress_calls: list[str] = []
+
+    with pytest.raises(WorkspaceLeaseLost, match="fenced"):
+        execute_request(
+            request(network=True),
+            policy(),
+            FakeProvider(),
+            SandboxLimits(),
+            lease_assertion=lambda _: False,
+            egress_assertion=lambda _: egress_calls.append("called") or True,
+            supervisor=supervisor,
+        )
+
+    assert egress_calls == []
+    assert supervisor.executed is False
