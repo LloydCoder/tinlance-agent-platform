@@ -21,7 +21,8 @@ class FakeSupervisor:
         self.executed = False
 
     def execute(self, assertion, argv, *, cwd, limits):
-        assert assertion() is True
+        if assertion() is not True:
+            raise WorkspaceLeaseLost("workspace lease is expired, revoked, or fenced")
         self.executed = True
         return ProcessResult(0, "ok", "")
 
