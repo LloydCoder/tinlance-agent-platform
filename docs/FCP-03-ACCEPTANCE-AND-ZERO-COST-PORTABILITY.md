@@ -23,7 +23,7 @@ The user constraint for this programme is **USD 0 new AWS spend**. Promotional c
 
 Never promote one state to another by inference. A template, unit test, failed client request, green CI, or scheduled teardown is not proof of live enforcement.
 
-## Current forensic status (2026-11-10)
+## Current forensic status (2026-11-11)
 
 | Workstream | Repository evidence | Acceptance state | Remaining proof |
 |---|---|---|---|
@@ -33,8 +33,8 @@ Never promote one state to another by inference. A template, unit test, failed c
 | Durable identity/snapshots | KMS/DynamoDB/S3/Object Lock candidate and adapter contracts | `IMPLEMENTED` / `CI_VERIFIED` | No live IAM effective-permission, revocation propagation, replay-race, snapshot-integrity or restore evidence; deployment is billable and retention is irreversible |
 | Sender-constrained identity | DPoP verification, `cnf.jkt` request binding and replay-cache implementation | `IMPLEMENTED` / `CI_VERIFIED` | Production issuer/JWKS, key custody, revocation feed, durable cache and end-to-end deployed tests |
 | External secret provider | Tenant-scoped OpenBao KV v2 adapter; exact secret-version selection; token-header auth; redirect rejection; bounded responses; redacted failures; disposable OpenBao policy test proving cross-tenant denial | `IMPLEMENTED` / `CI_VERIFIED` / `HOSTED_SERVICE_INTEGRATION_VERIFIED` (PR #291 merge `d5993cfd`) | No production OpenBao endpoint, identity integration, TLS trust provisioning, token rotation/lease renewal, HA/seal recovery or operational alert evidence |
-| Host/runtime isolation | Existing sandbox/runtime code and phase-2 evidence | Partial repository evidence | Production host hardening, persistent-computer end-to-end qualification, resource limits, escape tests and operational isolation evidence |
-| Persistence and DR | Durable adapter contracts and AWS storage candidate | Partial repository evidence | Production PostgreSQL/outbox/queue, backups, restore drills, measured RTO/RPO and operator-owned recovery |
+| Host/runtime isolation | Existing sandbox/runtime code and phase-2 evidence; PR #293 triggers W3 browser environment, W4 adversarial browser isolation, gVisor restricted-workload benchmark and Firecracker jailer/guest boot smoke on ephemeral runners | `IMPLEMENTED` / `CI_VERIFIED` / selected `HOSTED_SERVICE_INTEGRATION_VERIFIED` | Production host/firmware/attestation, sustained end-to-end persistent-computer qualification, production resource ceilings, independent escape assessment and operational isolation evidence |
+| Persistence and DR | PostgreSQL outbox/snapshot-catalog/restore-ledger adapters now run against a real ephemeral PostgreSQL 17 service in CI (PR #293); tenant RLS under a non-login runtime role, claim/ack/release, redaction, tenant isolation, idempotency and restore transitions are exercised | `IMPLEMENTED` / `CI_VERIFIED` / `HOSTED_SERVICE_INTEGRATION_VERIFIED` | No production PostgreSQL deployment, independent backup system, encrypted backup/restore drill, measured RTO/RPO or operator-owned recovery |
 | Telemetry and operations | Observability contracts and OpenTelemetry adapter tests | Partial repository evidence | Live collector/exporter, alert routing, verified recipients, SLO/error-budget measurements, incident runbook and on-call ownership |
 | Cost and governance | Teardown validator and documented estimates | Partial repository evidence | Enforceable spend ceiling, verified Billing/Operations/Security contacts and evidence of an operational budget control |
 | Independent assurance | M29 report contract | Contract only | Actual named independent assessor, scope, findings, evidence and disposition |
@@ -116,3 +116,22 @@ FCP-03 can be accepted only when all of the following are true:
 ## FCP-04 sequencing
 
 FCP-04 is the agent-workforce runtime and autonomous-orchestration phase. It remains gated behind FCP-03 acceptance. Do not create FCP-04 implementation branches or represent preparatory work as phase commencement while FCP-03 is not accepted. The canonical M0–M29 repository roadmap is a separate taxonomy and must not be relabelled as FCP-00–FCP-10.
+
+
+### 2026-11-11 forensic delta — PostgreSQL and runtime CI qualification
+
+Agent Platform PR [#293](https://github.com/LloydCoder/tinlance-agent-platform/pull/293) merged as `fd5004a0077746d11884de51d55ed40fdab077ef` (head `42545ef37797abc0a3c4bd3e060177d708b1f19d`). The exact PR-head run set completed successfully, including CI, CodeQL, Secret Scan, Reference Agents, R10 Certification, persistent-computer W3 browser environment, W4 adversarial browser isolation, gVisor W1 restricted-workload benchmark, Firecracker jailer smoke and KVM guest-boot smoke. Mainline has 14 reported successful check-runs.
+
+The PR adds live adapter integration tests against a disposable PostgreSQL 17 CI service for `PostgresOutboxPublisher`, `PostgresSnapshotCatalog` and `PostgresRestoreLedger`. Tests exercise tenant RLS using a non-login runtime role, outbox claim/ack/release, error redaction, cross-tenant isolation, snapshot catalog idempotency and restore transitions. This closes an adapter-to-real-PostgreSQL CI evidence gap. It does **not** establish a production database deployment, independent backup, encrypted restore, measured RTO/RPO or operational recovery ownership.
+
+The additional runtime workflows establish bounded ephemeral-runner evidence only. They do not establish production host attestation, a sustained production persistent-computer service, multi-tenant noisy-neighbour isolation, provider-independent hardware assurance or an independent sandbox-escape assessment.
+
+### Cross-repository live state (2026-11-11)
+
+- Five core repositories were re-read: Agent Platform, Agent OS, Platform SDK, TADL/Agent Developer and TSIC. No open PRs were returned. The only open issues observed are Platform #275 (default-branch governance) and TSIC #102 (canonical FCP-03 production acceptance tracker).
+- Latest observed main commits: Platform `fd5004a0077746d11884de51d55ed40fdab077ef`; Agent OS `62b05001121e3c8d3d144b61700b3204aa0d4428`; Platform SDK `95cc8ef81d35392624f2070bf3a5aad4525c23a2`; TADL `409a0bda27ba3db48e696f665bda7d4e6355e4d3`; TSIC `09533756d7bcdf7fb6de0068bc578b9c205f3b6c`.
+- The latest SDK main check-run read included one queued `.github/dependabot.yml` check with no conclusion; all other reported checks were successful. Do not label that entire check-run set fully green until the queued check concludes or is confirmed non-blocking by the workflow owner.
+- All five default branches still report `protected: false`. Platform issue #275 remains open. The connected GitHub integration exposes branch/ruleset reads but not repository-administration writes, so this audit cannot enable or verify required branch rules.
+- TSIC issue #102 remains the canonical programme tracker and records FCP-03 as active/incomplete. TADS remains adjacent to, not a substitute for, the five core conformance repositories.
+
+**Updated disposition: FCP-03 remains NOT ACCEPTED.** PR #293 materially improves hosted-service and runtime CI evidence, but production identity/key custody/revocation, deployed network enforcement or an approved equivalent target, production host isolation, backup/DR, operational alert ownership, branch governance and independent assessment remain open. FCP-04 through FCP-10 remain gated.
