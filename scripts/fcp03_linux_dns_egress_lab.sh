@@ -203,7 +203,8 @@ NFT
 # Wait for the local resolver and test endpoint without relying on outside DNS.
 ready=0
 for _ in $(seq 1 30); do
-  if ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short 2>/dev/null | grep -Fxq "10.203.0.10"; then
+  ready_answer="$(ip netns exec "$worker_ns" dig @10.203.0.1 allowed.test A +time=1 +tries=1 +short 2>/dev/null)"
+  if [[ "$ready_answer" == "10.203.0.10" ]]; then
     ready=1
     break
   fi
