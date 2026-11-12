@@ -259,7 +259,8 @@ class WorkerEgressController:
         """Raise unless ownership, namespace, policy, and routing remain exact."""
         self._require_privilege()
         self._prepare_state_dir()
-        state = self._load_state(self._state_path(hashlib.sha256(attachment.worker_id.encode()).hexdigest()))
+        digest = hashlib.sha256(attachment.worker_id.encode("utf-8")).hexdigest()
+        state = self._load_state(self._state_path(digest))
         if state != asdict(attachment):
             raise EgressBoundaryNotReady("worker egress ownership metadata does not match")
         namespaces = self._run(["ip", "netns", "list"]).stdout.splitlines()
@@ -291,7 +292,9 @@ class WorkerEgressController:
             "tcp dport 53",
         ):
             if required not in nft:
-                raise EgressBoundaryNotReady("worker nftables policy is missing a required deny/allow rule")
+                raise EgressBoundaryNotReady(
+                    "worker nftables policy is missing a required deny/allow rule"
+                )
         if "0.0.0.0/0" in nft or "::/0" in nft or nft.count("policy drop") < 3:
             raise EgressBoundaryNotReady("worker nftables policy is permissive or incomplete")
         default_routes = self._run(
@@ -332,9 +335,17 @@ class WorkerEgressController:
     def _validate_identity(self, worker_id: str, policy_revision: str, proxy_port: int) -> None:
         if not isinstance(worker_id, str) or not worker_id or len(worker_id) > 128:
             raise ValueError("worker_id must be a non-empty string of at most 128 characters")
-        if not isinstance(policy_revision, str) or not policy_revision or len(policy_revision) > 128:
+        if (
+            not isinstance(policy_revision, str)
+            or not policy_revision
+            or len(policy_revision) > 128
+        ):
             raise ValueError("policy_revision must be a non-empty string of at most 128 characters")
-        if not isinstance(proxy_port, int) or isinstance(proxy_port, bool) or not 1 <= proxy_port <= 65535:
+        if (
+            not isinstance(proxy_port, int)
+            or isinstance(proxy_port, bool)
+            or not 1 <= proxy_port <= 65535
+        ):
             raise ValueError("proxy_port must be a valid TCP port")
 
     def _require_privilege(self) -> None:
@@ -360,9 +371,13 @@ class WorkerEgressController:
         except FileNotFoundError as exc:
             raise EgressBoundaryNotReady("worker egress ownership metadata is missing") from exc
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid():
-            raise EgressBoundaryNotReady("worker egress ownership metadata is not a trusted regular file")
+            raise EgressBoundaryNotReady(
+                "worker egress ownership metadata is not a trusted regular file"
+            )
         if stat.S_IMODE(info.st_mode) & 0o077:
-            raise EgressBoundaryNotReady("worker egress ownership metadata permissions must be 0600")
+            raise EgressBoundaryNotReady(
+                "worker egress ownership metadata permissions must be 0600"
+            )
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -421,9 +436,13 @@ class WorkerEgressController:
     def _assert_names_available(self, namespace: str, host_interface: str) -> None:
         namespaces = self._run(["ip", "netns", "list"]).stdout.splitlines()
         if any(line.split()[0] == namespace for line in namespaces if line.split()):
-            raise EgressBoundaryConflict("worker namespace already exists without matching ownership metadata")
+            raise EgressBoundaryConflict(
+                "worker namespace already exists without matching ownership metadata"
+            )
         if self._exists(["ip", "link", "show", "dev", host_interface]):
-            raise EgressBoundaryConflict("worker host veth already exists without matching ownership metadata")
+            raise EgressBoundaryConflict(
+                "worker host veth already exists without matching ownership metadata"
+            )
 
     def _ruleset(self, attachment: WorkerEgressAttachment) -> str:
         return f"""table inet {self._TABLE} {{
@@ -474,7 +493,12 @@ class WorkerEgressController:
         error = result.stderr.lower()
         if any(
             marker in error
-            for marker in ("cannot find device", "does not exist", "no such file", "cannot open network namespace")
+            for marker in (
+                "cannot find device",
+                "does not exist",
+                "no such file",
+                "cannot open network namespace",
+            )
         ):
             return False
         raise EgressBoundaryNotReady(f"cannot establish egress object state: {argv[0]}")
