@@ -128,3 +128,52 @@ def test_create_rejects_symlinked_state_directory(tmp_path: Path) -> None:
 
     with pytest.raises(EgressBoundaryNotReady, match="state directory"):
         controller.create("worker-a", policy_revision="policy-7", proxy_port=3128)
+
+
+def test_existing_attachment_is_reused_only_while_policy_and_kernel_state_match(
+    tmp_path: Path,
+) -> None:
+    runner = FakeRunner()
+    controller = WorkerEgressController(
+        state_dir=tmp_path / "state",
+        runner=runner,
+        require_root=False,
+    )
+    first = controller.create("worker-a", policy_revision="policy-7", proxy_port=3128)
+
+    second = controller.create("worker-a", policy_revision="policy-7", proxy_port=3128)
+
+    assert second == first
+    assert sum(argv[:3] == ["ip", "netns", "add"] for argv, _ in runner.calls) == 1
+    with pytest.raises(EgressBoundaryConflict, match="different egress attachment"):
+        controller.create("worker-a", policy_revision="policy-8", proxy_port=3128)
+
+
+def test_is_ready_fails_closed_when_nftables_policy_drifts(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    controller = WorkerEgressController(
+        state_dir=tmp_path / "state",
+        runner=runner,
+        require_root=False,
+    )
+    attachment = controller.create("worker-a", policy_revision="policy-7", proxy_port=3128)
+    runner.nft_result = "table inet tinlance_egress { chain output { policy accept; } }"
+
+    assert controller.is_ready(attachment) is False
+
+
+def test_destroy_removes_only_the_owned_namespace_veth_and_state(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state_dir = tmp_path / "state"
+    controller = WorkerEgressController(
+        state_dir=state_dir,
+        runner=runner,
+        require_root=False,
+    )
+    attachment = controller.create("worker-a", policy_revision="policy-7", proxy_port=3128)
+
+    controller.destroy("worker-a")
+
+    assert not list(state_dir.glob("*.json"))
+    assert attachment.namespace not in runner.existing_namespaces
+    assert attachment.host_interface not in runner.existing_links
