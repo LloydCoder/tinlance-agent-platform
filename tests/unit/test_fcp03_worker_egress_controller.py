@@ -33,8 +33,9 @@ class FakeRunner:
         if argv[:3] == ["ip", "netns", "add"]:
             self.existing_namespaces += f"{argv[3]} (id: 1)\\n"
         if argv[:3] == ["ip", "netns", "del"]:
-            self.existing_namespaces = "".join(
-                line for line in self.existing_namespaces.splitlines()
+            self.existing_namespaces = "\\n".join(
+                line
+                for line in self.existing_namespaces.splitlines()
                 if line.split() and line.split()[0] != argv[3]
             )
         if argv[:3] == ["ip", "link", "add"]:
