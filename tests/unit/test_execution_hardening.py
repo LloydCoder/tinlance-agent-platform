@@ -463,7 +463,9 @@ def test_exec_guard_limits_data_memory_without_capping_virtual_address_space(
 
 
 
-def test_egress_revocation_kills_active_command(tmp_path: Path) -> None:
+def test_sandbox_service_terminates_worker_process_on_egress_authority_revocation(
+    tmp_path: Path,
+) -> None:
     from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
 
     started = tmp_path / "egress-started"
