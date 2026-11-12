@@ -21,7 +21,12 @@ class FakeRunner:
         self.existing_namespaces = ""
         self.existing_links: set[str] = set()
 
-    def __call__(self, argv: list[str], *, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    def __call__(
+        self,
+        argv: list[str],
+        *,
+        input_text: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         self.calls.append((argv, input_text))
         if argv == ["ip", "netns", "list"]:
             return subprocess.CompletedProcess(argv, 0, self.existing_namespaces, "")
@@ -74,7 +79,10 @@ def test_create_installs_atomic_default_deny_policy_without_default_route(tmp_pa
     assert "udp dport 53 accept" in ruleset
     assert "tcp dport 53 accept" in ruleset
     assert "forward" in ruleset
-    assert not any(argv[:3] == ["ip", "netns", "exec"] and "route" in argv for argv, _ in runner.calls)
+    assert not any(
+        argv[:3] == ["ip", "netns", "exec"] and "route" in argv
+        for argv, _ in runner.calls
+    )
 
 
 def test_create_fails_closed_and_cleans_owned_objects_when_nftables_rejects_policy(
