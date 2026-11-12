@@ -12,7 +12,6 @@ import hashlib
 import ipaddress
 import json
 import os
-import re
 import stat
 import subprocess
 from dataclasses import asdict, dataclass
@@ -81,7 +80,7 @@ class WorkerEgressController:
     _TABLE = "tinlance_egress"
     _STATE_MODE = 0o600
     _DIRECTORY_MODE = 0o700
-    _WORKER_NETWORK = ipaddress.ip_network("198.18.0.0/15")
+    _WORKER_NETWORK = ipaddress.IPv4Network("198.18.0.0/15")
 
     def __init__(
         self,
@@ -141,6 +140,7 @@ class WorkerEgressController:
 
         namespace_created = False
         veth_created = False
+        state_written = False
         try:
             self._run(["ip", "netns", "add", namespace])
             namespace_created = True
@@ -231,6 +231,7 @@ class WorkerEgressController:
                 input_text=self._ruleset(attachment),
             )
             self._write_state(state_path, attachment)
+            state_written = True
             self.assert_ready(attachment)
             return attachment
         except BaseException as exc:
@@ -243,7 +244,7 @@ class WorkerEgressController:
                 result = self._run_optional(["ip", "link", "del", host_interface])
                 if result is not None:
                     cleanup_errors.append(result)
-            if state_path.exists():
+            if state_written and state_path.exists():
                 state_path.unlink()
             if cleanup_errors:
                 raise EgressBoundaryNotReady(
@@ -280,6 +281,9 @@ class WorkerEgressController:
         ).stdout
         expected = self._ruleset(attachment)
         for required in (
+            "chain input",
+            "chain output",
+            "chain forward",
             "policy drop",
             attachment.host_address,
             f"tcp dport {attachment.proxy_port}",
@@ -302,7 +306,7 @@ class WorkerEgressController:
         """Boolean assertion suitable for the sandbox's continuous egress gate."""
         try:
             self.assert_ready(attachment)
-        except (EgressBoundaryError, OSError, ValueError, KeyError, TypeError):
+        except Exception:
             return False
         return True
 
