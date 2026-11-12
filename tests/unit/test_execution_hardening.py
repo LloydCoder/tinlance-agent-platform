@@ -20,6 +20,22 @@ from tinlance_agent_platform_sandbox import (
 )
 
 
+def install_ip_netns_stub(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import os
+
+    executable = tmp_path / "ip"
+    executable.write_text(
+        """#!/bin/sh
+[ "$1" = "netns" ] && [ "$2" = "exec" ] || exit 64
+shift 3
+exec "$@"
+""",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ.get('PATH', '')}")
+
+
 def test_model_deadline_is_hard() -> None:
     def slow() -> str:
         time.sleep(0.2)
@@ -268,7 +284,11 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
     assert not marker.exists()
 
 
-def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path: Path) -> None:
+def test_sandbox_service_executes_commands_through_the_lease_supervisor(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    install_ip_netns_stub(monkeypatch, tmp_path)
     request = SandboxRequest(
         UUID("00000000-0000-0000-0000-000000000094"),
         "tenant-a",
@@ -312,6 +332,7 @@ def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path
         SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
         lease_assertion=active_lease,
         egress_assertion=lambda candidate: candidate is request,
+        network_namespace="tln-0123456789",
     )
 
     assert result.exit_code == 0
@@ -463,8 +484,10 @@ def test_exec_guard_limits_data_memory_without_capping_virtual_address_space(
 
 
 def test_sandbox_service_terminates_worker_process_on_egress_authority_revocation(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    install_ip_netns_stub(monkeypatch, tmp_path)
     from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
 
     started = tmp_path / "egress-started"
@@ -515,6 +538,7 @@ def test_sandbox_service_terminates_worker_process_on_egress_authority_revocatio
             SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
             lease_assertion=lambda candidate: candidate is request,
             egress_assertion=egress_is_active,
+            network_namespace="tln-0123456789",
         )
 
     assert started.exists(), "network command must start only after egress readiness is verified"

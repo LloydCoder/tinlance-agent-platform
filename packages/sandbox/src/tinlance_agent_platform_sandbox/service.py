@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 
 from tinlance_agent_platform_contracts import SandboxRequest
@@ -38,6 +39,7 @@ def execute_request(
     *,
     lease_assertion: Callable[[SandboxRequest], bool],
     egress_assertion: Callable[[SandboxRequest], bool] | None = None,
+    network_namespace: str | None = None,
     supervisor: WorkspaceLeaseSupervisor | None = None,
 ) -> ProcessResult:
     """Execute a command only while its workspace lease and egress boundary remain valid.
@@ -56,6 +58,21 @@ def execute_request(
         )
     if egress_assertion is not None and not callable(egress_assertion):
         raise TypeError("egress_assertion must be callable")
+    validated_namespace: str | None = None
+    if request.network:
+        if not isinstance(network_namespace, str):
+            raise SandboxUnavailable(
+                "network-enabled sandbox execution requires an owned worker network namespace"
+            )
+        if not re.fullmatch(r"tln-[0-9a-f]{10}", network_namespace):
+            raise SandboxUnavailable(
+                "network-enabled sandbox execution requires an owned worker network namespace"
+            )
+        validated_namespace = network_namespace
+    elif network_namespace is not None:
+        raise SandboxUnavailable(
+            "non-network sandbox execution cannot select a worker network namespace"
+        )
 
     effective_timeout = min(limits.timeout_seconds, int(request.timeout_seconds))
     if effective_timeout < 1:
@@ -69,6 +86,8 @@ def execute_request(
     command = provider.command(
         list(request.command), effective_limits, request.allowed_paths, network=request.network
     )
+    if validated_namespace is not None:
+        command = ["ip", "netns", "exec", validated_namespace, *command]
 
     def assert_request_authority() -> bool:
         if lease_assertion(request) is not True:
