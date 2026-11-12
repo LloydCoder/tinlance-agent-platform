@@ -74,6 +74,7 @@ def test_network_execution_checks_egress_boundary_before_worker_command() -> Non
         SandboxLimits(),
         lease_assertion=lambda _: True,
         egress_assertion=lambda _: calls.append("verified") or True,
+        network_namespace="tln-0123456789",
         supervisor=supervisor,
     )
 
@@ -93,6 +94,7 @@ def test_network_execution_fails_closed_when_egress_boundary_is_not_ready() -> N
             SandboxLimits(),
             lease_assertion=lambda _: True,
             egress_assertion=lambda _: False,
+            network_namespace="tln-0123456789",
             supervisor=supervisor,
         )
 
@@ -140,6 +142,7 @@ def test_workspace_lease_loss_prevents_egress_authority_from_being_used() -> Non
             SandboxLimits(),
             lease_assertion=lambda _: False,
             egress_assertion=lambda _: egress_calls.append("called") or True,
+            network_namespace="tln-0123456789",
             supervisor=supervisor,
         )
 
