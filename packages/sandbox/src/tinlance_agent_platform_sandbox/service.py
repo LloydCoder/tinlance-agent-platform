@@ -66,7 +66,9 @@ def execute_request(
                 "network-enabled sandbox execution requires an owned worker network namespace"
             )
     elif network_namespace is not None:
-        raise SandboxUnavailable("non-network sandbox execution cannot select a worker network namespace")
+        raise SandboxUnavailable(
+            "non-network sandbox execution cannot select a worker network namespace"
+        )
 
     effective_timeout = min(limits.timeout_seconds, int(request.timeout_seconds))
     if effective_timeout < 1:
