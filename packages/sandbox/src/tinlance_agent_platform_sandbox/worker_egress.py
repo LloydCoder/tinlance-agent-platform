@@ -413,10 +413,14 @@ class WorkerEgressController:
             return value
 
         if any(not isinstance(state.get(field), str) for field in string_fields):
-            raise EgressBoundaryNotReady("worker egress ownership metadata has invalid string fields")
+            raise EgressBoundaryNotReady(
+                "worker egress ownership metadata has invalid string fields"
+            )
         proxy_port = state.get("proxy_port")
         if not isinstance(proxy_port, int) or isinstance(proxy_port, bool):
-            raise EgressBoundaryNotReady("worker egress ownership metadata has an invalid proxy port")
+            raise EgressBoundaryNotReady(
+                "worker egress ownership metadata has an invalid proxy port"
+            )
         attachment = WorkerEgressAttachment(
             worker_id=string_field("worker_id"),
             policy_revision=string_field("policy_revision"),
