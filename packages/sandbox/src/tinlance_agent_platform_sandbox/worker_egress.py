@@ -13,6 +13,7 @@ import ipaddress
 import json
 import os
 import stat
+from types import TracebackType
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -584,7 +585,12 @@ class WorkerEgressSession:
             and self._controller.is_ready(attachment)
         )
 
-    def __exit__(self, exc_type: object, exc: BaseException | None, traceback: object) -> bool:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
         self._closed = True
         if self._attachment is not None:
             try:
