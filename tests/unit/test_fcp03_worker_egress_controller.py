@@ -24,14 +24,26 @@ class FakeRunner:
         self.calls.append((argv, input_text))
         if argv == ["ip", "netns", "list"]:
             return subprocess.CompletedProcess(argv, 0, self.existing_namespaces, "")
+        if argv[:3] == ["ip", "netns", "add"]:
+            self.existing_namespaces += f"{argv[3]} (id: 1)\\n"
+        if argv[:3] == ["ip", "netns", "del"]:
+            self.existing_namespaces = "".join(
+                line for line in self.existing_namespaces.splitlines()
+                if line.split() and line.split()[0] != argv[3]
+            )
+        if argv[:3] == ["ip", "link", "add"]:
+            self.existing_links.add(argv[3])
+        if argv[:3] == ["ip", "link", "del"]:
+            self.existing_links.discard(argv[3])
         if argv[:3] == ["ip", "link", "show"]:
             name = argv[-1]
             return subprocess.CompletedProcess(argv, 0 if name in self.existing_links else 1, "", "")
-        if argv[-3:] == ["nft", "list", "table"] or argv[-4:-1] == ["nft", "list", "table"]:
+        if argv[-4:] == ["list", "table", "inet", "tinlance_egress"]:
             return subprocess.CompletedProcess(argv, 0, self.nft_result, "")
         if argv[-3:] == ["nft", "-f", "-"]:
             if self.fail_nft:
                 return subprocess.CompletedProcess(argv, 1, "", "nft rejected policy")
+            self.nft_result = input_text or ""
         return subprocess.CompletedProcess(argv, 0, "", "")
 
 
