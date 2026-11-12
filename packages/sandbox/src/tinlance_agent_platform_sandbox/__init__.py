@@ -17,9 +17,19 @@ from .executor import ProcessResult, SandboxExecutor, WorkspaceLeaseLost
 from .policy import SandboxPolicy
 from .service import SandboxUnavailable, build_command, execute_request, validate_request
 from .workspace_supervisor import WorkspaceLeaseSupervisor
+from .worker_egress import (
+    EgressBoundaryConflict,
+    EgressBoundaryNotReady,
+    WorkerEgressAttachment,
+    WorkerEgressController,
+)
 
 __all__ = [
     "BrowserEgressProxy",
+    "EgressBoundaryConflict",
+    "EgressBoundaryNotReady",
+    "WorkerEgressAttachment",
+    "WorkerEgressController",
     "BrowserIsolationError",
     "BrowserProfileLease",
     "BrowserSession",
