@@ -46,7 +46,7 @@ class FakeRunner:
             if name in self.existing_links:
                 return subprocess.CompletedProcess(argv, 0, "", "")
             return subprocess.CompletedProcess(argv, 1, "", 'Cannot find device "missing"')
-        if argv[-4:] == ["list", "table", "inet", "tinlance_egress"]:
+        if argv[-2:] == ["list", "ruleset"]:
             return subprocess.CompletedProcess(argv, 0, self.nft_result, "")
         if argv[-3:] == ["nft", "-f", "-"]:
             if self.fail_nft:
