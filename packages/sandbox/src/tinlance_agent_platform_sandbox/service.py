@@ -59,9 +59,11 @@ def execute_request(
     if egress_assertion is not None and not callable(egress_assertion):
         raise TypeError("egress_assertion must be callable")
     if request.network:
-        if not isinstance(network_namespace, str) or not re.fullmatch(
-            r"tln-[0-9a-f]{10}", network_namespace
-        ):
+        if not isinstance(network_namespace, str):
+            raise SandboxUnavailable(
+                "network-enabled sandbox execution requires an owned worker network namespace"
+            )
+        if not re.fullmatch(r"tln-[0-9a-f]{10}", network_namespace):
             raise SandboxUnavailable(
                 "network-enabled sandbox execution requires an owned worker network namespace"
             )
