@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import time
@@ -19,6 +20,19 @@ from tinlance_agent_platform_sandbox import (
     execute_request,
 )
 
+
+
+def install_ip_netns_stub(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    executable = tmp_path / "ip"
+    executable.write_text(
+        "#!/usr/bin/env python3\\n"
+        "import os, sys\\n"
+        "assert sys.argv[1:3] == ['netns', 'exec']\\n"
+        "os.execvp(sys.argv[4], sys.argv[4:])\\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ.get('PATH', '')}")
 
 def test_model_deadline_is_hard() -> None:
     def slow() -> str:
@@ -268,7 +282,11 @@ def test_workspace_lease_supervisor_fails_closed_when_the_lease_store_is_unavail
     assert not marker.exists()
 
 
-def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path: Path) -> None:
+def test_sandbox_service_executes_commands_through_the_lease_supervisor(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    install_ip_netns_stub(monkeypatch, tmp_path)
     request = SandboxRequest(
         UUID("00000000-0000-0000-0000-000000000094"),
         "tenant-a",
@@ -464,8 +482,10 @@ def test_exec_guard_limits_data_memory_without_capping_virtual_address_space(
 
 
 def test_sandbox_service_terminates_worker_process_on_egress_authority_revocation(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    install_ip_netns_stub(monkeypatch, tmp_path)
     from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
 
     started = tmp_path / "egress-started"
