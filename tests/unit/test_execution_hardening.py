@@ -20,7 +20,6 @@ from tinlance_agent_platform_sandbox import (
 )
 
 
-
 def install_ip_netns_stub(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import os
 
