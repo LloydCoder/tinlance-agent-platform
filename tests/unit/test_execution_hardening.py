@@ -311,6 +311,7 @@ def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path
         PassthroughProvider(),
         SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
         lease_assertion=active_lease,
+        egress_assertion=lambda candidate: candidate is request,
     )
 
     assert result.exit_code == 0
