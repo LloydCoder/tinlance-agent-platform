@@ -294,6 +294,42 @@ class WorkerEgressController:
             or "policy accept" in nft
         ):
             raise EgressBoundaryNotReady("worker nftables ruleset is permissive or has drifted")
+        sysctl_checks = (
+            (["sysctl", "-n", f"net.ipv4.conf.{attachment.host_interface}.forwarding"], "0"),
+            (["sysctl", "-n", f"net.ipv6.conf.{attachment.host_interface}.forwarding"], "0"),
+            (
+                ["ip", "netns", "exec", attachment.namespace, "sysctl", "-n", "net.ipv4.ip_forward"],
+                "0",
+            ),
+            (
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    attachment.namespace,
+                    "sysctl",
+                    "-n",
+                    "net.ipv6.conf.all.forwarding",
+                ],
+                "0",
+            ),
+            (
+                [
+                    "ip",
+                    "netns",
+                    "exec",
+                    attachment.namespace,
+                    "sysctl",
+                    "-n",
+                    "net.ipv6.conf.all.disable_ipv6",
+                ],
+                "1",
+            ),
+        )
+        for command, expected_value in sysctl_checks:
+            actual_value = self._run(command).stdout.strip()
+            if actual_value != expected_value:
+                raise EgressBoundaryNotReady("worker namespace forwarding controls have drifted")
         default_routes = self._run(
             ["ip", "netns", "exec", attachment.namespace, "ip", "route", "show", "default"]
         ).stdout.strip()
