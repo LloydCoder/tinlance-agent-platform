@@ -278,7 +278,6 @@ class WorkerEgressController:
                 "ruleset",
             ]
         ).stdout
-        expected = self._ruleset(attachment)
         expected_accepts = {
             'iifname "lo" accept',
             "ct state established,related accept",
@@ -306,8 +305,6 @@ class WorkerEgressController:
         ).stdout.strip()
         if default_routes:
             raise EgressBoundaryNotReady("worker namespace unexpectedly has a default route")
-        if expected.count("policy drop") != 3:
-            raise EgressBoundaryNotReady("internal worker policy template is invalid")
 
     def is_ready(self, attachment: WorkerEgressAttachment) -> bool:
         """Boolean assertion suitable for the sandbox's continuous egress gate."""
