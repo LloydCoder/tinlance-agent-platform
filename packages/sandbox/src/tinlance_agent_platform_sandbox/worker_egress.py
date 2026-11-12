@@ -275,28 +275,32 @@ class WorkerEgressController:
                 attachment.namespace,
                 "nft",
                 "list",
-                "table",
-                "inet",
-                self._TABLE,
+                "ruleset",
             ]
         ).stdout
         expected = self._ruleset(attachment)
-        for required in (
-            "chain input",
-            "chain output",
-            "chain forward",
-            "policy drop",
-            attachment.host_address,
-            f"tcp dport {attachment.proxy_port}",
-            "udp dport 53",
-            "tcp dport 53",
+        expected_accepts = {
+            'iifname "lo" accept',
+            "ct state established,related accept",
+            'oifname "lo" accept',
+            f"ip daddr {attachment.host_address} udp dport 53 accept",
+            f"ip daddr {attachment.host_address} tcp dport 53 accept",
+            f"ip daddr {attachment.host_address} tcp dport {attachment.proxy_port} accept",
+        }
+        observed_accepts = {
+            line.strip()
+            for line in nft.splitlines()
+            if line.strip().endswith(" accept")
+        }
+        if (
+            nft.count("table ") != 1
+            or f"table inet {self._TABLE}" not in nft
+            or nft.count("type filter hook") != 3
+            or nft.count("policy drop") != 3
+            or observed_accepts != expected_accepts
+            or "policy accept" in nft
         ):
-            if required not in nft:
-                raise EgressBoundaryNotReady(
-                    "worker nftables policy is missing a required deny/allow rule"
-                )
-        if "0.0.0.0/0" in nft or "::/0" in nft or nft.count("policy drop") < 3:
-            raise EgressBoundaryNotReady("worker nftables policy is permissive or incomplete")
+            raise EgressBoundaryNotReady("worker nftables ruleset is permissive or has drifted")
         default_routes = self._run(
             ["ip", "netns", "exec", attachment.namespace, "ip", "route", "show", "default"]
         ).stdout.strip()
