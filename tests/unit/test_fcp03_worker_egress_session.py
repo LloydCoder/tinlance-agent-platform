@@ -47,7 +47,7 @@ class FakeRunner:
         elif argv[:3] == ["ip", "link", "show"]:
             if argv[-1] not in self.links:
                 return subprocess.CompletedProcess(argv, 1, "", "Cannot find device")
-        elif argv[-2:] == ["nft", "-f"]:
+        elif argv[-3:] == ["nft", "-f", "-"]:
             self.nft_result = input_text or ""
         elif argv[-2:] == ["list", "ruleset"]:
             return subprocess.CompletedProcess(argv, 0, self.nft_result, "")
