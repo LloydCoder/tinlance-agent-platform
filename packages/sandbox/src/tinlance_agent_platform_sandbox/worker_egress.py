@@ -46,6 +46,11 @@ class WorkerEgressAttachment:
     worker_address: str
     proxy_port: int
 
+    @property
+    def proxy_client_cidr(self) -> str:
+        """Exact worker source address to allow in the host-side proxy policy."""
+        return f"{self.worker_address}/32"
+
 
 class CommandRunner(Protocol):
     def __call__(
