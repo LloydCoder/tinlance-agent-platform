@@ -192,9 +192,7 @@ class WorkerEgressController:
                     "eth0",
                 ]
             )
-            self._run(
-                ["ip", "netns", "exec", namespace, "ip", "link", "set", "eth0", "up"]
-            )
+            self._run(["ip", "netns", "exec", namespace, "ip", "link", "set", "eth0", "up"])
             self._run(
                 ["ip", "netns", "exec", namespace, "sysctl", "-q", "-w", "net.ipv4.ip_forward=0"]
             )
