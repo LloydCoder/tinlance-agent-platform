@@ -34,6 +34,7 @@ def install_ip_netns_stub(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ.get('PATH', '')}")
 
+
 def test_model_deadline_is_hard() -> None:
     def slow() -> str:
         time.sleep(0.2)
