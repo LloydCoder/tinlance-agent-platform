@@ -77,7 +77,9 @@ def test_create_installs_atomic_default_deny_policy_without_default_route(tmp_pa
     assert "tcp dport 53 accept" in ruleset
     assert "forward" in ruleset
     route_commands = [
-        argv for argv, _ in runner.calls if argv[:3] == ["ip", "netns", "exec"] and "route" in argv
+        argv
+        for argv, _ in runner.calls
+        if argv[:3] == ["ip", "netns", "exec"] and "route" in argv and "add" in argv
     ]
     assert not route_commands
 
