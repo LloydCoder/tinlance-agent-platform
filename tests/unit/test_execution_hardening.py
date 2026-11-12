@@ -460,3 +460,62 @@ def test_exec_guard_limits_data_memory_without_capping_virtual_address_space(
 
     assert (exec_guard.resource.RLIMIT_DATA, (1_610_612_736, 1_610_612_736)) in applied
     assert all(resource_id != exec_guard.resource.RLIMIT_AS for resource_id, _ in applied)
+
+
+def test_sandbox_service_terminates_worker_process_on_egress_authority_revocation(
+    tmp_path: Path,
+) -> None:
+    from tinlance_agent_platform_sandbox import WorkspaceLeaseLost
+
+    started = tmp_path / "egress-started"
+    finished = tmp_path / "egress-finished"
+    request = SandboxRequest(
+        UUID("00000000-0000-0000-0000-000000000095"),
+        "tenant-a",
+        UUID("40000000-0000-0000-0000-000000000095"),
+        "workspace-a",
+        (
+            "/usr/bin/python3",
+            "-c",
+            "from pathlib import Path; import time; "
+            f"Path({str(started)!r}).touch(); time.sleep(3); "
+            f"Path({str(finished)!r}).touch()",
+        ),
+        5,
+        network=True,
+        allowed_paths=(str(tmp_path),),
+    )
+    policy = SandboxPolicy(
+        allowed_commands=frozenset({"/usr/bin/python3"}),
+        allowed_workspace_roots=(str(tmp_path),),
+        allow_network=True,
+    )
+
+    class PassthroughProvider:
+        def command(
+            self,
+            argv: list[str],
+            limits: SandboxLimits,
+            workspace_paths: tuple[str, ...] = (),
+            *,
+            network: bool = False,
+        ) -> list[str]:
+            assert network is True
+            return argv
+
+    def egress_is_active(candidate: SandboxRequest) -> bool:
+        assert candidate is request
+        return not started.exists()
+
+    with pytest.raises(WorkspaceLeaseLost, match="expired, revoked, or fenced"):
+        execute_request(
+            request,
+            policy,
+            PassthroughProvider(),
+            SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
+            lease_assertion=lambda candidate: candidate is request,
+            egress_assertion=egress_is_active,
+        )
+
+    assert started.exists(), "network command must start only after egress readiness is verified"
+    assert not finished.exists(), "egress revocation must terminate the command process group"
