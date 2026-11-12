@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -98,7 +99,8 @@ def test_create_rejects_a_preexisting_namespace_without_ownership_metadata(
     tmp_path: Path,
 ) -> None:
     runner = FakeRunner()
-    runner.existing_namespaces = "tln-deadbeef00 (id: 42)"
+    namespace = "tln-" + hashlib.sha256(b"worker-a").hexdigest()[:10]
+    runner.existing_namespaces = f"{namespace} (id: 42)"
     controller = WorkerEgressController(
         state_dir=tmp_path / "state",
         runner=runner,
