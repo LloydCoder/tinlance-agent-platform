@@ -161,12 +161,8 @@ class WorkerEgressController:
             self._run(["ip", "link", "set", worker_interface, "netns", namespace])
             self._run(["ip", "addr", "add", f"{host_ip}/30", "dev", host_interface])
             self._run(["ip", "link", "set", host_interface, "up"])
-            self._run(
-                ["sysctl", "-q", "-w", f"net.ipv4.conf.{host_interface}.forwarding=0"]
-            )
-            self._run(
-                ["sysctl", "-q", "-w", f"net.ipv6.conf.{host_interface}.forwarding=0"]
-            )
+            self._run(["sysctl", "-q", "-w", f"net.ipv4.conf.{host_interface}.forwarding=0"])
+            self._run(["sysctl", "-q", "-w", f"net.ipv6.conf.{host_interface}.forwarding=0"])
             self._run(["ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"])
             self._run(
                 [
