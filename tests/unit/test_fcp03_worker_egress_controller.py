@@ -68,9 +68,7 @@ def test_create_installs_atomic_default_deny_policy_without_default_route(tmp_pa
 
     assert attachment.worker_id == "worker-a"
     assert attachment.policy_revision == "policy-7"
-    nft_calls = [
-        input_text for argv, input_text in runner.calls if argv[-3:] == ["nft", "-f", "-"]
-    ]
+    nft_calls = [input_text for argv, input_text in runner.calls if argv[-3:] == ["nft", "-f", "-"]]
     assert len(nft_calls) == 1
     ruleset = nft_calls[0] or ""
     assert "policy drop" in ruleset
