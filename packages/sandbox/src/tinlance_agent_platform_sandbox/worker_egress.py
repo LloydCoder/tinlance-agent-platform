@@ -457,7 +457,10 @@ class WorkerEgressController:
             raise EgressBoundaryNotReady(f"required egress command failed: {argv[0]}") from exc
         if result.returncode != 0:
             reason = result.stderr.strip()[:160] or f"exit={result.returncode}"
-            raise EgressBoundaryNotReady(f"required egress command failed: {argv[0]} ({reason})")
+            command_label = "nftables policy" if input_text is not None else argv[0]
+            raise EgressBoundaryNotReady(
+                f"required egress command failed: {command_label} ({reason})"
+            )
         return result
 
 
