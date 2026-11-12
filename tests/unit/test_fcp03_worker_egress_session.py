@@ -25,7 +25,7 @@ class FakeRunner:
         self.namespaces: set[str] = set()
         self.links: set[str] = set()
         self.nft_result = ""
-        self.sysctl_overrides: dict[str, str] = ""
+        self.sysctl_overrides: dict[str, str] = {}
 
     def __call__(
         self,
