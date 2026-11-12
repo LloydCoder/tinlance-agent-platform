@@ -21,7 +21,9 @@ from .worker_egress import (
     EgressBoundaryNotReady,
     WorkerEgressAttachment,
     WorkerEgressController,
+    WorkerEgressSession,
 )
+from .worker_egress_session import execute_network_request
 from .workspace_supervisor import WorkspaceLeaseSupervisor
 
 __all__ = [
@@ -30,6 +32,8 @@ __all__ = [
     "EgressBoundaryNotReady",
     "WorkerEgressAttachment",
     "WorkerEgressController",
+    "WorkerEgressSession",
+    "execute_network_request",
     "BrowserIsolationError",
     "BrowserProfileLease",
     "BrowserSession",
