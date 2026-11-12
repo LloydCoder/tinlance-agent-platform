@@ -474,7 +474,6 @@ class WorkerEgressController:
             )
         return result
 
-
     def _exists(self, argv: list[str]) -> bool:
         try:
             result = self._runner(argv)
