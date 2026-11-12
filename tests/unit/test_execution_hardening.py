@@ -1,4 +1,3 @@
-import os
 import subprocess
 import sys
 import time
@@ -23,6 +22,8 @@ from tinlance_agent_platform_sandbox import (
 
 
 def install_ip_netns_stub(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import os
+
     executable = tmp_path / "ip"
     executable.write_text(
         "#!/usr/bin/env python3\\n"
