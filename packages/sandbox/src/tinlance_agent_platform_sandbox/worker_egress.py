@@ -18,6 +18,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
 
+from tinlance_agent_platform_contracts import SandboxRequest
+
 
 class EgressBoundaryError(RuntimeError):
     """Base class for worker egress-boundary failures."""
@@ -526,14 +528,12 @@ class WorkerEgressSession:
     def __init__(
         self,
         controller: WorkerEgressController,
-        request: object,
+        request: SandboxRequest,
         *,
         policy_revision: str,
         proxy_port: int = 3128,
     ) -> None:
-        from tinlance_agent_platform_contracts import SandboxRequest
-
-        if not isinstance(request, SandboxRequest) or not request.network:
+        if not request.network:
             raise ValueError("worker egress sessions require a network-enabled SandboxRequest")
         identity = json.dumps(
             {
