@@ -394,20 +394,32 @@ class WorkerEgressController:
             raise
 
     def _attachment_from_state(self, state: dict[str, object]) -> WorkerEgressAttachment:
-        try:
-            attachment = WorkerEgressAttachment(
-                worker_id=str(state["worker_id"]),
-                policy_revision=str(state["policy_revision"]),
-                namespace=str(state["namespace"]),
-                host_interface=str(state["host_interface"]),
-                worker_interface=str(state["worker_interface"]),
-                network=str(state["network"]),
-                host_address=str(state["host_address"]),
-                worker_address=str(state["worker_address"]),
-                proxy_port=int(state["proxy_port"]),
-            )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise EgressBoundaryNotReady("worker egress ownership metadata is incomplete") from exc
+        string_fields = (
+            "worker_id",
+            "policy_revision",
+            "namespace",
+            "host_interface",
+            "worker_interface",
+            "network",
+            "host_address",
+            "worker_address",
+        )
+        if any(not isinstance(state.get(field), str) for field in string_fields):
+            raise EgressBoundaryNotReady("worker egress ownership metadata has invalid string fields")
+        proxy_port = state.get("proxy_port")
+        if not isinstance(proxy_port, int) or isinstance(proxy_port, bool):
+            raise EgressBoundaryNotReady("worker egress ownership metadata has an invalid proxy port")
+        attachment = WorkerEgressAttachment(
+            worker_id=state["worker_id"],
+            policy_revision=state["policy_revision"],
+            namespace=state["namespace"],
+            host_interface=state["host_interface"],
+            worker_interface=state["worker_interface"],
+            network=state["network"],
+            host_address=state["host_address"],
+            worker_address=state["worker_address"],
+            proxy_port=proxy_port,
+        )
         if set(state) != set(asdict(attachment)):
             raise EgressBoundaryNotReady("worker egress ownership metadata has unexpected fields")
         return attachment
