@@ -312,6 +312,7 @@ def test_sandbox_service_executes_commands_through_the_lease_supervisor(tmp_path
         SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
         lease_assertion=active_lease,
         egress_assertion=lambda candidate: candidate is request,
+        network_namespace="tln-0123456789",
     )
 
     assert result.exit_code == 0
@@ -515,6 +516,7 @@ def test_sandbox_service_terminates_worker_process_on_egress_authority_revocatio
             SandboxLimits(timeout_seconds=5, max_output_bytes=4096),
             lease_assertion=lambda candidate: candidate is request,
             egress_assertion=egress_is_active,
+            network_namespace="tln-0123456789",
         )
 
     assert started.exists(), "network command must start only after egress readiness is verified"
