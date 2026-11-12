@@ -280,11 +280,7 @@ class WorkerEgressController:
             f"ip daddr {attachment.host_address} tcp dport 53 accept",
             f"ip daddr {attachment.host_address} tcp dport {attachment.proxy_port} accept",
         }
-        observed_accepts = {
-            line.strip()
-            for line in nft.splitlines()
-            if line.strip().endswith(" accept")
-        }
+        observed_accepts = {line.strip() for line in nft.splitlines() if line.strip().endswith(" accept")}
         if (
             nft.count("table ") != 1
             or f"table inet {self._TABLE}" not in nft
