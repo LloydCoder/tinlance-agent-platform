@@ -382,9 +382,29 @@ class WorkerEgressController:
             path.unlink(missing_ok=True)
             raise
 
+    def _attachment_from_state(self, state: dict[str, object]) -> WorkerEgressAttachment:
+        try:
+            attachment = WorkerEgressAttachment(
+                worker_id=str(state["worker_id"]),
+                policy_revision=str(state["policy_revision"]),
+                namespace=str(state["namespace"]),
+                host_interface=str(state["host_interface"]),
+                worker_interface=str(state["worker_interface"]),
+                network=str(state["network"]),
+                host_address=str(state["host_address"]),
+                worker_address=str(state["worker_address"]),
+                proxy_port=int(state["proxy_port"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise EgressBoundaryNotReady("worker egress ownership metadata is incomplete") from exc
+        if set(state) != set(asdict(attachment)):
+            raise EgressBoundaryNotReady("worker egress ownership metadata has unexpected fields")
+        return attachment
+
     def _network_for(self, digest: str) -> ipaddress.IPv4Network:
         index = int(digest[:8], 16) % 131072
-        return ipaddress.ip_network((int(self._WORKER_NETWORK.network_address) + index * 4, 30))
+        address = int(self._WORKER_NETWORK.network_address) + index * 4
+        return ipaddress.IPv4Network((address, 30))
 
     def _assert_network_available(self, network: ipaddress.IPv4Network, own_path: Path) -> None:
         for path in self._state_dir.glob("*.json"):
