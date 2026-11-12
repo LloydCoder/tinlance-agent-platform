@@ -25,10 +25,10 @@ def install_ip_netns_stub(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
 
     executable = tmp_path / "ip"
     executable.write_text(
-        "#!/usr/bin/env python3\\n"
-        "import os, sys\\n"
-        "assert sys.argv[1:3] == ['netns', 'exec']\\n"
-        "os.execvp(sys.argv[4], sys.argv[4:])\\n",
+        "#!/bin/sh\\n"
+        '[ "$1" = "netns" ] && [ "$2" = "exec" ] || exit 64\\n'
+        "shift 3\\n"
+        'exec "$@"\\n',
         encoding="utf-8",
     )
     executable.chmod(0o755)
