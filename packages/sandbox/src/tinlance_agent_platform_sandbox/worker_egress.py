@@ -444,5 +444,5 @@ class WorkerEgressController:
             return f"{argv[0]}: {type(exc).__name__}"
         if result.returncode == 0:
             return None
-        return None
-        
+        reason = result.stderr.strip()[:160] or f"exit={result.returncode}"
+        return f"{argv[0]}: {reason}"
