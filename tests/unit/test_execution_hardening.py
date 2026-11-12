@@ -462,7 +462,6 @@ def test_exec_guard_limits_data_memory_without_capping_virtual_address_space(
     assert all(resource_id != exec_guard.resource.RLIMIT_AS for resource_id, _ in applied)
 
 
-
 def test_sandbox_service_terminates_worker_process_on_egress_authority_revocation(
     tmp_path: Path,
 ) -> None:
