@@ -25,6 +25,7 @@ class FakeRunner:
         self.namespaces: set[str] = set()
         self.links: set[str] = set()
         self.nft_result = ""
+        self.sysctl_overrides: dict[str, str] = ""
 
     def __call__(
         self,
@@ -49,6 +50,10 @@ class FakeRunner:
                 return subprocess.CompletedProcess(argv, 1, "", "Cannot find device")
         elif argv[-3:] == ["nft", "-f", "-"]:
             self.nft_result = input_text or ""
+        elif len(argv) >= 3 and argv[-2] == "-n":
+            key = argv[-1]
+            value = self.sysctl_overrides.get(key, "1" if key.endswith("disable_ipv6") else "0")
+            return subprocess.CompletedProcess(argv, 0, value, "")
         elif argv[-2:] == ["list", "ruleset"]:
             return subprocess.CompletedProcess(argv, 0, self.nft_result, "")
         return subprocess.CompletedProcess(argv, 0, "", "")
