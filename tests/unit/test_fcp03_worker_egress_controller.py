@@ -76,10 +76,10 @@ def test_create_installs_atomic_default_deny_policy_without_default_route(tmp_pa
     assert "udp dport 53 accept" in ruleset
     assert "tcp dport 53 accept" in ruleset
     assert "forward" in ruleset
-    assert not any(
-        argv[:3] == ["ip", "netns", "exec"] and "route" in argv
-        for argv, _ in runner.calls
-    )
+    route_commands = [
+        argv for argv, _ in runner.calls if argv[:3] == ["ip", "netns", "exec"] and "route" in argv
+    ]
+    assert not route_commands
 
 
 def test_create_fails_closed_and_cleans_owned_objects_when_nftables_rejects_policy(
