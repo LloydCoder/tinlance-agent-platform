@@ -47,6 +47,10 @@ class FakeRunner:
             if name in self.existing_links:
                 return subprocess.CompletedProcess(argv, 0, "", "")
             return subprocess.CompletedProcess(argv, 1, "", 'Cannot find device "missing"')
+        if len(argv) >= 3 and argv[-2] == "-n":
+            key = argv[-1]
+            value = self.sysctl_overrides.get(key, "1" if key.endswith("disable_ipv6") else "0")
+            return subprocess.CompletedProcess(argv, 0, value, "")
         if argv[-2:] == ["list", "ruleset"]:
             return subprocess.CompletedProcess(argv, 0, self.nft_result, "")
         if argv[-3:] == ["nft", "-f", "-"]:
