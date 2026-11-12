@@ -320,8 +320,7 @@ class WorkerEgressController:
         namespaces = self._run(["ip", "netns", "list"]).stdout.splitlines()
         if any(line.split()[0] == attachment.namespace for line in namespaces if line.split()):
             self._run(["ip", "netns", "del", attachment.namespace])
-        link = self._run_optional(["ip", "link", "show", "dev", attachment.host_interface])
-        if link is None:
+        if self._exists(["ip", "link", "show", "dev", attachment.host_interface]):
             self._run(["ip", "link", "del", attachment.host_interface])
         if state_path.exists():
             state_path.unlink()
@@ -399,7 +398,7 @@ class WorkerEgressController:
         namespaces = self._run(["ip", "netns", "list"]).stdout.splitlines()
         if any(line.split()[0] == namespace for line in namespaces if line.split()):
             raise EgressBoundaryConflict("worker namespace already exists without matching ownership metadata")
-        if self._run_optional(["ip", "link", "show", "dev", host_interface]) is None:
+        if self._exists(["ip", "link", "show", "dev", host_interface]):
             raise EgressBoundaryConflict("worker host veth already exists without matching ownership metadata")
 
     def _ruleset(self, attachment: WorkerEgressAttachment) -> str:
@@ -436,6 +435,22 @@ class WorkerEgressController:
             reason = result.stderr.strip()[:160] or f"exit={result.returncode}"
             raise EgressBoundaryNotReady(f"required egress command failed: {argv[0]} ({reason})")
         return result
+
+
+    def _exists(self, argv: list[str]) -> bool:
+        try:
+            result = self._runner(argv)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise EgressBoundaryNotReady(f"cannot inspect egress object: {argv[0]}") from exc
+        if result.returncode == 0:
+            return True
+        error = result.stderr.lower()
+        if any(
+            marker in error
+            for marker in ("cannot find device", "does not exist", "no such file", "cannot open network namespace")
+        ):
+            return False
+        raise EgressBoundaryNotReady(f"cannot establish egress object state: {argv[0]}")
 
     def _run_optional(self, argv: list[str]) -> str | None:
         try:
