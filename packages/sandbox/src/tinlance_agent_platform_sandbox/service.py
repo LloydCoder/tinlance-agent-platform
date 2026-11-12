@@ -58,6 +58,7 @@ def execute_request(
         )
     if egress_assertion is not None and not callable(egress_assertion):
         raise TypeError("egress_assertion must be callable")
+    validated_namespace: str | None = None
     if request.network:
         if not isinstance(network_namespace, str):
             raise SandboxUnavailable(
@@ -67,6 +68,7 @@ def execute_request(
             raise SandboxUnavailable(
                 "network-enabled sandbox execution requires an owned worker network namespace"
             )
+        validated_namespace = network_namespace
     elif network_namespace is not None:
         raise SandboxUnavailable(
             "non-network sandbox execution cannot select a worker network namespace"
@@ -84,8 +86,8 @@ def execute_request(
     command = provider.command(
         list(request.command), effective_limits, request.allowed_paths, network=request.network
     )
-    if request.network:
-        command = ["ip", "netns", "exec", network_namespace, *command]
+    if validated_namespace is not None:
+        command = ["ip", "netns", "exec", validated_namespace, *command]
 
     def assert_request_authority() -> bool:
         if lease_assertion(request) is not True:
