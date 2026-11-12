@@ -513,3 +513,86 @@ class WorkerEgressController:
             return None
         reason = result.stderr.strip()[:160] or f"exit={result.returncode}"
         return f"{argv[0]}: {reason}"
+
+
+class WorkerEgressSession:
+    """Bind a sandbox request to one owned namespace for exactly one execution.
+
+    The session derives an opaque worker identity from tenant, run, workspace,
+    and request identifiers. Its assertion is request-object-bound and rechecks
+    the kernel boundary continuously while the command is running.
+    """
+
+    def __init__(
+        self,
+        controller: WorkerEgressController,
+        request: object,
+        *,
+        policy_revision: str,
+        proxy_port: int = 3128,
+    ) -> None:
+        from tinlance_agent_platform_contracts import SandboxRequest
+
+        if not isinstance(request, SandboxRequest) or not request.network:
+            raise ValueError("worker egress sessions require a network-enabled SandboxRequest")
+        identity = json.dumps(
+            {
+                "tenant_id": request.tenant_id,
+                "run_id": str(request.run_id),
+                "workspace_id": request.workspace_id,
+                "request_id": str(request.request_id),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        self._controller = controller
+        self._request = request
+        self._worker_id = "worker-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        self._policy_revision = policy_revision
+        self._proxy_port = proxy_port
+        self._attachment: WorkerEgressAttachment | None = None
+        self._closed = False
+
+    def __enter__(self) -> WorkerEgressSession:
+        if self._attachment is not None or self._closed:
+            raise EgressBoundaryConflict("worker egress session cannot be entered more than once")
+        self._attachment = self._controller.create(
+            self._worker_id,
+            policy_revision=self._policy_revision,
+            proxy_port=self._proxy_port,
+        )
+        return self
+
+    @property
+    def network_namespace(self) -> str:
+        if self._attachment is None or self._closed:
+            raise EgressBoundaryNotReady("worker egress session is not active")
+        return self._attachment.namespace
+
+    @property
+    def attachment(self) -> WorkerEgressAttachment:
+        if self._attachment is None or self._closed:
+            raise EgressBoundaryNotReady("worker egress session is not active")
+        return self._attachment
+
+    def assert_active(self, candidate: object) -> bool:
+        attachment = self._attachment
+        return (
+            not self._closed
+            and attachment is not None
+            and candidate is self._request
+            and self._controller.is_ready(attachment)
+        )
+
+    def __exit__(self, exc_type: object, exc: BaseException | None, traceback: object) -> bool:
+        self._closed = True
+        if self._attachment is not None:
+            try:
+                self._controller.destroy(self._worker_id)
+            except Exception as cleanup_error:
+                if exc is None:
+                    raise
+                if hasattr(exc, "add_note"):
+                    exc.add_note(f"worker egress teardown failed: {cleanup_error}")
+        self._attachment = None
+        return False
