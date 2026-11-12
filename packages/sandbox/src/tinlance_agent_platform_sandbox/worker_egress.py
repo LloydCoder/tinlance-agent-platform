@@ -394,16 +394,6 @@ class WorkerEgressController:
             raise
 
     def _attachment_from_state(self, state: dict[str, object]) -> WorkerEgressAttachment:
-        string_fields = (
-            "worker_id",
-            "policy_revision",
-            "namespace",
-            "host_interface",
-            "worker_interface",
-            "network",
-            "host_address",
-            "worker_address",
-        )
         def string_field(name: str) -> str:
             value = state.get(name)
             if not isinstance(value, str):
@@ -412,10 +402,6 @@ class WorkerEgressController:
                 )
             return value
 
-        if any(not isinstance(state.get(field), str) for field in string_fields):
-            raise EgressBoundaryNotReady(
-                "worker egress ownership metadata has invalid string fields"
-            )
         proxy_port = state.get("proxy_port")
         if not isinstance(proxy_port, int) or isinstance(proxy_port, bool):
             raise EgressBoundaryNotReady(
